@@ -1,1 +1,7 @@
 build/
+*.so
+
+venv/
+__pycache__/
+
+notebooks/

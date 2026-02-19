@@ -40,6 +40,10 @@ pybind11_add_module(_pyck
     cpp/bindings.cpp
 )
 target_link_libraries(_pyck PRIVATE pyck_geometry)
+set_target_properties(_pyck PROPERTIES
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/pyck"
+)
+install(TARGETS _pyck DESTINATION pyck)
 
 # Test executable: BSpline
 add_executable(test_bspline
