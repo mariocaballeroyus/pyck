@@ -3,6 +3,7 @@ project(pyck_tests LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 # Eigen (header-only)
 set(EIGEN_DIR ${CMAKE_SOURCE_DIR}/external/eigen)
@@ -22,11 +23,36 @@ target_include_directories(pyck_basis PUBLIC
 )
 target_link_libraries(pyck_basis PUBLIC eigen)
 
-# Test executable
+# Geometry library
+add_library(pyck_geometry
+    cpp/geometry/surface.cpp
+)
+target_include_directories(pyck_geometry PUBLIC
+    cpp/geometry
+)
+target_link_libraries(pyck_geometry PUBLIC pyck_basis)
+
+# pybind11
+add_subdirectory(external/pybind11)
+
+# Python module
+pybind11_add_module(_pyck
+    cpp/bindings.cpp
+)
+target_link_libraries(_pyck PRIVATE pyck_geometry)
+
+# Test executable: BSpline
 add_executable(test_bspline
     tests/test_bspline.cpp
 )
 target_link_libraries(test_bspline PRIVATE pyck_basis catch)
 
+# Test executable: SurfacePatch
+add_executable(test_surface
+    tests/test_surface.cpp
+)
+target_link_libraries(test_surface PRIVATE pyck_geometry catch)
+
 enable_testing()
 add_test(NAME bspline_tests COMMAND test_bspline)
+add_test(NAME surface_tests COMMAND test_surface)
