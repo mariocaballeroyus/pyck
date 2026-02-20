@@ -410,3 +410,149 @@ TEST_CASE("SurfacePatch: corner interpolation", "[surface]") {
     REQUIRE(X(3, 0) == Approx(5.0).margin(1e-12));
     REQUIRE(X(3, 1) == Approx(3.0).margin(1e-12));
 }
+
+// =======================================================================
+//  jacobian()  tests
+// =======================================================================
+
+/**
+ * Test jacobian for a flat plate: S(u,v)=(Lx*u, Ly*v, 0)
+ * J = [[Lx, 0], [0, Ly], [0, 0]],  det = Lx*Ly
+ */
+TEST_CASE("SurfacePatch: jacobian flat plate", "[surface][jacobian]") {
+    double Lx = 3.0, Ly = 2.0;
+    auto ku = clamped_uniform_knots(2, 4);
+    auto kv = clamped_uniform_knots(2, 3);
+    BSpline bu(2, ku);
+    BSpline bv(2, kv);
+    auto surf = make_flat_plate(bu, bv, Lx, Ly);
+
+    Eigen::VectorXd u = Eigen::VectorXd::LinSpaced(5, 0.0, 1.0);
+    Eigen::VectorXd v = Eigen::VectorXd::LinSpaced(4, 0.0, 1.0);
+    int Q = 5 * 4;
+
+    auto [jacs, dets] = surf.jacobian(u, v);
+
+    REQUIRE(jacs.size() == static_cast<std::size_t>(Q));
+    REQUIRE(dets.size() == Q);
+
+    for (int q = 0; q < Q; ++q) {
+        auto& J = jacs[q];
+        REQUIRE(J.rows() == 3);
+        REQUIRE(J.cols() == 2);
+
+        // col 0 = dS/du = (Lx, 0, 0)
+        REQUIRE(J(0, 0) == Approx(Lx).margin(1e-10));
+        REQUIRE(J(1, 0) == Approx(0.0).margin(1e-10));
+        REQUIRE(J(2, 0) == Approx(0.0).margin(1e-10));
+
+        // col 1 = dS/dv = (0, Ly, 0)
+        REQUIRE(J(0, 1) == Approx(0.0).margin(1e-10));
+        REQUIRE(J(1, 1) == Approx(Ly).margin(1e-10));
+        REQUIRE(J(2, 1) == Approx(0.0).margin(1e-10));
+
+        // det = sqrt(det(J^T J)) = Lx * Ly
+        REQUIRE(dets(q) == Approx(Lx * Ly).margin(1e-10));
+    }
+}
+
+/**
+ * Test jacobian for the parabolic surface S(u,v)=(u, v, u²+v²).
+ * J.col(0) = (1, 0, 2u), J.col(1) = (0, 1, 2v).
+ * det = sqrt(1+4u²+4v²).
+ */
+TEST_CASE("SurfacePatch: jacobian parabolic surface", "[surface][jacobian]") {
+    std::vector<double> knots = {0, 0, 0, 1, 1, 1};
+    BSpline bu(2, knots);
+    BSpline bv(2, knots);
+
+    double x_ctrl[] = {0.0, 0.5, 1.0};
+    double y_ctrl[] = {0.0, 0.5, 1.0};
+    double zu_ctrl[] = {0.0, 0.0, 1.0};
+    double zv_ctrl[] = {0.0, 0.0, 1.0};
+
+    Eigen::MatrixXd P(9, 3);
+    for (int a = 0; a < 3; ++a)
+        for (int b = 0; b < 3; ++b)
+            P.row(a * 3 + b) << x_ctrl[a], y_ctrl[b], zu_ctrl[a] + zv_ctrl[b];
+
+    SurfacePatch surf(3, &bu, &bv, P);
+
+    Eigen::VectorXd u(5), v(4);
+    u << 0.0, 0.25, 0.5, 0.75, 1.0;
+    v << 0.0, 0.3, 0.7, 1.0;
+
+    auto [jacs, dets] = surf.jacobian(u, v);
+
+    for (int p = 0; p < 5; ++p) {
+        for (int q = 0; q < 4; ++q) {
+            int idx = p * 4 + q;
+            double uu = u(p), vv = v(q);
+            auto& J = jacs[idx];
+
+            // J.col(0) = (1, 0, 2u)
+            REQUIRE(J(0, 0) == Approx(1.0).margin(1e-10));
+            REQUIRE(J(1, 0) == Approx(0.0).margin(1e-10));
+            REQUIRE(J(2, 0) == Approx(2.0 * uu).margin(1e-10));
+
+            // J.col(1) = (0, 1, 2v)
+            REQUIRE(J(0, 1) == Approx(0.0).margin(1e-10));
+            REQUIRE(J(1, 1) == Approx(1.0).margin(1e-10));
+            REQUIRE(J(2, 1) == Approx(2.0 * vv).margin(1e-10));
+
+            // det J^T J = (1+4u²)(1+4v²)  (since J^T J is diagonal)
+            // Wait: J^T J = [[1+4u², 4uv], [4uv, 1+4v²]]
+            //   det = (1+4u²)(1+4v²) - 16u²v² = 1 + 4u² + 4v²
+            double expected_det = std::sqrt(1.0 + 4*uu*uu + 4*vv*vv);
+            REQUIRE(dets(idx) == Approx(expected_det).margin(1e-10));
+        }
+    }
+}
+
+/**
+ * Test jacobian on a skewed linear mapping: x=2u+0.3v, y=0.1u+1.5v, z=0.
+ * The Jacobian should be constant and the determinant should match
+ * the analytical value.
+ */
+TEST_CASE("SurfacePatch: jacobian skewed mapping", "[surface][jacobian]") {
+    auto ku = clamped_uniform_knots(2, 4);
+    auto kv = clamped_uniform_knots(2, 3);
+    BSpline bu(2, ku);
+    BSpline bv(2, kv);
+
+    auto xi_u = greville_abscissae(bu);
+    auto xi_v = greville_abscissae(bv);
+    std::size_t n_u = bu.num_basis(), n_v = bv.num_basis();
+    Eigen::MatrixXd P(n_u * n_v, 3);
+    for (std::size_t a = 0; a < n_u; ++a)
+        for (std::size_t b = 0; b < n_v; ++b)
+            P.row(a * n_v + b) << 2.0 * xi_u[a] + 0.3 * xi_v[b],
+                                   0.1 * xi_u[a] + 1.5 * xi_v[b],
+                                   0.0;
+
+    SurfacePatch surf(3, &bu, &bv, P);
+
+    Eigen::VectorXd u(3), v(3);
+    u << 0.2, 0.5, 0.8;
+    v << 0.3, 0.5, 0.7;
+
+    auto [jacs, dets] = surf.jacobian(u, v);
+
+    // Expected J = [[2.0, 0.3], [0.1, 1.5], [0, 0]]
+    // J^T J = [[2²+0.1², 2*0.3+0.1*1.5], [2*0.3+0.1*1.5, 0.3²+1.5²]]
+    //       = [[4.01, 0.75], [0.75, 2.34]]
+    //   det = 4.01*2.34 - 0.75² = 8.8209
+    double expected_det = std::sqrt(4.01 * 2.34 - 0.75 * 0.75);
+
+    for (std::size_t q = 0; q < jacs.size(); ++q) {
+        auto& J = jacs[q];
+        REQUIRE(J(0, 0) == Approx(2.0).margin(1e-10));
+        REQUIRE(J(0, 1) == Approx(0.3).margin(1e-10));
+        REQUIRE(J(1, 0) == Approx(0.1).margin(1e-10));
+        REQUIRE(J(1, 1) == Approx(1.5).margin(1e-10));
+        REQUIRE(J(2, 0) == Approx(0.0).margin(1e-10));
+        REQUIRE(J(2, 1) == Approx(0.0).margin(1e-10));
+
+        REQUIRE(dets(q) == Approx(expected_det).margin(1e-10));
+    }
+}

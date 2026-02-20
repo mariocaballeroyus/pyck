@@ -39,5 +39,7 @@ PYBIND11_MODULE(_pyck, m) {
              py::arg("basis_v"), py::arg("control_points"),
              py::keep_alive<1, 3>(), py::keep_alive<1, 4>())
         .def("eval", &pyck::SurfacePatch::eval,
-             py::arg("u"), py::arg("v"), py::arg("order") = 0);
+             py::arg("u"), py::arg("v"), py::arg("order") = 0)
+        .def("jacobian", &pyck::SurfacePatch::jacobian,
+             py::arg("u"), py::arg("v"));
 }

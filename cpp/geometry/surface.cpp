@@ -65,4 +65,34 @@ std::vector<std::vector<Eigen::MatrixXd>> SurfacePatch::eval(
     return result;
 }
 
+std::pair<std::vector<Eigen::MatrixXd>, Eigen::VectorXd>
+SurfacePatch::jacobian(const Eigen::VectorXd& u,
+                       const Eigen::VectorXd& v) const
+{
+    // Evaluate first-order parametric derivatives
+    auto derivs = eval(u, v, 1);
+    const auto& dSdu = derivs[1][0];  // (Q × gdim)
+    const auto& dSdv = derivs[0][1];  // (Q × gdim)
+
+    const Eigen::Index Q = dSdu.rows();
+    const Eigen::Index d = static_cast<Eigen::Index>(gdim_);
+
+    std::vector<Eigen::MatrixXd> jacobians(Q);
+    Eigen::VectorXd dets(Q);
+
+    for (Eigen::Index q = 0; q < Q; ++q) {
+        // J is (gdim × 2)
+        Eigen::MatrixXd J(d, 2);
+        J.col(0) = dSdu.row(q).transpose();
+        J.col(1) = dSdv.row(q).transpose();
+        jacobians[q] = J;
+
+        // det = sqrt(det(J^T J))
+        Eigen::Matrix2d JtJ = J.transpose() * J;
+        dets(q) = std::sqrt(JtJ.determinant());
+    }
+
+    return {std::move(jacobians), std::move(dets)};
+}
+
 } // namespace pyck

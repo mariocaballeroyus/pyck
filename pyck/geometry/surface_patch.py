@@ -129,6 +129,50 @@ class SurfacePatch(Patch):
 
         return self.cpp_object.eval(u, v, order)
 
+    def jacobian(
+        self,
+        u: npt.NDArray[np.float64],
+        v: npt.NDArray[np.float64],
+    ) -> tuple[list[npt.NDArray[np.float64]], npt.NDArray[np.float64]]:
+        """Compute the Jacobian matrix and determinant at each grid point.
+
+        Returns
+        -------
+        jacobians : list of ndarray, each (gdim, 2)
+            Jacobian matrices. Columns are dS/du and dS/dv.
+        det_jacobians : ndarray of shape (M*N,)
+            sqrt(det(J^T J)) at each point.
+        """
+        u = np.asarray(u, dtype=np.float64)
+        v = np.asarray(v, dtype=np.float64)
+
+        if u.ndim != 1:
+            raise ValueError(f"u must be a 1-D array, got shape {u.shape}")
+        if v.ndim != 1:
+            raise ValueError(f"v must be a 1-D array, got shape {v.shape}")
+        if u.size == 0:
+            raise ValueError("u must not be empty")
+        if v.size == 0:
+            raise ValueError("v must not be empty")
+
+        knots_u = self._basis_u.knots
+        knots_v = self._basis_v.knots
+        lo_u, hi_u = knots_u[0], knots_u[-1]
+        lo_v, hi_v = knots_v[0], knots_v[-1]
+
+        if np.any(u < lo_u) or np.any(u > hi_u):
+            raise ValueError(
+                f"all values in u must be in [{lo_u}, {hi_u}]; "
+                f"got range [{u.min()}, {u.max()}]"
+            )
+        if np.any(v < lo_v) or np.any(v > hi_v):
+            raise ValueError(
+                f"all values in v must be in [{lo_v}, {hi_v}]; "
+                f"got range [{v.min()}, {v.max()}]"
+            )
+
+        return self.cpp_object.jacobian(u, v)
+
     def __repr__(self) -> str:
         n_u = self._basis_u.num_basis
         n_v = self._basis_v.num_basis

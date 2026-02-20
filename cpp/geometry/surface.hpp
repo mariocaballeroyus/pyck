@@ -54,6 +54,19 @@ public:
                                                    const Eigen::VectorXd& v,
                                                    std::size_t order = 0) const;
 
+    /**
+     * @brief Compute the Jacobian matrix and its determinant at a
+     *        tensor-product grid of parameter values.
+     *
+     * @param u  Parameter values in the u direction (size M).
+     * @param v  Parameter values in the v direction (size N).
+     * @return A pair:
+     *         - first:  vector of M*N matrices, each (gdim × 2).
+     *         - second: VectorXd of length M*N with the determinants.
+     */
+    std::pair<std::vector<Eigen::MatrixXd>, Eigen::VectorXd>
+    jacobian(const Eigen::VectorXd& u, const Eigen::VectorXd& v) const;
+
 private:
     /// @brief Basis functions in the u and v parametric directions
     std::array<Basis*, 2> basis_;
