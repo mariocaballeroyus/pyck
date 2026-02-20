@@ -411,10 +411,6 @@ TEST_CASE("SurfacePatch: corner interpolation", "[surface]") {
     REQUIRE(X(3, 1) == Approx(3.0).margin(1e-12));
 }
 
-// =======================================================================
-//  jacobian()  tests
-// =======================================================================
-
 /**
  * Test jacobian for a flat plate: S(u,v)=(Lx*u, Ly*v, 0)
  * J = [[Lx, 0], [0, Ly], [0, 0]],  det = Lx*Ly

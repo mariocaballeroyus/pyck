@@ -65,7 +65,23 @@ public:
      *         - second: VectorXd of length M*N with the determinants.
      */
     std::pair<std::vector<Eigen::MatrixXd>, Eigen::VectorXd>
-    jacobian(const Eigen::VectorXd& u, const Eigen::VectorXd& v) const;
+    jacobian(const Eigen::VectorXd& u, const Eigen::VectorXd& v) const override;
+
+    /**
+     * @brief Build the tensor-product basis matrices and their parametric
+     *        derivatives at a tensor-product grid.
+     *
+     * @param u  Parameter values in the u direction (size M).
+     * @param v  Parameter values in the v direction (size N).
+     * @param order  Maximum total derivative order.
+     * @return A 2-D vector indexed as result[i][j] for
+     *         the (i,j)-derivative of the tensor-product basis.
+     *         Each matrix is (M*N) × (n_u * n_v).
+     */
+    std::vector<std::vector<Eigen::MatrixXd>> tensor_basis(
+        const Eigen::VectorXd& u,
+        const Eigen::VectorXd& v,
+        std::size_t order = 0) const;
 
 private:
     /// @brief Basis functions in the u and v parametric directions

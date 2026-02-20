@@ -1,6 +1,9 @@
 #ifndef PYCK_PATCH_HPP
 #define PYCK_PATCH_HPP
 
+#include <utility>
+#include <vector>
+
 #include "basis.hpp"
 
 namespace pyck
@@ -39,6 +42,13 @@ public:
     /// @brief Get the basis functions for a given parametric direction
     /// @param dir The parametric direction
     virtual const Basis& basis(std::size_t dir) const = 0;
+
+    /// @brief Compute the Jacobian matrices and their determinants at a
+    ///        tensor-product grid of parameter values.
+    /// @return A pair: vector of Jacobian matrices (gdim × tdim) and
+    ///         a VectorXd of sqrt(det(J^T J)) values.
+    virtual std::pair<std::vector<Eigen::MatrixXd>, Eigen::VectorXd>
+    jacobian(const Eigen::VectorXd& u, const Eigen::VectorXd& v) const = 0;
 
 protected:
     /// @brief Geometric dimension of the patch (e.g., 3 for surfaces in 3D)

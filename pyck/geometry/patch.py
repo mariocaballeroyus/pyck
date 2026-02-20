@@ -26,5 +26,5 @@ class Patch(ABC):
     @property
     @abstractmethod
     def control_points(self) -> npt.NDArray[np.float64]:
-        """Control-point matrix, shape ``(n_cp, gdim)``."""
+        """Control-point matrix of shape ``(n_cp, gdim)``."""
         ...

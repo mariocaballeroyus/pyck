@@ -26,7 +26,9 @@ PYBIND11_MODULE(_pyck, m) {
         .def("control_points",
              static_cast<const Eigen::MatrixXd& (pyck::Patch::*)() const>(
                  &pyck::Patch::control_points),
-             py::return_value_policy::reference_internal);
+             py::return_value_policy::reference_internal)
+        .def("jacobian", &pyck::Patch::jacobian,
+             py::arg("u"), py::arg("v"));
 
     py::class_<pyck::SurfacePatch, pyck::Patch>(m, "SurfacePatch")
         .def(py::init([](std::size_t gdim,
@@ -41,5 +43,7 @@ PYBIND11_MODULE(_pyck, m) {
         .def("eval", &pyck::SurfacePatch::eval,
              py::arg("u"), py::arg("v"), py::arg("order") = 0)
         .def("jacobian", &pyck::SurfacePatch::jacobian,
-             py::arg("u"), py::arg("v"));
+             py::arg("u"), py::arg("v"))
+        .def("tensor_basis", &pyck::SurfacePatch::tensor_basis,
+             py::arg("u"), py::arg("v"), py::arg("order") = 0);
 }

@@ -31,16 +31,12 @@ class Basis(ABC):
     ) -> list[npt.NDArray[np.float64]]:
         """Evaluate basis functions and derivatives up to *order*.
 
-        Parameters
-        ----------
-        u : (M,) array
-            Parameter values.
-        order : int
-            Maximum derivative order (0 = values only).
+        Args:
+            u: Parameter values, shape ``(M,)``.
+            order: Maximum derivative order (0 = values only).
 
-        Returns
-        -------
-        list of (M, num_basis) arrays
-            ``result[k]`` is the *k*-th derivative for *k = 0 … order*.
+        Returns:
+            A list of ``(M, num_basis)`` arrays where ``result[k]`` is
+            the *k*-th derivative for *k = 0 … order*.
         """
         ...
