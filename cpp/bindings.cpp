@@ -16,8 +16,26 @@ PYBIND11_MODULE(_pyck, m) {
         .def("eval", &pyck::Basis::eval_derivs,
              py::arg("u"), py::arg("order") = 0);
 
+    py::class_<pyck::KnotVector>(m, "KnotVector")
+        .def(py::init<std::vector<double>>(),
+             py::arg("knots"))
+        .def_static("clamped_uniform", &pyck::KnotVector::clamped_uniform,
+             py::arg("degree"), py::arg("num_basis"))
+        .def("size", &pyck::KnotVector::size)
+        .def("num_basis", &pyck::KnotVector::num_basis,
+             py::arg("degree"))
+        .def("find_span", &pyck::KnotVector::find_span,
+             py::arg("degree"), py::arg("u"))
+        .def("data", &pyck::KnotVector::data)
+        .def("__getitem__", [](const pyck::KnotVector& kv, std::size_t i) {
+             return kv[i];
+         })
+        .def("__len__", &pyck::KnotVector::size);
+
     py::class_<pyck::BSpline, pyck::Basis, std::shared_ptr<pyck::BSpline>>(m, "BSpline")
-        .def(py::init<std::size_t, const std::vector<double>&>(),
+        .def(py::init([](std::size_t degree, const std::vector<double>& knots) {
+                 return std::make_shared<pyck::BSpline>(degree, pyck::KnotVector(knots));
+             }),
              py::arg("degree"), py::arg("knots"))
         .def("knots", &pyck::BSpline::knots);
 

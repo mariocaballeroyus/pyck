@@ -16,6 +16,7 @@ target_include_directories(catch INTERFACE ${CMAKE_SOURCE_DIR}/external/catch)
 
 # BSpline library
 add_library(pyck_basis
+    cpp/basis/knots.cpp
     cpp/basis/bspline.cpp
     cpp/basis/tensor.cpp
 )

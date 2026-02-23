@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "basis.hpp"
+#include "knots.hpp"
 
 namespace pyck
 {
@@ -21,8 +22,8 @@ public:
      * @param degree Degree of the B-spline basis functions
      * @param knots Knot vector defining the B-spline basis functions
      */
-    BSpline(std::size_t degree, const std::vector<double>& knots)
-        : Basis(degree), knots_(knots) {}
+    BSpline(std::size_t degree, KnotVector knots)
+        : Basis(degree), knots_(std::move(knots)) {}
 
     /**
      * @brief Evaluate B-spline basis functions at given parameter values
@@ -55,23 +56,18 @@ public:
     std::vector<Eigen::MatrixXd> eval_derivs(const Eigen::VectorXd& params, 
                                       std::size_t order = 0) const override;
 
-    std::size_t num_basis() const override { return knots_.size() - degree_ - 1; }
+    std::size_t num_basis() const override { return knots_.num_basis(degree_); }
 
-    /// @brief Get the knot vector
-    const std::vector<double>& knots() const { return knots_; }
+    /// @brief Get the knot vector object
+    const KnotVector& knot_vector() const { return knots_; }
+
+    /// @brief Get the raw knot values (backward-compatible)
+    const std::vector<double>& knots() const { return knots_.data(); }
 
 private:
     /// @brief Knot vector defining the B-spline basis functions
-    std::vector<double> knots_;
+    KnotVector knots_;
 
-    /**
-     * @brief Find the knot span index for a given parameter value
-     * 
-     * @param u Parameter value for which to find the span
-     * @return Index of the knot span containing u
-     */
-    std::size_t find_span(double u) const;
-    
     /**
      * @brief Compute the table of basis function values for given parameter values
      * 

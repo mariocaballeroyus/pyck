@@ -3,25 +3,11 @@
 namespace pyck
 {
 
-std::size_t BSpline::find_span(double u) const
-{
-    std::size_t num_knots = knots_.size();
-
-    // Basis indexing 0 .. n
-    int n = num_knots - degree_ - 2;
-    // Edge cases
-    if (u >= knots_[n + 1]) return n;
-    if (u <= knots_[degree_]) return degree_;
-    // Binary search for the span
-    auto it = std::upper_bound(knots_.begin() + degree_, knots_.begin() + n + 1, u);
-    return std::distance(knots_.begin(), it) - 1;
-}
-
 std::vector<Eigen::MatrixXd> BSpline::compute_basis_table(const Eigen::VectorXd& params) const
 {
     std::size_t num_points = params.size();
     std::size_t num_knots = knots_.size();
-    std::size_t num_basis = num_knots - degree_ - 1; 
+    std::size_t num_basis = knots_.num_basis(degree_); 
 
     // --- Preallocate basis functions table ----------------------------------------
 
@@ -37,7 +23,7 @@ std::vector<Eigen::MatrixXd> BSpline::compute_basis_table(const Eigen::VectorXd&
 
     for (std::size_t i = 0; i < num_points; ++i) {
         double u = params(i);
-        int span = find_span(u);
+        int span = knots_.find_span(degree_, u);
 
         // 0-th degree basis definition
         table[0](i, span) = 1.0;
@@ -82,8 +68,7 @@ std::vector<Eigen::MatrixXd> BSpline::eval_derivs(const Eigen::VectorXd& params,
                                                   std::size_t order) const
 {
     std::size_t num_points = params.size();
-    std::size_t num_knots = knots_.size();
-    std::size_t num_basis = num_knots - degree_ - 1;
+    std::size_t num_basis = knots_.num_basis(degree_);
 
     std::vector<Eigen::MatrixXd> results(order + 1);
     std::vector<Eigen::MatrixXd> table = compute_basis_table(params);
