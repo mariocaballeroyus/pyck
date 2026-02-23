@@ -11,12 +11,15 @@ namespace pyck
 {
 
 /**
- * Abstract base class for parametric surface patches defined by tensor the 
+ * Abstract base class for parametric patches defined by the 
  * tensor product of one-dimensional basis functions.
  */
 class Patch
 {
 public:
+
+    // --- Constructors --------------------------------------------------------------
+
     /// @brief Virtual destructor
     virtual ~Patch() = default;
 
@@ -24,6 +27,8 @@ public:
           std::size_t tdim, 
           const Eigen::MatrixXd& control_points)
         : gdim_(gdim), tdim_(tdim), control_points_(control_points) {}
+
+    // --- Properties ----------------------------------------------------------------
 
     /// @brief Get the geometric dimension of the patch
     std::size_t gdim() const { return gdim_; }
@@ -44,12 +49,19 @@ public:
     /// @param dir The parametric direction
     virtual const Basis& basis(std::size_t dir) const = 0;
 
-    /// @brief Compute the Jacobian matrices and their determinants at a
-    ///        tensor-product grid of parameter values.
-    /// @return A pair: vector of Jacobian matrices (gdim × tdim) and
-    ///         a VectorXd of sqrt(det(J^T J)) values.
-    virtual std::pair<std::vector<Eigen::MatrixXd>, Eigen::VectorXd>
-    jacobian(const Eigen::VectorXd& u, const Eigen::VectorXd& v) const = 0;
+    // --- Evaluation ----------------------------------------------------------------
+
+    /// @brief Compute the Jacobian matrices at the given evaluation points.
+    /// @param params  Evaluation points as a (Q × tdim) matrix.
+    /// @return A vector of Q matrices, each of shape (gdim × tdim).
+    virtual std::vector<Eigen::MatrixXd>
+    jacobian(const Eigen::MatrixXd& params) const = 0;
+
+    /// @brief Compute the Jacobian determinant √det(J^T J) at the given points.
+    /// @param params  Evaluation points as a (Q × tdim) matrix.
+    /// @return A VectorXd of length Q.
+    virtual Eigen::VectorXd
+    jacobian_det(const Eigen::MatrixXd& params) const = 0;
 
 protected:
     /// @brief Geometric dimension of the patch (e.g., 3 for surfaces in 3D)

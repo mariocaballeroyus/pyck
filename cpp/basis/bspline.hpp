@@ -16,6 +16,9 @@ namespace pyck
 class BSpline : public Basis
 {
 public:
+
+    // --- Constructors ------------------------------------------------------------
+
     /**
      * @brief Construct a B-spline basis with the given degree and knot vector
      * 
@@ -24,6 +27,8 @@ public:
      */
     BSpline(std::size_t degree, KnotVector knots)
         : Basis(degree), knots_(std::move(knots)) {}
+
+    // --- Evaluation ------------------------------------------------------------
 
     /**
      * @brief Evaluate B-spline basis functions at given parameter values
@@ -51,10 +56,11 @@ public:
      *                         d^k(N_0)/du^k(u_1) d^k(N_1)/du^k(u_1) ... d^k(N_n)/du^k(u_1)
      *                         ...                ...                ... ...
      *                         d^k(N_0)/du^k(u_m) d^k(N_1)/du^k(u_m) ... d^k(N_n)/du^k(u_m) }
-     * 
      */
     std::vector<Eigen::MatrixXd> eval_derivs(const Eigen::VectorXd& params, 
                                       std::size_t order = 0) const override;
+
+    // --- Properties ------------------------------------------------------------
 
     std::size_t num_basis() const override { return knots_.num_basis(degree_); }
 
@@ -67,6 +73,8 @@ public:
 private:
     /// @brief Knot vector defining the B-spline basis functions
     KnotVector knots_;
+
+    // --- Internal Methods ------------------------------------------------------
 
     /**
      * @brief Compute the table of basis function values for given parameter values

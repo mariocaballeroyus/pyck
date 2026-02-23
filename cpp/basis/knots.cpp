@@ -7,8 +7,7 @@ namespace pyck
 
 KnotVector KnotVector::clamped_uniform(std::size_t degree, std::size_t num_basis)
 {
-    // Math check: m = n + p + 1
-    // Number of knots = num_basis + degree + 1
+    // Check: num_knots = num_basis + degree + 1
     if (num_basis < degree + 1) {
         throw std::invalid_argument(
             "Number of basis functions must be at least degree + 1."
@@ -19,8 +18,7 @@ KnotVector KnotVector::clamped_uniform(std::size_t degree, std::size_t num_basis
     std::vector<double> knots(num_knots);
 
     // Number of unique "spans" in the internal part of the vector
-    // For a clamped vector, there are (num_basis - degree) internal segments
-    std::size_t num_internal_spans = num_basis - degree;
+    std::size_t num_spans = num_basis - degree;
 
     for (std::size_t i = 0; i < num_knots; ++i) {
         if (i <= degree) {
@@ -33,25 +31,24 @@ KnotVector KnotVector::clamped_uniform(std::size_t degree, std::size_t num_basis
         } 
         else {
             // Uniformly spaced internal knots
-            // Example: p=2, n=4 -> knots = [0, 0, 0, 0.33, 0.66, 1, 1, 1]
-            knots[i] = static_cast<double>(i - degree) / num_internal_spans;
+            knots[i] = static_cast<double>(i - degree) / num_spans;
         }
     }
 
     return KnotVector(std::move(knots));
 }
 
-std::size_t KnotVector::find_span(std::size_t degree, double u) const
+std::size_t KnotVector::find_span(std::size_t degree, double param) const
 {
     std::size_t num_knots = knots_.size();
 
     // Basis indexing 0 .. n
     int n = num_knots - degree - 2;
     // Edge cases
-    if (u >= knots_[n + 1]) return n;
-    if (u <= knots_[degree]) return degree;
+    if (param >= knots_[n + 1]) return n;
+    if (param <= knots_[degree]) return degree;
     // Binary search for the span
-    auto it = std::upper_bound(knots_.begin() + degree, knots_.begin() + n + 1, u);
+    auto it = std::upper_bound(knots_.begin() + degree, knots_.begin() + n + 1, param);
     return std::distance(knots_.begin(), it) - 1;
 }
 

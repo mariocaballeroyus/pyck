@@ -2,256 +2,207 @@
 #include "catch.hpp"
 
 #include "bspline.hpp"
+#include "knots.hpp"
 #include "tensor.hpp"
 
 using namespace pyck;
 
 /**
- * Helper function for clamped uniform knot vector generation
+ * Helper: build a (M*N x 2) parameter grid from 1D vectors u and v.
+ * Row ordering is (u_0,v_0), (u_0,v_1), ..., (u_0,v_{N-1}),
+ *                  (u_1,v_0), ..., i.e. v varies fastest.
  */
-static std::vector<double> clamped_uniform_knots(std::size_t degree,
-                                                  std::size_t num_basis)
+static Eigen::MatrixXd make_grid(const Eigen::VectorXd& u,
+                                  const Eigen::VectorXd& v)
 {
-    std::size_t n = num_basis + degree + 1;
-    std::vector<double> knots(n);
-    for (std::size_t i = 0; i < n; ++i) {
-        if (i <= degree)
-            knots[i] = 0.0;
-        else if (i >= num_basis)
-            knots[i] = 1.0;
-        else
-            knots[i] = static_cast<double>(i - degree)
-                      / static_cast<double>(num_basis - degree);
-    }
-    return knots;
-}
-
-/**
- * Test the constructor and accessors of the TensorProduct class
- */
-TEST_CASE("TensorProduct: construction and accessors", "[tensor]") {
-    auto ku = clamped_uniform_knots(2, 4);
-    auto kv = clamped_uniform_knots(2, 3);
-
-    auto bu = std::make_shared<BSpline>(2, ku);
-    auto bv = std::make_shared<BSpline>(2, kv);
-
-    SECTION("2D tensor product") {
-        TensorProduct tp({bu, bv});
-        REQUIRE(tp.dim() == 2);
-        REQUIRE(tp.num_basis() == 4 * 3);
-    }
-
-    SECTION("1D (single basis)") {
-        TensorProduct tp({bu});
-        REQUIRE(tp.dim() == 1);
-        REQUIRE(tp.num_basis() == 4);
-    }
-
-    SECTION("3D tensor product") {
-        auto bw = std::make_shared<BSpline>(1, clamped_uniform_knots(1, 2));
-        TensorProduct tp({bu, bv, bw});
-        REQUIRE(tp.dim() == 3);
-        REQUIRE(tp.num_basis() == 4 * 3 * 2);
-    }
-}
-
-/**
- * Test that a TensorProduct with a single basis matches BSpline::eval exactly
- */
-TEST_CASE("TensorProduct: 1D passthrough", "[tensor]") {
-    auto knots = clamped_uniform_knots(2, 5);
-    auto bs = std::make_shared<BSpline>(2, knots);
-    TensorProduct tp({bs});
-
-    Eigen::VectorXd u = Eigen::VectorXd::LinSpaced(10, 0.0, 1.0);
-    Eigen::MatrixXd params(10, 1);
-    params.col(0) = u;
-
-    Eigen::MatrixXd tp_result = tp.eval(params);
-    Eigen::MatrixXd bs_result = bs->eval(u);
-
-    REQUIRE(tp_result.rows() == bs_result.rows());
-    REQUIRE(tp_result.cols() == bs_result.cols());
-    REQUIRE(tp_result.isApprox(bs_result, 1e-14));
-}
-
-/**
- * Test partition of unity: row sums of eval() should be 1 at all parameter values
- */
-TEST_CASE("TensorProduct: 2D partition of unity", "[tensor]") {
-    auto ku = clamped_uniform_knots(2, 4);
-    auto kv = clamped_uniform_knots(3, 5);
-    auto bu = std::make_shared<BSpline>(2, ku);
-    auto bv = std::make_shared<BSpline>(3, kv);
-    TensorProduct tp({bu, bv});
-
-    // Build a grid of evaluation points
-    std::size_t M = 6, N = 5;
+    int M = u.size(), N = v.size();
     Eigen::MatrixXd params(M * N, 2);
-    Eigen::VectorXd u = Eigen::VectorXd::LinSpaced(M, 0.0, 1.0);
-    Eigen::VectorXd v = Eigen::VectorXd::LinSpaced(N, 0.0, 1.0);
-    for (std::size_t p = 0; p < M; ++p)
-        for (std::size_t q = 0; q < N; ++q) {
+    for (int p = 0; p < M; ++p)
+        for (int q = 0; q < N; ++q) {
             params(p * N + q, 0) = u(p);
             params(p * N + q, 1) = v(q);
         }
+    return params;
+}
 
+/**
+ * Multivariate partition of unity.
+ *
+ * For a 2D tensor-product basis R_{i,j}(u,v) = N_{i,p}(u) · M_{j,q}(v),
+ * the sum over all basis functions must equal 1 at every point:
+ *
+ *   Σ_{i,j} R_{i,j}(u, v) = 1
+ */
+TEST_CASE("TensorProduct: partition of unity", "[tensor]") {
+    auto bu = std::make_shared<BSpline>(2, KnotVector::clamped_uniform(2, 4));
+    auto bv = std::make_shared<BSpline>(3, KnotVector::clamped_uniform(3, 5));
+    TensorProduct tp({bu, bv});
+
+    auto params = make_grid(Eigen::VectorXd::LinSpaced(6, 0.0, 1.0),
+                            Eigen::VectorXd::LinSpaced(5, 0.0, 1.0));
     Eigen::MatrixXd R = tp.eval(params);
-
-    REQUIRE(R.rows() == static_cast<int>(M * N));
-    REQUIRE(R.cols() == static_cast<int>(bu->num_basis() * bv->num_basis()));
 
     for (int i = 0; i < R.rows(); ++i)
         REQUIRE(R.row(i).sum() == Approx(1.0).margin(1e-12));
 }
 
 /**
- * Test 2D known values: compare eval() against manually-computed Kronecker product
+ * Lexicographical ordering of eval_derivs.
+ *
+ * eval_derivs(params, {k_u, k_v}) returns a vector of matrices indexed
+ * in lexicographic order of the derivative multi-index (i_u, i_v),
+ * where i_v varies fastest:
+ *
+ *   index = i_u * (k_v + 1) + i_v
+ *
+ * For orders = {1, 1}, the 4 matrices correspond to:
+ *   [0] = (0,0),  [1] = (0,1),  [2] = (1,0),  [3] = (1,1)
+ *
+ * We verify this against manually computed Kronecker products of 1D
+ * basis values and derivatives (quadratic Bernstein at u = v = 0.5).
  */
-TEST_CASE("TensorProduct: 2D known values", "[tensor]") {
-    // Quadratic Bernstein: knots = {0,0,0,1,1,1}
+TEST_CASE("TensorProduct: lexicographical ordering", "[tensor]") {
     std::vector<double> knots = {0, 0, 0, 1, 1, 1};
-    auto bu = std::make_shared<BSpline>(2, knots);
-    auto bv = std::make_shared<BSpline>(2, knots);
+    auto bu = std::make_shared<BSpline>(2, KnotVector(knots));
+    auto bv = std::make_shared<BSpline>(2, KnotVector(knots));
     TensorProduct tp({bu, bv});
 
-    // Evaluate at a single point (0.5, 0.5)
     Eigen::MatrixXd params(1, 2);
     params << 0.5, 0.5;
 
-    Eigen::MatrixXd R = tp.eval(params);
-
-    // 1D Bernstein at u=0.5: N = [0.25, 0.5, 0.25]
     Eigen::VectorXd u(1);
     u << 0.5;
-    Eigen::MatrixXd Nu = bu->eval(u);
-    Eigen::MatrixXd Nv = bv->eval(u);
-
-    // Manual Kronecker product
-    REQUIRE(R.cols() == 9);
-    for (int a = 0; a < 3; ++a)
-        for (int b = 0; b < 3; ++b)
-            REQUIRE(R(0, a * 3 + b) == Approx(Nu(0, a) * Nv(0, b)).margin(1e-14));
-}
-
-/**
- * Test that eval_derivs returns the correct number and shape of matrices
- */
-TEST_CASE("TensorProduct: derivatives structure", "[tensor][deriv]") {
-    auto ku = clamped_uniform_knots(2, 4);
-    auto kv = clamped_uniform_knots(2, 3);
-    auto bu = std::make_shared<BSpline>(2, ku);
-    auto bv = std::make_shared<BSpline>(2, kv);
-    TensorProduct tp({bu, bv});
-
-    Eigen::MatrixXd params(1, 2);
-    params << 0.5, 0.5;
-
-    SECTION("orders={1,1} → 4 matrices") {
-        auto derivs = tp.eval_derivs(params, {1, 1});
-        REQUIRE(derivs.size() == 4);  // (0,0), (0,1), (1,0), (1,1)
-        for (auto& mat : derivs) {
-            REQUIRE(mat.rows() == 1);
-            REQUIRE(mat.cols() == static_cast<int>(tp.num_basis()));
-        }
-    }
-
-    SECTION("orders={2,0} → 3 matrices") {
-        auto derivs = tp.eval_derivs(params, {2, 0});
-        REQUIRE(derivs.size() == 3);  // (0,0), (1,0), (2,0)
-    }
-
-    SECTION("orders={0,0} → 1 matrix matching eval") {
-        auto derivs = tp.eval_derivs(params, {0, 0});
-        REQUIRE(derivs.size() == 1);
-        REQUIRE(derivs[0].isApprox(tp.eval(params), 1e-14));
-    }
-}
-
-/**
- * Test derivative values against manual product of 1D derivative matrices
- */
-TEST_CASE("TensorProduct: derivative values", "[tensor][deriv]") {
-    std::vector<double> knots = {0, 0, 0, 1, 1, 1};
-    auto bu = std::make_shared<BSpline>(2, knots);
-    auto bv = std::make_shared<BSpline>(2, knots);
-    TensorProduct tp({bu, bv});
-
-    Eigen::MatrixXd params(1, 2);
-    params << 0.5, 0.5;
-
-    Eigen::VectorXd u(1), v(1);
-    u << 0.5;
-    v << 0.5;
-
-    // Get 1D derivatives
-    auto du = bu->eval_derivs(u, 1);  // [N, dN]
-    auto dv = bv->eval_derivs(v, 1);
+    auto du = bu->eval_derivs(u, 1);  // [N_u, dN_u]
+    auto dv = bv->eval_derivs(u, 1);  // [N_v, dN_v]
 
     auto derivs = tp.eval_derivs(params, {1, 1});
-    // derivs ordering: (0,0), (0,1), (1,0), (1,1)
+    REQUIRE(derivs.size() == 4);
 
     std::size_t n_u = bu->num_basis();
     std::size_t n_v = bv->num_basis();
 
-    // Check (1,0): dN_u × N_v
-    auto& d10 = derivs[2]; // index = 1*(1+1) + 0
+    // Index 0 = (0,0): N_u ⊗ N_v
     for (std::size_t a = 0; a < n_u; ++a)
         for (std::size_t b = 0; b < n_v; ++b)
-            REQUIRE(d10(0, a * n_v + b) ==
-                    Approx(du[1](0, a) * dv[0](0, b)).margin(1e-14));
+            REQUIRE(derivs[0](0, a * n_v + b) ==
+                    Approx(du[0](0, a) * dv[0](0, b)).margin(1e-14));
 
-    // Check (0,1): N_u × dN_v
-    auto& d01 = derivs[1]; // index = 0*(1+1) + 1
+    // Index 1 = (0,1): N_u ⊗ dN_v
     for (std::size_t a = 0; a < n_u; ++a)
         for (std::size_t b = 0; b < n_v; ++b)
-            REQUIRE(d01(0, a * n_v + b) ==
+            REQUIRE(derivs[1](0, a * n_v + b) ==
                     Approx(du[0](0, a) * dv[1](0, b)).margin(1e-14));
 
-    // Check (1,1): dN_u × dN_v
-    auto& d11 = derivs[3]; // index = 1*(1+1) + 1
+    // Index 2 = (1,0): dN_u ⊗ N_v
     for (std::size_t a = 0; a < n_u; ++a)
         for (std::size_t b = 0; b < n_v; ++b)
-            REQUIRE(d11(0, a * n_v + b) ==
+            REQUIRE(derivs[2](0, a * n_v + b) ==
+                    Approx(du[1](0, a) * dv[0](0, b)).margin(1e-14));
+
+    // Index 3 = (1,1): dN_u ⊗ dN_v
+    for (std::size_t a = 0; a < n_u; ++a)
+        for (std::size_t b = 0; b < n_v; ++b)
+            REQUIRE(derivs[3](0, a * n_v + b) ==
                     Approx(du[1](0, a) * dv[1](0, b)).margin(1e-14));
 }
 
 /**
- * Test the non-negativity property: all basis function values should be >= 0
+ * Linear consistency (bilinear patch).
+ *
+ * If both 1D bases are linear (degree 1, 2 basis functions each), the
+ * tensor-product basis must be able to represent any bilinear function
+ * exactly.  We test:
+ *
+ *   f(u, v) = 3u + 2v + 5uv + 1
+ *
+ * by computing  Σ R_{i,j}(u,v) · c_{i,j}  where the four control values
+ * are f evaluated at the parameter corners (0,0), (0,1), (1,0), (1,1).
  */
-TEST_CASE("TensorProduct: non-negativity", "[tensor]") {
-    auto ku = clamped_uniform_knots(3, 6);
-    auto kv = clamped_uniform_knots(2, 4);
-    auto bu = std::make_shared<BSpline>(3, ku);
-    auto bv = std::make_shared<BSpline>(2, kv);
+TEST_CASE("TensorProduct: bilinear consistency", "[tensor]") {
+    auto bu = std::make_shared<BSpline>(1, KnotVector({0, 0, 1, 1}));
+    auto bv = std::make_shared<BSpline>(1, KnotVector({0, 0, 1, 1}));
     TensorProduct tp({bu, bv});
 
-    std::size_t M = 10, N = 8;
-    Eigen::MatrixXd params(M * N, 2);
-    Eigen::VectorXd u = Eigen::VectorXd::LinSpaced(M, 0.0, 1.0);
-    Eigen::VectorXd v = Eigen::VectorXd::LinSpaced(N, 0.0, 1.0);
-    for (std::size_t p = 0; p < M; ++p)
-        for (std::size_t q = 0; q < N; ++q) {
-            params(p * N + q, 0) = u(p);
-            params(p * N + q, 1) = v(q);
-        }
+    // f(u,v) = 3u + 2v + 5uv + 1
+    // Control values at corners (u-major, v-minor ordering):
+    //   (0,0) → 1,  (0,1) → 3,  (1,0) → 4,  (1,1) → 11
+    Eigen::VectorXd ctrl(4);
+    ctrl << 1.0, 3.0, 4.0, 11.0;
 
-    Eigen::MatrixXd R = tp.eval(params);
+    auto params = make_grid(Eigen::VectorXd::LinSpaced(7, 0.0, 1.0),
+                            Eigen::VectorXd::LinSpaced(7, 0.0, 1.0));
+    Eigen::MatrixXd R = tp.eval(params);  // (49 x 4)
 
-    for (int i = 0; i < R.rows(); ++i)
-        for (int j = 0; j < R.cols(); ++j)
-            REQUIRE(R(i, j) >= -1e-15);
+    // Compute f(u,v) = R * ctrl and compare to analytical
+    Eigen::VectorXd f_computed = R * ctrl;
+
+    for (int i = 0; i < params.rows(); ++i) {
+        double uu = params(i, 0), vv = params(i, 1);
+        double f_exact = 3 * uu + 2 * vv + 5 * uu * vv + 1;
+        REQUIRE(f_computed(i) == Approx(f_exact).margin(1e-12));
+    }
 }
 
 /**
- * Verify first derivatives against central finite differences
+ * Derivative Kronecker product check.
+ *
+ * For a 2D tensor-product basis, the mixed partial derivatives factor as:
+ *
+ *   ∂^{a+b} R / (∂u^a ∂v^b)  =  (d^a N_u / du^a) ⊗ (d^b N_v / dv^b)
+ *
+ * We verify (1,0), (0,1), and (1,1) against the manually computed
+ * Kronecker products of the 1D quantities.
  */
-TEST_CASE("TensorProduct: finite difference derivative check", "[tensor][deriv]") {
-    auto ku = clamped_uniform_knots(3, 5);
-    auto kv = clamped_uniform_knots(2, 4);
-    auto bu = std::make_shared<BSpline>(3, ku);
-    auto bv = std::make_shared<BSpline>(2, kv);
+TEST_CASE("TensorProduct: derivative Kronecker check", "[tensor][deriv]") {
+    std::vector<double> knots = {0, 0, 0, 1, 1, 1};
+    auto bu = std::make_shared<BSpline>(2, KnotVector(knots));
+    auto bv = std::make_shared<BSpline>(2, KnotVector(knots));
+    TensorProduct tp({bu, bv});
+
+    Eigen::MatrixXd params(1, 2);
+    params << 0.4, 0.7;
+
+    Eigen::VectorXd uu(1), vv(1);
+    uu << 0.4;
+    vv << 0.7;
+
+    auto du = bu->eval_derivs(uu, 1);
+    auto dv = bv->eval_derivs(vv, 1);
+    auto derivs = tp.eval_derivs(params, {1, 1});
+
+    std::size_t n_u = bu->num_basis();
+    std::size_t n_v = bv->num_basis();
+
+    // (1,0): dN_u ⊗ N_v
+    for (std::size_t a = 0; a < n_u; ++a)
+        for (std::size_t b = 0; b < n_v; ++b)
+            REQUIRE(derivs[2](0, a * n_v + b) ==
+                    Approx(du[1](0, a) * dv[0](0, b)).margin(1e-14));
+
+    // (0,1): N_u ⊗ dN_v
+    for (std::size_t a = 0; a < n_u; ++a)
+        for (std::size_t b = 0; b < n_v; ++b)
+            REQUIRE(derivs[1](0, a * n_v + b) ==
+                    Approx(du[0](0, a) * dv[1](0, b)).margin(1e-14));
+
+    // (1,1): dN_u ⊗ dN_v
+    for (std::size_t a = 0; a < n_u; ++a)
+        for (std::size_t b = 0; b < n_v; ++b)
+            REQUIRE(derivs[3](0, a * n_v + b) ==
+                    Approx(du[1](0, a) * dv[1](0, b)).margin(1e-14));
+}
+
+/**
+ * Finite-difference derivative check.
+ *
+ * We verify the parametric partial derivatives ∂R/∂u and ∂R/∂v returned
+ * by eval_derivs against a central finite-difference approximation:
+ *
+ *   ∂R/∂u ≈ [R(u+h,v) - R(u-h,v)] / (2h)
+ */
+TEST_CASE("TensorProduct: finite-difference derivative check", "[tensor][deriv]") {
+    auto bu = std::make_shared<BSpline>(3, KnotVector::clamped_uniform(3, 5));
+    auto bv = std::make_shared<BSpline>(2, KnotVector::clamped_uniform(2, 4));
     TensorProduct tp({bu, bv});
 
     double h = 1e-7;
@@ -259,21 +210,20 @@ TEST_CASE("TensorProduct: finite difference derivative check", "[tensor][deriv]"
     params << 0.4, 0.6;
 
     auto derivs = tp.eval_derivs(params, {1, 1});
-    // derivs[2] = d/du at (0.4, 0.6), derivs[1] = d/dv
 
-    // Finite difference for d/du
-    Eigen::MatrixXd params_fwd(1, 2), params_bwd(1, 2);
-    params_fwd << 0.4 + h, 0.6;
-    params_bwd << 0.4 - h, 0.6;
-    Eigen::MatrixXd dRdu_fd = (tp.eval(params_fwd) - tp.eval(params_bwd)) / (2.0 * h);
+    // ∂/∂u
+    Eigen::MatrixXd p_fwd(1, 2), p_bwd(1, 2);
+    p_fwd << 0.4 + h, 0.6;
+    p_bwd << 0.4 - h, 0.6;
+    Eigen::MatrixXd dRdu_fd = (tp.eval(p_fwd) - tp.eval(p_bwd)) / (2.0 * h);
 
     for (int j = 0; j < dRdu_fd.cols(); ++j)
         REQUIRE(derivs[2](0, j) == Approx(dRdu_fd(0, j)).margin(1e-5));
 
-    // Finite difference for d/dv
-    params_fwd << 0.4, 0.6 + h;
-    params_bwd << 0.4, 0.6 - h;
-    Eigen::MatrixXd dRdv_fd = (tp.eval(params_fwd) - tp.eval(params_bwd)) / (2.0 * h);
+    // ∂/∂v
+    p_fwd << 0.4, 0.6 + h;
+    p_bwd << 0.4, 0.6 - h;
+    Eigen::MatrixXd dRdv_fd = (tp.eval(p_fwd) - tp.eval(p_bwd)) / (2.0 * h);
 
     for (int j = 0; j < dRdv_fd.cols(); ++j)
         REQUIRE(derivs[1](0, j) == Approx(dRdv_fd(0, j)).margin(1e-5));

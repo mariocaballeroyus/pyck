@@ -47,6 +47,12 @@ set_target_properties(_pyck PROPERTIES
 )
 install(TARGETS _pyck DESTINATION pyck)
 
+# Test executable: KnotVector
+add_executable(test_knot_vector
+    tests/test_knot_vector.cpp
+)
+target_link_libraries(test_knot_vector PRIVATE pyck_basis catch)
+
 # Test executable: BSpline
 add_executable(test_bspline
     tests/test_bspline.cpp
@@ -66,6 +72,8 @@ add_executable(test_surface
 target_link_libraries(test_surface PRIVATE pyck_geometry catch)
 
 enable_testing()
+add_test(NAME knot_vector_tests COMMAND test_knot_vector)
 add_test(NAME bspline_tests COMMAND test_bspline)
 add_test(NAME tensor_product_tests COMMAND test_tensor_product)
 add_test(NAME surface_tests COMMAND test_surface)
+

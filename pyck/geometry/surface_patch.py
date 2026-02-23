@@ -19,16 +19,14 @@ class SurfacePatch(Patch):
     def __init__(
         self,
         gdim: int,
-        basis_u: BSpline,
-        basis_v: BSpline,
+        bases: tuple[BSpline, BSpline] | list[BSpline],
         control_points: npt.NDArray[np.float64],
     ) -> None:
         """Create a tensor-product surface patch.
 
         Args:
             gdim: Geometric (embedding) dimension.
-            basis_u: B-spline basis in the u parametric direction.
-            basis_v: B-spline basis in the v parametric direction.
+            bases: A pair of B-spline bases for the u and v directions.
             control_points: Control-point matrix of shape
                 ``(n_u * n_v, gdim)``, ordered with v running fastest.
 
@@ -45,14 +43,13 @@ class SurfacePatch(Patch):
             raise ValueError(f"gdim must be >= 1, got {gdim}")
 
         # --- bases ---
-        if not isinstance(basis_u, BSpline):
-            raise TypeError(
-                f"basis_u must be a BSpline instance, got {type(basis_u).__name__}"
-            )
-        if not isinstance(basis_v, BSpline):
-            raise TypeError(
-                f"basis_v must be a BSpline instance, got {type(basis_v).__name__}"
-            )
+        if len(bases) != 2:
+            raise ValueError(f"bases must have exactly 2 elements, got {len(bases)}")
+        for i, b in enumerate(bases):
+            if not isinstance(b, BSpline):
+                raise TypeError(
+                    f"bases[{i}] must be a BSpline instance, got {type(b).__name__}"
+                )
 
         # --- control points ---
         control_points = np.asarray(control_points, dtype=np.float64)
@@ -61,11 +58,11 @@ class SurfacePatch(Patch):
                 f"control_points must be a 2-D array, got shape {control_points.shape}"
             )
 
-        expected_rows = basis_u.num_basis * basis_v.num_basis
+        expected_rows = bases[0].num_basis * bases[1].num_basis
         if control_points.shape[0] != expected_rows:
             raise ValueError(
                 f"control_points has {control_points.shape[0]} rows, "
-                f"expected n_u * n_v = {basis_u.num_basis} * {basis_v.num_basis} "
+                f"expected n_u * n_v = {bases[0].num_basis} * {bases[1].num_basis} "
                 f"= {expected_rows}"
             )
         if control_points.shape[1] != gdim:
@@ -74,12 +71,10 @@ class SurfacePatch(Patch):
                 f"expected gdim = {gdim}"
             )
 
-        self._basis_u = basis_u
-        self._basis_v = basis_v
+        self._bases = list(bases)
         self.cpp_object = _pyck.SurfacePatch(
             gdim,
-            basis_u.cpp_object,
-            basis_v.cpp_object,
+            [b.cpp_object for b in bases],
             control_points,
         )
 
@@ -101,157 +96,115 @@ class SurfacePatch(Patch):
     @property
     def basis_u(self) -> BSpline:
         """B-spline basis in the u parametric direction."""
-        return self._basis_u
+        return self._bases[0]
 
     @property
     def basis_v(self) -> BSpline:
         """B-spline basis in the v parametric direction."""
-        return self._basis_v
-
-    def _validate_uv(
-        self,
-        u: npt.NDArray[np.float64],
-        v: npt.NDArray[np.float64],
-    ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
-        """Coerce and validate parameter arrays.
-
-        Args:
-            u: Parameter values in the u direction.
-            v: Parameter values in the v direction.
-
-        Returns:
-            The validated ``(u, v)`` arrays cast to float64.
-
-        Raises:
-            ValueError: If an array is not 1-D, empty, or out of range.
-        """
-        u = np.asarray(u, dtype=np.float64)
-        v = np.asarray(v, dtype=np.float64)
-
-        if u.ndim != 1:
-            raise ValueError(f"u must be a 1-D array, got shape {u.shape}")
-        if v.ndim != 1:
-            raise ValueError(f"v must be a 1-D array, got shape {v.shape}")
-        if u.size == 0:
-            raise ValueError("u must not be empty")
-        if v.size == 0:
-            raise ValueError("v must not be empty")
-
-        knots_u = self._basis_u.knots
-        knots_v = self._basis_v.knots
-        lo_u, hi_u = knots_u[0], knots_u[-1]
-        lo_v, hi_v = knots_v[0], knots_v[-1]
-
-        if np.any(u < lo_u) or np.any(u > hi_u):
-            raise ValueError(
-                f"all values in u must be in [{lo_u}, {hi_u}]; "
-                f"got range [{u.min()}, {u.max()}]"
-            )
-        if np.any(v < lo_v) or np.any(v > hi_v):
-            raise ValueError(
-                f"all values in v must be in [{lo_v}, {hi_v}]; "
-                f"got range [{v.min()}, {v.max()}]"
-            )
-
-        return u, v
+        return self._bases[1]
 
     def eval(
         self,
-        u: npt.NDArray[np.float64],
-        v: npt.NDArray[np.float64],
-        order: int = 0,
+        params: npt.NDArray[np.float64],
+    ) -> npt.NDArray[np.float64]:
+        """Evaluate the surface at the given parametric points.
+
+        Args:
+            params: Evaluation points, shape ``(Q, 2)``. Each row is ``(u, v)``.
+
+        Returns:
+            Position array of shape ``(Q, gdim)``.
+
+        Raises:
+            ValueError: If *params* has invalid shape.
+        """
+        params = self._validate_params(params)
+        return self.cpp_object.eval(params)
+
+    def eval_derivs(
+        self,
+        params: npt.NDArray[np.float64],
+        order: int = 1,
     ) -> list[list[npt.NDArray[np.float64]]]:
         """Evaluate the surface and its partial derivatives.
 
-        Given vectors *u* (size M) and *v* (size N), the evaluation points
-        form an M x N tensor-product grid.
-
         Args:
-            u: Parameter values in the u direction (size M).
-            v: Parameter values in the v direction (size N).
-            order: Maximum total derivative order (default 0).
+            params: Evaluation points, shape ``(Q, 2)``. Each row is ``(u, v)``.
+            order: Maximum total derivative order (default 1).
 
         Returns:
             A nested list indexed as ``result[i][j]`` for
             :math:`\\partial^{i+j} S / \\partial u^i \\partial v^j`,
             with ``0 <= i + j <= order``.  Each entry is an array of
-            shape ``(M*N, gdim)``.
+            shape ``(Q, gdim)``.
 
         Raises:
             TypeError: If *order* is not an integer.
-            ValueError: If *u* or *v* are invalid or out of the knot range.
+            ValueError: If *params* has invalid shape or *order* is negative.
         """
-        u, v = self._validate_uv(u, v)
+        params = self._validate_params(params)
 
         if not isinstance(order, (int, np.integer)):
             raise TypeError(f"order must be an integer, got {type(order).__name__}")
         if order < 0:
             raise ValueError(f"order must be non-negative, got {order}")
 
-        return self.cpp_object.eval(u, v, order)
+        return self.cpp_object.eval_derivs(params, order)
 
     def jacobian(
         self,
-        u: npt.NDArray[np.float64],
-        v: npt.NDArray[np.float64],
-    ) -> tuple[list[npt.NDArray[np.float64]], npt.NDArray[np.float64]]:
-        """Compute the Jacobian matrix and determinant at each grid point.
+        params: npt.NDArray[np.float64],
+    ) -> list[npt.NDArray[np.float64]]:
+        """Compute the Jacobian matrices at each evaluation point.
 
         Args:
-            u: Parameter values in the u direction (size M).
-            v: Parameter values in the v direction (size N).
+            params: Evaluation points, shape ``(Q, 2)``. Each row is ``(u, v)``.
 
         Returns:
-            A tuple ``(jacobians, det_jacobians)`` where *jacobians* is a
-            list of ``(gdim, 2)`` arrays (columns are dS/du and dS/dv) and
-            *det_jacobians* is a 1-D array of length ``M*N`` containing
-            :math:`\\sqrt{\\det(J^T J)}` at each point.
+            A list of Q arrays, each of shape ``(gdim, 2)``.
+            Column 0 is ∂S/∂u, column 1 is ∂S/∂v.
 
         Raises:
-            ValueError: If *u* or *v* are invalid or out of the knot range.
+            ValueError: If *params* has invalid shape.
         """
-        u, v = self._validate_uv(u, v)
-        return self.cpp_object.jacobian(u, v)
+        params = self._validate_params(params)
+        return self.cpp_object.jacobian(params)
 
-    def tensor_basis(
+    def jacobian_det(
         self,
-        u: npt.NDArray[np.float64],
-        v: npt.NDArray[np.float64],
-        order: int = 0,
-    ) -> list[list[npt.NDArray[np.float64]]]:
-        """Build tensor-product basis matrices and parametric derivatives.
-
-        This calls into C++ and avoids the Python/NumPy Kronecker product
-        loop that would otherwise be needed.
+        params: npt.NDArray[np.float64],
+    ) -> npt.NDArray[np.float64]:
+        """Compute the Jacobian determinant at each evaluation point.
 
         Args:
-            u: Parameter values in the u direction (size M).
-            v: Parameter values in the v direction (size N).
-            order: Maximum total derivative order (default 0).
+            params: Evaluation points, shape ``(Q, 2)``. Each row is ``(u, v)``.
 
         Returns:
-            A nested list indexed as ``result[i][j]`` for the
-            ``(i, j)``-derivative of the tensor-product basis.  Each entry
-            is an array of shape ``(M*N, n_u * n_v)``.
+            A 1-D array of length Q containing :math:`\\sqrt{\\det(J^T J)}`
+            at each point.
 
         Raises:
-            TypeError: If *order* is not an integer.
-            ValueError: If *u* or *v* are invalid or out of the knot range.
+            ValueError: If *params* has invalid shape.
         """
-        u, v = self._validate_uv(u, v)
+        params = self._validate_params(params)
+        return self.cpp_object.jacobian_det(params)
 
-        if not isinstance(order, (int, np.integer)):
-            raise TypeError(f"order must be an integer, got {type(order).__name__}")
-        if order < 0:
-            raise ValueError(f"order must be non-negative, got {order}")
-
-        return self.cpp_object.tensor_basis(u, v, order)
+    def _validate_params(
+        self, params: npt.NDArray[np.float64]
+    ) -> npt.NDArray[np.float64]:
+        """Coerce and validate the (Q, 2) parameter array."""
+        params = np.asarray(params, dtype=np.float64)
+        if params.ndim != 2 or params.shape[1] != 2:
+            raise ValueError(
+                f"params must have shape (Q, 2), got {params.shape}"
+            )
+        return params
 
     def __repr__(self) -> str:
-        n_u = self._basis_u.num_basis
-        n_v = self._basis_v.num_basis
+        n_u = self._bases[0].num_basis
+        n_v = self._bases[1].num_basis
         return (
             f"SurfacePatch(gdim={self.gdim}, "
-            f"basis_u={self._basis_u!r}, basis_v={self._basis_v!r}, "
+            f"bases=[{self._bases[0]!r}, {self._bases[1]!r}], "
             f"control_points={n_u * n_v}×{self.gdim})"
         )

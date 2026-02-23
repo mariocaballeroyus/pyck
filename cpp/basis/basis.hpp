@@ -23,6 +23,8 @@ public:
     /// @param degree Polynomial degree of the basis functions
     explicit Basis(std::size_t degree) : degree_(degree) {}
 
+    // --- Evaluation ------------------------------------------------------------
+
     /**
      * @brief Evaluate the basis functions
      * 
@@ -54,6 +56,8 @@ public:
      */
     virtual std::vector<Eigen::MatrixXd> eval_derivs(const Eigen::VectorXd& params, 
                                                      std::size_t order = 0) const = 0;
+
+    // --- Properties ------------------------------------------------------------
 
     /// @brief Get the degree of the basis functions
     std::size_t degree() const { return degree_; }

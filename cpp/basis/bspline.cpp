@@ -9,8 +9,6 @@ std::vector<Eigen::MatrixXd> BSpline::compute_basis_table(const Eigen::VectorXd&
     std::size_t num_knots = knots_.size();
     std::size_t num_basis = knots_.num_basis(degree_); 
 
-    // --- Preallocate basis functions table ----------------------------------------
-
     // The k-th derivative is computed using basis of all lower degrees,
     // (p-1, p-2, ..., p-k), so we need to store them all in a table.
     std::vector<Eigen::MatrixXd> table(degree_ + 1);
@@ -19,8 +17,7 @@ std::vector<Eigen::MatrixXd> BSpline::compute_basis_table(const Eigen::VectorXd&
         table[d] = Eigen::MatrixXd::Zero(num_points, num_basis);
     }
 
-    // --- Compute basis functions using Cox-de Boor recursion -----------------------
-
+    // Compute basis functions using Cox-de Boor recursion
     for (std::size_t i = 0; i < num_points; ++i) {
         double u = params(i);
         int span = knots_.find_span(degree_, u);

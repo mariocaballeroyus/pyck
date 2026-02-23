@@ -57,22 +57,25 @@ PYBIND11_MODULE(_pyck, m) {
                  &pyck::Patch::control_points),
              py::return_value_policy::reference_internal)
         .def("jacobian", &pyck::Patch::jacobian,
-             py::arg("u"), py::arg("v"));
+             py::arg("params"))
+        .def("jacobian_det", &pyck::Patch::jacobian_det,
+             py::arg("params"));
 
     py::class_<pyck::SurfacePatch, pyck::Patch>(m, "SurfacePatch")
         .def(py::init([](std::size_t gdim,
-                         pyck::BSpline* basis_u,
-                         pyck::BSpline* basis_v,
+                         std::array<pyck::Basis*, 2> bases,
                          const Eigen::MatrixXd& cp) {
-                 return new pyck::SurfacePatch(gdim, basis_u, basis_v, cp);
+                 return new pyck::SurfacePatch(gdim, bases, cp);
              }),
-             py::arg("gdim"), py::arg("basis_u"),
-             py::arg("basis_v"), py::arg("control_points"),
-             py::keep_alive<1, 3>(), py::keep_alive<1, 4>())
+             py::arg("gdim"), py::arg("bases"),
+             py::arg("control_points"),
+             py::keep_alive<1, 3>())
         .def("eval", &pyck::SurfacePatch::eval,
-             py::arg("u"), py::arg("v"), py::arg("order") = 0)
+             py::arg("params"))
+        .def("eval_derivs", &pyck::SurfacePatch::eval_derivs,
+             py::arg("params"), py::arg("order"))
         .def("jacobian", &pyck::SurfacePatch::jacobian,
-             py::arg("u"), py::arg("v"))
-        .def("tensor_basis", &pyck::SurfacePatch::tensor_basis,
-             py::arg("u"), py::arg("v"), py::arg("order") = 0);
+             py::arg("params"))
+        .def("jacobian_det", &pyck::SurfacePatch::jacobian_det,
+             py::arg("params"));
 }

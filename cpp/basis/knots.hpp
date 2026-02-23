@@ -18,6 +18,9 @@ namespace pyck
 class KnotVector
 {
 public:
+
+    // --- Constructors & Factory Methods --------------------------------------------
+
     /**
      * @brief Construct a knot vector from a sequence of knot values.
      * @param knots Non-decreasing sequence of knot values.
@@ -34,7 +37,7 @@ public:
      */
     static KnotVector clamped_uniform(std::size_t degree, std::size_t num_basis);
 
-    // --- Element access -------------------------------------------------------
+    // --- Element access ------------------------------------------------------------
 
     /// @brief Number of knots in the vector.
     std::size_t size() const { return knots_.size(); }
@@ -68,14 +71,14 @@ public:
     /**
      * @brief Find the knot span index for a given parameter value.
      *
-     * Returns the index *i* such that knots[i] <= u < knots[i+1],
+     * Returns the index *i* such that knots[i] <= param < knots[i+1],
      * with the convention that the last span is closed on the right.
      *
      * @param degree Polynomial degree.
-     * @param u      Parameter value.
+     * @param param Parameter value.
      * @return Span index.
      */
-    std::size_t find_span(std::size_t degree, double u) const;
+    std::size_t find_span(std::size_t degree, double param) const;
 
 private:
     /// @brief Non-decreasing sequence of knot values.

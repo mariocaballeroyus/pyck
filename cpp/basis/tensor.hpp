@@ -16,6 +16,9 @@ namespace pyck
 class TensorProduct 
 {
 public:
+
+    // --- Constructors --------------------------------------------------------------
+
     /**
      * @brief Construct a tensor product basis from a vector of 1D bases
      * 
@@ -24,6 +27,8 @@ public:
      */
     explicit TensorProduct(std::vector<std::shared_ptr<Basis>> bases)
         : bases_(std::move(bases)) {}
+
+    // --- Evaluation ----------------------------------------------------------------
 
     /**
      * @brief Evaluate the N-dimensional basis functions
@@ -55,36 +60,42 @@ public:
      *         derivatives. The total number of matrices is the product of (orders[i] + 1) 
      *         for all dimensions i.
      * 
-     *          The derivative combinations are unrolled into the vector in lexicographical 
-     *          order, meaning the last parametric dimension varies the fastest.
+     *         The derivative combinations are unrolled into the vector in lexicographical 
+     *         order.
      * 
-     *          Example for a 2D surface (d=2) with orders = {1, 2}:
-     *          The vector will contain (1+1) * (2+1) = 6 matrices at the following indices:
-     *          - [0]: d^0 / (du^0 dv^0)  -> Basis values
-     *          - [1]: d^1 / (du^0 dv^1)  -> 1st partial w.r.t v
-     *          - [2]: d^2 / (du^0 dv^2)  -> 2nd partial w.r.t v
-     *          - [3]: d^1 / (du^1 dv^0)  -> 1st partial w.r.t u
-     *          - [4]: d^2 / (du^1 dv^1)  -> Mixed partial (1st u, 1st v)
-     *          - [5]: d^3 / (du^1 dv^2)  -> Mixed partial (1st u, 2nd v)
+     *         Example for a 2D surface (d=2) with orders = {1, 2}:
+     *         The vector will contain (1+1) * (2+1) = 6 Eigen::MatrixXd at the following indices:
+     *         - [0]: d^0 / (du^0 dv^0)  -> Basis values
+     *         - [1]: d^1 / (du^0 dv^1)  -> 1st partial w.r.t v
+     *         - [2]: d^2 / (du^0 dv^2)  -> 2nd partial w.r.t v
+     *         - [3]: d^1 / (du^1 dv^0)  -> 1st partial w.r.t u
+     *         - [4]: d^2 / (du^1 dv^1)  -> Mixed partial (1st u, 1st v)
+     *         - [5]: d^3 / (du^1 dv^2)  -> Mixed partial (1st u, 2nd v)
      * 
-     *          Each Eigen::MatrixXd in the returned vector has size (m x K), where 'K' is the 
-     *          total number of tensor product basis functions (the product of num_basis() 
-     *          from all constituent 1D bases). Row 'i' of a matrix contains the specific 
-     *          derivative evaluated at the 'i'-th input point.
+     *         Each Eigen::MatrixXd in the returned vector has size (m x K), where 'K' is the 
+     *         total number of tensor product basis functions (the product of num_basis() 
+     *         from all constituent 1D bases). Row 'i' of a matrix contains the specific 
+     *         derivative evaluated at the 'i'-th input point.
      *          
-     *          result[i] = { d^0(u_0) d^0(u_1) ... d^0(u_m)
-     *                        d^1(u_0) d^1(u_1) ... d^1(u_m)
-     *                        ...      ...      ... ...
-     *                        d^2(u_0) d^2(u_1) ... d^2(u_m) }
+     *         result[i] = { d^0(u_0) d^0(u_1) ... d^0(u_m)
+     *                       d^1(u_0) d^1(u_1) ... d^1(u_m)
+     *                       ...      ...      ... ...
+     *                       d^2(u_0) d^2(u_1) ... d^2(u_m) }
      */
     std::vector<Eigen::MatrixXd> eval_derivs(const Eigen::MatrixXd& params, 
                                              const std::vector<std::size_t>& orders) const;
+
+    // --- Properties ----------------------------------------------------------------
 
     /// @brief Get the parametric dimension (e.g., 2 for a surface)
     std::size_t dim() const { return bases_.size(); }
 
     /// @brief Total number of basis functions (n_u * n_v * ...)
     std::size_t num_basis() const;
+
+    /// @brief Get the 1D basis for a given parametric direction
+    /// @param dir Parametric direction index (0-based)
+    const Basis& basis(std::size_t dir) const { return *bases_[dir]; }
 
 private:
     /// @brief Vector of shared pointers to 1D basis objects for each parametric dimension
