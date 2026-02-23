@@ -4,6 +4,8 @@
 #include <array>
 #include <cstddef>
 #include <memory>
+#include <string>
+#include <unordered_map>
 #include <vector>
 #include <Eigen/Dense>
 
@@ -66,8 +68,7 @@ public:
     // --- Properties ----------------------------------------------------------------
 
     /// @brief Get the basis in a given parametric direction (0 = u, 1 = v).
-    const Basis& basis(std::size_t dir) const override 
-    { return tensor_product_.basis(dir); }
+    const Basis& basis(std::size_t dir) const override { return tensor_product_.basis(dir); }
 
     // --- Evaluation ----------------------------------------------------------------
 
@@ -80,26 +81,25 @@ public:
     Eigen::MatrixXd eval(const Eigen::MatrixXd& params) const;
 
     /**
-     * @brief Evaluate the surface and its partial derivatives.
+     * @brief Evaluate physical (spatial) derivatives of basis functions
+     *        in local tangent-plane coordinates.
+     *
+     * Builds a local orthonormal frame on the surface at each evaluation
+     * point via Gram-Schmidt (e₁ aligned with ∂S/∂u, e₂ orthogonal in the
+     * tangent plane).  Derivatives are w.r.t. arc-length–scaled local
+     * coordinates (x, y) on the surface — NOT global Cartesian axes.
      *
      * @param params  Evaluation points, shape (Q × 2). Each row is a (u, v) pair.
-     * @param order   Maximum total derivative order to compute.
-     * @return A triangular 2-D vector indexed as result[i][j] for the
-     *         mixed partial derivative ∂^{i+j} S / (∂u^i ∂v^j),
-     *         with 0 ≤ i + j ≤ order. Each entry is a matrix of shape (Q × gdim).
+     * @param order   Maximum derivative order (1, 2, or 3). Default = 1.
+     * @return An unordered map from derivative label to a (Q × n_basis) matrix.
      *
-     *         For order = 1, the layout is:
-     *           result[0][0] = S          (Q × gdim)
-     *           result[0][1] = ∂S/∂v      (Q × gdim)
-     *           result[1][0] = ∂S/∂u      (Q × gdim)
-     *
-     *         For order = 2, the layout adds:
-     *           result[0][2] = ∂²S/∂v²    (Q × gdim)
-     *           result[1][1] = ∂²S/∂u∂v   (Q × gdim)
-     *           result[2][0] = ∂²S/∂u²    (Q × gdim)
+     *         Order 1 keys: "N", "dNdx", "dNdy"
+     *         Order 2 adds: "dNdxdx", "dNdxdy", "dNdydy"
+     *         Order 3 adds: "dNdxdxdx", "dNdxdxdy", "dNdxdydy", "dNdydydy"
      */
-    std::vector<std::vector<Eigen::MatrixXd>> eval_derivs(
-        const Eigen::MatrixXd& params, std::size_t order) const;
+    std::unordered_map<std::string, Eigen::MatrixXd>
+    eval_physical_derivs(const Eigen::MatrixXd& params,
+                         std::size_t order = 1) const;
 
     /**
      * @brief Compute the Jacobian matrices at the given parametric points.
@@ -108,8 +108,7 @@ public:
      * @return A vector of Q matrices, each of shape (gdim × 2).
      *         Column 0 is ∂S/∂u, column 1 is ∂S/∂v.
      */
-    std::vector<Eigen::MatrixXd>
-    jacobian(const Eigen::MatrixXd& params) const override;
+    std::vector<Eigen::MatrixXd> jacobian(const Eigen::MatrixXd& params) const override;
 
     /**
      * @brief Compute the Jacobian determinant at the given parametric points.
@@ -117,12 +116,21 @@ public:
      * @param params  Evaluation points, shape (Q × 2). Each row is a (u, v) pair.
      * @return VectorXd of length Q containing √det(J^T J) at each point.
      */
-    Eigen::VectorXd
-    jacobian_det(const Eigen::MatrixXd& params) const override;
+    Eigen::VectorXd jacobian_det(const Eigen::MatrixXd& params) const override;
 
 private:
     /// @brief Tensor product of the two 1D bases
     TensorProduct tensor_product_;
+
+    /**
+     * @brief Internal parametric derivative evaluation.
+     *
+     * Same semantics as the old public eval_derivs: result[i][j] is
+     * ∂^{i+j}S / (∂u^i ∂v^j), shape (Q × gdim).
+     */
+    std::vector<std::vector<Eigen::MatrixXd>>
+    eval_parametric_derivs_(const Eigen::MatrixXd& params,
+                            std::size_t order) const;
 };
 
 } // namespace pyck

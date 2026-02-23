@@ -72,8 +72,8 @@ PYBIND11_MODULE(_pyck, m) {
              py::keep_alive<1, 3>())
         .def("eval", &pyck::SurfacePatch::eval,
              py::arg("params"))
-        .def("eval_derivs", &pyck::SurfacePatch::eval_derivs,
-             py::arg("params"), py::arg("order"))
+        .def("eval_physical_derivs", &pyck::SurfacePatch::eval_physical_derivs,
+             py::arg("params"), py::arg("order") = 1)
         .def("jacobian", &pyck::SurfacePatch::jacobian,
              py::arg("params"))
         .def("jacobian_det", &pyck::SurfacePatch::jacobian_det,
