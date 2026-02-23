@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "basis.hpp"
+#include "tensor.hpp"
 
 namespace pyck
 {

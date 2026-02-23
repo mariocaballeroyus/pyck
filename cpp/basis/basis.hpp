@@ -24,16 +24,36 @@ public:
     explicit Basis(std::size_t degree) : degree_(degree) {}
 
     /**
-     * @brief Evaluate the basis functions and their derivatives up to a given order
+     * @brief Evaluate the basis functions
      * 
-     * @param u A vector of parameter values at which to evaluate the basis functions
-     * @param order Highest order of derivatives to compute (0 = values only)
-     * @return A vector of matrices, where index k contains the k-th order derivative.
-     *         For each matrix, rows correspond to parameter values and columns to
-     *         basis functions.
+     * @param params A vector of parameter values at which to evaluate the basis functions
+     * @return A matrix of size (m x n) where m is the number of parameter values and 
+     *         n is the number of basis functions.
+     * 
+     *          result = { N_0(u_0) N_1(u_0) ... N_n(u_0)
+     *                     N_0(u_1) N_1(u_1) ... N_n(u_1)
+     *                     ...      ...      ... ...
+     *                     N_0(u_m) N_1(u_m) ... N_n(u_m) }
      */
-    virtual std::vector<Eigen::MatrixXd> eval(const Eigen::VectorXd& u, 
-                                              std::size_t order = 0) const = 0;
+    virtual Eigen::MatrixXd eval(const Eigen::VectorXd& params) const = 0;
+
+
+    /**
+     * @brief Evaluate basis functions and their derivatives at given parameter values
+     * 
+     * @param params Parameter values at which to evaluate the basis functions
+     * @param order Highest order of derivatives to compute
+     * @return A vector of matrices, where each matrix corresponds to the basis functions or 
+     *         their derivatives
+     * 
+     *          results[k] = { d^k(N_0)/du^k(u_0) d^k(N_1)/du^k(u_0) ... d^k(N_n)/du^k(u_0)
+     *                         d^k(N_0)/du^k(u_1) d^k(N_1)/du^k(u_1) ... d^k(N_n)/du^k(u_1)
+     *                         ...                ...                ... ...
+     *                         d^k(N_0)/du^k(u_m) d^k(N_1)/du^k(u_m) ... d^k(N_n)/du^k(u_m) }
+     * 
+     */
+    virtual std::vector<Eigen::MatrixXd> eval_derivs(const Eigen::VectorXd& params, 
+                                                     std::size_t order = 0) const = 0;
 
     /// @brief Get the degree of the basis functions
     std::size_t degree() const { return degree_; }

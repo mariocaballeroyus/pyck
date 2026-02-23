@@ -3,10 +3,12 @@
 
 #include <cstddef>
 #include <array>
+#include <memory>
 #include <vector>
 #include <Eigen/Dense>
 
 #include "patch.hpp"
+#include "tensor.hpp"
 
 namespace pyck
 {
@@ -29,7 +31,14 @@ public:
                  Basis* basis_u,
                  Basis* basis_v,
                  const Eigen::MatrixXd& control_points)
-        : Patch(gdim, 2, control_points), basis_{basis_u, basis_v} {}
+        : Patch(gdim, 2, control_points),
+          basis_{basis_u, basis_v},
+          tensor_product_({
+              // Non-owning shared_ptrs via aliasing constructor:
+              // the empty shared_ptr owns nothing, the alias points to the raw ptr
+              std::shared_ptr<Basis>(std::shared_ptr<Basis>{}, basis_u),
+              std::shared_ptr<Basis>(std::shared_ptr<Basis>{}, basis_v)
+          }) {}
 
     /// @brief Get the basis in a given parametric direction (0 = u, 1 = v)
     const Basis& basis(std::size_t dir) const override 
@@ -86,6 +95,9 @@ public:
 private:
     /// @brief Basis functions in the u and v parametric directions
     std::array<Basis*, 2> basis_;
+
+    /// @brief Tensor product of the two 1D bases
+    TensorProduct tensor_product_;
 };
 
 } // namespace pyck

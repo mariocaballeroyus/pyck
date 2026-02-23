@@ -17,6 +17,7 @@ target_include_directories(catch INTERFACE ${CMAKE_SOURCE_DIR}/external/catch)
 # BSpline library
 add_library(pyck_basis
     cpp/basis/bspline.cpp
+    cpp/basis/tensor.cpp
 )
 target_include_directories(pyck_basis PUBLIC
     cpp/basis
@@ -51,6 +52,12 @@ add_executable(test_bspline
 )
 target_link_libraries(test_bspline PRIVATE pyck_basis catch)
 
+# Test executable: TensorProduct
+add_executable(test_tensor_product
+    tests/test_tensor_product.cpp
+)
+target_link_libraries(test_tensor_product PRIVATE pyck_basis catch)
+
 # Test executable: SurfacePatch
 add_executable(test_surface
     tests/test_surface.cpp
@@ -59,4 +66,5 @@ target_link_libraries(test_surface PRIVATE pyck_geometry catch)
 
 enable_testing()
 add_test(NAME bspline_tests COMMAND test_bspline)
+add_test(NAME tensor_product_tests COMMAND test_tensor_product)
 add_test(NAME surface_tests COMMAND test_surface)

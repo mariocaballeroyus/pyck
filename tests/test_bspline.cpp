@@ -47,15 +47,14 @@ TEST_CASE("BSpline: eval returns correct structure", "[bspline]") {
 
     Eigen::VectorXd u = Eigen::VectorXd::LinSpaced(10, 0.0, 1.0);
 
-    SECTION("order 0 → 1 matrix") {
+    SECTION("order 0 → single matrix") {
         auto result = bs.eval(u);
-        REQUIRE(result.size() == 1);
-        REQUIRE(result[0].rows() == 10);
-        REQUIRE(result[0].cols() == static_cast<int>(bs.num_basis()));
+        REQUIRE(result.rows() == 10);
+        REQUIRE(result.cols() == static_cast<int>(bs.num_basis()));
     }
 
-    SECTION("order 2 → 3 matrices") {
-        auto result = bs.eval(u, 2);
+    SECTION("order 2 → 3 matrices via eval_derivs") {
+        auto result = bs.eval_derivs(u, 2);
         REQUIRE(result.size() == 3);
         for (auto& mat : result) {
             REQUIRE(mat.rows() == 10);
@@ -75,7 +74,7 @@ TEST_CASE("BSpline: partition of unity", "[bspline]") {
         BSpline bs(1, knots);
 
         Eigen::VectorXd u = Eigen::VectorXd::LinSpaced(20, 0.0, 1.0);
-        auto N = bs.eval(u)[0];
+        auto N = bs.eval(u);
 
         REQUIRE(N.rows() == 20);
         REQUIRE(N.cols() == 4);
@@ -89,7 +88,7 @@ TEST_CASE("BSpline: partition of unity", "[bspline]") {
         BSpline bs(2, knots);
 
         Eigen::VectorXd u = Eigen::VectorXd::LinSpaced(30, 0.0, 1.0);
-        auto N = bs.eval(u)[0];
+        auto N = bs.eval(u);
 
         REQUIRE(N.rows() == 30);
         REQUIRE(N.cols() == 5);
@@ -103,7 +102,7 @@ TEST_CASE("BSpline: partition of unity", "[bspline]") {
         BSpline bs(3, knots);
 
         Eigen::VectorXd u = Eigen::VectorXd::LinSpaced(50, 0.0, 1.0);
-        auto N = bs.eval(u)[0];
+        auto N = bs.eval(u);
 
         REQUIRE(N.rows() == 50);
         REQUIRE(N.cols() == 6);
@@ -121,7 +120,7 @@ TEST_CASE("BSpline: non-negativity", "[bspline]") {
     BSpline bs(3, knots);
 
     Eigen::VectorXd u = Eigen::VectorXd::LinSpaced(100, 0.0, 1.0);
-    auto N = bs.eval(u)[0];
+    auto N = bs.eval(u);
 
     for (int i = 0; i < N.rows(); ++i)
         for (int j = 0; j < N.cols(); ++j)
@@ -140,8 +139,8 @@ TEST_CASE("BSpline: endpoint interpolation", "[bspline]") {
     u_start << 0.0;
     u_end   << 1.0;
 
-    auto N0 = bs.eval(u_start)[0];
-    auto N1 = bs.eval(u_end)[0];
+    auto N0 = bs.eval(u_start);
+    auto N1 = bs.eval(u_end);
 
     REQUIRE(N0(0, 0) == Approx(1.0).margin(1e-12));
     REQUIRE(N1(0, bs.num_basis() - 1) == Approx(1.0).margin(1e-12));
@@ -165,7 +164,7 @@ TEST_CASE("BSpline: degree-1 known values", "[bspline]") {
     Eigen::VectorXd u(5);
     u << 0.0, 0.25, 0.5, 0.75, 1.0;
 
-    auto N = bs.eval(u)[0];
+    auto N = bs.eval(u);
 
     for (int i = 0; i < 5; ++i) {
         REQUIRE(N(i, 0) == Approx(1.0 - u(i)).margin(1e-14));
@@ -186,7 +185,7 @@ TEST_CASE("BSpline: degree-2 midpoint values", "[bspline]") {
     Eigen::VectorXd u(1);
     u << 0.5;
 
-    auto N = bs.eval(u)[0];
+    auto N = bs.eval(u);
 
     // N_0(0.5) = (1-u)^2 = 0.25
     // N_1(0.5) = 2u(1-u) = 0.5
@@ -205,7 +204,7 @@ TEST_CASE("BSpline: first derivative sums to zero", "[bspline][deriv]") {
     BSpline bs(3, knots);
 
     Eigen::VectorXd u = Eigen::VectorXd::LinSpaced(40, 0.0, 1.0);
-    auto result = bs.eval(u, 1);
+    auto result = bs.eval_derivs(u, 1);
     auto& dN = result[1];
 
     REQUIRE(dN.rows() == 40);
@@ -226,7 +225,7 @@ TEST_CASE("BSpline: degree-1 first derivative", "[bspline][deriv]") {
     Eigen::VectorXd u(3);
     u << 0.0, 0.5, 1.0;
 
-    auto dN = bs.eval(u, 1)[1];
+    auto dN = bs.eval_derivs(u, 1)[1];
 
     for (int i = 0; i < 3; ++i) {
         REQUIRE(dN(i, 0) == Approx(-1.0).margin(1e-12));
@@ -247,7 +246,7 @@ TEST_CASE("BSpline: degree-2 first derivative", "[bspline][deriv]") {
     Eigen::VectorXd u(3);
     u << 0.0, 0.5, 1.0;
 
-    auto dN = bs.eval(u, 1)[1];
+    auto dN = bs.eval_derivs(u, 1)[1];
 
     // u = 0: [-2, 2, 0]
     REQUIRE(dN(0, 0) == Approx(-2.0).margin(1e-12));
@@ -276,7 +275,7 @@ TEST_CASE("BSpline: degree-2 second derivative", "[bspline][deriv]") {
     Eigen::VectorXd u(3);
     u << 0.0, 0.5, 1.0;
 
-    auto d2N = bs.eval(u, 2)[2];
+    auto d2N = bs.eval_derivs(u, 2)[2];
 
     for (int i = 0; i < 3; ++i) {
         REQUIRE(d2N(i, 0) == Approx( 2.0).margin(1e-10));
@@ -296,7 +295,7 @@ TEST_CASE("BSpline: derivative higher than degree is zero", "[bspline][deriv]") 
     Eigen::VectorXd u(3);
     u << 0.0, 0.5, 1.0;
 
-    auto d3N = bs.eval(u, 3)[3];
+    auto d3N = bs.eval_derivs(u, 3)[3];
 
     for (int i = 0; i < d3N.rows(); ++i)
         for (int j = 0; j < d3N.cols(); ++j)
@@ -307,18 +306,17 @@ TEST_CASE("BSpline: derivative higher than degree is zero", "[bspline][deriv]") 
  * Test that the free function evaluate_bspline produces the same results as the 
  * BSpline class method eval()
  */
-TEST_CASE("evaluate_bspline free function matches class", "[bspline]") {
+TEST_CASE("eval_derivs order 0 matches eval", "[bspline]") {
     auto knots = clamped_uniform_knots(2, 5);
     BSpline bs(2, knots);
 
     Eigen::VectorXd u = Eigen::VectorXd::LinSpaced(12, 0.0, 1.0);
 
-    auto free_result  = evaluate_bspline(2, knots, u, 1);
-    auto class_result = bs.eval(u, 1);
+    auto derivs = bs.eval_derivs(u, 0);
+    auto values = bs.eval(u);
 
-    REQUIRE(free_result.size() == class_result.size());
-    for (std::size_t k = 0; k < free_result.size(); ++k)
-        REQUIRE(free_result[k].isApprox(class_result[k], 1e-14));
+    REQUIRE(derivs.size() == 1);
+    REQUIRE(derivs[0].isApprox(values, 1e-14));
 }
 
 /**
@@ -333,15 +331,15 @@ TEST_CASE("BSpline: finite difference derivative check", "[bspline][deriv]") {
     Eigen::VectorXd u(5);
     u << 0.1, 0.25, 0.5, 0.75, 0.9;
 
-    auto dN_exact = bs.eval(u, 1)[1];
+    auto dN_exact = bs.eval_derivs(u, 1)[1];
 
     for (int i = 0; i < u.size(); ++i) {
         Eigen::VectorXd u_fwd(1), u_bwd(1);
         u_fwd << u(i) + h;
         u_bwd << u(i) - h;
 
-        auto N_fwd = bs.eval(u_fwd)[0];
-        auto N_bwd = bs.eval(u_bwd)[0];
+        auto N_fwd = bs.eval(u_fwd);
+        auto N_bwd = bs.eval(u_bwd);
 
         Eigen::VectorXd dN_fd = (N_fwd.row(0) - N_bwd.row(0)) / (2.0 * h);
 
@@ -361,7 +359,7 @@ TEST_CASE("BSpline: non-uniform knot vector", "[bspline]") {
     REQUIRE(bs.num_basis() == 5);
 
     Eigen::VectorXd u = Eigen::VectorXd::LinSpaced(50, 0.0, 1.0);
-    auto N = bs.eval(u)[0];
+    auto N = bs.eval(u);
 
     for (int i = 0; i < N.rows(); ++i) {
         REQUIRE(N.row(i).sum() == Approx(1.0).margin(1e-12));
@@ -381,7 +379,7 @@ TEST_CASE("BSpline: single evaluation point", "[bspline]") {
     Eigen::VectorXd u(1);
     u << 0.5;
 
-    auto N = bs.eval(u)[0];
+    auto N = bs.eval(u);
     REQUIRE(N.rows() == 1);
     REQUIRE(N.cols() == 4);
     REQUIRE(N.row(0).sum() == Approx(1.0).margin(1e-12));

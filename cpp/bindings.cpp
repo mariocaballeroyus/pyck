@@ -3,22 +3,33 @@
 #include <pybind11/eigen.h>
 
 #include "bspline.hpp"
+#include "tensor.hpp"
 #include "surface.hpp"
 
 namespace py = pybind11;
 
 PYBIND11_MODULE(_pyck, m) {
 
-    py::class_<pyck::Basis>(m, "Basis")
+    py::class_<pyck::Basis, std::shared_ptr<pyck::Basis>>(m, "Basis")
         .def("degree", &pyck::Basis::degree)
         .def("num_basis", &pyck::Basis::num_basis)
-        .def("eval", &pyck::Basis::eval,
+        .def("eval", &pyck::Basis::eval_derivs,
              py::arg("u"), py::arg("order") = 0);
 
-    py::class_<pyck::BSpline, pyck::Basis>(m, "BSpline")
+    py::class_<pyck::BSpline, pyck::Basis, std::shared_ptr<pyck::BSpline>>(m, "BSpline")
         .def(py::init<std::size_t, const std::vector<double>&>(),
              py::arg("degree"), py::arg("knots"))
         .def("knots", &pyck::BSpline::knots);
+
+    py::class_<pyck::TensorProduct>(m, "TensorProduct")
+        .def(py::init<std::vector<std::shared_ptr<pyck::Basis>>>(),
+             py::arg("bases"))
+        .def("dim", &pyck::TensorProduct::dim)
+        .def("num_basis", &pyck::TensorProduct::num_basis)
+        .def("eval", &pyck::TensorProduct::eval,
+             py::arg("params"))
+        .def("eval_derivs", &pyck::TensorProduct::eval_derivs,
+             py::arg("params"), py::arg("orders"));
 
     py::class_<pyck::Patch>(m, "Patch")
         .def("gdim", &pyck::Patch::gdim)

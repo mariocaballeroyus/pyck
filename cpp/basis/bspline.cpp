@@ -3,104 +3,131 @@
 namespace pyck
 {
 
-std::vector<Eigen::MatrixXd> evaluate_bspline(std::size_t degree,
-                                              const std::vector<double>& knots,
-                                              const Eigen::VectorXd& u,
-                                              std::size_t order)
+std::size_t BSpline::find_span(double u) const
 {
-    std::size_t num_points = u.size();
-    std::size_t num_knots = knots.size();
-    std::size_t num_basis = num_knots - degree - 1; 
+    std::size_t num_knots = knots_.size();
 
-    // --- Compute basis functions table --------------------------------------------
+    // Basis indexing 0 .. n
+    int n = num_knots - degree_ - 2;
+    // Edge cases
+    if (u >= knots_[n + 1]) return n;
+    if (u <= knots_[degree_]) return degree_;
+    // Binary search for the span
+    auto it = std::upper_bound(knots_.begin() + degree_, knots_.begin() + n + 1, u);
+    return std::distance(knots_.begin(), it) - 1;
+}
 
-    std::vector<Eigen::MatrixXd> table(degree + 1);
-    for (std::size_t d = 0; d <= degree; ++d) {
-        table[d] = Eigen::MatrixXd::Zero(num_points, num_knots - d - 1);
+std::vector<Eigen::MatrixXd> BSpline::compute_basis_table(const Eigen::VectorXd& params) const
+{
+    std::size_t num_points = params.size();
+    std::size_t num_knots = knots_.size();
+    std::size_t num_basis = num_knots - degree_ - 1; 
+
+    // --- Preallocate basis functions table ----------------------------------------
+
+    // The k-th derivative is computed using basis of all lower degrees,
+    // (p-1, p-2, ..., p-k), so we need to store them all in a table.
+    std::vector<Eigen::MatrixXd> table(degree_ + 1);
+    for (std::size_t d = 0; d <= degree_; ++d) {
+        // Preallocate with size: num_points x num_basis
+        table[d] = Eigen::MatrixXd::Zero(num_points, num_basis);
     }
 
-    auto find_span = [&](double u_val) -> int {
-        int n = num_knots - degree - 2;
-        if (u_val >= knots[n + 1]) return n;
-        if (u_val <= knots[degree]) return degree;
-        auto it = std::upper_bound(knots.begin() + degree, knots.begin() + n + 1, u_val);
-        return std::distance(knots.begin(), it) - 1;
-    };
+    // --- Compute basis functions using Cox-de Boor recursion -----------------------
 
     for (std::size_t i = 0; i < num_points; ++i) {
-        double current_u = u(i);
-        int span = find_span(current_u);
+        double u = params(i);
+        int span = find_span(u);
+
+        // 0-th degree basis definition
         table[0](i, span) = 1.0;
 
-        for (std::size_t d = 1; d <= degree; ++d) {
+        // Recursive computation for degrees 1 .. p
+        for (std::size_t d = 1; d <= degree_; ++d) {
             for (std::size_t k = 0; k <= d; ++k) {
+
+                // Map the local index k to the global basis function index j
                 int j = span - d + k; 
+
+                // Skip out-of-range indices
                 if (j < 0 || j >= static_cast<int>(num_knots - d - 1)) continue;
 
                 double val = 0.0;
-                double denom_left = knots[j + d] - knots[j];
+
+                // Cox-de Boor: Left term
+                double denom_left = knots_[j + d] - knots_[j];
                 if (denom_left > 1e-14) {
-                    val += ((current_u - knots[j]) / denom_left) * table[d - 1](i, j);
+                    val += ((u - knots_[j]) / denom_left) * table[d - 1](i, j);
                 }
                 
-                double denom_right = knots[j + d + 1] - knots[j + 1];
+                // Cox-de Boor: Right term
+                double denom_right = knots_[j + d + 1] - knots_[j + 1];
                 if (denom_right > 1e-14) {
-                    val += ((knots[j + d + 1] - current_u) / denom_right) * table[d - 1](i, j + 1);
+                    val += ((knots_[j + d + 1] - u) / denom_right) * table[d - 1](i, j + 1);
                 }
+
                 table[d](i, j) = val;
             }
         }
     }
+    return table;
+}
 
-    // Allocate results vector: indices 0 through order
+Eigen::MatrixXd BSpline::eval(const Eigen::VectorXd& params) const
+{
+    return std::move(compute_basis_table(params)[degree_]);
+}
+
+std::vector<Eigen::MatrixXd> BSpline::eval_derivs(const Eigen::VectorXd& params, 
+                                                  std::size_t order) const
+{
+    std::size_t num_points = params.size();
+    std::size_t num_knots = knots_.size();
+    std::size_t num_basis = num_knots - degree_ - 1;
+
     std::vector<Eigen::MatrixXd> results(order + 1);
-    results[0] = table[degree]; // The standard basis evaluation
-    
-    // If no derivatives were requested, we are done!
-    if (order == 0) return results;
-
-    // --- Compute 1 .. order derivatives -------------------------------------------
-
-    std::vector<Eigen::MatrixXd> D = table;
+    std::vector<Eigen::MatrixXd> table = compute_basis_table(params);
+    results[0] = table[degree_];
 
     for (std::size_t k = 1; k <= order; ++k) {
         
         // Derivatives higher than the polynomial degree are strictly zero
-        if (k > degree) {
+        if (k > degree_) {
             results[k] = Eigen::MatrixXd::Zero(num_points, num_basis);
             continue;
         }
 
-        std::vector<Eigen::MatrixXd> next_D(degree + 1);
+        // Preallocate next table for k-th derivative
+        std::vector<Eigen::MatrixXd> next_table(degree_ + 1);
         
-        for (std::size_t d = k; d <= degree; ++d) {
-            std::size_t current_num_basis = knots.size() - d - 1;
-            next_D[d] = Eigen::MatrixXd::Zero(num_points, current_num_basis);
-            
-            for (std::size_t i = 0; i < current_num_basis; ++i) {
-                double left_denom = knots[i + d] - knots[i];
-                double right_denom = knots[i + d + 1] - knots[i + 1];
+        // Compute derivatives from k .. degree
+        for (std::size_t d = k; d <= degree_; ++d) {
 
+            // Preallocate table for d-th degree derivatives
+            std::size_t current_num_basis = knots_.size() - d - 1;
+            next_table[d] = Eigen::MatrixXd::Zero(num_points, current_num_basis);
+            
+            // Apply differenciation rule
+            for (std::size_t i = 0; i < current_num_basis; ++i) {
+
+                double left_denom = knots_[i + d] - knots_[i];
+                double right_denom = knots_[i + d + 1] - knots_[i + 1];
+
+                // Handle potential division by zero
                 if (left_denom > 1e-14) {
-                    next_D[d].col(i) += (d / left_denom) * D[d - 1].col(i);
+                    next_table[d].col(i) += (d / left_denom) * table[d - 1].col(i);
                 }
                 if (right_denom > 1e-14) {
-                    next_D[d].col(i) -= (d / right_denom) * D[d - 1].col(i + 1);
+                    next_table[d].col(i) -= (d / right_denom) * table[d - 1].col(i + 1);
                 }
             }
         }
         
-        D = next_D;
-        results[k] = D[degree];
+        table = next_table;
+        results[k] = table[degree_];
     }
 
     return results;
-}
-
-std::vector<Eigen::MatrixXd> BSpline::eval(const Eigen::VectorXd& u, 
-                                               std::size_t order) const
-{
-    return evaluate_bspline(degree_, knots_, u, order);
 }
 
 } // namespace pyck

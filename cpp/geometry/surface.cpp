@@ -12,39 +12,40 @@ std::vector<std::vector<Eigen::MatrixXd>> SurfacePatch::tensor_basis(
     const std::size_t N = v.size();
     const std::size_t Q = M * N;
 
-    auto Nu = basis_[0]->eval(u, order);
-    auto Nv = basis_[1]->eval(v, order);
+    // Build the M*N × 2 parameter grid (v runs fastest)
+    Eigen::MatrixXd params(Q, 2);
+    for (std::size_t p = 0; p < M; ++p) {
+        for (std::size_t q = 0; q < N; ++q) {
+            params(p * N + q, 0) = u(p);
+            params(p * N + q, 1) = v(q);
+        }
+    }
 
-    const std::size_t n_u = basis_[0]->num_basis();
-    const std::size_t n_v = basis_[1]->num_basis();
-
+    // Allocate the triangular result[i][j] with i + j <= order
     std::vector<std::vector<Eigen::MatrixXd>> result(order + 1);
     for (std::size_t i = 0; i <= order; ++i) {
         result[i].resize(order + 1 - i);
     }
 
-    for (std::size_t i = 0; i <= order; ++i) {
-        for (std::size_t j = 0; j <= order - i; ++j) {
-            Eigen::MatrixXd R(Q, n_u * n_v);
+    if (order == 0) {
+        // Fast path: only basis values, no derivatives
+        result[0][0] = tensor_product_.eval(params);
+    } else {
+        // eval_derivs returns (order+1)*(order+1) matrices in flat order:
+        //   index = i_u * (order+1) + i_v
+        // where i_u is the derivative order in u and i_v in v.
+        auto derivs = tensor_product_.eval_derivs(params, {order, order});
 
-            for (std::size_t p = 0; p < M; ++p) {
-                for (std::size_t q = 0; q < N; ++q) {
-                    std::size_t row = p * N + q;
-                    for (std::size_t a = 0; a < n_u; ++a) {
-                        double nu_val = Nu[i](p, a);
-                        for (std::size_t b = 0; b < n_v; ++b) {
-                            R(row, a * n_v + b) = nu_val * Nv[j](q, b);
-                        }
-                    }
-                }
+        for (std::size_t i = 0; i <= order; ++i) {
+            for (std::size_t j = 0; j <= order - i; ++j) {
+                result[i][j] = std::move(derivs[i * (order + 1) + j]);
             }
-
-            result[i][j] = std::move(R);
         }
     }
 
     return result;
 }
+
 
 std::vector<std::vector<Eigen::MatrixXd>> SurfacePatch::eval(
     const Eigen::VectorXd& u,
