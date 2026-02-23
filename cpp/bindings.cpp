@@ -4,6 +4,7 @@
 
 #include "bspline.hpp"
 #include "tensor.hpp"
+#include "curve.hpp"
 #include "surface.hpp"
 
 namespace py = pybind11;
@@ -59,6 +60,24 @@ PYBIND11_MODULE(_pyck, m) {
         .def("jacobian", &pyck::Patch::jacobian,
              py::arg("params"))
         .def("jacobian_det", &pyck::Patch::jacobian_det,
+             py::arg("params"));
+
+    py::class_<pyck::CurvePatch, pyck::Patch>(m, "CurvePatch")
+        .def(py::init([](std::size_t gdim,
+                         pyck::Basis* basis,
+                         const Eigen::MatrixXd& cp) {
+                 return new pyck::CurvePatch(gdim, basis, cp);
+             }),
+             py::arg("gdim"), py::arg("basis"),
+             py::arg("control_points"),
+             py::keep_alive<1, 3>())
+        .def("eval", &pyck::CurvePatch::eval,
+             py::arg("params"))
+        .def("eval_physical_derivs", &pyck::CurvePatch::eval_physical_derivs,
+             py::arg("params"), py::arg("order") = 1)
+        .def("jacobian", &pyck::CurvePatch::jacobian,
+             py::arg("params"))
+        .def("jacobian_det", &pyck::CurvePatch::jacobian_det,
              py::arg("params"));
 
     py::class_<pyck::SurfacePatch, pyck::Patch>(m, "SurfacePatch")

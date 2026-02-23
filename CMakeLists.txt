@@ -27,6 +27,7 @@ target_link_libraries(pyck_basis PUBLIC eigen)
 
 # Geometry library
 add_library(pyck_geometry
+    cpp/geometry/curve.cpp
     cpp/geometry/surface.cpp
 )
 target_include_directories(pyck_geometry PUBLIC
@@ -65,6 +66,12 @@ add_executable(test_tensor_product
 )
 target_link_libraries(test_tensor_product PRIVATE pyck_basis catch)
 
+# Test executable: CurvePatch
+add_executable(test_curve
+    tests/test_curve.cpp
+)
+target_link_libraries(test_curve PRIVATE pyck_geometry catch)
+
 # Test executable: SurfacePatch
 add_executable(test_surface
     tests/test_surface.cpp
@@ -75,5 +82,6 @@ enable_testing()
 add_test(NAME knot_vector_tests COMMAND test_knot_vector)
 add_test(NAME bspline_tests COMMAND test_bspline)
 add_test(NAME tensor_product_tests COMMAND test_tensor_product)
+add_test(NAME curve_tests COMMAND test_curve)
 add_test(NAME surface_tests COMMAND test_surface)
 
