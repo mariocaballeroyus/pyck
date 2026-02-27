@@ -12,7 +12,7 @@ using namespace pyck;
  * We verify this property on vectors produced by the clamped_uniform factory
  * for several polynomial degrees.
  */
-TEST_CASE("KnotVector: monotonicity", "[knots]") {
+TEST_CASE("KnotVector: monotonicity", "[basis][knots]") {
     for (std::size_t p = 1; p <= 4; ++p) {
         std::size_t n = p + 3;  // a few more basis functions than the minimum
         auto kv = KnotVector::clamped_uniform(p, n);
@@ -30,7 +30,7 @@ TEST_CASE("KnotVector: monotonicity", "[knots]") {
  * which must return the last valid span index n (the index of the last
  * non-trivial basis function).
  */
-TEST_CASE("KnotVector: find_span", "[knots]") {
+TEST_CASE("KnotVector: find_span", "[basis][knots]") {
     // Degree 2, 5 basis → knots = {0,0,0, 1/3, 2/3, 1,1,1}
     auto kv = KnotVector::clamped_uniform(2, 5);
 
@@ -54,7 +54,7 @@ TEST_CASE("KnotVector: find_span", "[knots]") {
  * For a clamped knot vector on [0, 1] of degree p, the first p+1 knots must
  * all equal 0.0 and the last p+1 knots must all equal 1.0.
  */
-TEST_CASE("KnotVector: clamped property", "[knots]") {
+TEST_CASE("KnotVector: clamped property", "[basis][knots]") {
     for (std::size_t p = 1; p <= 4; ++p) {
         std::size_t n = p + 2;
         auto kv = KnotVector::clamped_uniform(p, n);
@@ -78,7 +78,7 @@ TEST_CASE("KnotVector: clamped property", "[knots]") {
  * For a clamped uniform vector with n basis functions of degree p,
  * the number of elements is n - p.
  */
-TEST_CASE("KnotVector: unique spans", "[knots]") {
+TEST_CASE("KnotVector: unique spans", "[basis][knots]") {
     std::size_t p = 2, n = 6;
     auto kv = KnotVector::clamped_uniform(p, n);
 

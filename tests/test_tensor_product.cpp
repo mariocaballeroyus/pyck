@@ -33,7 +33,7 @@ static Eigen::MatrixXd make_grid(const Eigen::VectorXd& u,
  *
  *   Σ_{i,j} R_{i,j}(u, v) = 1
  */
-TEST_CASE("TensorProduct: partition of unity", "[tensor]") {
+TEST_CASE("TensorProduct: partition of unity", "[basis][tensor]") {
     auto bu = std::make_shared<BSpline>(2, KnotVector::clamped_uniform(2, 4));
     auto bv = std::make_shared<BSpline>(3, KnotVector::clamped_uniform(3, 5));
     TensorProduct tp({bu, bv});
@@ -61,7 +61,7 @@ TEST_CASE("TensorProduct: partition of unity", "[tensor]") {
  * We verify this against manually computed Kronecker products of 1D
  * basis values and derivatives (quadratic Bernstein at u = v = 0.5).
  */
-TEST_CASE("TensorProduct: lexicographical ordering", "[tensor]") {
+TEST_CASE("TensorProduct: lexicographical ordering", "[basis][tensor]") {
     std::vector<double> knots = {0, 0, 0, 1, 1, 1};
     auto bu = std::make_shared<BSpline>(2, KnotVector(knots));
     auto bv = std::make_shared<BSpline>(2, KnotVector(knots));
@@ -118,7 +118,7 @@ TEST_CASE("TensorProduct: lexicographical ordering", "[tensor]") {
  * by computing  Σ R_{i,j}(u,v) · c_{i,j}  where the four control values
  * are f evaluated at the parameter corners (0,0), (0,1), (1,0), (1,1).
  */
-TEST_CASE("TensorProduct: bilinear consistency", "[tensor]") {
+TEST_CASE("TensorProduct: bilinear consistency", "[basis][tensor]") {
     auto bu = std::make_shared<BSpline>(1, KnotVector({0, 0, 1, 1}));
     auto bv = std::make_shared<BSpline>(1, KnotVector({0, 0, 1, 1}));
     TensorProduct tp({bu, bv});
@@ -153,7 +153,7 @@ TEST_CASE("TensorProduct: bilinear consistency", "[tensor]") {
  * We verify (1,0), (0,1), and (1,1) against the manually computed
  * Kronecker products of the 1D quantities.
  */
-TEST_CASE("TensorProduct: derivative Kronecker check", "[tensor][deriv]") {
+TEST_CASE("TensorProduct: derivative Kronecker check", "[basis][tensor]") {
     std::vector<double> knots = {0, 0, 0, 1, 1, 1};
     auto bu = std::make_shared<BSpline>(2, KnotVector(knots));
     auto bv = std::make_shared<BSpline>(2, KnotVector(knots));
@@ -200,7 +200,7 @@ TEST_CASE("TensorProduct: derivative Kronecker check", "[tensor][deriv]") {
  *
  *   ∂R/∂u ≈ [R(u+h,v) - R(u-h,v)] / (2h)
  */
-TEST_CASE("TensorProduct: finite-difference derivative check", "[tensor][deriv]") {
+TEST_CASE("TensorProduct: finite-difference derivative check", "[basis][tensor]") {
     auto bu = std::make_shared<BSpline>(3, KnotVector::clamped_uniform(3, 5));
     auto bv = std::make_shared<BSpline>(2, KnotVector::clamped_uniform(2, 4));
     TensorProduct tp({bu, bv});

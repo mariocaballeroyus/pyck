@@ -16,7 +16,7 @@ using namespace pyck;
  *
  * We verify this for polynomial degrees 1 through 3.
  */
-TEST_CASE("BSpline: partition of unity", "[bspline]") {
+TEST_CASE("BSpline: partition of unity", "[basis][bspline]") {
     for (std::size_t p = 1; p <= 3; ++p) {
         auto kv = KnotVector::clamped_uniform(p, p + 3);
         BSpline bs(p, kv);
@@ -36,7 +36,7 @@ TEST_CASE("BSpline: partition of unity", "[bspline]") {
  *
  *   N_{i,p}(u) ≥ 0   for all i, p, u
  */
-TEST_CASE("BSpline: non-negativity", "[bspline]") {
+TEST_CASE("BSpline: non-negativity", "[basis][bspline]") {
     auto kv = KnotVector::clamped_uniform(3, 8);
     BSpline bs(3, kv);
 
@@ -59,7 +59,7 @@ TEST_CASE("BSpline: non-negativity", "[bspline]") {
  * We build a non-uniform knot vector {0,0,0, 0.3, 0.7, 1,1,1} (p=2, n=5)
  * and verify that each basis function vanishes outside its support.
  */
-TEST_CASE("BSpline: local support", "[bspline]") {
+TEST_CASE("BSpline: local support", "[basis][bspline]") {
     std::vector<double> raw_knots = {0, 0, 0, 0.3, 0.7, 1, 1, 1};
     BSpline bs(2, KnotVector(raw_knots));
 
@@ -90,7 +90,7 @@ TEST_CASE("BSpline: local support", "[bspline]") {
  *
  * We verify this for derivatives of order 1 and 2.
  */
-TEST_CASE("BSpline: derivative sum to zero", "[bspline][deriv]") {
+TEST_CASE("BSpline: derivative sum to zero", "[basis][bspline]") {
     auto kv = KnotVector::clamped_uniform(3, 6);
     BSpline bs(3, kv);
 
@@ -113,7 +113,7 @@ TEST_CASE("BSpline: derivative sum to zero", "[bspline][deriv]") {
  * (left and right limits agree), while, as a sanity check, we also ensure
  * that the third derivative can exhibit a jump (C^{p-k} = C^2).
  */
-TEST_CASE("BSpline: C-continuity at internal knot", "[bspline][deriv]") {
+TEST_CASE("BSpline: C-continuity at internal knot", "[basis][bspline]") {
     // p = 3, 7 basis → knots = {0,0,0,0, 0.25, 0.5, 0.75, 1,1,1,1}
     auto kv = KnotVector::clamped_uniform(3, 7);
     BSpline bs(3, kv);
@@ -149,7 +149,7 @@ TEST_CASE("BSpline: C-continuity at internal knot", "[bspline][deriv]") {
  * Degree 2, knots = {0,0,0,1,1,1}:
  *   N_0(u) = (1-u)²,   N_1(u) = 2u(1-u),   N_2(u) = u²
  */
-TEST_CASE("BSpline: analytical values", "[bspline]") {
+TEST_CASE("BSpline: analytical values", "[basis][bspline]") {
     Eigen::VectorXd u(5);
     u << 0.0, 0.25, 0.5, 0.75, 1.0;
 
@@ -189,7 +189,7 @@ TEST_CASE("BSpline: analytical values", "[bspline]") {
  *   N_0'' = 2,       N_1'' = -4,      N_2'' = 2
  *   Orders > p are zero identically.
  */
-TEST_CASE("BSpline: analytical derivatives", "[bspline][deriv]") {
+TEST_CASE("BSpline: analytical derivatives", "[basis][bspline]") {
     Eigen::VectorXd u(3);
     u << 0.0, 0.5, 1.0;
 
@@ -246,7 +246,7 @@ TEST_CASE("BSpline: analytical derivatives", "[bspline][deriv]") {
  *
  * This is a general sanity check for arbitrary knot vectors and degrees.
  */
-TEST_CASE("BSpline: finite-difference derivative check", "[bspline][deriv]") {
+TEST_CASE("BSpline: finite-difference derivative check", "[basis][bspline][deriv]") {
     auto kv = KnotVector::clamped_uniform(3, 6);
     BSpline bs(3, kv);
 

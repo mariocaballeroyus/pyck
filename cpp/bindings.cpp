@@ -5,7 +5,6 @@
 #include "bspline.hpp"
 #include "tensor.hpp"
 #include "curve.hpp"
-#include "surface.hpp"
 
 namespace py = pybind11;
 
@@ -53,13 +52,11 @@ PYBIND11_MODULE(_pyck, m) {
     py::class_<pyck::Patch>(m, "Patch")
         .def("gdim", &pyck::Patch::gdim)
         .def("tdim", &pyck::Patch::tdim)
-        .def("control_points",
+        .def("control_pts",
              static_cast<const Eigen::MatrixXd& (pyck::Patch::*)() const>(
-                 &pyck::Patch::control_points),
+                 &pyck::Patch::control_pts),
              py::return_value_policy::reference_internal)
-        .def("jacobian", &pyck::Patch::jacobian,
-             py::arg("params"))
-        .def("jacobian_det", &pyck::Patch::jacobian_det,
+        .def("eval_jacobian", &pyck::Patch::eval_jacobian,
              py::arg("params"));
 
     py::class_<pyck::CurvePatch, pyck::Patch>(m, "CurvePatch")
@@ -71,30 +68,12 @@ PYBIND11_MODULE(_pyck, m) {
              py::arg("gdim"), py::arg("basis"),
              py::arg("control_points"),
              py::keep_alive<1, 3>())
-        .def("eval", &pyck::CurvePatch::eval,
-             py::arg("params"))
-        .def("eval_physical_derivs", &pyck::CurvePatch::eval_physical_derivs,
-             py::arg("params"), py::arg("order") = 1)
-        .def("jacobian", &pyck::CurvePatch::jacobian,
-             py::arg("params"))
-        .def("jacobian_det", &pyck::CurvePatch::jacobian_det,
-             py::arg("params"));
-
-    py::class_<pyck::SurfacePatch, pyck::Patch>(m, "SurfacePatch")
-        .def(py::init([](std::size_t gdim,
-                         std::array<pyck::Basis*, 2> bases,
-                         const Eigen::MatrixXd& cp) {
-                 return new pyck::SurfacePatch(gdim, bases, cp);
-             }),
-             py::arg("gdim"), py::arg("bases"),
-             py::arg("control_points"),
-             py::keep_alive<1, 3>())
-        .def("eval", &pyck::SurfacePatch::eval,
-             py::arg("params"))
-        .def("eval_physical_derivs", &pyck::SurfacePatch::eval_physical_derivs,
-             py::arg("params"), py::arg("order") = 1)
-        .def("jacobian", &pyck::SurfacePatch::jacobian,
-             py::arg("params"))
-        .def("jacobian_det", &pyck::SurfacePatch::jacobian_det,
+        .def("eval_basis_functions", &pyck::CurvePatch::eval_basis_functions,
+             py::arg("params"), py::arg("order") = 0)
+        .def("eval_shape_functions", &pyck::CurvePatch::eval_shape_functions,
+             py::arg("params"), py::arg("order") = 0)
+        .def("eval_geometry", &pyck::CurvePatch::eval_geometry,
+             py::arg("params"), py::arg("order") = 0)
+        .def("eval_jacobian", &pyck::CurvePatch::eval_jacobian,
              py::arg("params"));
 }

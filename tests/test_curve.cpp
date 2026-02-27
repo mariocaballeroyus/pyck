@@ -10,368 +10,184 @@
 
 using namespace pyck;
 
-// =============================================================================
-// eval() tests
-// =============================================================================
 
-TEST_CASE("CurvePatch: endpoint interpolation", "[curve]") {
-    double L = 5.0;
-    BSpline bu(2, KnotVector::clamped_uniform(2, 4));
-    auto curve = CurvePatch::line_segment(&bu, L);
+/**
+ * @test Analytical Push-Forward Verification
+ * @brief This test verifies the CurvePatch physical derivatives against 
+ * analytical hand-derived values using the Metric Tensor and Christoffel symbols.
+ * * Equations used for verification:
+ * - 1st order: dN/ds = (dN/du) / sqrt(g11)
+ * - 2nd order: d2N/ds2 = (d2N/du2 - Gamma * dN/du) / g11
+ * - 3rd order: d3N/ds3 = (d3N/du3 - 3*Gamma*d2N/du2 + (2*Gamma^2 - Gamma_u)*dN/du) / g11^1.5
+ * * Where g11 is the metric and Gamma is the Christoffel symbol of the 1st kind.
+ */
+TEST_CASE("CurvePatch: Analytical Push-Forward Verification", "[geometry][curve]") {
+    // 1. Setup - Use the constructor from your HPP: (gdim, basis_ptr, control_pts)
+    std::vector<double> knots_vec = {0, 0, 0, 0, 1, 1, 1, 1};
+    BSpline basis(3, KnotVector(knots_vec));
 
-    Eigen::MatrixXd params(2, 1);
-    params << 0.0, 1.0;
-    auto X = curve.eval(params);
+    // gdim = 3 (3D space)
+    Eigen::MatrixXd control_pts(4, 3);
+    control_pts.row(0) << 0.0,  0.0, 0.0;
+    control_pts.row(1) << 1.0,  2.0, 0.0;
+    control_pts.row(2) << 2.0, -1.0, 1.0;
+    control_pts.row(3) << 3.0,  0.0, 0.0;
 
-    REQUIRE(X(0, 0) == Approx(0.0).margin(1e-12));
-    REQUIRE(X(0, 1) == Approx(0.0).margin(1e-12));
-    REQUIRE(X(0, 2) == Approx(0.0).margin(1e-12));
-    REQUIRE(X(1, 0) == Approx(L).margin(1e-12));
-    REQUIRE(X(1, 1) == Approx(0.0).margin(1e-12));
-    REQUIRE(X(1, 2) == Approx(0.0).margin(1e-12));
-}
+    // Correcting constructor call: (gdim=3, basis_ptr, control_pts)
+    CurvePatch curve(3, &basis, control_pts);
 
-TEST_CASE("CurvePatch: rigid body translation", "[curve]") {
-    double L = 3.0;
-    BSpline bu(2, KnotVector::clamped_uniform(2, 4));
-    auto curve_original = CurvePatch::line_segment(&bu, L);
+    std::vector<double> test_pts = {0.15, 0.5, 0.85};
 
-    Eigen::RowVector3d T(10.0, -5.0, 7.0);
-    Eigen::MatrixXd P_translated = curve_original.control_points().rowwise() + T;
-    CurvePatch curve_translated(3, &bu, P_translated);
+    for (double u : test_pts)
+    {
+        SECTION("Evaluation at u = " + std::to_string(u)) {
+            // Your API expects a (Q x 1) matrix for points
+            Eigen::MatrixXd params(1, 1);
+            params << u;
 
-    Eigen::MatrixXd params = Eigen::VectorXd::LinSpaced(5, 0.0, 1.0);
-    params.resize(5, 1);
-    auto X_old = curve_original.eval(params);
-    auto X_new = curve_translated.eval(params);
+            // --- Analytical Parametric Basis Derivatives (dN/du) ---
+            std::vector<double> N_u = {
+                -3.0 * std::pow(1.0 - u, 2),
+                 3.0 * (1.0 - u) * (1.0 - 3.0 * u),
+                 3.0 * u * (2.0 - 3.0 * u),
+                 3.0 * std::pow(u, 2)
+            };
+            std::vector<double> N_uu = {
+                 6.0 * (1.0 - u),
+                -6.0 * (2.0 - 3.0 * u),
+                 6.0 * (1.0 - 3.0 * u),
+                 6.0 * u
+            };
+            std::vector<double> N_uuu = {-6.0, 18.0, -18.0, 6.0};
 
-    for (int i = 0; i < X_old.rows(); ++i)
-        for (int d = 0; d < 3; ++d)
-            REQUIRE(X_new(i, d) == Approx(X_old(i, d) + T(d)).margin(1e-12));
-}
+            // --- Analytical Geometry Push-Forward ---
+            Eigen::Vector3d x_1(3.0, 27*u*u - 30*u + 6, -9*u*u + 6*u);
+            Eigen::Vector3d x_11(0.0, 54*u - 30, -18*u + 6);
+            Eigen::Vector3d x_111(0.0, 54.0, -18.0);
 
-TEST_CASE("CurvePatch: affine covariance (rotation)", "[curve]") {
-    double L = 3.0;
-    BSpline bu(2, KnotVector::clamped_uniform(2, 4));
-    auto curve_original = CurvePatch::line_segment(&bu, L);
+            double g11 = x_1.dot(x_1);
+            double Gamma = x_1.dot(x_11) / g11;
+            double Gamma_u = (x_11.dot(x_11) + x_1.dot(x_111)) / g11 - 2.0 * std::pow(Gamma, 2);
 
-    // 90-degree rotation around z-axis
-    Eigen::Matrix3d R;
-    R << 0, -1, 0, 1, 0, 0, 0, 0, 1;
+            // --- API EVALUATION ---
+            // basis_geom -> eval_shape_functions
+            auto r = curve.eval_shape_functions(params, 3);
+            
+            const auto& dN  = r[1]; // dN/ds (Q x K)
+            const auto& d2N = r[2]; // d2N/ds2
+            const auto& d3N = r[3]; // d3N/ds3
 
-    Eigen::MatrixXd P_rotated = (R * curve_original.control_points().transpose()).transpose();
-    CurvePatch curve_rotated(3, &bu, P_rotated);
+            // --- Assertions ---
+            for (int a = 0; a < 4; ++a) {
+                // 1st Physical Deriv
+                double expected_dN = N_u[a] / std::sqrt(g11);
+                CHECK(dN(0, a) == Approx(expected_dN).margin(1e-10));
 
-    Eigen::MatrixXd params = Eigen::VectorXd::LinSpaced(5, 0.0, 1.0);
-    params.resize(5, 1);
-    auto X_old = curve_original.eval(params);
-    auto X_new = curve_rotated.eval(params);
+                // 2nd Physical Deriv
+                double expected_d2N = (N_uu[a] - Gamma * N_u[a]) / g11;
+                CHECK(d2N(0, a) == Approx(expected_d2N).margin(1e-10));
 
-    for (int i = 0; i < X_old.rows(); ++i) {
-        Eigen::Vector3d expected = R * X_old.row(i).transpose();
-        for (int d = 0; d < 3; ++d)
-            REQUIRE(X_new(i, d) == Approx(expected(d)).margin(1e-12));
-    }
-}
-
-// =============================================================================
-// Jacobian tests
-// =============================================================================
-
-TEST_CASE("CurvePatch: jacobian line segment", "[curve][jacobian]") {
-    double L = 4.0;
-    BSpline bu(2, KnotVector::clamped_uniform(2, 4));
-    auto curve = CurvePatch::line_segment(&bu, L);
-
-    Eigen::MatrixXd params(3, 1);
-    params << 0.0, 0.5, 1.0;
-    auto jacs = curve.jacobian(params);
-    auto dets = curve.jacobian_det(params);
-
-    for (int q = 0; q < 3; ++q) {
-        auto& J = jacs[q];
-        REQUIRE(J.rows() == 3);
-        REQUIRE(J.cols() == 1);
-        REQUIRE(J(0, 0) == Approx(L).margin(1e-10));
-        REQUIRE(J(1, 0) == Approx(0.0).margin(1e-10));
-        REQUIRE(J(2, 0) == Approx(0.0).margin(1e-10));
-        REQUIRE(dets(q) == Approx(L).margin(1e-10));
-    }
-}
-
-TEST_CASE("CurvePatch: jacobian parabolic curve", "[curve][jacobian]") {
-    // C(u) = (u, u^2, 0) — quadratic Bernstein basis
-    std::vector<double> knots = {0, 0, 0, 1, 1, 1};
-    BSpline bu(2, KnotVector(knots));
-    // Control points for parabola C(u) = (u, u², 0):
-    // With quadratic Bernstein on [0,1]:
-    //   P0 = (0, 0, 0), P1 = (0.5, 0, 0), P2 = (1, 1, 0)
-    // Actually C(u) = (1-u)²P0 + 2u(1-u)P1 + u²P2
-    // For x(u) = u: P0_x=0, P1_x=0.5, P2_x=1  ✓
-    // For y(u) = u²: P0_y=0, P1_y=0, P2_y=1  ✓
-    Eigen::MatrixXd P(3, 3);
-    P.row(0) << 0.0, 0.0, 0.0;
-    P.row(1) << 0.5, 0.0, 0.0;
-    P.row(2) << 1.0, 1.0, 0.0;
-
-    CurvePatch curve(3, &bu, P);
-
-    Eigen::MatrixXd params(5, 1);
-    params << 0.0, 0.25, 0.5, 0.75, 1.0;
-    auto jacs = curve.jacobian(params);
-    auto dets = curve.jacobian_det(params);
-
-    for (int q = 0; q < 5; ++q) {
-        double u = params(q, 0);
-        // dC/du = (1, 2u, 0)
-        REQUIRE(jacs[q](0, 0) == Approx(1.0).margin(1e-10));
-        REQUIRE(jacs[q](1, 0) == Approx(2.0 * u).margin(1e-10));
-        REQUIRE(jacs[q](2, 0) == Approx(0.0).margin(1e-10));
-        REQUIRE(dets(q) == Approx(std::sqrt(1.0 + 4.0 * u * u)).margin(1e-10));
-    }
-}
-
-// =============================================================================
-// eval_physical_derivs — arc-length tests
-// =============================================================================
-
-TEST_CASE("CurvePatch: physical derivs key check", "[curve][phys_deriv]") {
-    std::vector<double> knots = {0, 0, 0, 1, 1, 1};
-    BSpline bu(2, KnotVector(knots));
-
-    Eigen::MatrixXd P(3, 3);
-    P.row(0) << 0.0, 0.0, 0.0;
-    P.row(1) << 0.5, 0.0, 0.0;
-    P.row(2) << 1.0, 1.0, 0.0;
-    CurvePatch curve(3, &bu, P);
-
-    Eigen::MatrixXd params(1, 1);
-    params << 0.5;
-
-    SECTION("Order 1") {
-        auto r = curve.eval_physical_derivs(params, 1);
-        REQUIRE(r.count("N") == 1);
-        REQUIRE(r.count("dNdx") == 1);
-        REQUIRE(r.count("dNdy") == 0);
-        REQUIRE(r.count("dNdxdx") == 0);
-        REQUIRE(r.size() == 2);
-    }
-
-    SECTION("Order 2") {
-        auto r = curve.eval_physical_derivs(params, 2);
-        REQUIRE(r.count("dNdxdx") == 1);
-        REQUIRE(r.count("dNdxdy") == 0);
-        REQUIRE(r.size() == 3);  // N + dNdx + dNdxdx
-    }
-
-    SECTION("Order 3") {
-        auto r = curve.eval_physical_derivs(params, 3);
-        REQUIRE(r.count("dNdxdxdx") == 1);
-        REQUIRE(r.size() == 4);  // N + dNdx + dNdxdx + dNdxdxdx
-    }
-}
-
-TEST_CASE("CurvePatch: partition of unity for physical derivs", "[curve][phys_deriv]") {
-    BSpline bu(3, KnotVector::clamped_uniform(3, 6));
-    auto curve = CurvePatch::line_segment(&bu, 4.0);
-
-    Eigen::MatrixXd params(5, 1);
-    params << 0.1, 0.3, 0.5, 0.7, 0.9;
-
-    auto r = curve.eval_physical_derivs(params, 3);
-
-    for (int q = 0; q < params.rows(); ++q) {
-        // Σ N_A = 1
-        REQUIRE(r.at("N").row(q).sum() == Approx(1.0).margin(1e-12));
-        // Σ dN_A/dx = 0
-        REQUIRE(r.at("dNdx").row(q).sum() == Approx(0.0).margin(1e-10));
-        // Σ d²N_A/dx² = 0
-        REQUIRE(r.at("dNdxdx").row(q).sum() == Approx(0.0).margin(1e-10));
-        // Σ d³N_A/dx³ = 0
-        REQUIRE(r.at("dNdxdxdx").row(q).sum() == Approx(0.0).margin(1e-10));
-    }
-}
-
-TEST_CASE("CurvePatch: line segment 1st-order physical derivs", "[curve][phys_deriv]") {
-    double L = 4.0;
-    BSpline bu(3, KnotVector::clamped_uniform(3, 6));
-    auto curve = CurvePatch::line_segment(&bu, L);
-
-    Eigen::VectorXd u_pts(3);
-    u_pts << 0.2, 0.5, 0.8;
-    Eigen::MatrixXd params(3, 1);
-    params.col(0) = u_pts;
-
-    auto r = curve.eval_physical_derivs(params, 1);
-
-    // Compare dN/dx against (1/L) * dN/du
-    auto dNdu = bu.eval_derivs(u_pts, 1)[1];  // (3 × n)
-
-    std::size_t n = bu.num_basis();
-    for (int q = 0; q < 3; ++q) {
-        for (std::size_t A = 0; A < n; ++A) {
-            double expected_dx = (1.0 / L) * dNdu(q, A);
-            REQUIRE(r.at("dNdx")(q, A) == Approx(expected_dx).margin(1e-10));
+                // 3rd Physical Deriv
+                double expected_d3N = (N_uuu[a] - 3.0 * Gamma * N_uu[a] + 
+                                      (2.0 * std::pow(Gamma, 2) - Gamma_u) * N_u[a]) / std::pow(g11, 1.5);
+                CHECK(d3N(0, a) == Approx(expected_d3N).margin(1e-10));
+            }
+            
+            // Partition of Unity
+            CHECK(dN.row(0).sum()  == Approx(0.0).margin(1e-11));
+            CHECK(d2N.row(0).sum() == Approx(0.0).margin(1e-11));
+            CHECK(d3N.row(0).sum() == Approx(0.0).margin(1e-11));
         }
     }
 }
 
-TEST_CASE("CurvePatch: line segment 2nd-order physical derivs", "[curve][phys_deriv]") {
-    double L = 4.0;
-    BSpline bu(3, KnotVector::clamped_uniform(3, 6));
-    auto curve = CurvePatch::line_segment(&bu, L);
-
-    Eigen::VectorXd u_pts(1);
-    u_pts << 0.4;
-    Eigen::MatrixXd params(1, 1);
-    params(0, 0) = 0.4;
-
-    auto r = curve.eval_physical_derivs(params, 2);
-    auto bu_d = bu.eval_derivs(u_pts, 2);
-
-    std::size_t n = bu.num_basis();
-    for (std::size_t A = 0; A < n; ++A) {
-        double exp_dxdx = (1.0 / (L * L)) * bu_d[2](0, A);
-        REQUIRE(r.at("dNdxdx")(0, A) == Approx(exp_dxdx).margin(1e-10));
-    }
-}
-
-TEST_CASE("CurvePatch: line segment FD 1st-order", "[curve][phys_deriv]") {
-    double L = 4.0;
-    BSpline bu(3, KnotVector::clamped_uniform(3, 6));
-    auto curve = CurvePatch::line_segment(&bu, L);
-
-    Eigen::MatrixXd params(1, 1);
-    params << 0.4;
-    const auto& P = curve.control_points();
-
-    auto r = curve.eval_physical_derivs(params, 1);
-
-    double h = 1e-7;
-    // dC/dx ≈ (C(u + h/L) - C(u - h/L)) / (2h)
-    Eigen::MatrixXd pf(1, 1), pb(1, 1);
-    pf << 0.4 + h / L;
-    pb << 0.4 - h / L;
-    Eigen::RowVectorXd dCdx_fd = (curve.eval(pf) - curve.eval(pb)).row(0) / (2.0 * h);
-    Eigen::RowVectorXd dCdx_api = (r.at("dNdx") * P).row(0);
-    for (int d = 0; d < 3; ++d)
-        REQUIRE(dCdx_api(d) == Approx(dCdx_fd(d)).margin(1e-5));
-}
-
-TEST_CASE("CurvePatch: line segment FD 2nd-order", "[curve][phys_deriv]") {
-    double L = 4.0;
-    BSpline bu(3, KnotVector::clamped_uniform(3, 6));
-    auto curve = CurvePatch::line_segment(&bu, L);
-
-    Eigen::MatrixXd params(1, 1);
-    params << 0.4;
-    auto r0 = curve.eval_physical_derivs(params, 2);
-
-    double h = 1e-6;
-    Eigen::MatrixXd pf(1, 1), pb(1, 1);
-
-    // d²N/dxdx ≈ (dNdx(u + h/L) - dNdx(u - h/L)) / (2h)
-    pf << 0.4 + h / L;
-    pb << 0.4 - h / L;
-    auto rf = curve.eval_physical_derivs(pf, 1);
-    auto rb = curve.eval_physical_derivs(pb, 1);
-    auto d2Ndxdx_fd = (rf.at("dNdx") - rb.at("dNdx")) / (2.0 * h);
-    for (int c = 0; c < r0.at("dNdxdx").cols(); ++c)
-        REQUIRE(r0.at("dNdxdx")(0, c) == Approx(d2Ndxdx_fd(0, c)).margin(1e-3));
-}
-
 /**
- * 3rd-order physical derivatives: partition of unity and geometry check.
- *
- * On a line segment (linear geometry), the 3rd-order geometry derivatives
- * d³C/dx³ = Σ d³N_A/dx³ * P_A should be zero because C is linear.
+ * @test Case: External AD Numerical Validation
+ * @brief This test validates the C++ implementation against values 
+ * generated by an external Automatic Differentiation (AD) engine 
+ * (JAX/Python).
  */
-TEST_CASE("CurvePatch: 3rd-order partition of unity & geometry", "[curve][phys_deriv]") {
-    double L = 3.0;
-    BSpline bu(3, KnotVector::clamped_uniform(3, 6));
-    auto curve = CurvePatch::line_segment(&bu, L);
+TEST_CASE("CurvePatch: External AD Numerical Validation", "[geometry][curve]") {
+    // === Setup Basis and Geometry ============================================
+    std::vector<double> knots_vec = {0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0};
+    BSpline basis(3, KnotVector(knots_vec));
 
-    Eigen::MatrixXd params(5, 1);
-    params << 0.1, 0.3, 0.5, 0.7, 0.9;
+    // Geometric dimension = 3
+    Eigen::MatrixXd control_pts(4, 3);
+    control_pts.row(0) << 0.0,  0.0, 0.0;
+    control_pts.row(1) << 1.0,  2.0, 0.0;
+    control_pts.row(2) << 2.0, -1.0, 1.0;
+    control_pts.row(3) << 3.0,  0.0, 0.0;
 
-    auto r = curve.eval_physical_derivs(params, 3);
-    const auto& P = curve.control_points();
+    CurvePatch curve(3, &basis, control_pts);
 
-    auto& m = r.at("dNdxdxdx");
-    for (int q = 0; q < m.rows(); ++q) {
-        // Partition of unity: sum of 3rd-order derivs = 0
-        REQUIRE(m.row(q).sum() == Approx(0.0).margin(1e-8));
-        // Geometry 3rd deriv = 0 (linear curve)
-        Eigen::RowVectorXd geom_deriv = m.row(q) * P;
-        for (int d = 0; d < geom_deriv.cols(); ++d)
-            REQUIRE(geom_deriv(d) == Approx(0.0).margin(1e-8));
+    // === Test Points =========================================================
+    
+    SECTION("Evaluation at u = 0.15") {
+        Eigen::MatrixXd u(1, 1); u << 0.15;
+        auto results = curve.eval_shape_functions(u, 3);
+
+        // n=0: N (Shape functions)
+        Eigen::Vector4d expected_N(0.6141250000000000, 0.3251250000000000, 0.0573750000000000, 0.0033750000000000);
+        // n=1: dN/ds
+        Eigen::Vector4d expected_dN(-0.5807828087105747, 0.3758006409303719, 0.1868955059172438, 0.0180866618629591);
+        // n=2: d2N/ds2
+        Eigen::Vector4d expected_d2N(-0.1238056625562066, -0.3506754246294261, 0.3946046702878425, 0.0798764168977904);
+        // n=3: d3N/ds3
+        Eigen::Vector4d expected_d3N(0.9294862062463560, -1.4201195886353655, 0.2153416673286355, 0.2752917150603740);
+
+        for(int i=0; i<4; ++i) {
+            CHECK(results[0](0, i) == Approx(expected_N(i)).margin(1e-12));
+            CHECK(results[1](0, i) == Approx(expected_dN(i)).margin(1e-12));
+            CHECK(results[2](0, i) == Approx(expected_d2N(i)).margin(1e-12));
+            CHECK(results[3](0, i) == Approx(expected_d3N(i)).margin(1e-12));
+        }
     }
-}
 
-/**
- * Curved geometry analytical benchmark.
- *
- * Quadratic Bernstein curve (knots {0,0,0,1,1,1}) with control points
- * P0 = (0,0,0), P1 = (0.5,0,0), P2 = (1,1,0)
- * which maps C(u) = (u, u², 0).
- *
- * At u = 0.5:
- *   g1 = dC/du = (1, 1, 0)
- *   a = ||g1|| = √2
- *   dN/dx = (1/√2) dN/du
- *
- * For basis function N_1(u) = 2u(1-u) (middle Bernstein, index 1):
- *   N_1(0.5) = 0.5
- *   dN_1/du = 2 - 4u = 0 at u=0.5
- *   d²N_1/du² = -4
- *
- *   dN_1/dx = (1/√2) * 0 = 0
- *
- *   da/du = g1 · (d²C/du²) / a = (1,1,0)·(0,2,0) / √2 = 2/√2 = √2
- *   d²N_1/dx² = (1/a²) d²N/du² - (da/du / a³) dN/du
- *             = (1/2)(-4) - (√2 / (2√2)) * 0
- *             = -2
- */
-TEST_CASE("CurvePatch: curved geometry analytical benchmark", "[curve][phys_deriv][benchmark]") {
-    std::vector<double> knots = {0, 0, 0, 1, 1, 1};
-    BSpline bu(2, KnotVector(knots));
+    SECTION("Evaluation at u = 0.5") {
+        Eigen::MatrixXd u(1, 1); u << 0.5;
+        auto results = curve.eval_shape_functions(u, 3);
 
-    Eigen::MatrixXd P(3, 3);
-    P.row(0) << 0.0, 0.0, 0.0;
-    P.row(1) << 0.5, 0.0, 0.0;
-    P.row(2) << 1.0, 1.0, 0.0;
+        Eigen::Vector4d expected_N(0.1250000000000000, 0.3750000000000000, 0.3750000000000000, 0.1250000000000000);
+        Eigen::Vector4d expected_dN(-0.1961161351381840, -0.1961161351381840, 0.1961161351381840, 0.1961161351381840);
+        Eigen::Vector4d expected_d2N(0.2209072978303747, -0.1893491124260355, -0.2209072978303747, 0.1893491124260355);
+        Eigen::Vector4d expected_d3N(-0.2691451698330937, 0.2589887483299580, -0.1599636386743859, 0.1701200601775215);
 
-    CurvePatch curve(3, &bu, P);
+        for(int i=0; i<4; ++i) {
+            CHECK(results[0](0, i) == Approx(expected_N(i)).margin(1e-12));
+            CHECK(results[1](0, i) == Approx(expected_dN(i)).margin(1e-12));
+            CHECK(results[2](0, i) == Approx(expected_d2N(i)).margin(1e-12));
+            CHECK(results[3](0, i) == Approx(expected_d3N(i)).margin(1e-12));
+        }
+    }
 
-    Eigen::MatrixXd params(1, 1);
-    params << 0.5;
+    SECTION("Evaluation at u = 0.85") {
+        Eigen::MatrixXd u(1, 1); u << 0.85;
+        auto results = curve.eval_shape_functions(u, 3);
 
-    // ── Verify curve position ──
-    auto X = curve.eval(params);
-    REQUIRE(X(0, 0) == Approx(0.5).margin(1e-12));
-    REQUIRE(X(0, 1) == Approx(0.25).margin(1e-12));
-    REQUIRE(X(0, 2) == Approx(0.0).margin(1e-12));
+        Eigen::Vector4d expected_N(0.0033750000000000, 0.0573750000000000, 0.3251250000000000, 0.6141249999999999);
+        Eigen::Vector4d expected_dN(-0.0203825545637234, -0.2106197304918083, -0.4235041892684746, 0.6545064743240061);
+        Eigen::Vector4d expected_d2N(0.0894507953662083, 0.3772321703322536, -0.6945105890554222, 0.2278276233569604);
+        Eigen::Vector4d expected_d3N(-0.2032875175830995, 0.6968774021132930, 1.4888884361605246, -1.9824783206907182);
 
-    // ── Verify Jacobian ──
-    auto jacs = curve.jacobian(params);
-    auto& J = jacs[0];
-    // g1 = (1, 1, 0)
-    REQUIRE(J(0, 0) == Approx(1.0).margin(1e-12));
-    REQUIRE(J(1, 0) == Approx(1.0).margin(1e-12));
-    REQUIRE(J(2, 0) == Approx(0.0).margin(1e-12));
+        for(int i=0; i<4; ++i) {
+            CHECK(results[0](0, i) == Approx(expected_N(i)).margin(1e-12));
+            CHECK(results[1](0, i) == Approx(expected_dN(i)).margin(1e-12));
+            CHECK(results[2](0, i) == Approx(expected_d2N(i)).margin(1e-12));
+            CHECK(results[3](0, i) == Approx(expected_d3N(i)).margin(1e-12));
+        }
+    }
 
-    // ── Physical derivatives ──
-    auto r = curve.eval_physical_derivs(params, 2);
+    SECTION("Partition of Unity") {
+        Eigen::MatrixXd u(1, 1); u << 0.42;
+        auto results = curve.eval_shape_functions(u, 3);
 
-    // Basis function N_1 (middle Bernstein) is at column index 1
-    const int col = 1;
-
-    // -- 0th order: N_1(0.5) = 2 * 0.5 * 0.5 = 0.5 --
-    REQUIRE(r.at("N")(0, col) == Approx(0.5).margin(1e-12));
-
-    // -- 1st order: dN_1/dx = (1/√2) * 0 = 0 --
-    REQUIRE(r.at("dNdx")(0, col) == Approx(0.0).margin(1e-10));
-
-    // -- 2nd order: d²N_1/dx² = -2 --
-    REQUIRE(r.at("dNdxdx")(0, col) == Approx(-2.0).margin(1e-10));
+        // Sum of basis functions (n=0) should be 1.0
+        CHECK(results[0].row(0).sum() == Approx(1.0).margin(1e-14));
+        
+        // Sum of any order physical derivative (n > 0) should be 0.0
+        CHECK(results[1].row(0).sum() == Approx(0.0).margin(1e-14));
+        CHECK(results[2].row(0).sum() == Approx(0.0).margin(1e-14));
+        CHECK(results[3].row(0).sum() == Approx(0.0).margin(1e-14));
+    }
 }
