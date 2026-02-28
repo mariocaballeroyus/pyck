@@ -20,61 +20,55 @@ add_library(pyck_basis
     cpp/basis/bspline.cpp
     cpp/basis/tensor.cpp
 )
-target_include_directories(pyck_basis PUBLIC
-    cpp/basis
-)
+target_include_directories(pyck_basis PUBLIC cpp/basis)
 target_link_libraries(pyck_basis PUBLIC eigen)
 
 # Geometry library
 add_library(pyck_geometry
     cpp/geometry/curve.cpp
 )
-target_include_directories(pyck_geometry PUBLIC
-    cpp/geometry
-)
+target_include_directories(pyck_geometry PUBLIC cpp/geometry)
 target_link_libraries(pyck_geometry PUBLIC pyck_basis)
+
+# Assembler library
+add_library(pyck_assembler
+    cpp/assembler/quadrature.cpp
+    cpp/assembler/gauss_legendre.cpp
+)
+target_include_directories(pyck_assembler PUBLIC cpp/assembler
+)
+target_link_libraries(pyck_assembler PUBLIC eigen)
+
 
 # pybind11
 add_subdirectory(external/pybind11)
 
 # Python module
-pybind11_add_module(_pyck
-    cpp/bindings.cpp
-)
+pybind11_add_module(_pyck cpp/bindings.cpp)
 target_link_libraries(_pyck PRIVATE pyck_geometry)
-set_target_properties(_pyck PROPERTIES
-    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/pyck"
-)
+set_target_properties(_pyck PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/pyck")
 install(TARGETS _pyck DESTINATION pyck)
 
-# Test executable: KnotVector
-add_executable(test_knot_vector
-    tests/test_knot_vector.cpp
-)
+# Test executables
+add_executable(test_knot_vector tests/test_knot_vector.cpp)
 target_link_libraries(test_knot_vector PRIVATE pyck_basis catch)
 
-# Test executable: BSpline
-add_executable(test_bspline
-    tests/test_bspline.cpp
-)
+add_executable(test_bspline tests/test_bspline.cpp)
 target_link_libraries(test_bspline PRIVATE pyck_basis catch)
 
-# Test executable: TensorProduct
-add_executable(test_tensor_product
-    tests/test_tensor_product.cpp
-)
+add_executable(test_tensor_product tests/test_tensor_product.cpp)
 target_link_libraries(test_tensor_product PRIVATE pyck_basis catch)
 
-# Test executable: CurvePatch
-add_executable(test_curve
-    tests/test_curve.cpp
-)
+add_executable(test_curve tests/test_curve.cpp)
 target_link_libraries(test_curve PRIVATE pyck_geometry catch)
 
+add_executable(test_quadrature tests/test_quadrature.cpp)
+target_link_libraries(test_quadrature PRIVATE pyck_assembler catch)
 
 enable_testing()
 add_test(NAME knot_vector_tests COMMAND test_knot_vector)
 add_test(NAME bspline_tests COMMAND test_bspline)
 add_test(NAME tensor_product_tests COMMAND test_tensor_product)
 add_test(NAME curve_tests COMMAND test_curve)
+add_test(NAME quadrature_tests COMMAND test_quadrature)
 
