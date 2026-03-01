@@ -48,6 +48,14 @@ target_include_directories(pyck_assembly PUBLIC cpp/assembly)
 target_link_libraries(pyck_assembly PUBLIC eigen)
 
 
+# Conditions library
+add_library(pyck_conditions
+    cpp/conditions/load_condition.cpp
+)
+target_include_directories(pyck_conditions PUBLIC cpp/conditions)
+target_link_libraries(pyck_conditions PUBLIC pyck_geometry pyck_assembly)
+
+
 # Elements library
 add_library(pyck_elements
     cpp/elements/euler_bernoulli_beam_1p.cpp
@@ -78,14 +86,14 @@ target_link_libraries(test_tensor_product PRIVATE pyck_basis catch)
 add_executable(test_curve tests/test_curve.cpp)
 target_link_libraries(test_curve PRIVATE pyck_geometry catch)
 
+add_executable(test_dof_mapper tests/test_dof_mapper.cpp)
+target_link_libraries(test_dof_mapper PRIVATE pyck_geometry catch)
+
+add_executable(test_load_condition tests/test_load_condition.cpp)
+target_link_libraries(test_load_condition PRIVATE pyck_conditions pyck_assembly pyck_basis catch)
+
 add_executable(test_quadrature tests/test_quadrature.cpp)
 target_link_libraries(test_quadrature PRIVATE pyck_assembly catch)
-
-add_executable(test_dof_mapper tests/test_dof_mapper.cpp)
-target_link_libraries(test_dof_mapper PRIVATE pyck_geometry catch)
-
-add_executable(test_dof_mapper tests/test_dof_mapper.cpp)
-target_link_libraries(test_dof_mapper PRIVATE pyck_geometry catch)
 
 enable_testing()
 add_test(NAME knot_vector_tests COMMAND test_knot_vector)
@@ -94,3 +102,4 @@ add_test(NAME tensor_product_tests COMMAND test_tensor_product)
 add_test(NAME curve_tests COMMAND test_curve)
 add_test(NAME quadrature_tests COMMAND test_quadrature)
 add_test(NAME dof_mapper_tests COMMAND test_dof_mapper)
+add_test(NAME load_condition_tests COMMAND test_load_condition)

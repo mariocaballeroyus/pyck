@@ -35,6 +35,15 @@ public:
     std::vector<Index> get_boundary_dofs(Index param_dim, bool at_start) const;
 
     /**
+     * @brief Increment a d-dimensional logical index to the next value in lexicographical order.
+     *        (fastest varying index first).
+     *
+     * @param logical_idx The current logical index array to be incremented.
+     * @return true if the index was successfully incremented, false if it wrapped around to zero.
+     */
+    bool next_logical_index(std::array<Index, d>& logical_idx) const;
+
+    /**
      * @brief Get the number of basis functions in each direction.
      */
     const std::array<Index, d>& num_basis() const { return num_basis_; }

@@ -4,6 +4,30 @@ namespace pyck
 {
 
 template <std::floating_point T, std::size_t d>
+std::pair<ColMatrix<T, d>, Vector<T>> QuadratureRule<T, d>::map_to_domain(
+    const std::array<T, d>& lower_bounds,
+    const std::array<T, d>& upper_bounds) const
+{
+    std::size_t Q = num_points();
+    ColMatrix<T, d> mapped_pts(Q, d);
+    Vector<T> mapped_weights = weights_;
+    
+    for (std::size_t q = 0; q < Q; ++q) 
+    {
+        for (std::size_t i = 0; i < d; ++i) 
+        {
+            T a = lower_bounds[i];
+            T b = upper_bounds[i];
+            T xi = points_(q, i);
+            
+            mapped_pts(q, i) = a + static_cast<T>(0.5) * (b - a) * (xi + static_cast<T>(1.0));
+            mapped_weights(q) *= static_cast<T>(0.5) * (b - a);
+        }
+    }
+    return {mapped_pts, mapped_weights};
+}
+
+template <std::floating_point T, std::size_t d>
 void QuadratureRule<T, d>::build_tensor_product(const std::array<std::size_t, d>& num_pts)
 {
     std::size_t total_q = 1;

@@ -59,6 +59,9 @@ public:
     /// @param dir The parametric direction
     virtual const Basis<T>& basis(std::size_t dir) const = 0;
 
+    /// @brief Get the full tensor product basis
+    virtual const TensorProduct<T, d>& tensor_product() const = 0;
+
     // === Evaluation =================================================================
 
     /**

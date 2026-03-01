@@ -55,8 +55,11 @@ public:
      */
     const Basis<T>& basis(std::size_t dir) const override 
     { 
-        (void)dir;
-        return tensor_product_.template basis<0>(); 
+        return tensor_product_.basis(dir); 
+    }
+
+    const TensorProduct<T, 1>& tensor_product() const override {
+        return tensor_product_;
     }
 
     // === Evaluation =================================================================

@@ -68,6 +68,19 @@ std::vector<Index> DofMapper<d>::get_boundary_dofs(std::size_t param_dim, bool a
     return dofs;
 }
 
+template <std::size_t d>
+bool DofMapper<d>::next_logical_index(std::array<Index, d>& logical_idx) const
+{
+    for (std::size_t i = 0; i < d; ++i) {
+        logical_idx[i]++;
+        if (logical_idx[i] < num_basis_[i]) {
+            return true;
+        }
+        logical_idx[i] = 0;
+    }
+    return false; // Wrapped around
+}
+
 // === Template Instantiations ========================================================
 
 template class DofMapper<1>;

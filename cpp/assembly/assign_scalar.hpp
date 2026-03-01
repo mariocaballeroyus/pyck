@@ -8,9 +8,6 @@
 namespace pyck
 {
 
-namespace assembler
-{
-
 /**
  * @brief Strong enforcement of a global DOF value.
  *        Maintains the symmetry of the global stiffness matrix.
@@ -40,8 +37,6 @@ template <std::floating_point T>
 void assign_zeros(const std::vector<Index>& dofs,
                   Matrix<T>& stiffness,
                   Vector<T>& load);
-
-} // namespace assembler
 
 } // namespace pyck
 

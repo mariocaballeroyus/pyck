@@ -4,9 +4,6 @@
 namespace pyck
 {
 
-namespace assembler
-{
-
 template <std::floating_point T>
 void assign_scalar(const std::vector<Index>& dofs,
                    const std::vector<T>& values,
@@ -75,7 +72,5 @@ template void assign_zeros<double>(const std::vector<Index>&, Matrix<double>&, V
 template void assign_scalar<float>(const std::vector<Index>&, const std::vector<float>&, Matrix<float>&, Vector<float>&);
 template void assign_zeros<float>(const std::vector<Index>&, Matrix<float>&, Vector<float>&);
 #endif
-
-} // namespace assembler
 
 } // namespace pyck

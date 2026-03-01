@@ -73,6 +73,17 @@ public:
     /// @brief Get the dimension of the quadrature points.
     static constexpr std::size_t dim() { return d; }
 
+    /**
+     * @brief Map the reference [-1, 1]^d quadrature points and weights to a specific tensor-product domain.
+     * 
+     * @param lower_bounds The lower bounds of the domain in each dimension.
+     * @param upper_bounds The upper bounds of the domain in each dimension.
+     * @return A pair containing the mapped points matrix and the mapped weights vector.
+     */
+    std::pair<ColMatrix<T, d>, Vector<T>> map_to_domain(
+        const std::array<T, d>& lower_bounds,
+        const std::array<T, d>& upper_bounds) const;
+
 protected:
 
     // === Internal Methods ===========================================================
