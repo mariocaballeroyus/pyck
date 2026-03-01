@@ -1,7 +1,15 @@
 cmake_minimum_required(VERSION 3.14)
-project(pyck_tests LANGUAGES CXX)
+project(pyck VERSION 0.1.0 LANGUAGES CXX C)
 
-set(CMAKE_CXX_STANDARD 17)
+# Build Options
+option(PYCK_BUILD_SINGLE_PRECISION "Build single precision (float) explicit instantiations alongside double" OFF)
+
+if(PYCK_BUILD_SINGLE_PRECISION)
+    add_compile_definitions(PYCK_BUILD_SINGLE_PRECISION)
+endif()
+
+# Set standard for C++ (C++20 required)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
@@ -15,7 +23,7 @@ add_library(catch INTERFACE)
 target_include_directories(catch INTERFACE ${CMAKE_SOURCE_DIR}/external/catch)
 
 # BSpline library
-add_library(pyck_basis
+add_library(pyck_basis 
     cpp/basis/knots.cpp
     cpp/basis/bspline.cpp
     cpp/basis/tensor.cpp
@@ -71,4 +79,3 @@ add_test(NAME bspline_tests COMMAND test_bspline)
 add_test(NAME tensor_product_tests COMMAND test_tensor_product)
 add_test(NAME curve_tests COMMAND test_curve)
 add_test(NAME quadrature_tests COMMAND test_quadrature)
-

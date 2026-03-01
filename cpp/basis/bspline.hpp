@@ -6,18 +6,23 @@
 
 #include "basis.hpp"
 #include "knots.hpp"
+#include "../types.hpp"
 
 namespace pyck
 {
 
-/**
- * @brief B-spline basis functions defined on a one-dimensional parametric space
- */
-class BSpline : public Basis
+/// @brief B-spline basis functions defined on a one-dimensional parametric space
+/// @tparam T Scalar type
+template <std::floating_point T = double>
+class BSpline : public Basis<T>
 {
+
 public:
 
-    // --- Constructors ------------------------------------------------------------
+    // === Constructors ===============================================================
+
+    /// @brief Default constructor
+    BSpline() = default;
 
     /**
      * @brief Construct a B-spline basis with the given degree and knot vector
@@ -25,10 +30,10 @@ public:
      * @param degree Degree of the B-spline basis functions
      * @param knots Knot vector defining the B-spline basis functions
      */
-    BSpline(std::size_t degree, KnotVector knots)
-        : Basis(degree), knots_(std::move(knots)) {}
+    BSpline(Index degree, KnotVector<T> knots)
+        : Basis<T>(degree), knots_(std::move(knots)) {}
 
-    // --- Evaluation ------------------------------------------------------------
+    // === Evaluation =================================================================
 
     /**
      * @brief Evaluate B-spline basis functions at given parameter values
@@ -42,7 +47,7 @@ public:
      *                    ...      ...      ... ...
      *                    N_0(u_m) N_1(u_m) ... N_n(u_m) }
      */
-    Eigen::MatrixXd eval(const Eigen::VectorXd& params) const override;
+    Matrix<T> eval(const Vector<T>& params) const override;
 
     /**
      * @brief Evaluate B-spline basis functions and their derivatives at given parameter values
@@ -57,24 +62,22 @@ public:
      *                         ...                ...                ... ...
      *                         d^k(N_0)/du^k(u_m) d^k(N_1)/du^k(u_m) ... d^k(N_n)/du^k(u_m) }
      */
-    std::vector<Eigen::MatrixXd> eval_derivs(const Eigen::VectorXd& params, 
-                                      std::size_t order = 0) const override;
+    std::vector<Matrix<T>> eval_derivs(const Vector<T>& params, 
+                                        Index order = 0) const override;
 
-    // --- Properties ------------------------------------------------------------
+    // === Properties =================================================================
 
-    std::size_t num_basis() const override { return knots_.num_basis(degree_); }
+    Index num_basis() const override { return knots_.num_basis(this->degree_); }
 
     /// @brief Get the knot vector object
-    const KnotVector& knot_vector() const { return knots_; }
+    const KnotVector<T>& knot_vector() const { return knots_; }
 
     /// @brief Get the raw knot values (backward-compatible)
-    const std::vector<double>& knots() const { return knots_.data(); }
+    const std::vector<T>& knots() const { return knots_.data(); }
 
 private:
-    /// @brief Knot vector defining the B-spline basis functions
-    KnotVector knots_;
 
-    // --- Internal Methods ------------------------------------------------------
+    // === Internal Methods =======================================================
 
     /**
      * @brief Compute the table of basis function values for given parameter values
@@ -82,7 +85,13 @@ private:
      * @param params Parameter values at which to compute the basis functions
      * @return A vector of matrices, where each matrix corresponds to the basis functions of a certain degree
      */
-    std::vector<Eigen::MatrixXd> compute_basis_table(const Eigen::VectorXd& params) const;
+    std::vector<Matrix<T>> compute_basis_table(const Vector<T>& params) const;
+
+    // === Member Variables =======================================================
+
+    /// @brief Knot vector defining the B-spline basis functions
+    KnotVector<T> knots_;
+
 };
 
 } // namespace pyck

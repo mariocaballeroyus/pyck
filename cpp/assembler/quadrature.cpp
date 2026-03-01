@@ -3,32 +3,54 @@
 namespace pyck
 {
 
-QuadratureRule QuadratureRule::tensor_product(const QuadratureRule& other) const
+template <std::floating_point T, std::size_t d>
+void QuadratureRule<T, d>::build_tensor_product(const std::array<std::size_t, d>& num_pts)
 {
-    QuadratureRule result;
-    std::size_t q1 = this->num_points();
-    std::size_t q2 = other.num_points();
-    std::size_t dim1 = this->dim();
-    std::size_t dim2 = other.dim();
+    std::size_t total_q = 1;
+    for (std::size_t i = 0; i < d; ++i) {
+        total_q *= num_pts[i];
+    }
 
-    result.points_.resize(q1 * q2, dim1 + dim2);
-    result.weights_.resize(q1 * q2);
+    this->points_.resize(total_q, Eigen::NoChange);
+    this->weights_.resize(total_q);
 
-    for (std::size_t i = 0; i < q1; ++i)
-    {
-        for (std::size_t j = 0; j < q2; ++j)
-        {
-            std::size_t idx = i * q2 + j;
+    std::array<ColMatrix<T, 1>, d> all_nodes;
+    std::array<Vector<T>, d> all_weights;
 
-            // Concatenate the coordinates
-            result.points_.row(idx).head(dim1) = this->points().row(i);
-            result.points_.row(idx).tail(dim2) = other.points().row(j);
-
-            // Multiply the weights
-            result.weights_(idx) = this->weights()(i) * other.weights()(j);
+    for (std::size_t i = 0; i < d; ++i) {
+        if (!this->lookup_reference(num_pts[i], all_nodes[i], all_weights[i])) {
+            this->compute_reference(num_pts[i], all_nodes[i], all_weights[i]);
         }
     }
-    return result;
+
+    for (std::size_t i = 0; i < total_q; ++i)
+    {
+        std::size_t temp = i;
+        T weight = 1.0;
+        // Lexicographical ordering: last dimension varies fastest
+        for (std::size_t j = d; j-- > 0; )
+        {
+            std::size_t qj = num_pts[j];
+            std::size_t idx = temp % qj;
+            temp /= qj;
+
+            this->points_(i, j) = all_nodes[j](idx, 0);
+            weight *= all_weights[j](idx);
+        }
+        this->weights_(i) = weight;
+    }
 }
+
+// === Template Instantiations ========================================================
+
+template class pyck::QuadratureRule<double, 1>;
+template class pyck::QuadratureRule<double, 2>;
+template class pyck::QuadratureRule<double, 3>;
+
+#ifdef PYCK_BUILD_SINGLE_PRECISION
+template class pyck::QuadratureRule<float, 1>;
+template class pyck::QuadratureRule<float, 2>;
+template class pyck::QuadratureRule<float, 3>;
+#endif
 
 } // namespace pyck

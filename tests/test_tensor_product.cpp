@@ -10,7 +10,7 @@ using namespace pyck;
 /**
  * Helper: build a (M*N x 2) parameter grid from 1D vectors u and v.
  * Row ordering is (u_0,v_0), (u_0,v_1), ..., (u_0,v_{N-1}),
- *                  (u_1,v_0), ..., i.e. v varies fastest.
+ *                  (u_1,v_0), ..., i.e. v varies fastest...
  */
 static Eigen::MatrixXd make_grid(const Eigen::VectorXd& u,
                                   const Eigen::VectorXd& v)
@@ -27,16 +27,11 @@ static Eigen::MatrixXd make_grid(const Eigen::VectorXd& u,
 
 /**
  * Multivariate partition of unity.
- *
- * For a 2D tensor-product basis R_{i,j}(u,v) = N_{i,p}(u) · M_{j,q}(v),
- * the sum over all basis functions must equal 1 at every point:
- *
- *   Σ_{i,j} R_{i,j}(u, v) = 1
  */
 TEST_CASE("TensorProduct: partition of unity", "[basis][tensor]") {
-    auto bu = std::make_shared<BSpline>(2, KnotVector::clamped_uniform(2, 4));
-    auto bv = std::make_shared<BSpline>(3, KnotVector::clamped_uniform(3, 5));
-    TensorProduct tp({bu, bv});
+    auto bu = std::make_shared<BSpline<double>>(2, KnotVector<double>::clamped_uniform(2, 4));
+    auto bv = std::make_shared<BSpline<double>>(3, KnotVector<double>::clamped_uniform(3, 5));
+    TensorProduct<double, 2> tp(std::array<std::shared_ptr<const Basis<double>>, 2>{bu, bv});
 
     auto params = make_grid(Eigen::VectorXd::LinSpaced(6, 0.0, 1.0),
                             Eigen::VectorXd::LinSpaced(5, 0.0, 1.0));
@@ -48,24 +43,12 @@ TEST_CASE("TensorProduct: partition of unity", "[basis][tensor]") {
 
 /**
  * Lexicographical ordering of eval_derivs.
- *
- * eval_derivs(params, {k_u, k_v}) returns a vector of matrices indexed
- * in lexicographic order of the derivative multi-index (i_u, i_v),
- * where i_v varies fastest:
- *
- *   index = i_u * (k_v + 1) + i_v
- *
- * For orders = {1, 1}, the 4 matrices correspond to:
- *   [0] = (0,0),  [1] = (0,1),  [2] = (1,0),  [3] = (1,1)
- *
- * We verify this against manually computed Kronecker products of 1D
- * basis values and derivatives (quadratic Bernstein at u = v = 0.5).
  */
 TEST_CASE("TensorProduct: lexicographical ordering", "[basis][tensor]") {
     std::vector<double> knots = {0, 0, 0, 1, 1, 1};
-    auto bu = std::make_shared<BSpline>(2, KnotVector(knots));
-    auto bv = std::make_shared<BSpline>(2, KnotVector(knots));
-    TensorProduct tp({bu, bv});
+    auto bu = std::make_shared<BSpline<double>>(2, KnotVector<double>(knots));
+    auto bv = std::make_shared<BSpline<double>>(2, KnotVector<double>(knots));
+    TensorProduct<double, 2> tp(std::array<std::shared_ptr<const Basis<double>>, 2>{bu, bv});
 
     Eigen::MatrixXd params(1, 2);
     params << 0.5, 0.5;
@@ -75,7 +58,8 @@ TEST_CASE("TensorProduct: lexicographical ordering", "[basis][tensor]") {
     auto du = bu->eval_derivs(u, 1);  // [N_u, dN_u]
     auto dv = bv->eval_derivs(u, 1);  // [N_v, dN_v]
 
-    auto derivs = tp.eval_derivs(params, {1, 1});
+    std::array<std::size_t, 2> orders = {1, 1};
+    auto derivs = tp.eval_derivs(params, orders);
     REQUIRE(derivs.size() == 4);
 
     std::size_t n_u = bu->num_basis();
@@ -108,20 +92,11 @@ TEST_CASE("TensorProduct: lexicographical ordering", "[basis][tensor]") {
 
 /**
  * Linear consistency (bilinear patch).
- *
- * If both 1D bases are linear (degree 1, 2 basis functions each), the
- * tensor-product basis must be able to represent any bilinear function
- * exactly.  We test:
- *
- *   f(u, v) = 3u + 2v + 5uv + 1
- *
- * by computing  Σ R_{i,j}(u,v) · c_{i,j}  where the four control values
- * are f evaluated at the parameter corners (0,0), (0,1), (1,0), (1,1).
  */
 TEST_CASE("TensorProduct: bilinear consistency", "[basis][tensor]") {
-    auto bu = std::make_shared<BSpline>(1, KnotVector({0, 0, 1, 1}));
-    auto bv = std::make_shared<BSpline>(1, KnotVector({0, 0, 1, 1}));
-    TensorProduct tp({bu, bv});
+    auto bu = std::make_shared<BSpline<double>>(1, KnotVector<double>({0, 0, 1, 1}));
+    auto bv = std::make_shared<BSpline<double>>(1, KnotVector<double>({0, 0, 1, 1}));
+    TensorProduct<double, 2> tp(std::array<std::shared_ptr<const Basis<double>>, 2>{bu, bv});
 
     // f(u,v) = 3u + 2v + 5uv + 1
     // Control values at corners (u-major, v-minor ordering):
@@ -145,19 +120,12 @@ TEST_CASE("TensorProduct: bilinear consistency", "[basis][tensor]") {
 
 /**
  * Derivative Kronecker product check.
- *
- * For a 2D tensor-product basis, the mixed partial derivatives factor as:
- *
- *   ∂^{a+b} R / (∂u^a ∂v^b)  =  (d^a N_u / du^a) ⊗ (d^b N_v / dv^b)
- *
- * We verify (1,0), (0,1), and (1,1) against the manually computed
- * Kronecker products of the 1D quantities.
  */
 TEST_CASE("TensorProduct: derivative Kronecker check", "[basis][tensor]") {
     std::vector<double> knots = {0, 0, 0, 1, 1, 1};
-    auto bu = std::make_shared<BSpline>(2, KnotVector(knots));
-    auto bv = std::make_shared<BSpline>(2, KnotVector(knots));
-    TensorProduct tp({bu, bv});
+    auto bu = std::make_shared<BSpline<double>>(2, KnotVector<double>(knots));
+    auto bv = std::make_shared<BSpline<double>>(2, KnotVector<double>(knots));
+    TensorProduct<double, 2> tp(std::array<std::shared_ptr<const Basis<double>>, 2>{bu, bv});
 
     Eigen::MatrixXd params(1, 2);
     params << 0.4, 0.7;
@@ -168,7 +136,9 @@ TEST_CASE("TensorProduct: derivative Kronecker check", "[basis][tensor]") {
 
     auto du = bu->eval_derivs(uu, 1);
     auto dv = bv->eval_derivs(vv, 1);
-    auto derivs = tp.eval_derivs(params, {1, 1});
+    
+    std::array<std::size_t, 2> orders = {1, 1};
+    auto derivs = tp.eval_derivs(params, orders);
 
     std::size_t n_u = bu->num_basis();
     std::size_t n_v = bv->num_basis();
@@ -194,22 +164,18 @@ TEST_CASE("TensorProduct: derivative Kronecker check", "[basis][tensor]") {
 
 /**
  * Finite-difference derivative check.
- *
- * We verify the parametric partial derivatives ∂R/∂u and ∂R/∂v returned
- * by eval_derivs against a central finite-difference approximation:
- *
- *   ∂R/∂u ≈ [R(u+h,v) - R(u-h,v)] / (2h)
  */
 TEST_CASE("TensorProduct: finite-difference derivative check", "[basis][tensor]") {
-    auto bu = std::make_shared<BSpline>(3, KnotVector::clamped_uniform(3, 5));
-    auto bv = std::make_shared<BSpline>(2, KnotVector::clamped_uniform(2, 4));
-    TensorProduct tp({bu, bv});
+    auto bu = std::make_shared<BSpline<double>>(3, KnotVector<double>::clamped_uniform(3, 5));
+    auto bv = std::make_shared<BSpline<double>>(2, KnotVector<double>::clamped_uniform(2, 4));
+    TensorProduct<double, 2> tp(std::array<std::shared_ptr<const Basis<double>>, 2>{bu, bv});
 
     double h = 1e-7;
     Eigen::MatrixXd params(1, 2);
     params << 0.4, 0.6;
 
-    auto derivs = tp.eval_derivs(params, {1, 1});
+    std::array<std::size_t, 2> orders = {1, 1};
+    auto derivs = tp.eval_derivs(params, orders);
 
     // ∂/∂u
     Eigen::MatrixXd p_fwd(1, 2), p_bwd(1, 2);

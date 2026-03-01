@@ -3,27 +3,30 @@
 
 #include <cstddef>
 #include <vector>
+#include <concepts>
 
-#include<Eigen/Dense>
+#include "../types.hpp"
 
 namespace pyck
 {
 
-/**
- * Abstract base class for basis functions defined on a one-dimensional 
- * parametric space
- */
+/// @brief Abstract base class for basis functions defined on a one-dimensional parametric space
+/// @tparam T Scalar type
+template <std::floating_point T = double>
 class Basis
 {
 public:
+
+    // === Constructors ===============================================================
+
     /// @brief Virtual destructor
     virtual ~Basis() = default;
 
     /// @brief Construct a basis with the given degree
     /// @param degree Polynomial degree of the basis functions
-    explicit Basis(std::size_t degree) : degree_(degree) {}
+    explicit Basis(Index degree) : degree_(degree) {}
 
-    // --- Evaluation ------------------------------------------------------------
+    // === Evaluation =================================================================
 
     /**
      * @brief Evaluate the basis functions
@@ -37,8 +40,7 @@ public:
      *                     ...      ...      ... ...
      *                     N_0(u_m) N_1(u_m) ... N_n(u_m) }
      */
-    virtual Eigen::MatrixXd eval(const Eigen::VectorXd& params) const = 0;
-
+    virtual Matrix<T> eval(const Vector<T>& params) const = 0;
 
     /**
      * @brief Evaluate basis functions and their derivatives at given parameter values
@@ -54,20 +56,24 @@ public:
      *                         d^k(N_0)/du^k(u_m) d^k(N_1)/du^k(u_m) ... d^k(N_n)/du^k(u_m) }
      * 
      */
-    virtual std::vector<Eigen::MatrixXd> eval_derivs(const Eigen::VectorXd& params, 
-                                                     std::size_t order = 0) const = 0;
+    virtual std::vector<Matrix<T>> eval_derivs(const Vector<T>& params, 
+                                               Index order = 0) const = 0;
 
-    // --- Properties ------------------------------------------------------------
+    // === Properties =================================================================
 
     /// @brief Get the degree of the basis functions
-    std::size_t degree() const { return degree_; }
+    Index degree() const { return degree_; }
 
     /// @brief Get the number of basis functions
-    virtual std::size_t num_basis() const = 0;
+    virtual Index num_basis() const = 0;
 
 protected:
+
+    // === Member Variables ===========================================================
+
     /// @brief Degree of the basis functions
-    std::size_t degree_;
+    Index degree_;
+
 };
 
 } // namespace pyck

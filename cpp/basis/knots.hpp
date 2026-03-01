@@ -5,27 +5,26 @@
 #include <cstddef>
 #include <vector>
 
+#include "../types.hpp"
+
 namespace pyck
 {
 
-/**
- * @brief Non-decreasing knot vector for B-spline basis functions.
- *
- * A KnotVector is the fundamental one-dimensional data structure used to
- * define B-spline basis functions.  It stores a non-decreasing sequence
- * of knot values and provides span-finding and convenience accessors.
- */
+/// @brief Non-decreasing knot vector for basis functions.
+/// @tparam T Scalar type
+template <std::floating_point T = double>
 class KnotVector
-{
+{   
+
 public:
 
-    // --- Constructors & Factory Methods --------------------------------------------
+    // === Constructors & Factory Methods =============================================
 
     /**
      * @brief Construct a knot vector from a sequence of knot values.
      * @param knots Non-decreasing sequence of knot values.
      */
-    KnotVector(std::vector<double> knots)
+    explicit KnotVector(std::vector<T> knots)
         : knots_(std::move(knots)) {}
 
     /**
@@ -35,38 +34,39 @@ public:
      * @return A knot vector with (p+1) repeated knots at each end and
      *         uniformly spaced internal knots.
      */
-    static KnotVector clamped_uniform(std::size_t degree, std::size_t num_basis);
+    static KnotVector clamped_uniform(Index degree, Index num_basis);
 
-    // --- Element access ------------------------------------------------------------
+    // === Element access =============================================================
 
     /// @brief Number of knots in the vector.
-    std::size_t size() const { return knots_.size(); }
+    Index size() const { return knots_.size(); }
 
     /// @brief Access the i-th knot value.
-    double operator[](std::size_t i) const { return knots_[i]; }
+    T operator[](Index i) const { return knots_[i]; }
 
     /// @brief First knot value.
-    double front() const { return knots_.front(); }
+    T front() const { return knots_.front(); }
 
     /// @brief Last knot value.
-    double back() const { return knots_.back(); }
+    T back() const { return knots_.back(); }
 
     /// @brief Read-only reference to the underlying std::vector.
-    const std::vector<double>& data() const { return knots_; }
+    const std::vector<T>& data() const { return knots_; }
 
-    // --- Iterators -----------------------------------------------------------
+    // === Iterators ==================================================================
 
+    /// @brief Iterator to the first knot.
     auto begin() const { return knots_.begin(); }
+
+    /// @brief Iterator to the past-the-end knot.
     auto end()   const { return knots_.end(); }
 
-    // --- B-spline/NURBS utilities --------------------------------------------
+    // === Properties =================================================================
 
-    /**
-     * @brief Number of basis functions of given degree supported by this vector.
-     * @param degree Polynomial degree.
-     * @return size() - degree - 1.
-     */
-    std::size_t num_basis(std::size_t degree) const { return knots_.size() - degree - 1; }
+    /// @brief Number of basis functions of given degree supported by this vector.
+    Index num_basis(Index degree) const { return knots_.size() - degree - 1; }
+
+    // === Utility Methods ============================================================
 
     /**
      * @brief Find the knot span index for a given parameter value.
@@ -78,11 +78,14 @@ public:
      * @param param Parameter value.
      * @return Span index.
      */
-    std::size_t find_span(std::size_t degree, double param) const;
+    Index find_span(Index degree, T param) const;
 
 private:
+
+    // === Member Variables ===========================================================
+
     /// @brief Non-decreasing sequence of knot values.
-    std::vector<double> knots_;
+    std::vector<T> knots_;
 };
 
 } // namespace pyck

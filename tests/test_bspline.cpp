@@ -18,8 +18,8 @@ using namespace pyck;
  */
 TEST_CASE("BSpline: partition of unity", "[basis][bspline]") {
     for (std::size_t p = 1; p <= 3; ++p) {
-        auto kv = KnotVector::clamped_uniform(p, p + 3);
-        BSpline bs(p, kv);
+        auto kv = KnotVector<double>::clamped_uniform(p, p + 3);
+        BSpline<double> bs(p, kv);
 
         Eigen::VectorXd u = Eigen::VectorXd::LinSpaced(30, 0.0, 1.0);
         auto N = bs.eval(u);
@@ -37,8 +37,8 @@ TEST_CASE("BSpline: partition of unity", "[basis][bspline]") {
  *   N_{i,p}(u) ≥ 0   for all i, p, u
  */
 TEST_CASE("BSpline: non-negativity", "[basis][bspline]") {
-    auto kv = KnotVector::clamped_uniform(3, 8);
-    BSpline bs(3, kv);
+    auto kv = KnotVector<double>::clamped_uniform(3, 8);
+    BSpline<double> bs(3, kv);
 
     Eigen::VectorXd u = Eigen::VectorXd::LinSpaced(100, 0.0, 1.0);
     auto N = bs.eval(u);
@@ -61,7 +61,7 @@ TEST_CASE("BSpline: non-negativity", "[basis][bspline]") {
  */
 TEST_CASE("BSpline: local support", "[basis][bspline]") {
     std::vector<double> raw_knots = {0, 0, 0, 0.3, 0.7, 1, 1, 1};
-    BSpline bs(2, KnotVector(raw_knots));
+    BSpline<double> bs(2, KnotVector(raw_knots));
 
     // Evaluate on a fine grid
     Eigen::VectorXd u = Eigen::VectorXd::LinSpaced(200, 0.0, 1.0);
@@ -91,8 +91,8 @@ TEST_CASE("BSpline: local support", "[basis][bspline]") {
  * We verify this for derivatives of order 1 and 2.
  */
 TEST_CASE("BSpline: derivative sum to zero", "[basis][bspline]") {
-    auto kv = KnotVector::clamped_uniform(3, 6);
-    BSpline bs(3, kv);
+    auto kv = KnotVector<double>::clamped_uniform(3, 6);
+    BSpline<double> bs(3, kv);
 
     Eigen::VectorXd u = Eigen::VectorXd::LinSpaced(40, 0.0, 1.0);
     auto derivs = bs.eval_derivs(u, 2);
@@ -115,8 +115,8 @@ TEST_CASE("BSpline: derivative sum to zero", "[basis][bspline]") {
  */
 TEST_CASE("BSpline: C-continuity at internal knot", "[basis][bspline]") {
     // p = 3, 7 basis → knots = {0,0,0,0, 0.25, 0.5, 0.75, 1,1,1,1}
-    auto kv = KnotVector::clamped_uniform(3, 7);
-    BSpline bs(3, kv);
+    auto kv = KnotVector<double>::clamped_uniform(3, 7);
+    BSpline<double> bs(3, kv);
 
     // Test at the internal knot ξ = 0.5
     double xi = 0.5;
@@ -154,7 +154,7 @@ TEST_CASE("BSpline: analytical values", "[basis][bspline]") {
     u << 0.0, 0.25, 0.5, 0.75, 1.0;
 
     SECTION("degree 1: linear Bernstein") {
-        BSpline bs(1, KnotVector({0, 0, 1, 1}));
+        BSpline<double> bs(1, KnotVector({0, 0, 1, 1}));
         auto N = bs.eval(u);
 
         for (int i = 0; i < 5; ++i) {
@@ -164,7 +164,7 @@ TEST_CASE("BSpline: analytical values", "[basis][bspline]") {
     }
 
     SECTION("degree 2: quadratic Bernstein") {
-        BSpline bs(2, KnotVector({0, 0, 0, 1, 1, 1}));
+        BSpline<double> bs(2, KnotVector({0, 0, 0, 1, 1, 1}));
         auto N = bs.eval(u);
 
         for (int i = 0; i < 5; ++i) {
@@ -194,7 +194,7 @@ TEST_CASE("BSpline: analytical derivatives", "[basis][bspline]") {
     u << 0.0, 0.5, 1.0;
 
     SECTION("degree 1: first derivative") {
-        BSpline bs(1, KnotVector({0, 0, 1, 1}));
+        BSpline<double> bs(1, KnotVector({0, 0, 1, 1}));
         auto dN = bs.eval_derivs(u, 1)[1];
 
         for (int i = 0; i < 3; ++i) {
@@ -204,7 +204,7 @@ TEST_CASE("BSpline: analytical derivatives", "[basis][bspline]") {
     }
 
     SECTION("degree 2: first derivative") {
-        BSpline bs(2, KnotVector({0, 0, 0, 1, 1, 1}));
+        BSpline<double> bs(2, KnotVector({0, 0, 0, 1, 1, 1}));
         auto dN = bs.eval_derivs(u, 1)[1];
 
         for (int i = 0; i < 3; ++i) {
@@ -216,7 +216,7 @@ TEST_CASE("BSpline: analytical derivatives", "[basis][bspline]") {
     }
 
     SECTION("degree 2: second derivative") {
-        BSpline bs(2, KnotVector({0, 0, 0, 1, 1, 1}));
+        BSpline<double> bs(2, KnotVector({0, 0, 0, 1, 1, 1}));
         auto d2N = bs.eval_derivs(u, 2)[2];
 
         for (int i = 0; i < 3; ++i) {
@@ -227,7 +227,7 @@ TEST_CASE("BSpline: analytical derivatives", "[basis][bspline]") {
     }
 
     SECTION("degree 2: third derivative is zero") {
-        BSpline bs(2, KnotVector({0, 0, 0, 1, 1, 1}));
+        BSpline<double> bs(2, KnotVector({0, 0, 0, 1, 1, 1}));
         auto d3N = bs.eval_derivs(u, 3)[3];
 
         for (int i = 0; i < d3N.rows(); ++i)
@@ -247,8 +247,8 @@ TEST_CASE("BSpline: analytical derivatives", "[basis][bspline]") {
  * This is a general sanity check for arbitrary knot vectors and degrees.
  */
 TEST_CASE("BSpline: finite-difference derivative check", "[basis][bspline][deriv]") {
-    auto kv = KnotVector::clamped_uniform(3, 6);
-    BSpline bs(3, kv);
+    auto kv = KnotVector<double>::clamped_uniform(3, 6);
+    BSpline<double> bs(3, kv);
 
     double h = 1e-7;
     Eigen::VectorXd u(5);

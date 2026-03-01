@@ -3,38 +3,36 @@
 
 #include <cstddef>
 #include <vector>
+#include <memory>
 #include <Eigen/Dense>
 
-#include "bspline.hpp"
+#include "basis.hpp"
 #include "patch.hpp"
 #include "tensor.hpp"
+#include "../types.hpp"
 
 namespace pyck
 {
 
 /**
  * @brief A parametric curve patch defined by a single univariate basis, embedded in 
- *        a gdim-dimensional space.
+ *        a 3-dimensional space.
+ * 
  */
-class CurvePatch : public Patch
+template <std::floating_point T>
+class CurvePatch : public Patch<T, 1>
 {
 public:
 
+    using PatchType = Patch<T, 1>;
+    using CurveType = CurvePatch<T>;
+    using ScalarType = T;
+
     // === Constructors & Factory Methods =============================================
 
-    CurvePatch(std::size_t gdim,
-           std::shared_ptr<Basis> basis_u,
-           const Eigen::MatrixXd& control_pts)
-    : Patch(gdim, 1, control_pts),
-      tensor_product_({std::move(basis_u)})
-    {}
-
-    /// @brief Non-owning constructor from a raw Basis pointer.
-    CurvePatch(std::size_t gdim,
-           Basis* basis_u,
-           const Eigen::MatrixXd& control_pts)
-    : Patch(gdim, 1, control_pts),
-      tensor_product_({std::shared_ptr<Basis>(std::shared_ptr<Basis>{}, basis_u)})
+    CurvePatch(std::shared_ptr<const Basis<T>> basis_u, const ColMatrix<T, 3>& control_pts)
+    : PatchType(control_pts),
+      tensor_product_(std::move(basis_u))
     {}
 
     /**
@@ -44,10 +42,9 @@ public:
      *
      * @param basis B-spline basis in the u direction.
      * @param length Physical length of the line segment.
-     * @param gdim Geometric dimension (default = 3).
      * @return A CurvePatch representing the line segment along the x-axis.
      */
-    static CurvePatch line_segment(BSpline* basis, double length, size_t gdim = 3);
+    static CurvePatch line_segment(std::shared_ptr<const Basis<T>> basis, ScalarType length);
 
     // === Properties =================================================================
 
@@ -55,7 +52,11 @@ public:
      * @brief Get the basis functions for a given parametric direction.
      * @param dir The parametric direction (must be 0 for curves).
      */
-    const Basis& basis(std::size_t dir) const override { return tensor_product_.basis(dir); }
+    const Basis<T>& basis(std::size_t dir) const override 
+    { 
+        (void)dir;
+        return tensor_product_.template basis<0>(); 
+    }
 
     // === Evaluation =================================================================
 
@@ -72,7 +73,7 @@ public:
      *      n = 2 : [d2N/du2]  (Second parametric derivative)
      *      ...
      */
-    std::vector<Eigen::MatrixXd> eval_basis_functions(const Eigen::MatrixXd& points, 
+    std::vector<Matrix<T>> eval_basis_functions(const ColMatrix<T, 1>& points, 
                                                       std::size_t order = 0) const override;
     
     /**
@@ -87,7 +88,7 @@ public:
      *      n = 1 : [dN/ds]    (First physical derivative)
      *      n = 2 : [d2N/ds2]  (Second physical derivative)
      */          
-    std::vector<Eigen::MatrixXd> eval_shape_functions(const Eigen::MatrixXd& points,
+    std::vector<Matrix<T>> eval_shape_functions(const ColMatrix<T, 1>& points,
                                                       std::size_t order = 0) const override;
 
     // No eval_physical_derivs or unordered_map. Only Patch interface functions implemented.
@@ -98,14 +99,14 @@ public:
      * @param points Evaluation points in parametric coordinates as a (Q × 1) matrix.
      * @param order The highest order of parametric derivatives to compute.
      * @return A vector of matrices where index n represents d^nX/du^n.
-     *         The size of each matrix is (Q, gdim).
+     *         The size of each matrix is (Q, 3).
      * 
      *      n = 0 : [X]        (Physical coordinates / Position)
      *      n = 1 : [dX/du]    (Parametric tangent vector)
      *      n = 2 : [d2X/du2]  (Parametric curvature vector)
      *      ...
      */
-    std::vector<Eigen::MatrixXd> eval_geometry(const Eigen::MatrixXd& points, 
+    std::vector<ColMatrix<T, 3>> eval_geometry(const ColMatrix<T, 1>& points, 
                                                std::size_t order = 0) const override;
 
     /**
@@ -114,11 +115,11 @@ public:
      * @param points Evaluation points in parametric coordinates as a (Q × 1) matrix.
      * @return A vector of size (Q) containing ||dX/du|| at each point.
      */
-    Eigen::VectorXd eval_jacobian(const Eigen::MatrixXd& points) const override;
+    Vector<T> eval_jacobian(const ColMatrix<T, 1>& points) const override;
 
 private:
     /// @brief Tensor product of the single 1D basis
-    TensorProduct tensor_product_;
+    TensorProduct<T, 1> tensor_product_;
 
 };
 
