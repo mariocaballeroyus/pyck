@@ -40,26 +40,20 @@ target_include_directories(pyck_geometry PUBLIC cpp/geometry)
 target_link_libraries(pyck_geometry PUBLIC pyck_basis)
 
 # Assembler library
-add_library(pyck_assembler
-    cpp/assembler/quadrature.cpp
-    cpp/assembler/gauss_legendre.cpp
+add_library(pyck_assembly
+    cpp/assembly/quadrature.cpp
+    cpp/assembly/gauss_legendre.cpp
 )
-target_include_directories(pyck_assembler PUBLIC cpp/assembler)
-target_link_libraries(pyck_assembler PUBLIC eigen)
+target_include_directories(pyck_assembly PUBLIC cpp/assembly)
+target_link_libraries(pyck_assembly PUBLIC eigen)
 
-# Conditions library
-add_library(pyck_conditions
-    cpp/conditions/clamped.cpp
-)
-target_include_directories(pyck_conditions PUBLIC cpp/conditions)
-target_link_libraries(pyck_conditions PUBLIC eigen pyck_geometry)
 
 # Elements library
 add_library(pyck_elements
     cpp/elements/euler_bernoulli_beam_1p.cpp
 )
 target_include_directories(pyck_elements PUBLIC cpp/elements)
-target_link_libraries(pyck_elements PUBLIC pyck_geometry pyck_assembler pyck_conditions)
+target_link_libraries(pyck_elements PUBLIC pyck_geometry pyck_assembly)
 
 
 # pybind11
@@ -85,7 +79,10 @@ add_executable(test_curve tests/test_curve.cpp)
 target_link_libraries(test_curve PRIVATE pyck_geometry catch)
 
 add_executable(test_quadrature tests/test_quadrature.cpp)
-target_link_libraries(test_quadrature PRIVATE pyck_assembler catch)
+target_link_libraries(test_quadrature PRIVATE pyck_assembly catch)
+
+add_executable(test_dof_mapper tests/test_dof_mapper.cpp)
+target_link_libraries(test_dof_mapper PRIVATE pyck_geometry catch)
 
 add_executable(test_dof_mapper tests/test_dof_mapper.cpp)
 target_link_libraries(test_dof_mapper PRIVATE pyck_geometry catch)
