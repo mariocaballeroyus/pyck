@@ -136,32 +136,6 @@ Vector<T> CurvePatch<T>::eval_jacobian(const ColMatrix<T, 1>& points) const
     return jac;
 }
 
-// === Boundary Conditions ========================================================
-
-template <std::floating_point T>
-std::vector<Index> CurvePatch<T>::get_boundary_dofs(std::size_t param_dim, bool at_start) const
-{
-    if (param_dim != 0) {
-        throw std::invalid_argument("param_dim must be 0 for a curve patch.");
-    }
-
-    std::vector<Index> clamped_dofs;
-    Index n = this->basis(0).num_basis();
-    
-    if (at_start)
-    {
-        clamped_dofs.push_back(0);
-        clamped_dofs.push_back(1);
-    }
-    else
-    {
-        clamped_dofs.push_back(n - 2);
-        clamped_dofs.push_back(n - 1);
-    }
-
-    return clamped_dofs;
-}
-
 // === Template Instantiations ========================================================
 
 template class CurvePatch<double>;

@@ -33,6 +33,7 @@ target_link_libraries(pyck_basis PUBLIC eigen)
 
 # Geometry library
 add_library(pyck_geometry
+    cpp/geometry/dof_mapper.cpp
     cpp/geometry/curve.cpp
 )
 target_include_directories(pyck_geometry PUBLIC cpp/geometry)
@@ -86,9 +87,13 @@ target_link_libraries(test_curve PRIVATE pyck_geometry catch)
 add_executable(test_quadrature tests/test_quadrature.cpp)
 target_link_libraries(test_quadrature PRIVATE pyck_assembler catch)
 
+add_executable(test_dof_mapper tests/test_dof_mapper.cpp)
+target_link_libraries(test_dof_mapper PRIVATE pyck_geometry catch)
+
 enable_testing()
 add_test(NAME knot_vector_tests COMMAND test_knot_vector)
 add_test(NAME bspline_tests COMMAND test_bspline)
 add_test(NAME tensor_product_tests COMMAND test_tensor_product)
 add_test(NAME curve_tests COMMAND test_curve)
 add_test(NAME quadrature_tests COMMAND test_quadrature)
+add_test(NAME dof_mapper_tests COMMAND test_dof_mapper)

@@ -32,7 +32,8 @@ public:
 
     CurvePatch(std::shared_ptr<const Basis<T>> basis_u, const ColMatrix<T, 3>& control_pts)
     : PatchType(control_pts),
-      tensor_product_(std::move(basis_u))
+      tensor_product_(std::move(basis_u)),
+      dof_mapper_({tensor_product_.template basis<0>().num_basis()})
     {}
 
     /**
@@ -115,11 +116,23 @@ public:
      * @param points Evaluation points in parametric coordinates as a (Q × 1) matrix.
      * @return A vector of size (Q) containing ||dX/du|| at each point.
      */
-    Vector<T> eval_jacobian(const ColMatrix<T, 1>& points) const override;
+    Vector<T> eval_jacobian(const ColMatrix<T, 1>& points) const;
+
+    // === DOF Mapping ================================================================
+    
+    /**
+     * @brief Get the DofMapper responsible for resolving logical tensor indices 
+     *        into global flattened DOF indices for this patch.
+     */
+    const DofMapper<1>& dof_mapper() const override 
+    { return dof_mapper_; }
 
 private:
     /// @brief Tensor product of the single 1D basis
     TensorProduct<T, 1> tensor_product_;
+    
+    /// @brief Geometric DOF Mapper taking local indices to global index
+    DofMapper<1> dof_mapper_;
 
 };
 

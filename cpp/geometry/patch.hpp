@@ -7,6 +7,7 @@
 
 #include "basis.hpp"
 #include "tensor.hpp"
+#include "dof_mapper.hpp"
 #include "../types.hpp"
 
 namespace pyck
@@ -35,19 +36,24 @@ public:
     // === Properties =================================================================
 
     /// @brief Get the geometric dimension of the patch
-    static constexpr std::size_t gdim() { return 3; }
+    static constexpr std::size_t gdim() 
+    { return 3; }
 
     /// @brief Get the topological dimension of the patch
-    static constexpr std::size_t tdim() { return d; }
+    static constexpr std::size_t tdim() 
+    { return d; }
 
     /// @brief Get the control points of the patch
-    const ColMatrix<T, 3>& control_pts() const { return control_pts_; }
+    const ColMatrix<T, 3>& control_pts() const 
+    { return control_pts_; }
 
     /// @brief Get the number of control points in the patch
-    std::size_t num_control_pts() const { return control_pts_.rows(); }
+    std::size_t num_control_pts() const 
+    { return control_pts_.rows(); }
 
     /// @brief Get the control points of the patch (non-const version)
-    ColMatrix<T, 3>& control_pts() { return control_pts_; }
+    ColMatrix<T, 3>& control_pts() 
+    { return control_pts_; }
 
     /// @brief Get the basis functions for a given parametric direction
     /// @param dir The parametric direction
@@ -136,6 +142,8 @@ public:
      */
     virtual Vector<T> eval_jacobian(const ColMatrix<T, d>& points) const = 0;
 
+    // === DOF Mapping ================================================================
+
     /**
      * @brief Compute the global flattened DOF indices for the clamped boundary layers.
      *        For degree p, a fully clamped boundary requires prescribing the first 2 control points 
@@ -144,7 +152,14 @@ public:
      * @param at_start True to get the first two layers (u=0), False for the last two layers (u=1).
      * @return A vector of flattened global DOF indices belonging to the boundary layers.
      */
-    virtual std::vector<Index> get_boundary_dofs(std::size_t param_dim, bool at_start) const = 0;
+    virtual std::vector<Index> boundary_dofs(std::size_t param_dim, bool at_start) const
+    { return dof_mapper().get_boundary_dofs(param_dim, at_start); }
+    
+    /**
+     * @brief Get the DofMapper responsible for resolving logical tensor indices 
+     *        into global flattened DOF indices for this patch.
+     */
+    virtual const DofMapper<d>& dof_mapper() const = 0;
 
 protected:
 
