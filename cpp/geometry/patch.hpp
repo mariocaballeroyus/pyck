@@ -136,6 +136,16 @@ public:
      */
     virtual Vector<T> eval_jacobian(const ColMatrix<T, d>& points) const = 0;
 
+    /**
+     * @brief Compute the global flattened DOF indices for the clamped boundary layers.
+     *        For degree p, a fully clamped boundary requires prescribing the first 2 control points 
+     *        (or last 2 control points) along the given parametric dimension.
+     * @param param_dim The parametric dimension along which the boundary lies (e.g. 0 for u, 1 for v).
+     * @param at_start True to get the first two layers (u=0), False for the last two layers (u=1).
+     * @return A vector of flattened global DOF indices belonging to the boundary layers.
+     */
+    virtual std::vector<Index> get_boundary_dofs(std::size_t param_dim, bool at_start) const = 0;
+
 protected:
 
     // === Member Variables ===========================================================

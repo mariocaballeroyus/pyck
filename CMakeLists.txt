@@ -43,9 +43,22 @@ add_library(pyck_assembler
     cpp/assembler/quadrature.cpp
     cpp/assembler/gauss_legendre.cpp
 )
-target_include_directories(pyck_assembler PUBLIC cpp/assembler
-)
+target_include_directories(pyck_assembler PUBLIC cpp/assembler)
 target_link_libraries(pyck_assembler PUBLIC eigen)
+
+# Conditions library
+add_library(pyck_conditions
+    cpp/conditions/clamped.cpp
+)
+target_include_directories(pyck_conditions PUBLIC cpp/conditions)
+target_link_libraries(pyck_conditions PUBLIC eigen pyck_geometry)
+
+# Elements library
+add_library(pyck_elements
+    cpp/elements/euler_bernoulli_beam_1p.cpp
+)
+target_include_directories(pyck_elements PUBLIC cpp/elements)
+target_link_libraries(pyck_elements PUBLIC pyck_geometry pyck_assembler pyck_conditions)
 
 
 # pybind11

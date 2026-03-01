@@ -15,6 +15,10 @@ using Index = std::size_t;
 template <std::floating_point T>
 using Vector = Eigen::Vector<T, Eigen::Dynamic>;
 
+/// @brief Dynamic-sized row vector of type T
+template <std::floating_point T>
+using RowVector = Eigen::RowVector<T, Eigen::Dynamic>;
+
 /// @brief Dynamic-sized dense matrix of type T
 template <std::floating_point T>
 using Matrix = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
