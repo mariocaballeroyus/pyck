@@ -32,10 +32,10 @@ TEST_CASE("LoadCondition 1D", "[conditions][load_condition]") {
     GaussLegendre<double, 1> quad(2);
 
     SECTION("Constant Body Force") {
-        // t(x) = 10.0
-        auto load_fn = [](const ColMatrix<double, 1>& /*u*/) { return 10.0; };
+        // t(x) = 10.0, with 2 non-zero elements and 2 quad points each = 4 total
+        Vector<double> load_values = Vector<double>::Constant(4, 10.0);
         
-        LoadCondition<double, 1> load_cond(curve, quad, load_fn);
+        LoadCondition<double, 1> load_cond(curve, quad, load_values);
         
         Vector<double> F(num_pts);
         F.setZero();

@@ -16,6 +16,11 @@ class DofMapper
 {
 public:
 
+    /**
+     * @brief Construct a new DofMapper object
+     * 
+     * @param num_basis Array of the number of basis functions in each direction
+     */
     explicit DofMapper(const std::array<Index, d>& num_basis)
         : num_basis_(num_basis) {}
 
@@ -49,6 +54,10 @@ public:
     const std::array<Index, d>& num_basis() const { return num_basis_; }
 
 private:
+
+    // === Member Variables ===========================================================
+
+    /// @brief Number of basis functions in each direction
     std::array<Index, d> num_basis_;
 };
 

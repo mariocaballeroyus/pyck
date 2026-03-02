@@ -18,7 +18,7 @@ using namespace pyck;
  */
 TEST_CASE("BSpline: partition of unity", "[basis][bspline]") {
     for (std::size_t p = 1; p <= 3; ++p) {
-        auto kv = KnotVector<double>::clamped_uniform(p, p + 3);
+        auto kv = clamped_uniform_knots<double>(p, p + 3);
         BSpline<double> bs(p, kv);
 
         Eigen::VectorXd u = Eigen::VectorXd::LinSpaced(30, 0.0, 1.0);
@@ -37,7 +37,7 @@ TEST_CASE("BSpline: partition of unity", "[basis][bspline]") {
  *   N_{i,p}(u) ≥ 0   for all i, p, u
  */
 TEST_CASE("BSpline: non-negativity", "[basis][bspline]") {
-    auto kv = KnotVector<double>::clamped_uniform(3, 8);
+    auto kv = clamped_uniform_knots<double>(3, 8);
     BSpline<double> bs(3, kv);
 
     Eigen::VectorXd u = Eigen::VectorXd::LinSpaced(100, 0.0, 1.0);
@@ -91,7 +91,7 @@ TEST_CASE("BSpline: local support", "[basis][bspline]") {
  * We verify this for derivatives of order 1 and 2.
  */
 TEST_CASE("BSpline: derivative sum to zero", "[basis][bspline]") {
-    auto kv = KnotVector<double>::clamped_uniform(3, 6);
+    auto kv = clamped_uniform_knots<double>(3, 6);
     BSpline<double> bs(3, kv);
 
     Eigen::VectorXd u = Eigen::VectorXd::LinSpaced(40, 0.0, 1.0);
@@ -115,7 +115,7 @@ TEST_CASE("BSpline: derivative sum to zero", "[basis][bspline]") {
  */
 TEST_CASE("BSpline: C-continuity at internal knot", "[basis][bspline]") {
     // p = 3, 7 basis → knots = {0,0,0,0, 0.25, 0.5, 0.75, 1,1,1,1}
-    auto kv = KnotVector<double>::clamped_uniform(3, 7);
+    auto kv = clamped_uniform_knots<double>(3, 7);
     BSpline<double> bs(3, kv);
 
     // Test at the internal knot ξ = 0.5
@@ -247,7 +247,7 @@ TEST_CASE("BSpline: analytical derivatives", "[basis][bspline]") {
  * This is a general sanity check for arbitrary knot vectors and degrees.
  */
 TEST_CASE("BSpline: finite-difference derivative check", "[basis][bspline][deriv]") {
-    auto kv = KnotVector<double>::clamped_uniform(3, 6);
+    auto kv = clamped_uniform_knots<double>(3, 6);
     BSpline<double> bs(3, kv);
 
     double h = 1e-7;

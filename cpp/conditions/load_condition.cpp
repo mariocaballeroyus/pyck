@@ -8,7 +8,7 @@ namespace pyck
 template <std::floating_point T, std::size_t d>
 LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
                                    const QuadratureRule<T, d>& quadrature,
-                                   const std::function<T(const ColMatrix<T, d>&)>& load_fn)
+                                   const Vector<T>& load_values)
 {
     const auto& points = quadrature.points();
     const auto& weights = quadrature.weights();
@@ -33,13 +33,16 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
         total_elements *= count;
     }
 
+    // Track quadrature point offset into load_values
+    std::size_t qp_offset = 0;
+
     // Single linear loop over all possible multidimensional element indices
     for (std::size_t elem_idx = 0; elem_idx < total_elements; ++elem_idx) 
     {
         // Decode linear index into multidimensional span_indices
         std::array<std::size_t, d> span_indices;
         std::size_t temp_idx = elem_idx;
-        for (std::size_t i = d; i-- > 0; ) // Lexicographical decoding
+        for (std::size_t i = d; i-- > 0; )
         {
             span_indices[i] = temp_idx % intervals[i];
             temp_idx /= intervals[i];
@@ -63,20 +66,18 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
 
         if (zero_volume) continue;
 
-        // 2. Map quadrature points from [-1, 1]^d to the parametric element box
+        // Map quadrature points from [-1, 1]^d to the parametric element box
         auto [mapped_pts, mapped_weights] = quadrature.map_to_domain(u_a, u_b);
         
-        // 3. Evaluate basis functions and Jacobian
+        // Evaluate basis functions and Jacobian
         auto shape_funcs = patch.eval_shape_functions(mapped_pts, 0)[0];
         auto jacobian    = patch.eval_jacobian(mapped_pts);
         
-        // 4. Evaluate the traction/load function at quadrature points
-        Vector<T> t_vals(Q);
-        for (std::size_t q = 0; q < Q; ++q) {
-            t_vals(q) = load_fn(mapped_pts.row(q));
-        }
+        // Extract load values for this element's quadrature points
+        Vector<T> t_vals = load_values.segment(qp_offset, Q);
+        qp_offset += Q;
 
-        // 5. Integrate: f_ext += \sum_{q} N^T * t * |J| * w_q
+        // Integrate: f_ext += \sum_{q} N^T * t * |J| * w_q
         Vector<T> W_J_T = mapped_weights.cwiseProduct(jacobian).cwiseProduct(t_vals);
         element_load_ += shape_funcs.transpose() * W_J_T;
     }

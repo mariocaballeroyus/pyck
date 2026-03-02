@@ -11,7 +11,7 @@ using namespace pyck;
 TEST_CASE("KnotVector: monotonicity", "[basis][knots]") {
     for (std::size_t p = 1; p <= 4; ++p) {
         std::size_t n = p + 3;  
-        auto kv = KnotVector<double>::clamped_uniform(p, n);
+        auto kv = clamped_uniform_knots<double>(p, n);
 
         for (std::size_t i = 0; i + 1 < kv.size(); ++i)
             REQUIRE(kv[i] <= kv[i + 1]);
@@ -22,7 +22,7 @@ TEST_CASE("KnotVector: monotonicity", "[basis][knots]") {
  * Knot span test.
  */
 TEST_CASE("KnotVector: find_span", "[basis][knots]") {
-    auto kv = KnotVector<double>::clamped_uniform(2, 5);
+    auto kv = clamped_uniform_knots<double>(2, 5);
 
     SECTION("interior points land in the correct span") {
         REQUIRE(kv.find_span(2, 0.0) == 2);
@@ -40,7 +40,7 @@ TEST_CASE("KnotVector: find_span", "[basis][knots]") {
 TEST_CASE("KnotVector: clamped property", "[basis][knots]") {
     for (std::size_t p = 1; p <= 4; ++p) {
         std::size_t n = p + 2;
-        auto kv = KnotVector<double>::clamped_uniform(p, n);
+        auto kv = clamped_uniform_knots<double>(p, n);
 
         for (std::size_t i = 0; i <= p; ++i)
             REQUIRE(kv[i] == Approx(0.0));
@@ -55,7 +55,7 @@ TEST_CASE("KnotVector: clamped property", "[basis][knots]") {
  */
 TEST_CASE("KnotVector: unique spans", "[basis][knots]") {
     std::size_t p = 2, n = 6;
-    auto kv = KnotVector<double>::clamped_uniform(p, n);
+    auto kv = clamped_uniform_knots<double>(p, n);
 
     std::size_t num_elements = 0;
     for (std::size_t i = 0; i + 1 < kv.size(); ++i) {

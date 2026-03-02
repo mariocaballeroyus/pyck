@@ -11,13 +11,16 @@
 namespace pyck
 {
 
-/// @brief B-spline basis functions defined on a one-dimensional parametric space
-/// @tparam T Scalar type
+/**
+ * @brief B-spline basis functions defined on a one-dimensional parametric space
+ * @tparam T Scalar type
+ */
 template <std::floating_point T = double>
 class BSpline : public Basis<T>
 {
-
 public:
+
+    using BasisType = Basis<T>;
 
     // === Constructors ===============================================================
 
@@ -31,14 +34,14 @@ public:
      * @param knots Knot vector defining the B-spline basis functions
      */
     BSpline(Index degree, KnotVector<T> knots)
-        : Basis<T>(degree), knots_(std::move(knots)) {}
+        : BasisType(degree, std::move(knots)) {}
 
     // === Evaluation =================================================================
 
     /**
      * @brief Evaluate B-spline basis functions at given parameter values
      * 
-     * @param params Parameter values at which to evaluate the basis functions
+     * @param points Parameter values at which to evaluate the basis functions
      * @return A matrix of size (m x n) where m is the number of parameter values and 
      *         n is the number of basis functions
      * 
@@ -47,33 +50,24 @@ public:
      *                    ...      ...      ... ...
      *                    N_0(u_m) N_1(u_m) ... N_n(u_m) }
      */
-    Matrix<T> eval(const Vector<T>& params) const override;
+    Matrix<T> eval(const Vector<T>& points) const override;
 
     /**
-     * @brief Evaluate B-spline basis functions and their derivatives at given parameter values
+     * @brief Evaluate B-spline basis functions and their derivatives at given 
+     *        parameter values
      * 
-     * @param params Parameter values at which to evaluate the basis functions
+     * @param points Parameter values at which to evaluate the basis functions
      * @param order Highest order of derivatives to compute
-     * @return A vector of matrices, where each matrix corresponds to the basis functions or 
-     *         their derivatives
+     * @return A vector of matrices, where each matrix corresponds to the basis 
+     *         functions or their derivatives
      * 
-     *          results[k] = { d^k(N_0)/du^k(u_0) d^k(N_1)/du^k(u_0) ... d^k(N_n)/du^k(u_0)
-     *                         d^k(N_0)/du^k(u_1) d^k(N_1)/du^k(u_1) ... d^k(N_n)/du^k(u_1)
-     *                         ...                ...                ... ...
-     *                         d^k(N_0)/du^k(u_m) d^k(N_1)/du^k(u_m) ... d^k(N_n)/du^k(u_m) }
+     *          results[k] = { d^k(N_0)/du^k(u_0) ... d^k(N_n)/du^k(u_0)
+     *                         d^k(N_0)/du^k(u_1) ... d^k(N_n)/du^k(u_1)
+     *                         ...                ... ...
+     *                         d^k(N_0)/du^k(u_m) ... d^k(N_n)/du^k(u_m) }
      */
-    std::vector<Matrix<T>> eval_derivs(const Vector<T>& params, 
-                                        Index order = 0) const override;
-
-    // === Properties =================================================================
-
-    Index num_basis() const override { return knots_.num_basis(this->degree_); }
-
-    /// @brief Get the knot vector object
-    const KnotVector<T>& knot_vector() const { return knots_; }
-
-    /// @brief Get the raw knot values (backward-compatible)
-    const std::vector<T>& knots() const { return knots_.data(); }
+    std::vector<Matrix<T>> eval_derivs(const Vector<T>& points, 
+                                       Index order = 0) const override;
 
 private:
 
@@ -82,15 +76,11 @@ private:
     /**
      * @brief Compute the table of basis function values for given parameter values
      * 
-     * @param params Parameter values at which to compute the basis functions
-     * @return A vector of matrices, where each matrix corresponds to the basis functions of a certain degree
+     * @param points Parameter values at which to compute the basis functions
+     * @return A vector of matrices, where each matrix corresponds to the basis 
+     *         functions of a certain degree
      */
-    std::vector<Matrix<T>> compute_basis_table(const Vector<T>& params) const;
-
-    // === Member Variables =======================================================
-
-    /// @brief Knot vector defining the B-spline basis functions
-    KnotVector<T> knots_;
+    std::vector<Matrix<T>> compute_basis_table(const Vector<T>& points) const;
 
 };
 

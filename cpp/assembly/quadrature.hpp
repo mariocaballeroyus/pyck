@@ -86,8 +86,6 @@ public:
 
 protected:
 
-    // === Internal Methods ===========================================================
-
     /**
      * @brief Compute the 1D reference nodes and weights for a given number of points.
      * 

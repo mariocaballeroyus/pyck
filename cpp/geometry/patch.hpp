@@ -29,9 +29,13 @@ public:
     /// @brief Virtual destructor
     virtual ~Patch() = default;
 
+    /**
+     * @brief Construct a new Patch object
+     * 
+     * @param control_pts The control points of the patch
+     */
     explicit Patch(const ColMatrix<T, 3>& control_pts)
-    : control_pts_(control_pts) 
-    {}
+        : control_pts_(control_pts) {}
 
     // === Properties =================================================================
 

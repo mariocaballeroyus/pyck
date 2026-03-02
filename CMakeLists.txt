@@ -43,14 +43,16 @@ target_link_libraries(pyck_geometry PUBLIC pyck_basis)
 add_library(pyck_assembly
     cpp/assembly/quadrature.cpp
     cpp/assembly/gauss_legendre.cpp
+    cpp/assembly/linear_elastic_problem.cpp
 )
 target_include_directories(pyck_assembly PUBLIC cpp/assembly)
-target_link_libraries(pyck_assembly PUBLIC eigen)
+target_link_libraries(pyck_assembly PUBLIC eigen pyck_elements pyck_conditions)
 
 
 # Conditions library
 add_library(pyck_conditions
     cpp/conditions/load_condition.cpp
+    cpp/conditions/assign_scalar.cpp
 )
 target_include_directories(pyck_conditions PUBLIC cpp/conditions)
 target_link_libraries(pyck_conditions PUBLIC pyck_geometry pyck_assembly)
@@ -95,6 +97,9 @@ target_link_libraries(test_load_condition PRIVATE pyck_conditions pyck_assembly 
 add_executable(test_quadrature tests/test_quadrature.cpp)
 target_link_libraries(test_quadrature PRIVATE pyck_assembly catch)
 
+add_executable(test_euler_bernoulli tests/test_euler_bernoulli.cpp)
+target_link_libraries(test_euler_bernoulli PRIVATE pyck_elements pyck_conditions pyck_assembly pyck_geometry pyck_basis catch)
+
 enable_testing()
 add_test(NAME knot_vector_tests COMMAND test_knot_vector)
 add_test(NAME bspline_tests COMMAND test_bspline)
@@ -103,3 +108,4 @@ add_test(NAME curve_tests COMMAND test_curve)
 add_test(NAME quadrature_tests COMMAND test_quadrature)
 add_test(NAME dof_mapper_tests COMMAND test_dof_mapper)
 add_test(NAME load_condition_tests COMMAND test_load_condition)
+add_test(NAME euler_bernoulli_tests COMMAND test_euler_bernoulli)

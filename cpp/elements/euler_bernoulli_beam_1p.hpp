@@ -32,7 +32,8 @@ public:
      * @param stiffness The local stiffness matrix to be computed.
      */
     void compute_local_stiffness(const Patch<T, 1>& patch,
-                                 const QuadratureRule<T, 1>& quadrature,
+                                 const ColMatrix<T, 1>& q_points,
+                                 const Vector<T>& q_weights,
                                  Matrix<T>& stiffness) const override;
 
     /**
@@ -42,8 +43,9 @@ public:
      * @param load The local load vector to be computed.
      */
     void compute_local_load(const Patch<T, 1>& patch,
-                            const QuadratureRule<T, 1>& quadrature,
-                            const std::function<T(const ColMatrix<T, 1>&)>& load_fn,
+                            const ColMatrix<T, 1>& q_points,
+                            const Vector<T>& q_weights,
+                            const Vector<T>& load_values,
                             Vector<T>& load) const override;
 
 private:

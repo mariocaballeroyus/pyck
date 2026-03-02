@@ -17,6 +17,25 @@ Index TensorProduct<T, d>::num_basis() const
 }
 
 template <std::floating_point T, std::size_t d>
+std::array<Index, d> TensorProduct<T, d>::num_intervals() const
+{
+    std::array<Index, d> intervals;
+    for (std::size_t i = 0; i < d; ++i) {
+        intervals[i] = bases_[i]->num_intervals();
+    }
+    return intervals;
+}
+
+template <std::floating_point T, std::size_t d>
+const Basis<T>& TensorProduct<T, d>::basis(Index dir) const
+{ 
+    if (dir >= d) {
+        throw std::out_of_range("Basis dimension index out of range");
+    }
+    return *bases_[dir]; 
+}
+
+template <std::floating_point T, std::size_t d>
 Matrix<T> TensorProduct<T, d>::eval(const Matrix<T>& params) const
 {
     if constexpr (d == 0) {
@@ -46,45 +65,45 @@ Matrix<T> TensorProduct<T, d>::eval(const Matrix<T>& params) const
 }
 
 template <std::floating_point T, std::size_t d>
-std::vector<Matrix<T>> TensorProduct<T, d>::eval_derivs(
-    const Matrix<T>& params, 
-    const std::array<Index, d>& orders) const
+std::vector<Matrix<T>> TensorProduct<T, d>::eval_derivs(const Matrix<T>& params, 
+                                                        Index order) const
 {
     if constexpr (d == 0) {
         return {};
     }
 
     std::size_t num_points = params.rows();
-    std::vector<Matrix<T>> accumulated_results = 
-        bases_[0]->eval_derivs(params.col(0), orders[0]);
+    std::vector<Matrix<T>> acc_results = bases_[0]->eval_derivs(params.col(0), order);
 
-    for (std::size_t i = 1; i < d; ++i) {
-        std::vector<Matrix<T>> mat_i_derivs = 
-            bases_[i]->eval_derivs(params.col(i), orders[i]);
-        
+    for (std::size_t i = 1; i < d; ++i) 
+    {
+        std::vector<Matrix<T>> mat_i_derivs = bases_[i]->eval_derivs(params.col(i), order);
+
         std::vector<Matrix<T>> next_accumulated;
-        next_accumulated.reserve(accumulated_results.size() * mat_i_derivs.size());
+        next_accumulated.reserve(acc_results.size() * mat_i_derivs.size());
 
-        for (const auto& res_mat : accumulated_results) {
-            for (const auto& new_mat : mat_i_derivs) {
-                
+        for (const auto& res_mat : acc_results) 
+        {
+            for (const auto& new_mat : mat_i_derivs) 
+            {
                 std::size_t cols_res = res_mat.cols();
                 std::size_t cols_mat = new_mat.cols();
-                
+
                 Matrix<T> combined(num_points, cols_res * cols_mat);
-                
+
                 for (std::size_t c1 = 0; c1 < cols_res; ++c1) {
                     for (std::size_t c2 = 0; c2 < cols_mat; ++c2) {
-                        combined.col(c1 * cols_mat + c2) = res_mat.col(c1).cwiseProduct(new_mat.col(c2));
+                        combined.col(c1 * cols_mat + c2) = 
+                            res_mat.col(c1).cwiseProduct(new_mat.col(c2));
                     }
                 }
                 next_accumulated.push_back(std::move(combined));
             }
         }
-        accumulated_results = std::move(next_accumulated);
+        acc_results = std::move(next_accumulated);
     }
-    
-    return accumulated_results;
+
+    return acc_results;
 }
 
 // === Template Instantiations ========================================================

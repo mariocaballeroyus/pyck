@@ -65,6 +65,7 @@ void assign_zeros(const std::vector<Index>& dofs,
 }
 
 // === Template Instantiations ========================================================
+
 template void assign_scalar<double>(const std::vector<Index>&, const std::vector<double>&, Matrix<double>&, Vector<double>&);
 template void assign_zeros<double>(const std::vector<Index>&, Matrix<double>&, Vector<double>&);
 

@@ -14,9 +14,12 @@
 namespace pyck
 {
 
-/// @brief Tensor product basis functions defined on a multi-dimensional parametric space
-/// @tparam T Scalar type
-/// @tparam d Parametric dimension
+/**
+ * @brief Tensor product basis functions defined on a multi-dimensional parametric 
+ *        space
+ * @tparam T Scalar type
+ * @tparam d Parametric dimension
+ */
 template <std::floating_point T, std::size_t d>
 class TensorProduct 
 {
@@ -29,29 +32,41 @@ public:
      * 
      * @param bases An array of shared pointers to 1D basis objects.
      */
-    explicit TensorProduct(std::array<std::shared_ptr<const Basis<T>>, d> bases)
+    explicit TensorProduct(std::array<Ptr<const Basis<T>>, d> bases)
         : bases_(std::move(bases)) {}
 
-    /**
-     * @brief Construct a tensor product basis dynamically from individual basis pointers
-     */
-    template <typename... Args>
-    requires (sizeof...(Args) == d)
-    explicit TensorProduct(std::shared_ptr<const Args>... bases)
-        : bases_({std::static_pointer_cast<const Basis<T>>(bases)...}) {}
+    /// @brief Construct a tensor product basis for a 1D curve
+    explicit TensorProduct(Ptr<const Basis<T>> b0)
+    requires (d == 1)
+        : bases_{std::move(b0)} {}
+
+    /// @brief Construct a tensor product basis for a 2D surface
+    TensorProduct(Ptr<const Basis<T>> b0, 
+                  Ptr<const Basis<T>> b1)
+    requires (d == 2)
+        : bases_{std::move(b0), std::move(b1)} {}
+
+    /// @brief Construct a tensor product basis for a 3D volume
+    TensorProduct(Ptr<const Basis<T>> b0, 
+                  Ptr<const Basis<T>> b1, 
+                  Ptr<const Basis<T>> b2)
+    requires (d == 3)
+        : bases_{std::move(b0), std::move(b1), std::move(b2)} {}
 
     // === Evaluation =================================================================
 
     /**
      * @brief Evaluate the N-dimensional basis functions
-     * @param params A matrix of 1 .. `m` parametric point coordinates in `d` dimensions.
+     * @param params A matrix of 1 .. `m` parametric point coordinates in `d` 
+     * dimensions.
      * 
      *                 params = { u_0^1 u_0^2 ... u_0^d
      *                            u_1^1 u_1^2 ... u_1^d
      *                            ...   ...   ... ...
      *                            u_m^1 u_m^2 ... u_m^d }
      * 
-     * @return A matrix of size (m x k) where `k` is the product of num_basis() of all 1D bases.
+     * @return A matrix of size (m x k) where `k` is the product of num_basis() of all 
+     *         1D bases.
      * 
      *         result = { R_0(u_0) R_1(u_0) ... R_{K-1}(u_0)
      *                    R_0(u_1) R_1(u_1) ... R_{K-1}(u_1)
@@ -63,43 +78,37 @@ public:
     /**
      * @brief Evaluate basis and mixed partial derivatives for the tensor product space
      * 
-     * @param params A matrix of size (m x d) containing 'm' parametric points in 'd' dimensions.
-     * Each row represents a single multi-dimensional point (e.g., u, v, w).
-     * @param orders A vector of length 'd' specifying the maximum derivative order to compute 
-     * for each respective parametric dimension.
+     * @param params A matrix of size (m x d) containing 'm' parametric points in 'd' 
+     *        dimensions. Each row represents a single multi-dimensional point.
+     * @param order Maximum derivative order to compute (same for all directions).
      * 
-     * @return A flat std::vector of Eigen::MatrixXd containing all combinations of partial 
-     *         derivatives. The total number of matrices is the product of (orders[i] + 1) 
-     *         for all dimensions i.
+     * @return A flat std::vector of matrices containing all combinations of partial 
+     *         derivatives. The total number of matrices is (order + 1)^d.
      */
     std::vector<Matrix<T>> eval_derivs(const Matrix<T>& params, 
-                                                           const std::array<Index, d>& orders) const;
+                                       Index order) const;
 
     // === Properties =================================================================
 
     /// @brief Get the parametric dimension (e.g., 2 for a surface)
-    static constexpr std::size_t dim() { return d; }
+    static constexpr std::size_t dim() 
+    { return d; }
 
-    /// @brief Total number of basis functions (n_u * n_v * ...)
+    /// @brief Total number of basis functions
     Index num_basis() const;
 
-    /// @brief Get the 1D basis for a given parametric direction
-    /// @tparam Dir Parametric direction index
-    template <std::size_t Dir>
-    const Basis<T>& basis() const { return *bases_[Dir]; }
+    /// @brief Get the number of parametric intervals (elements) for each dimension
+    std::array<Index, d> num_intervals() const;
 
     /// @brief Get the 1D basis for a given parametric direction (runtime index)
-    const Basis<T>& basis(std::size_t dir) const { 
-        if (dir >= d) throw std::out_of_range("Basis dimension index out of range");
-        return *bases_[dir]; 
-    }
+    const Basis<T>& basis(Index dir) const;
 
 private:
 
     // === Member Variables ===========================================================
 
     /// @brief Array of 1D basis objects for each parametric dimension
-    std::array<std::shared_ptr<const Basis<T>>, d> bases_;
+    std::array<Ptr<const Basis<T>>, d> bases_;
 };
 
 } // namespace pyck

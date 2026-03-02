@@ -10,12 +10,13 @@
 namespace pyck
 {
 
-/// @brief Non-decreasing knot vector for basis functions.
-/// @tparam T Scalar type
+/**
+ * @brief Non-decreasing knot vector for basis functions.
+ * @tparam T Scalar type
+ */
 template <std::floating_point T = double>
 class KnotVector
 {   
-
 public:
 
     // === Constructors & Factory Methods =============================================
@@ -27,44 +28,41 @@ public:
     explicit KnotVector(std::vector<T> knots)
         : knots_(std::move(knots)) {}
 
-    /**
-     * @brief Create a clamped, uniformly-spaced knot vector on [0, 1].
-     * @param degree   Polynomial degree (p).
-     * @param num_basis Number of basis functions (n).  Must satisfy n >= p + 1.
-     * @return A knot vector with (p+1) repeated knots at each end and
-     *         uniformly spaced internal knots.
-     */
-    static KnotVector clamped_uniform(Index degree, Index num_basis);
+    // === Properties =================================================================
 
-    // === Element access =============================================================
+    /// @brief Number of basis functions of given degree supported by this vector.
+    Index num_basis(Index degree) const 
+    { return knots_.size() - degree - 1; }
 
     /// @brief Number of knots in the vector.
-    Index size() const { return knots_.size(); }
+    Index size() const 
+    { return knots_.size(); }
 
     /// @brief Access the i-th knot value.
-    T operator[](Index i) const { return knots_[i]; }
+    T operator[](Index i) const 
+    { return knots_[i]; }
 
     /// @brief First knot value.
-    T front() const { return knots_.front(); }
+    T front() const 
+    { return knots_.front(); }
 
     /// @brief Last knot value.
-    T back() const { return knots_.back(); }
+    T back() const 
+    { return knots_.back(); }
 
     /// @brief Read-only reference to the underlying std::vector.
-    const std::vector<T>& data() const { return knots_; }
+    const std::vector<T>& data() const 
+    { return knots_; }
 
     // === Iterators ==================================================================
 
     /// @brief Iterator to the first knot.
-    auto begin() const { return knots_.begin(); }
+    auto begin() const 
+    { return knots_.begin(); }
 
     /// @brief Iterator to the past-the-end knot.
-    auto end()   const { return knots_.end(); }
-
-    // === Properties =================================================================
-
-    /// @brief Number of basis functions of given degree supported by this vector.
-    Index num_basis(Index degree) const { return knots_.size() - degree - 1; }
+    auto end() const 
+    { return knots_.end(); }
 
     // === Utility Methods ============================================================
 
@@ -86,7 +84,21 @@ private:
 
     /// @brief Non-decreasing sequence of knot values.
     std::vector<T> knots_;
+
 };
+
+// === Factory Methods ================================================================
+
+/**
+ * @brief Create a clamped, uniformly-spaced knot vector on [0, 1].
+ * @tparam T Scalar type
+ * @param degree   Polynomial degree (p).
+ * @param num_basis Number of basis functions (n).  Must satisfy n >= p + 1.
+ * @return A knot vector with (p+1) repeated knots at each end and
+ *         uniformly spaced internal knots.
+ */
+template <std::floating_point T = double>
+KnotVector<T> clamped_uniform_knots(Index degree, Index num_basis);
 
 } // namespace pyck
 

@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <concepts>
+#include <memory>
 #include <Eigen/Dense>
 
 namespace pyck
@@ -10,6 +11,10 @@ namespace pyck
 
 /// @brief Global integral type for indexing and sizes
 using Index = std::size_t;
+
+/// @brief Shared pointer alias
+template <typename T>
+using Ptr = std::shared_ptr<T>;
 
 /// @brief Dynamic-sized column vector of type T
 template <std::floating_point T>

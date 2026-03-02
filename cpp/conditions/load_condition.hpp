@@ -1,7 +1,7 @@
 #ifndef PYCK_LOAD_CONDITION_HPP
 #define PYCK_LOAD_CONDITION_HPP
 
-#include <functional>
+
 #include <vector>
 #include <Eigen/Dense>
 
@@ -20,13 +20,13 @@ template <std::floating_point T, std::size_t d>
 class LoadCondition : public Condition<T>
 {
 public:
-    /// @brief Construct a generic load condition by numerically integrating the load function.
+    /// @brief Construct a generic load condition by numerically integrating the load values.
     /// @param patch The geometric patch over which to integrate.
     /// @param quadrature The quadrature rule used for integration.
-    /// @param load_fn The external scalar traction function t(u).
+    /// @param load_values Pre-evaluated load values at the quadrature points.
     LoadCondition(const Patch<T, d>& patch,
                   const QuadratureRule<T, d>& quadrature,
-                  const std::function<T(const ColMatrix<T, d>&)>& load_fn);
+                  const Vector<T>& load_values);
 
     /// @brief Apply the integrated load to the global load vector.
     void apply(Matrix<T>& stiffness, Vector<T>& load) const override;

@@ -11,7 +11,7 @@ namespace py = pybind11;
 PYBIND11_MODULE(_pyck, m) {
 
     using BasisD = pyck::Basis<double>;
-    py::class_<BasisD, std::shared_ptr<BasisD>>(m, "Basis")
+    py::class_<BasisD, pyck::Ptr<BasisD>>(m, "Basis")
         .def("degree", &BasisD::degree)
         .def("num_basis", &BasisD::num_basis)
         .def("eval", &BasisD::eval_derivs,
@@ -21,7 +21,7 @@ PYBIND11_MODULE(_pyck, m) {
     py::class_<KnotVectorD>(m, "KnotVector")
         .def(py::init<std::vector<double>>(),
              py::arg("knots"))
-        .def_static("clamped_uniform", &KnotVectorD::clamped_uniform,
+        .def_static("clamped_uniform", &pyck::clamped_uniform_knots<double>,
              py::arg("degree"), py::arg("num_basis"))
         .def("size", &KnotVectorD::size)
         .def("num_basis", &KnotVectorD::num_basis,
@@ -35,7 +35,7 @@ PYBIND11_MODULE(_pyck, m) {
         .def("__len__", &KnotVectorD::size);
 
     using BSplineD = pyck::BSpline<double>;
-    py::class_<BSplineD, BasisD, std::shared_ptr<BSplineD>>(m, "BSpline")
+    py::class_<BSplineD, BasisD, pyck::Ptr<BSplineD>>(m, "BSpline")
         .def(py::init([](std::size_t degree, const std::vector<double>& knots) {
                  return std::make_shared<BSplineD>(degree, KnotVectorD(knots));
              }),
@@ -55,7 +55,7 @@ PYBIND11_MODULE(_pyck, m) {
 
     using CurvePatch3D = pyck::CurvePatch<double>;
     py::class_<CurvePatch3D, Patch3D1D>(m, "CurvePatch")
-        .def(py::init([](std::shared_ptr<BSplineD> basis,
+        .def(py::init([](pyck::Ptr<BSplineD> basis,
                          const pyck::ColMatrix<double, 3>& cp) {
                  return new CurvePatch3D(std::static_pointer_cast<BasisD>(basis), cp);
              }),
@@ -72,7 +72,7 @@ PYBIND11_MODULE(_pyck, m) {
 
 #ifdef PYCK_BUILD_SINGLE_PRECISION
     using BasisF = pyck::Basis<float>;
-    py::class_<BasisF, std::shared_ptr<BasisF>>(m, "Basis32")
+    py::class_<BasisF, pyck::Ptr<BasisF>>(m, "Basis32")
         .def("degree", &BasisF::degree)
         .def("num_basis", &BasisF::num_basis)
         .def("eval", &BasisF::eval_derivs,
@@ -82,7 +82,7 @@ PYBIND11_MODULE(_pyck, m) {
     py::class_<KnotVectorF>(m, "KnotVector32")
         .def(py::init<std::vector<float>>(),
              py::arg("knots"))
-        .def_static("clamped_uniform", &KnotVectorF::clamped_uniform,
+        .def_static("clamped_uniform", &pyck::clamped_uniform_knots<float>,
              py::arg("degree"), py::arg("num_basis"))
         .def("size", &KnotVectorF::size)
         .def("num_basis", &KnotVectorF::num_basis,
@@ -96,7 +96,7 @@ PYBIND11_MODULE(_pyck, m) {
         .def("__len__", &KnotVectorF::size);
 
     using BSplineF = pyck::BSpline<float>;
-    py::class_<BSplineF, BasisF, std::shared_ptr<BSplineF>>(m, "BSpline32")
+    py::class_<BSplineF, BasisF, pyck::Ptr<BSplineF>>(m, "BSpline32")
         .def(py::init([](std::size_t degree, const std::vector<float>& knots) {
                  return std::make_shared<BSplineF>(degree, KnotVectorF(knots));
              }),
@@ -116,7 +116,7 @@ PYBIND11_MODULE(_pyck, m) {
 
     using CurvePatch3DF = pyck::CurvePatch<float>;
     py::class_<CurvePatch3DF, Patch3D1DF>(m, "CurvePatch32")
-        .def(py::init([](std::shared_ptr<BSplineF> basis,
+        .def(py::init([](pyck::Ptr<BSplineF> basis,
                          const pyck::ColMatrix<float, 3>& cp) {
                  return new CurvePatch3DF(std::static_pointer_cast<BasisF>(basis), cp);
              }),

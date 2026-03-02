@@ -18,18 +18,20 @@ Index DofMapper<d>::to_global(const std::array<Index, d>& logical_idx) const
 }
 
 template <std::size_t d>
-std::vector<Index> DofMapper<d>::get_boundary_dofs(std::size_t param_dim, bool at_start) const
-{
-    std::vector<Index> dofs;
-    
+std::vector<Index> DofMapper<d>::get_boundary_dofs(std::size_t param_dim, 
+                                                   bool at_start) const
+{    
     if (param_dim >= d) {
-        throw std::invalid_argument("param_dim is out of bounds for the dimension d.");
+        throw std::invalid_argument(
+            "param_dim is out of bounds for the dimension d."
+        );
     }
 
+    std::vector<Index> dofs;
     std::array<Index, d> current_idx;
     current_idx.fill(0);
     
-    // Only iterate over exactly the indices we need!
+    // Only iterate over exactly the indices we need
     auto iterate = [&](auto& self, std::size_t current_dim) -> void {
         if (current_dim == d) {
             dofs.push_back(to_global(current_idx));
@@ -78,7 +80,7 @@ bool DofMapper<d>::next_logical_index(std::array<Index, d>& logical_idx) const
         }
         logical_idx[i] = 0;
     }
-    return false; // Wrapped around
+    return false;
 }
 
 // === Template Instantiations ========================================================

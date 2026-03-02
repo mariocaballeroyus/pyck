@@ -6,7 +6,26 @@ namespace pyck
 {
 
 template <std::floating_point T>
-KnotVector<T> KnotVector<T>::clamped_uniform(Index degree, Index num_basis)
+Index KnotVector<T>::find_span(Index degree, T param) const
+{
+    // Basis indexing 0 .. n
+    Index num_knots = knots_.size();
+    Index n = num_knots - degree - 2;
+
+    // Edge cases
+    if (param >= knots_[n + 1]) return n;
+    if (param <= knots_[degree]) return degree;
+
+    // Binary search for the span
+    auto it = std::upper_bound(knots_.begin() + degree, knots_.begin() + n + 1, param);
+    return static_cast<Index>(std::distance(knots_.begin(), it) - 1);
+}
+
+// === Factory Methods ================================================================
+
+template <std::floating_point T>
+KnotVector<T> clamped_uniform_knots(Index degree, 
+                                    Index num_basis)
 {
     // Check: num_knots = num_basis + degree + 1
     if (num_basis < degree + 1) {
@@ -18,10 +37,11 @@ KnotVector<T> KnotVector<T>::clamped_uniform(Index degree, Index num_basis)
     Index num_knots = num_basis + degree + 1;
     std::vector<T> knots(num_knots);
 
-    // Number of unique "spans" in the internal part of the vector
-    Index num_spans = num_basis - degree;
+    // Number of unique spans in the internal part of the vector
+    const Index num_spans = num_basis - degree;
 
-    for (Index i = 0; i < num_knots; ++i) {
+    for (Index i = 0; i < num_knots; ++i) 
+    {
         if (i <= degree) {
             // Clamped start: first p+1 knots are 0.0
             knots[i] = static_cast<T>(0.0);
@@ -39,27 +59,14 @@ KnotVector<T> KnotVector<T>::clamped_uniform(Index degree, Index num_basis)
     return KnotVector<T>(std::move(knots));
 }
 
-template <std::floating_point T>
-Index KnotVector<T>::find_span(Index degree, T param) const
-{
-    Index num_knots = knots_.size();
-
-    // Basis indexing 0 .. n
-    int n = static_cast<int>(num_knots) - static_cast<int>(degree) - 2;
-    // Edge cases
-    if (param >= knots_[n + 1]) return static_cast<Index>(n);
-    if (param <= knots_[degree]) return degree;
-    // Binary search for the span
-    auto it = std::upper_bound(knots_.begin() + degree, knots_.begin() + n + 1, param);
-    return static_cast<Index>(std::distance(knots_.begin(), it) - 1);
-}
-
 // === Template Instantiations ========================================================
 
 template class KnotVector<double>;
+template KnotVector<double> clamped_uniform_knots<double>(Index, Index);
 
 #ifdef PYCK_BUILD_SINGLE_PRECISION
 template class KnotVector<float>;
+template KnotVector<float> clamped_uniform_knots<float>(Index, Index);
 #endif
 
 } // namespace pyck

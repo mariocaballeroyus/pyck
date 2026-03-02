@@ -17,50 +17,30 @@ namespace pyck
 /**
  * @brief A parametric curve patch defined by a single univariate basis, embedded in 
  *        a 3-dimensional space.
- * 
+ * @tparam T Scalar type.
  */
 template <std::floating_point T>
 class CurvePatch : public Patch<T, 1>
 {
 public:
 
-    using PatchType = Patch<T, 1>;
-    using CurveType = CurvePatch<T>;
-    using ScalarType = T;
-
     // === Constructors & Factory Methods =============================================
 
-    CurvePatch(std::shared_ptr<const Basis<T>> basis_u, const ColMatrix<T, 3>& control_pts)
-    : PatchType(control_pts),
+    CurvePatch(Ptr<const Basis<T>> basis_u, const ColMatrix<T, 3>& control_pts)
+    : Patch<T, 1>(control_pts),
       tensor_product_(std::move(basis_u)),
-      dof_mapper_({tensor_product_.template basis<0>().num_basis()})
+      dof_mapper_({tensor_product_.basis(0).num_basis()})
     {}
-
-    /**
-     * @brief Create a straight line segment C(u) = (Lu, 0, 0).
-     *        Control points are placed at Greville abscissae so that the linear
-     *        mapping is represented exactly by any polynomial degree.
-     *
-     * @param basis B-spline basis in the u direction.
-     * @param length Physical length of the line segment.
-     * @return A CurvePatch representing the line segment along the x-axis.
-     */
-    static CurvePatch line_segment(std::shared_ptr<const Basis<T>> basis, ScalarType length);
 
     // === Properties =================================================================
 
-    /**
-     * @brief Get the basis functions for a given parametric direction.
-     * @param dir The parametric direction (must be 0 for curves).
-     */
+    /// @brief Get the basis functions for the parametric direction
     const Basis<T>& basis(std::size_t dir) const override 
-    { 
-        return tensor_product_.basis(dir); 
-    }
+    { return tensor_product_.basis(dir); }
 
-    const TensorProduct<T, 1>& tensor_product() const override {
-        return tensor_product_;
-    }
+    /// @brief Get the tensor product object
+    const TensorProduct<T, 1>& tensor_product() const override 
+    { return tensor_product_; }
 
     // === Evaluation =================================================================
 
@@ -78,7 +58,7 @@ public:
      *      ...
      */
     std::vector<Matrix<T>> eval_basis_functions(const ColMatrix<T, 1>& points, 
-                                                      std::size_t order = 0) const override;
+                                                std::size_t order = 0) const override;
     
     /**
      * @brief Evaluate shape functions and their physical derivatives with respect to arc-length.
@@ -93,9 +73,7 @@ public:
      *      n = 2 : [d2N/ds2]  (Second physical derivative)
      */          
     std::vector<Matrix<T>> eval_shape_functions(const ColMatrix<T, 1>& points,
-                                                      std::size_t order = 0) const override;
-
-    // No eval_physical_derivs or unordered_map. Only Patch interface functions implemented.
+                                                std::size_t order = 0) const override;
 
     /**
      * @brief Evaluate the physical curve mapping and its parametric derivatives.
@@ -123,21 +101,35 @@ public:
 
     // === DOF Mapping ================================================================
     
-    /**
-     * @brief Get the DofMapper responsible for resolving logical tensor indices 
-     *        into global flattened DOF indices for this patch.
-     */
-    const DofMapper<1>& dof_mapper() const override 
-    { return dof_mapper_; }
+    /// @brief Get the DOF Mapper for this patch
+    const DofMapper<1>& dof_mapper() const override { return dof_mapper_; }
 
 private:
+
+    // === Member Variables ===========================================================
+
     /// @brief Tensor product of the single 1D basis
     TensorProduct<T, 1> tensor_product_;
-    
+
     /// @brief Geometric DOF Mapper taking local indices to global index
     DofMapper<1> dof_mapper_;
 
 };
+
+// === Factory Methods ================================================================
+
+/**
+ * @brief Create a straight line segment C(u) = (Lu, 0, 0).
+ *        Control points are placed at Greville abscissae so that the linear
+ *        mapping is represented exactly by any polynomial degree.
+ *
+ * @param basis B-spline basis in the u direction.
+ * @param length Physical length of the line segment.
+ * @return A CurvePatch representing the line segment along the x-axis.
+ */
+template <std::floating_point T>
+CurvePatch<T> line_segment(Ptr<const Basis<T>> basis, 
+                           T length);
 
 } // namespace pyck
 
