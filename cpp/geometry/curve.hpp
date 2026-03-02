@@ -29,7 +29,8 @@ public:
     CurvePatch(Ptr<const Basis<T>> basis_u, const ColMatrix<T, 3>& control_pts)
     : Patch<T, 1>(control_pts),
       tensor_product_(std::move(basis_u)),
-      dof_mapper_({tensor_product_.basis(0).num_basis()})
+      dof_mapper_({tensor_product_.basis(0).num_basis()},
+                  {tensor_product_.basis(0).degree()})
     {}
 
     // === Properties =================================================================

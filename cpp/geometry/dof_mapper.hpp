@@ -20,9 +20,11 @@ public:
      * @brief Construct a new DofMapper object
      * 
      * @param num_basis Array of the number of basis functions in each direction
+     * @param degree Array of the polynomial degree in each direction
      */
-    explicit DofMapper(const std::array<Index, d>& num_basis)
-        : num_basis_(num_basis) {}
+    DofMapper(const std::array<Index, d>& num_basis,
+              const std::array<Index, d>& degree)
+        : num_basis_(num_basis), degree_(degree) {}
 
     /**
      * @brief Map logical tensor-product indices to a flattened global DOF index.
@@ -40,6 +42,20 @@ public:
     std::vector<Index> get_boundary_dofs(Index param_dim, bool at_start) const;
 
     /**
+     * @brief Get the active global DOF indices for a specific element.
+     *
+     * Elements are indexed lexicographically over the full knot-span grid
+     * (num_basis[i] + degree[i] intervals per direction). For each direction,
+     * the (degree[i] + 1) basis functions active on the span are collected,
+     * and the d-dimensional tensor product of those 1D index sets is mapped
+     * to global DOF indices.
+     *
+     * @param elem_idx Flat (lexicographic) element index.
+     * @return Sorted vector of global DOF indices active on the element.
+     */
+    std::vector<Index> get_element_dofs(Index elem_idx) const;
+
+    /**
      * @brief Increment a d-dimensional logical index to the next value in lexicographical order.
      *        (fastest varying index first).
      *
@@ -53,12 +69,20 @@ public:
      */
     const std::array<Index, d>& num_basis() const { return num_basis_; }
 
+    /**
+     * @brief Get the polynomial degree in each direction.
+     */
+    const std::array<Index, d>& degree() const { return degree_; }
+
 private:
 
     // === Member Variables ===========================================================
 
     /// @brief Number of basis functions in each direction
     std::array<Index, d> num_basis_;
+
+    /// @brief Polynomial degree in each direction
+    std::array<Index, d> degree_;
 };
 
 } // namespace pyck

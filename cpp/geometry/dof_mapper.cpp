@@ -71,6 +71,69 @@ std::vector<Index> DofMapper<d>::get_boundary_dofs(std::size_t param_dim,
 }
 
 template <std::size_t d>
+std::vector<Index> DofMapper<d>::get_element_dofs(Index elem_idx) const
+{
+    // Compute the number of knot-span intervals per direction:
+    //   intervals[i] = num_basis_[i] + degree_[i]
+    std::array<Index, d> intervals;
+    Index total_elements = 1;
+    for (std::size_t i = 0; i < d; ++i) {
+        intervals[i] = num_basis_[i] + degree_[i];
+        total_elements *= intervals[i];
+    }
+
+    if (elem_idx >= total_elements) {
+        throw std::invalid_argument(
+            "elem_idx is out of bounds for the element grid."
+        );
+    }
+
+    // Decode the flat element index into per-direction span indices
+    // using row-major (last index fastest) convention matching the assembler
+    std::array<Index, d> span_indices;
+    Index temp = elem_idx;
+    for (std::size_t i = d; i-- > 0; ) {
+        span_indices[i] = temp % intervals[i];
+        temp /= intervals[i];
+    }
+
+    // For each direction, collect the (degree+1) active basis function indices.
+    // For span s in direction i the active basis functions are:
+    //   max(0, s - degree_[i]) .. min(s, num_basis_[i] - 1)
+    std::array<std::vector<Index>, d> active_1d;
+    for (std::size_t i = 0; i < d; ++i) {
+        Index s = span_indices[i];
+        Index lo = (s >= degree_[i]) ? (s - degree_[i]) : 0;
+        Index hi = std::min(s, num_basis_[i] - 1);
+        for (Index k = lo; k <= hi; ++k) {
+            active_1d[i].push_back(k);
+        }
+    }
+
+    // Build the tensor-product of the per-direction 1D index sets and
+    // map each multi-index to a global DOF
+    std::vector<Index> dofs;
+    std::array<Index, d> logical_idx;
+    logical_idx.fill(0);
+
+    // Recursive lambda to iterate over the tensor product of 1D index sets
+    auto iterate = [&](auto& self, std::size_t dim) -> void {
+        if (dim == d) {
+            dofs.push_back(to_global(logical_idx));
+            return;
+        }
+        for (Index k : active_1d[dim]) {
+            logical_idx[dim] = k;
+            self(self, dim + 1);
+        }
+    };
+
+    iterate(iterate, 0);
+    std::sort(dofs.begin(), dofs.end());
+    return dofs;
+}
+
+template <std::size_t d>
 bool DofMapper<d>::next_logical_index(std::array<Index, d>& logical_idx) const
 {
     for (std::size_t i = 0; i < d; ++i) {
