@@ -56,36 +56,28 @@ public:
     // === Evaluation =================================================================
 
     /**
-     * @brief Evaluate the N-dimensional basis functions
-     * @param params A matrix of 1 .. `m` parametric point coordinates in `d` 
-     * dimensions.
-     * 
-     *                 params = { u_0^1 u_0^2 ... u_0^d
-     *                            u_1^1 u_1^2 ... u_1^d
-     *                            ...   ...   ... ...
-     *                            u_m^1 u_m^2 ... u_m^d }
-     * 
-     * @return A matrix of size (m x k) where `k` is the product of num_basis() of all 
-     *         1D bases.
-     * 
-     *         result = { R_0(u_0) R_1(u_0) ... R_{K-1}(u_0)
-     *                    R_0(u_1) R_1(u_1) ... R_{K-1}(u_1)
-     *                    ...      ...      ... ...
-     *                    R_0(u_m) R_1(u_m) ... R_{K-1}(u_m) }
+     * @brief Evaluate the non-zero tensor-product basis functions within a given
+     *        multi-dimensional knot span.
+     *
+     * @param params A matrix of (m × d) parametric coordinates (all in the same span).
+     * @param spans  Per-direction knot-span indices.
+     * @return A matrix of size (m × K) where K = prod(p_i + 1).  The column ordering
+     *         follows the same tensor-product layout as the 1D bases.
      */
-    Matrix<T> eval(const Matrix<T>& params) const;
+    Matrix<T> eval(const Matrix<T>& params,
+                   const std::array<Index, d>& spans) const;
 
     /**
-     * @brief Evaluate basis and mixed partial derivatives for the tensor product space
-     * 
-     * @param params A matrix of size (m x d) containing 'm' parametric points in 'd' 
-     *        dimensions. Each row represents a single multi-dimensional point.
-     * @param order Maximum derivative order to compute (same for all directions).
-     * 
-     * @return A flat std::vector of matrices containing all combinations of partial 
-     *         derivatives. The total number of matrices is (order + 1)^d.
+     * @brief Evaluate non-zero basis functions and mixed partial derivatives for the
+     *        tensor product space within a given multi-dimensional knot span.
+     *
+     * @param params A matrix of size (m × d) containing parametric points.
+     * @param spans  Per-direction knot-span indices.
+     * @param order  Maximum derivative order to compute (same for all directions).
+     * @return A flat std::vector of matrices (one per derivative multi-index).
      */
-    std::vector<Matrix<T>> eval_derivs(const Matrix<T>& params, 
+    std::vector<Matrix<T>> eval_derivs(const Matrix<T>& params,
+                                       const std::array<Index, d>& spans,
                                        Index order) const;
 
     // === Properties =================================================================

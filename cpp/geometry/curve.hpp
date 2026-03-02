@@ -46,60 +46,54 @@ public:
     // === Evaluation =================================================================
 
     /**
-     * @brief Evaluate the raw basis functions and their parametric derivatives.
+     * @brief Evaluate the non-zero raw basis functions and their parametric derivatives
+     *        within a given knot span.
      * 
      * @param points Evaluation points in parametric coordinates as a (Q × 1) matrix.
+     * @param spans  Knot-span index array (single element for 1D).
      * @param order The highest order of derivatives to compute.
-     * @return A vector of matrices where index n represents the n-th derivative d^nN/du^n.
-     *         The size of each matrix is (Q, K) where K is the number of basis functions.
-     * 
-     *      n = 0 : [N]        (Basis functions)
-     *      n = 1 : [dN/du]    (First parametric derivative)
-     *      n = 2 : [d2N/du2]  (Second parametric derivative)
-     *      ...
+     * @return A vector of matrices, each of size (Q, p+1).
      */
-    std::vector<Matrix<T>> eval_basis_functions(const ColMatrix<T, 1>& points, 
+    std::vector<Matrix<T>> eval_basis_functions(const ColMatrix<T, 1>& points,
+                                                const std::array<Index, 1>& spans,
                                                 std::size_t order = 0) const override;
     
     /**
-     * @brief Evaluate shape functions and their physical derivatives with respect to arc-length.
+     * @brief Evaluate non-zero shape functions and their physical derivatives
+     *        with respect to arc-length within a given knot span, together
+     *        with the Jacobian determinant (arc-length increment).
      * 
      * @param points Evaluation points in parametric coordinates as a (Q × 1) matrix.
+     * @param spans  Knot-span index array (single element for 1D).
      * @param order  The highest order of physical derivatives to compute.
-     * @return A vector of matrices where index n represents the n-th derivative d^nN/ds^n.
-     *         The size of each matrix is (Q, K), where K is the number of basis functions.
-     * 
-     *      n = 0 : [N]        (Shape functions)
-     *      n = 1 : [dN/ds]    (First physical derivative)
-     *      n = 2 : [d2N/ds2]  (Second physical derivative)
+     * @return A pair of (vector of matrices each (Q, p+1), Jacobian vector of size Q).
      */          
-    std::vector<Matrix<T>> eval_shape_functions(const ColMatrix<T, 1>& points,
-                                                std::size_t order = 0) const override;
+    std::pair<std::vector<Matrix<T>>, Vector<T>>
+    eval_shape_functions(const ColMatrix<T, 1>& points,
+                         const std::array<Index, 1>& spans,
+                         std::size_t order = 0) const override;
 
     /**
-     * @brief Evaluate the physical curve mapping and its parametric derivatives.
+     * @brief Evaluate the physical curve mapping and its parametric derivatives
+     *        using only the active control points for the given knot span.
      * 
      * @param points Evaluation points in parametric coordinates as a (Q × 1) matrix.
+     * @param spans  Knot-span index array (single element for 1D).
      * @param order The highest order of parametric derivatives to compute.
-     * @return A vector of matrices where index n represents d^nX/du^n.
-     *         The size of each matrix is (Q, 3).
-     * 
-     *      n = 0 : [X]        (Physical coordinates / Position)
-     *      n = 1 : [dX/du]    (Parametric tangent vector)
-     *      n = 2 : [d2X/du2]  (Parametric curvature vector)
-     *      ...
+     * @return A vector of matrices, each of size (Q, 3).
      */
-    std::vector<ColMatrix<T, 3>> eval_geometry(const ColMatrix<T, 1>& points, 
+    std::vector<ColMatrix<T, 3>> eval_geometry(const ColMatrix<T, 1>& points,
+                                               const std::array<Index, 1>& spans,
                                                std::size_t order = 0) const override;
 
     /**
-     * @brief Evaluate the Jacobian determinant (arc-length increment) at each point.
+     * @brief Evaluate the Jacobian determinant (arc-length increment) at each point
+     *        within a given knot span.
      *
      * @param points Evaluation points in parametric coordinates as a (Q × 1) matrix.
+     * @param spans  Knot-span index array (single element for 1D).
      * @return A vector of size (Q) containing ||dX/du|| at each point.
      */
-    Vector<T> eval_jacobian(const ColMatrix<T, 1>& points) const;
-
     // === DOF Mapping ================================================================
     
     /// @brief Get the DOF Mapper for this patch

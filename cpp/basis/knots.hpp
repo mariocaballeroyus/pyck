@@ -64,7 +64,20 @@ public:
     auto end() const 
     { return knots_.end(); }
 
-    // === Utility Methods ============================================================
+    // === Span Methods ===============================================================
+
+    /// @brief Total number of knot spans (including zero-length clamped ones).
+    Index num_spans() const
+    { return knots_.size() - 1; }
+
+    /**
+     * @brief Get the parametric bounds of a knot span.
+     *
+     * @param span Span index in [0, num_spans()).
+     * @return Pair (knots[span], knots[span+1]).
+     */
+    std::pair<T, T> span_bounds(Index span) const
+    { return {knots_[span], knots_[span + 1]}; }
 
     /**
      * @brief Find the knot span index for a given parameter value.

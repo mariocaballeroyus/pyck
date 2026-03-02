@@ -63,23 +63,31 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
         bool zero_volume = false;
 
         for (std::size_t i = 0; i < d; ++i) {
-            const auto& basis = patch_->basis(i);
-            const auto& knots = basis.knots();
-            u_a[i] = knots[span_indices[i]];
-            u_b[i] = knots[span_indices[i] + 1];
+            auto [lo, hi] = patch_->basis(i).knot_vector().span_bounds(span_indices[i]);
+            u_a[i] = lo;
+            u_b[i] = hi;
 
-            if (std::abs(u_b[i] - u_a[i]) < 1e-14) {
+            if (std::abs(hi - lo) < 1e-14) {
                 zero_volume = true;
                 break;
             }
         }
 
+        if (zero_volume) continue;
+
         // Create mapped quadrature rule points and weights for the element
         auto [mapped_pts, mapped_weights] = quadrature_->map_to_domain(u_a, u_b);
         
-        // Gather element contributions
-        element_->compute_local_stiffness(*patch_, mapped_pts, mapped_weights, Ke);
-        K += Ke;
+        // Gather element contributions (span-local stiffness)
+        element_->compute_local_stiffness(*patch_, mapped_pts, mapped_weights, span_indices, Ke);
+
+        // Scatter local stiffness into global matrix
+        auto elem_dofs = mapper.get_element_dofs(elem_idx);
+        for (std::size_t i = 0; i < elem_dofs.size(); ++i) {
+            for (std::size_t j = 0; j < elem_dofs.size(); ++j) {
+                K(elem_dofs[i], elem_dofs[j]) += Ke(i, j);
+            }
+        }
     }
 
     // Apply boundary / load conditions

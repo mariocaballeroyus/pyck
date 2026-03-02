@@ -88,7 +88,10 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load", "[assembly][eul
     // Evaluate the numerical displacement at mid-span (ξ = 0.5)
     ColMatrix<double, 1> param(1);
     param(0) = 0.5;
-    auto shape_funcs = curve->eval_shape_functions(param, 0)[0];
+    Index span = basis->find_span(0.5);
+    std::array<Index, 1> spans = {span};
+    auto [sf, jac_eval] = curve->eval_shape_functions(param, spans, 0);
+    auto& shape_funcs = sf[0];
     
     double v_num = (shape_funcs * u)(0, 0);
 
@@ -169,9 +172,17 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load (Cubic Approximat
     
     ColMatrix<double, 1> param(1);
     param(0) = 0.5;
-    auto shape_funcs = curve->eval_shape_functions(param, 0)[0];
+    Index span2 = basis->find_span(0.5);
+    std::array<Index, 1> spans2 = {span2};
+    auto [sf2, jac_eval2] = curve->eval_shape_functions(param, spans2, 0);
+    auto& shape_funcs = sf2[0];
     
-    double v_num = (shape_funcs * u)(0, 0);
+    // Extract active DOFs for this span
+    auto active = curve->dof_mapper().get_element_dofs(span2);
+    Vector<double> u_active(active.size());
+    for (std::size_t i = 0; i < active.size(); ++i)
+        u_active(i) = u(active[i]);
+    double v_num = (shape_funcs * u_active)(0, 0);
 
     // Strain energy
     double U_num = 0.5 * u.dot(K * u);

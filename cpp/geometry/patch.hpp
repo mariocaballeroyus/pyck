@@ -72,82 +72,57 @@ public:
      * @brief Evaluate the raw basis functions and their parametric derivatives.
      * 
      * @param points Evaluation points in parametric coordinates as a (Q × d) matrix.
+     * @param spans  Per-direction knot-span indices.
      * @param order The highest order of derivatives to compute.
-     * @return A vector of matrices ordered lexicographically by derivative degree.
-     *         The size of each matrix is (Q, K) where K is the number of basis functions.
-     * 
-     *      Let d=2 (surface patch geometry) and let parametric coordinates be (u,v):
-     * 
-     *      n = 0 : (0,0) -> [N]        (Basis functions)
-     *      n = 1 : (1,0) -> [dN/du]
-     *      n = 2 : (0,1) -> [dN/dv]
-     *      n = 3 : (2,0) -> [d2N/du2]
-     *      n = 4 : (1,1) -> [d2N/dudv]
-     *      n = 5 : (0,2) -> [d2N/dv2]
-     *      ...
+     * @return A vector of matrices.  Each matrix has size (Q, K) where K = prod(p_i + 1).
      */
-    virtual std::vector<Matrix<T>> eval_basis_functions(const ColMatrix<T, d>& points, 
+    virtual std::vector<Matrix<T>> eval_basis_functions(const ColMatrix<T, d>& points,
+                                                        const std::array<Index, d>& spans,
                                                         std::size_t order = 0) const = 0;
     
     /**
-     * @brief Evaluate shape functions and their covariant derivatives expressed in the local 
-     *        orthonormal basis of the tangent space at each evaluation point.
-     * 
-     *        The derivatives are obtained by mapping parametric derivatives using the surface 
-     *        Jacobian and Christoffel symbols to form covariant derivatives.
+     * @brief Evaluate non-zero shape functions and their covariant derivatives
+     *        within a given multi-dimensional knot span, together with the
+     *        Jacobian determinant (integration measure) at each point.
      * 
      * @param points Evaluation points in parametric coordinates as a (Q × d) matrix.
+     * @param spans  Per-direction knot-span indices.
      * @param order  The highest order of manifold derivatives to compute.
-     * @return A vector of matrices ordered lexicographically by derivative degree.
-     *         The size of each matrix is (Q, K) where K is the number of basis functions.
-     * 
-     *      Let d=2 (surface patch geometry) and let local tangent coordinates be (x,y):
-     * 
-     *      n = 0 : (0,0) -> [N]        (Shape functions)
-     *      n = 1 : (1,0) -> [dN/dx]
-     *      n = 2 : (0,1) -> [dN/dy]      
-     *      n = 3 : (2,0) -> [d2N/dx2]
-     *      n = 4 : (1,1) -> [d2N/dxdy]
-     *      n = 5 : (0,2) -> [d2N/dy2]
-     *      ...
+     * @return A pair of (vector of matrices each (Q, K), Jacobian vector of size Q).
      */          
-    virtual std::vector<Matrix<T>> eval_shape_functions(const ColMatrix<T, d>& points,
-                                                        std::size_t order = 0) const = 0;
+    virtual std::pair<std::vector<Matrix<T>>, Vector<T>>
+    eval_shape_functions(const ColMatrix<T, d>& points,
+                         const std::array<Index, d>& spans,
+                         std::size_t order = 0) const = 0;
 
     /**
-     * @brief Evaluate the physical geometry mapping and its parametric derivatives.
-     *        The geometry is computeed as the dot product of the tensor-product basis functions 
-     *        and the control points as X(u) = N_i(u) P_i.
+     * @brief Evaluate the physical geometry mapping and its parametric derivatives
+     *        using only the active control points for the given knot span.
      * 
      * @param points Evaluation points in parametric coordinates as a (Q × d) matrix.
+     * @param spans  Per-direction knot-span indices.
      * @param order The highest order of parametric derivatives to compute.
-     * @return A vector of matrices ordered lexicographically by derivative degree.
-     *         The size of each matrix is (Q, 3).
-     * 
-     *      Let d=2 (surface patch geometry) and let parametric coordinates be (u,v):
-     * 
-     *      n = 0 : (0,0) -> [X]       (Physical coordinates / Position)
-     *      n = 1 : (1,0) -> [dX/du]
-     *      n = 2 : (0,1) -> [dX/dv]
-     *      n = 3 : (2,0) -> [d2X/du2]
-     *      n = 4 : (1,1) -> [d2X/dudv]
-     *      n = 5 : (0,2) -> [d2X/dv2]
-     *      ...
+     * @return A vector of matrices, each of size (Q, 3).
      */
-    virtual std::vector<ColMatrix<T, 3>> eval_geometry(const ColMatrix<T, d>& points, 
+    virtual std::vector<ColMatrix<T, 3>> eval_geometry(const ColMatrix<T, d>& points,
+                                                       const std::array<Index, d>& spans,
                                                        std::size_t order = 0) const = 0;
 
     /**
-     * @brief Evaluate the Jacobian determinant (integration measure) at each point.
-     * * The Jacobian determinant represents the ratio of the physical "volume" 
-     * (length, area, or volume) to the parametric "volume".
-     * * - If d = 1: Returns the arc-length increment ||dX/du||.
-     * - If d = 2: Returns the area increment ||dX/du × dX/dv||.
-     * - If d = 3: Returns the volume increment |det(J)|.
-     * * @param points Evaluation points in parametric coordinates as a (Q × d) matrix.
+     * @brief Evaluate the Jacobian determinant (integration measure) at each point
+     *        within a given knot span.
+     *
+     * Convenience method — delegates to eval_shape_functions.
+     *
+     * @param points Evaluation points in parametric coordinates as a (Q × d) matrix.
+     * @param spans  Per-direction knot-span indices.
      * @return A vector of size (Q) containing the Jacobian determinant at each point.
      */
-    virtual Vector<T> eval_jacobian(const ColMatrix<T, d>& points) const = 0;
+    virtual Vector<T> eval_jacobian(const ColMatrix<T, d>& points,
+                                    const std::array<Index, d>& spans) const
+    {
+        return eval_shape_functions(points, spans, 0).second;
+    }
 
     // === DOF Mapping ================================================================
 
@@ -167,6 +142,28 @@ public:
      *        into global flattened DOF indices for this patch.
      */
     virtual const DofMapper<d>& dof_mapper() const = 0;
+
+    // === Active Control Points ======================================================
+
+    /**
+     * @brief Extract the subset of control points that are active (non-zero) in
+     *        the given knot span.
+     *
+     * This uses the DofMapper to determine which global DOF indices correspond
+     * to the span, then gathers the matching rows from the control point matrix.
+     *
+     * @param spans Per-direction knot-span indices.
+     * @return A matrix of size (K, 3) where K = prod(p_i + 1) for non-degenerate spans.
+     */
+    ColMatrix<T, 3> active_control_pts(const std::array<Index, d>& spans) const
+    {
+        auto dofs = dof_mapper().get_element_dofs(spans);
+        ColMatrix<T, 3> pts(dofs.size(), 3);
+        for (Index i = 0; i < dofs.size(); ++i) {
+            pts.row(i) = control_pts_.row(dofs[i]);
+        }
+        return pts;
+    }
 
 protected:
 

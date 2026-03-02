@@ -10,26 +10,32 @@ namespace pyck
 {
 
 template <std::floating_point T>
-std::vector<Matrix<T>> CurvePatch<T>::eval_basis_functions(const ColMatrix<T, 1>& points, 
+std::vector<Matrix<T>> CurvePatch<T>::eval_basis_functions(const ColMatrix<T, 1>& points,
+                                                           const std::array<Index, 1>& spans,
                                                            Index order) const
 {
-    return tensor_product_.eval_derivs(points, order);
+    return tensor_product_.eval_derivs(points, spans, order);
 }
 
 template <std::floating_point T>
-std::vector<Matrix<T>> CurvePatch<T>::eval_shape_functions(const ColMatrix<T, 1>& points, 
-                                                           Index order) const
+std::pair<std::vector<Matrix<T>>, Vector<T>> CurvePatch<T>::eval_shape_functions(
+    const ColMatrix<T, 1>& points,
+    const std::array<Index, 1>& spans,
+    Index order) const
 {
     order = std::max(Index(1), std::min(order, Index(3)));
     const Index Q = points.rows();
-    const Index K  = tensor_product_.num_basis();
 
-    auto basis_derivs = tensor_product_.eval_derivs(points, order);
-    ColMatrix<T, 3> x_u = basis_derivs[1] * this->control_pts_; 
-    ColMatrix<T, 3> x_uu = (order >= 2) ? (basis_derivs[2] * this->control_pts_) : ColMatrix<T, 3>();
-    ColMatrix<T, 3> x_uuu = (order >= 3) ? (basis_derivs[3] * this->control_pts_) : ColMatrix<T, 3>();
+    auto basis_derivs = tensor_product_.eval_derivs(points, spans, order);
+    const Index K = basis_derivs[0].cols();
+
+    auto act_pts = this->active_control_pts(spans);
+    ColMatrix<T, 3> x_u = basis_derivs[1] * act_pts; 
+    ColMatrix<T, 3> x_uu = (order >= 2) ? (basis_derivs[2] * act_pts) : ColMatrix<T, 3>();
+    ColMatrix<T, 3> x_uuu = (order >= 3) ? (basis_derivs[3] * act_pts) : ColMatrix<T, 3>();
 
     std::vector<Matrix<T>> result(order + 1);
+    Vector<T> jacobian(Q);
 
     result[0] = basis_derivs[0];
     if (order >= 1) result[1] = Matrix<T>(Q, K);
@@ -41,7 +47,8 @@ std::vector<Matrix<T>> CurvePatch<T>::eval_shape_functions(const ColMatrix<T, 1>
         // 1st Order (Tangent component)
         const T g11 = x_u.row(q).squaredNorm(); 
         const T J = std::sqrt(g11);
-        
+
+        jacobian(q) = J;
         result[1].row(q) = basis_derivs[1].row(q) / J;
 
         if (order < 2) continue;
@@ -62,31 +69,22 @@ std::vector<Matrix<T>> CurvePatch<T>::eval_shape_functions(const ColMatrix<T, 1>
                          (static_cast<T>(2.0) * (Gamma * Gamma) - Gamma_u) * basis_derivs[1].row(q)) / J3;
     }
 
-    return result;
+    return {std::move(result), std::move(jacobian)};
 }
 
 template <std::floating_point T>
 std::vector<ColMatrix<T, 3>> CurvePatch<T>::eval_geometry(const ColMatrix<T, 1>& points,
+                                                          const std::array<Index, 1>& spans,
                                                           Index order) const
 {
-    auto basis_derivs = tensor_product_.eval_derivs(points, order);
+    auto basis_derivs = tensor_product_.eval_derivs(points, spans, order);
+    auto act_pts = this->active_control_pts(spans);
+
     std::vector<ColMatrix<T, 3>> result(order + 1);
     for (Index i = 0; i <= order; ++i) {
-        result[i] = basis_derivs[i] * this->control_pts_;
+        result[i] = basis_derivs[i] * act_pts;
     }
     return result;
-}
-
-template <std::floating_point T>
-Vector<T> CurvePatch<T>::eval_jacobian(const ColMatrix<T, 1>& points) const
-{
-    auto basis_derivs = tensor_product_.eval_derivs(points, Index(1));
-    ColMatrix<T, 3> x_u = basis_derivs[1] * this->control_pts_;
-    Vector<T> jac(points.rows());
-    for (Index q = 0; q < points.rows(); ++q) {
-        jac(q) = x_u.row(q).norm();
-    }
-    return jac;
 }
 
 // === Factory Methods ================================================================

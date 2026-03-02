@@ -27,11 +27,11 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
     std::size_t total_elements = 1;
 
     for (std::size_t i = 0; i < d; ++i) {
-        const auto& bspline = dynamic_cast<const BSpline<T>&>(patch.basis(i));
-        std::size_t count = bspline.knots().size() - 1;
-        intervals[i] = count;
-        total_elements *= count;
+        intervals[i] = patch.basis(i).knot_vector().num_spans();
+        total_elements *= intervals[i];
     }
+
+    const auto& mapper = patch.dof_mapper();
 
     // Track quadrature point offset into load_values
     std::size_t qp_offset = 0;
@@ -53,12 +53,11 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
         bool zero_volume = false;
 
         for (std::size_t i = 0; i < d; ++i) {
-            const auto& bspline = dynamic_cast<const BSpline<T>&>(patch.basis(i));
-            const auto& knots = bspline.knots();
-            u_a[i] = knots[span_indices[i]];
-            u_b[i] = knots[span_indices[i] + 1];
+            auto [lo, hi] = patch.basis(i).knot_vector().span_bounds(span_indices[i]);
+            u_a[i] = lo;
+            u_b[i] = hi;
 
-            if (std::abs(u_b[i] - u_a[i]) < 1e-14) {
+            if (std::abs(hi - lo) < 1e-14) {
                 zero_volume = true;
                 break;
             }
@@ -69,33 +68,30 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
         // Map quadrature points from [-1, 1]^d to the parametric element box
         auto [mapped_pts, mapped_weights] = quadrature.map_to_domain(u_a, u_b);
         
-        // Evaluate basis functions and Jacobian
-        auto shape_funcs = patch.eval_shape_functions(mapped_pts, 0)[0];
-        auto jacobian    = patch.eval_jacobian(mapped_pts);
+        // Evaluate span-local basis functions and Jacobian
+        auto [shape_derivs, jacobian] = patch.eval_shape_functions(mapped_pts, span_indices, 0);
+        const auto& shape_funcs = shape_derivs[0];
         
         // Extract load values for this element's quadrature points
         Vector<T> t_vals = load_values.segment(qp_offset, Q);
         qp_offset += Q;
 
-        // Integrate: f_ext += \sum_{q} N^T * t * |J| * w_q
+        // Integrate local load: f_local = N^T * (t * |J| * w)
         Vector<T> W_J_T = mapped_weights.cwiseProduct(jacobian).cwiseProduct(t_vals);
-        element_load_ += shape_funcs.transpose() * W_J_T;
+        Vector<T> local_load = shape_funcs.transpose() * W_J_T;
+
+        // Scatter into global load vector
+        auto elem_dofs = mapper.get_element_dofs(elem_idx);
+        for (std::size_t k = 0; k < elem_dofs.size(); ++k) {
+            element_load_(elem_dofs[k]) += local_load(k);
+        }
     }
 
-    // Map to global DOFs
+    // Map to global DOFs (identity mapping for the scatter indices)
     std::size_t K = element_load_.size();
     global_dofs_.reserve(K);
-    const auto& mapper = patch.dof_mapper();
-    
-    std::array<Index, d> current_idx;
-    current_idx.fill(0);
-
-    for (std::size_t k = 0; k < K; ++k) 
-    {
-        global_dofs_.push_back(mapper.to_global(current_idx));
-        if (k < K - 1) {
-            mapper.next_logical_index(current_idx);
-        }
+    for (std::size_t k = 0; k < K; ++k) {
+        global_dofs_.push_back(k);
     }
 }
 

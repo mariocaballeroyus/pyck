@@ -4,55 +4,47 @@ namespace pyck
 {
 
 template <std::floating_point T>
-std::vector<Matrix<T>> BSpline<T>::compute_basis_table(const Vector<T>& points) const
+std::vector<Matrix<T>> BSpline<T>::compute_basis_table(const Vector<T>& points,
+                                                       Index span) const
 {
     Index num_points = points.size();
-    Index num_knots = this->knots_.size();
-    Index num_basis = this->knots_.num_basis(this->degree_); 
 
-    // The k-th derivative is computed using basis of all lower degrees,
-    // (p-1, p-2, ..., p-k), which are stored in a table
+    // table[d] has (d+1) columns: the non-zero degree-d basis functions
+    // at the given span.  Column k corresponds to global index (span - d + k).
     std::vector<Matrix<T>> table(this->degree_ + 1);
     for (Index d = 0; d <= this->degree_; ++d) {
-        // Preallocate with size: (num_points, num_basis)
-        table[d] = Matrix<T>::Zero(num_points, num_basis);
+        table[d] = Matrix<T>::Zero(num_points, d + 1);
     }
 
-    // Compute basis functions using Cox-de Boor recursion
-    for (Index i = 0; i < num_points; ++i) {
-        T u = points(i);
-        int span = this->knots_.find_span(this->degree_, u);
+    // 0-th degree: single non-zero function N_{span,0} = 1
+    table[0].col(0).setOnes();
 
-        // 0-th degree basis definition
-        table[0](i, span) = static_cast<T>(1.0);
+    // Recursive computation for degrees 1 .. p (vectorised over all points)
+    for (Index d = 1; d <= this->degree_; ++d) {
+        for (Index k = 0; k <= d; ++k) {
+            // Global basis function index j = span - d + k
+            Index j = span - d + k;
 
-        // Recursive computation for degrees 1 .. p
-        for (Index d = 1; d <= this->degree_; ++d) {
-            for (Index k = 0; k <= d; ++k) {
-
-                // Map the local index k to the global basis function index j
-                int j = span - static_cast<int>(d) + static_cast<int>(k); 
-
-                // Skip out-of-range indices
-                if (j < 0 || j >= static_cast<int>(num_knots - d - 1)) continue;
-
-                T val = static_cast<T>(0.0);
-
-                // Cox-de Boor: Left term
-                T denom_left = this->knots_[j + d] - this->knots_[j];
-                if (denom_left > static_cast<T>(1e-14)) {
-                    val += ((u - this->knots_[j]) / denom_left) * 
-                            table[d - 1](i, j);
+            // Left term:  ((u - xi_j) / (xi_{j+d} - xi_j)) * table[d-1](:, k-1)
+            if (k >= 1) 
+            {
+                T denom = this->knots_[j + d] - this->knots_[j];
+                if (denom > static_cast<T>(1e-14)) {
+                    table[d].col(k).array() +=
+                        ((points.array() - this->knots_[j]) / denom)
+                        * table[d - 1].col(k - 1).array();
                 }
-                
-                // Cox-de Boor: Right term
-                T denom_right = this->knots_[j + d + 1] - this->knots_[j + 1];
-                if (denom_right > static_cast<T>(1e-14)) {
-                    val += ((this->knots_[j + d + 1] - u) / denom_right) * 
-                            table[d - 1](i, j + 1);
-                }
+            }
 
-                table[d](i, j) = val;
+            // Right term: ((xi_{j+d+1} - u) / (xi_{j+d+1} - xi_{j+1})) * table[d-1](:, k)
+            if (k < d) 
+            {
+                T denom = this->knots_[j + d + 1] - this->knots_[j + 1];
+                if (denom > static_cast<T>(1e-14)) {
+                    table[d].col(k).array() +=
+                        ((this->knots_[j + d + 1] - points.array()) / denom)
+                        * table[d - 1].col(k).array();
+                }
             }
         }
     }
@@ -60,63 +52,70 @@ std::vector<Matrix<T>> BSpline<T>::compute_basis_table(const Vector<T>& points) 
 }
 
 template <std::floating_point T>
-Matrix<T> BSpline<T>::eval(const Vector<T>& points) const
+Matrix<T> BSpline<T>::eval(const Vector<T>& points, Index span) const
 {
-    return std::move(compute_basis_table(points)[this->degree_]);
+    return std::move(compute_basis_table(points, span)[this->degree_]);
 }
 
 template <std::floating_point T>
-std::vector<Matrix<T>> BSpline<T>::eval_derivs(const Vector<T>& points, 
+std::vector<Matrix<T>> BSpline<T>::eval_derivs(const Vector<T>& points,
+                                               Index span,
                                                Index order) const
 {
     Index num_points = points.size();
-    Index num_basis = this->knots_.num_basis(this->degree_);
+    Index p = this->degree_;
 
-    // Compute basis values
     std::vector<Matrix<T>> results(order + 1);
-    std::vector<Matrix<T>> table = compute_basis_table(points);
-    results[0] = table[this->degree_];
+    std::vector<Matrix<T>> table = compute_basis_table(points, span);
+    results[0] = table[p]; // (m × (p+1))
 
     // Iteratively compute derivatives
-    for (Index k = 1; k <= order; ++k) 
+    for (Index k = 1; k <= order; ++k)
     {
         // Derivatives higher than the polynomial degree are strictly zero
-        if (k > this->degree_) {
-            results[k] = Matrix<T>::Zero(num_points, num_basis);
+        if (k > p) {
+            results[k] = Matrix<T>::Zero(num_points, p + 1);
             continue;
         }
 
-        // Preallocate next table for k-th derivative
-        std::vector<Matrix<T>> next_table(this->degree_ + 1);
-        
-        // Compute derivatives from k .. degree
-        for (Index d = k; d <= this->degree_; ++d) 
-        {
-            // Preallocate table for d-th degree derivatives
-            Index current_num_basis = this->knots_.size() - d - 1;
-            next_table[d] = Matrix<T>::Zero(num_points, current_num_basis);
-            
-            // Apply differenciation rule
-            for (Index i = 0; i < current_num_basis; ++i) 
-            {
-                // Denominators for the differenciation rule
-                T left_denom = this->knots_[i + d] - this->knots_[i];
-                T right_denom = this->knots_[i + d + 1] - this->knots_[i + 1];
+        std::vector<Matrix<T>> next_table(p + 1);
 
-                // Handle potential division by zero
-                if (left_denom > static_cast<T>(1e-14)) {
-                    next_table[d].col(i) += (static_cast<T>(d) / left_denom) * 
-                                            table[d - 1].col(i);
+        // Compute derivatives from degree k .. p
+        for (Index d = k; d <= p; ++d)
+        {
+            // table[d-1] has d columns (local indices 0..d-1).
+            // next_table[d] has d+1 columns (local indices 0..d).
+            next_table[d] = Matrix<T>::Zero(num_points, d + 1);
+
+            for (Index kl = 0; kl <= d; ++kl)
+            {
+                // Global basis function index
+                Index j = span - d + kl;
+
+                // Left term:  d / denom * table[d-1].col(kl-1)
+                if (kl >= 1) 
+                {
+                    T denom = this->knots_[j + d] - this->knots_[j];
+                    if (denom > static_cast<T>(1e-14)) {
+                        next_table[d].col(kl) += (static_cast<T>(d) / denom) *
+                                                  table[d - 1].col(kl - 1);
+                    }
                 }
-                if (right_denom > static_cast<T>(1e-14)) {
-                    next_table[d].col(i) -= (static_cast<T>(d) / right_denom) * 
-                                            table[d - 1].col(i + 1);
+
+                // Right term: -d / denom * table[d-1].col(kl)
+                if (kl < d) 
+                {
+                    T denom = this->knots_[j + d + 1] - this->knots_[j + 1];
+                    if (denom > static_cast<T>(1e-14)) {
+                        next_table[d].col(kl) -= (static_cast<T>(d) / denom) *
+                                                  table[d - 1].col(kl);
+                    }
                 }
             }
         }
-        // Update table for next iteration
-        table = next_table;
-        results[k] = table[this->degree_];
+
+        table = std::move(next_table);
+        results[k] = table[p]; // (m, (p+1))
     }
     return results;
 }

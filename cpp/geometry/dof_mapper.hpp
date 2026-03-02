@@ -44,16 +44,18 @@ public:
     /**
      * @brief Get the active global DOF indices for a specific element.
      *
-     * Elements are indexed lexicographically over the full knot-span grid
-     * (num_basis[i] + degree[i] intervals per direction). For each direction,
-     * the (degree[i] + 1) basis functions active on the span are collected,
-     * and the d-dimensional tensor product of those 1D index sets is mapped
-     * to global DOF indices.
-     *
      * @param elem_idx Flat (lexicographic) element index.
      * @return Sorted vector of global DOF indices active on the element.
      */
     std::vector<Index> get_element_dofs(Index elem_idx) const;
+
+    /**
+     * @brief Get the active global DOF indices from per-direction span indices.
+     *
+     * @param span_indices Per-direction knot-span indices (e.g. {s_u, s_v} for 2D).
+     * @return Sorted vector of global DOF indices active on the element.
+     */
+    std::vector<Index> get_element_dofs(const std::array<Index, d>& span_indices) const;
 
     /**
      * @brief Increment a d-dimensional logical index to the next value in lexicographical order.

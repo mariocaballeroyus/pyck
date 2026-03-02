@@ -36,17 +36,18 @@ const Basis<T>& TensorProduct<T, d>::basis(Index dir) const
 }
 
 template <std::floating_point T, std::size_t d>
-Matrix<T> TensorProduct<T, d>::eval(const Matrix<T>& params) const
+Matrix<T> TensorProduct<T, d>::eval(const Matrix<T>& params,
+                                    const std::array<Index, d>& spans) const
 {
     if constexpr (d == 0) {
         return Matrix<T>(0, 0);
     }
 
     std::size_t num_points = params.rows();
-    Matrix<T> result = bases_[0]->eval(params.col(0));
+    Matrix<T> result = bases_[0]->eval(params.col(0), spans[0]);
 
     for (std::size_t i = 1; i < d; ++i) {
-        Matrix<T> mat_i = bases_[i]->eval(params.col(i));
+        Matrix<T> mat_i = bases_[i]->eval(params.col(i), spans[i]);
         
         std::size_t cols_res = result.cols();
         std::size_t cols_mat = mat_i.cols();
@@ -65,7 +66,8 @@ Matrix<T> TensorProduct<T, d>::eval(const Matrix<T>& params) const
 }
 
 template <std::floating_point T, std::size_t d>
-std::vector<Matrix<T>> TensorProduct<T, d>::eval_derivs(const Matrix<T>& params, 
+std::vector<Matrix<T>> TensorProduct<T, d>::eval_derivs(const Matrix<T>& params,
+                                                        const std::array<Index, d>& spans,
                                                         Index order) const
 {
     if constexpr (d == 0) {
@@ -73,11 +75,11 @@ std::vector<Matrix<T>> TensorProduct<T, d>::eval_derivs(const Matrix<T>& params,
     }
 
     std::size_t num_points = params.rows();
-    std::vector<Matrix<T>> acc_results = bases_[0]->eval_derivs(params.col(0), order);
+    std::vector<Matrix<T>> acc_results = bases_[0]->eval_derivs(params.col(0), spans[0], order);
 
     for (std::size_t i = 1; i < d; ++i) 
     {
-        std::vector<Matrix<T>> mat_i_derivs = bases_[i]->eval_derivs(params.col(i), order);
+        std::vector<Matrix<T>> mat_i_derivs = bases_[i]->eval_derivs(params.col(i), spans[i], order);
 
         std::vector<Matrix<T>> next_accumulated;
         next_accumulated.reserve(acc_results.size() * mat_i_derivs.size());

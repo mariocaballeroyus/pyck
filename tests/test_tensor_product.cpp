@@ -29,16 +29,28 @@ static Eigen::MatrixXd make_grid(const Eigen::VectorXd& u,
  * Multivariate partition of unity.
  */
 TEST_CASE("TensorProduct: partition of unity", "[basis][tensor]") {
-    auto bu = std::make_shared<BSpline<double>>(2, clamped_uniform_knots<double>(2, 4));
-    auto bv = std::make_shared<BSpline<double>>(3, clamped_uniform_knots<double>(3, 5));
+    auto kv_u = clamped_uniform_knots<double>(2, 4);
+    auto kv_v = clamped_uniform_knots<double>(3, 5);
+    auto bu = std::make_shared<BSpline<double>>(2, kv_u);
+    auto bv = std::make_shared<BSpline<double>>(3, kv_v);
     TensorProduct<double, 2> tp(std::array<Ptr<const Basis<double>>, 2>{bu, bv});
 
-    auto params = make_grid(Eigen::VectorXd::LinSpaced(6, 0.0, 1.0),
-                            Eigen::VectorXd::LinSpaced(5, 0.0, 1.0));
-    Eigen::MatrixXd R = tp.eval(params);
+    auto u_pts = Eigen::VectorXd::LinSpaced(6, 0.0, 1.0);
+    auto v_pts = Eigen::VectorXd::LinSpaced(5, 0.0, 1.0);
 
-    for (int i = 0; i < R.rows(); ++i)
-        REQUIRE(R.row(i).sum() == Approx(1.0).margin(1e-12));
+    for (int p = 0; p < u_pts.size(); ++p) {
+        for (int q = 0; q < v_pts.size(); ++q) {
+            Eigen::MatrixXd params(1, 2);
+            params(0, 0) = u_pts(p);
+            params(0, 1) = v_pts(q);
+            std::array<Index, 2> spans = {
+                bu->find_span(u_pts(p)),
+                bv->find_span(v_pts(q))
+            };
+            Eigen::MatrixXd R = tp.eval(params, spans);
+            REQUIRE(R.row(0).sum() == Approx(1.0).margin(1e-12));
+        }
+    }
 }
 
 /**
@@ -46,23 +58,26 @@ TEST_CASE("TensorProduct: partition of unity", "[basis][tensor]") {
  */
 TEST_CASE("TensorProduct: lexicographical ordering", "[basis][tensor]") {
     std::vector<double> knots = {0, 0, 0, 1, 1, 1};
-    auto bu = std::make_shared<BSpline<double>>(2, KnotVector<double>(knots));
-    auto bv = std::make_shared<BSpline<double>>(2, KnotVector<double>(knots));
+    KnotVector<double> kv(knots);
+    auto bu = std::make_shared<BSpline<double>>(2, kv);
+    auto bv = std::make_shared<BSpline<double>>(2, kv);
     TensorProduct<double, 2> tp(std::array<Ptr<const Basis<double>>, 2>{bu, bv});
 
     Eigen::MatrixXd params(1, 2);
     params << 0.5, 0.5;
+    std::array<Index, 2> spans = {2, 2};
 
     Eigen::VectorXd u(1);
     u << 0.5;
-    auto du = bu->eval_derivs(u, 1);  // [N_u, dN_u]
-    auto dv = bv->eval_derivs(u, 1);  // [N_v, dN_v]
+    Index span_1d = 2;
+    auto du = bu->eval_derivs(u, span_1d, 1);  // [N_u, dN_u]
+    auto dv = bv->eval_derivs(u, span_1d, 1);  // [N_v, dN_v]
 
-    auto derivs = tp.eval_derivs(params, Index(1));
+    auto derivs = tp.eval_derivs(params, spans, Index(1));
     REQUIRE(derivs.size() == 4);
 
-    std::size_t n_u = bu->num_basis();
-    std::size_t n_v = bv->num_basis();
+    std::size_t n_u = du[0].cols();  // p+1 = 3
+    std::size_t n_v = dv[0].cols();  // p+1 = 3
 
     // Index 0 = (0,0): N_u ⊗ N_v
     for (std::size_t a = 0; a < n_u; ++a)
@@ -93,8 +108,9 @@ TEST_CASE("TensorProduct: lexicographical ordering", "[basis][tensor]") {
  * Linear consistency (bilinear patch).
  */
 TEST_CASE("TensorProduct: bilinear consistency", "[basis][tensor]") {
-    auto bu = std::make_shared<BSpline<double>>(1, KnotVector<double>({0, 0, 1, 1}));
-    auto bv = std::make_shared<BSpline<double>>(1, KnotVector<double>({0, 0, 1, 1}));
+    KnotVector<double> kv({0, 0, 1, 1});
+    auto bu = std::make_shared<BSpline<double>>(1, kv);
+    auto bv = std::make_shared<BSpline<double>>(1, kv);
     TensorProduct<double, 2> tp(std::array<Ptr<const Basis<double>>, 2>{bu, bv});
 
     // f(u,v) = 3u + 2v + 5uv + 1
@@ -103,9 +119,11 @@ TEST_CASE("TensorProduct: bilinear consistency", "[basis][tensor]") {
     Eigen::VectorXd ctrl(4);
     ctrl << 1.0, 3.0, 4.0, 11.0;
 
+    // Single span → spans = {1, 1}
+    std::array<Index, 2> spans = {1, 1};
     auto params = make_grid(Eigen::VectorXd::LinSpaced(7, 0.0, 1.0),
                             Eigen::VectorXd::LinSpaced(7, 0.0, 1.0));
-    Eigen::MatrixXd R = tp.eval(params);  // (49 x 4)
+    Eigen::MatrixXd R = tp.eval(params, spans);  // (49 x 4)
 
     // Compute f(u,v) = R * ctrl and compare to analytical
     Eigen::VectorXd f_computed = R * ctrl;
@@ -122,24 +140,27 @@ TEST_CASE("TensorProduct: bilinear consistency", "[basis][tensor]") {
  */
 TEST_CASE("TensorProduct: derivative Kronecker check", "[basis][tensor]") {
     std::vector<double> knots = {0, 0, 0, 1, 1, 1};
-    auto bu = std::make_shared<BSpline<double>>(2, KnotVector<double>(knots));
-    auto bv = std::make_shared<BSpline<double>>(2, KnotVector<double>(knots));
+    KnotVector<double> kv(knots);
+    auto bu = std::make_shared<BSpline<double>>(2, kv);
+    auto bv = std::make_shared<BSpline<double>>(2, kv);
     TensorProduct<double, 2> tp(std::array<Ptr<const Basis<double>>, 2>{bu, bv});
 
     Eigen::MatrixXd params(1, 2);
     params << 0.4, 0.7;
+    std::array<Index, 2> spans = {2, 2};
 
     Eigen::VectorXd uu(1), vv(1);
     uu << 0.4;
     vv << 0.7;
 
-    auto du = bu->eval_derivs(uu, 1);
-    auto dv = bv->eval_derivs(vv, 1);
+    Index span_1d = 2;
+    auto du = bu->eval_derivs(uu, span_1d, 1);
+    auto dv = bv->eval_derivs(vv, span_1d, 1);
     
-    auto derivs = tp.eval_derivs(params, Index(1));
+    auto derivs = tp.eval_derivs(params, spans, Index(1));
 
-    std::size_t n_u = bu->num_basis();
-    std::size_t n_v = bv->num_basis();
+    std::size_t n_u = du[0].cols();  // p+1 = 3
+    std::size_t n_v = dv[0].cols();  // p+1 = 3
 
     // (1,0): dN_u ⊗ N_v
     for (std::size_t a = 0; a < n_u; ++a)
@@ -164,21 +185,27 @@ TEST_CASE("TensorProduct: derivative Kronecker check", "[basis][tensor]") {
  * Finite-difference derivative check.
  */
 TEST_CASE("TensorProduct: finite-difference derivative check", "[basis][tensor]") {
-    auto bu = std::make_shared<BSpline<double>>(3, clamped_uniform_knots<double>(3, 5));
-    auto bv = std::make_shared<BSpline<double>>(2, clamped_uniform_knots<double>(2, 4));
+    auto kv_u = clamped_uniform_knots<double>(3, 5);
+    auto kv_v = clamped_uniform_knots<double>(2, 4);
+    auto bu = std::make_shared<BSpline<double>>(3, kv_u);
+    auto bv = std::make_shared<BSpline<double>>(2, kv_v);
     TensorProduct<double, 2> tp(std::array<Ptr<const Basis<double>>, 2>{bu, bv});
 
     double h = 1e-7;
     Eigen::MatrixXd params(1, 2);
     params << 0.4, 0.6;
+    std::array<Index, 2> spans = {
+        bu->find_span(0.4),
+        bv->find_span(0.6)
+    };
 
-    auto derivs = tp.eval_derivs(params, Index(1));
+    auto derivs = tp.eval_derivs(params, spans, Index(1));
 
-    // ∂/∂u
+    // ∂/∂u  (use same spans — for small h they don't change)
     Eigen::MatrixXd p_fwd(1, 2), p_bwd(1, 2);
     p_fwd << 0.4 + h, 0.6;
     p_bwd << 0.4 - h, 0.6;
-    Eigen::MatrixXd dRdu_fd = (tp.eval(p_fwd) - tp.eval(p_bwd)) / (2.0 * h);
+    Eigen::MatrixXd dRdu_fd = (tp.eval(p_fwd, spans) - tp.eval(p_bwd, spans)) / (2.0 * h);
 
     for (int j = 0; j < dRdu_fd.cols(); ++j)
         REQUIRE(derivs[2](0, j) == Approx(dRdu_fd(0, j)).margin(1e-5));
@@ -186,7 +213,7 @@ TEST_CASE("TensorProduct: finite-difference derivative check", "[basis][tensor]"
     // ∂/∂v
     p_fwd << 0.4, 0.6 + h;
     p_bwd << 0.4, 0.6 - h;
-    Eigen::MatrixXd dRdv_fd = (tp.eval(p_fwd) - tp.eval(p_bwd)) / (2.0 * h);
+    Eigen::MatrixXd dRdv_fd = (tp.eval(p_fwd, spans) - tp.eval(p_bwd, spans)) / (2.0 * h);
 
     for (int j = 0; j < dRdv_fd.cols(); ++j)
         REQUIRE(derivs[1](0, j) == Approx(dRdv_fd(0, j)).margin(1e-5));

@@ -97,6 +97,12 @@ std::vector<Index> DofMapper<d>::get_element_dofs(Index elem_idx) const
         temp /= intervals[i];
     }
 
+    return get_element_dofs(span_indices);
+}
+
+template <std::size_t d>
+std::vector<Index> DofMapper<d>::get_element_dofs(const std::array<Index, d>& span_indices) const
+{
     // For each direction, collect the (degree+1) active basis function indices.
     // For span s in direction i the active basis functions are:
     //   max(0, s - degree_[i]) .. min(s, num_basis_[i] - 1)

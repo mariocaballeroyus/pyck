@@ -3,6 +3,7 @@
 
 
 #include <vector>
+#include <array>
 #include <Eigen/Dense>
 
 #include "patch.hpp"
@@ -24,13 +25,8 @@ public:
     virtual void compute_local_stiffness(const Patch<T, d>& patch,
                                          const ColMatrix<T, d>& q_points,
                                          const Vector<T>& q_weights,
+                                         const std::array<Index, d>& spans,
                                          Matrix<T>& stiffness) const = 0;
-
-    virtual void compute_local_load(const Patch<T, d>& patch,
-                                    const ColMatrix<T, d>& q_points,
-                                    const Vector<T>& q_weights,
-                                    const Vector<T>& load_values,
-                                    Vector<T>& load) const = 0;
 
 };
 

@@ -39,34 +39,27 @@ public:
     // === Evaluation =================================================================
 
     /**
-     * @brief Evaluate B-spline basis functions at given parameter values
+     * @brief Evaluate the (p+1) non-zero B-spline basis functions at given parameter
+     *        values within a single knot span.
      * 
-     * @param points Parameter values at which to evaluate the basis functions
-     * @return A matrix of size (m x n) where m is the number of parameter values and 
-     *         n is the number of basis functions
-     * 
-     *         result = { N_0(u_0) N_1(u_0) ... N_n(u_0)
-     *                    N_0(u_1) N_1(u_1) ... N_n(u_1)
-     *                    ...      ...      ... ...
-     *                    N_0(u_m) N_1(u_m) ... N_n(u_m) }
+     * @param points Parameter values (all assumed to lie in knot span `span`).
+     * @param span   Knot-span index (as returned by KnotVector::find_span).
+     * @return A matrix of size (m, p+1).  Column k gives N_{span-p+k,p}(u_i).
      */
-    Matrix<T> eval(const Vector<T>& points) const override;
+    Matrix<T> eval(const Vector<T>& points, Index span) const override;
 
     /**
-     * @brief Evaluate B-spline basis functions and their derivatives at given 
-     *        parameter values
+     * @brief Evaluate the (p+1) non-zero B-spline basis functions and their
+     *        derivatives at given parameter values within a single knot span.
      * 
-     * @param points Parameter values at which to evaluate the basis functions
-     * @param order Highest order of derivatives to compute
-     * @return A vector of matrices, where each matrix corresponds to the basis 
-     *         functions or their derivatives
-     * 
-     *          results[k] = { d^k(N_0)/du^k(u_0) ... d^k(N_n)/du^k(u_0)
-     *                         d^k(N_0)/du^k(u_1) ... d^k(N_n)/du^k(u_1)
-     *                         ...                ... ...
-     *                         d^k(N_0)/du^k(u_m) ... d^k(N_n)/du^k(u_m) }
+     * @param points Parameter values (all assumed to lie in knot span `span`).
+     * @param span   Knot-span index (as returned by KnotVector::find_span).
+     * @param order  Highest order of derivatives to compute.
+     * @return A vector of (order+1) matrices, each of size (m, p+1).
+     *         results[k](i, j) = d^k N_{span-p+j,p} / du^k (points[i])
      */
-    std::vector<Matrix<T>> eval_derivs(const Vector<T>& points, 
+    std::vector<Matrix<T>> eval_derivs(const Vector<T>& points,
+                                       Index span,
                                        Index order = 0) const override;
 
 private:
@@ -74,13 +67,15 @@ private:
     // === Internal Methods =======================================================
 
     /**
-     * @brief Compute the table of basis function values for given parameter values
+     * @brief Compute the span-local triangular table of basis function values.
      * 
-     * @param points Parameter values at which to compute the basis functions
-     * @return A vector of matrices, where each matrix corresponds to the basis 
-     *         functions of a certain degree
+     * @param points Parameter values (all in the given span).
+     * @param span   Knot-span index.
+     * @return table[d] is an (m × (d+1)) matrix holding the non-zero degree-d
+     *         basis values.  Column k corresponds to global index (span − d + k).
      */
-    std::vector<Matrix<T>> compute_basis_table(const Vector<T>& points) const;
+    std::vector<Matrix<T>> compute_basis_table(const Vector<T>& points,
+                                               Index span) const;
 
 };
 
