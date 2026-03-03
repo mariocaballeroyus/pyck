@@ -5,9 +5,6 @@ from pyck.elements.euler_bernoulli_beam import EulerBernoulliBeam, create_euler_
 
 
 __all__ = [
-    # Classes
-    "Element",
     "EulerBernoulliBeam",
-    # Factories
     "create_euler_bernoulli_beam",
 ]

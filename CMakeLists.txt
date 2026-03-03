@@ -35,6 +35,7 @@ target_link_libraries(pyck_basis PUBLIC eigen)
 add_library(pyck_geometry
     cpp/geometry/dof_mapper.cpp
     cpp/geometry/curve.cpp
+    cpp/geometry/boundary_patch.cpp
 )
 target_include_directories(pyck_geometry PUBLIC cpp/geometry)
 target_link_libraries(pyck_geometry PUBLIC pyck_basis)
@@ -44,6 +45,7 @@ add_library(pyck_assembly
     cpp/assembly/quadrature.cpp
     cpp/assembly/gauss_legendre.cpp
     cpp/assembly/linear_elastic_problem.cpp
+    cpp/assembly/assign_scalar.cpp
 )
 target_include_directories(pyck_assembly PUBLIC cpp/assembly)
 target_link_libraries(pyck_assembly PUBLIC eigen pyck_elements pyck_conditions)
@@ -52,7 +54,8 @@ target_link_libraries(pyck_assembly PUBLIC eigen pyck_elements pyck_conditions)
 # Conditions library
 add_library(pyck_conditions
     cpp/conditions/load_condition.cpp
-    cpp/conditions/assign_scalar.cpp
+    cpp/conditions/displacement_condition.cpp
+    cpp/conditions/rotation_condition.cpp
 )
 target_include_directories(pyck_conditions PUBLIC cpp/conditions)
 target_link_libraries(pyck_conditions PUBLIC pyck_geometry pyck_assembly)

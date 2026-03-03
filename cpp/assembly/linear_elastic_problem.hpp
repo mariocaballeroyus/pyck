@@ -47,7 +47,7 @@ public:
     void set_quadrature(const Ptr<QuadratureRule<T>>& quadrature);
 
     /**
-     * @brief Add a boundary condition (e.g. LoadCondition, DirichletCondition) to the system.
+     * @brief Add a boundary condition (e.g. LoadCondition, DisplacementCondition, RotationCondition) to the system.
      * 
      * @param condition Shared pointer to the condition.
      */

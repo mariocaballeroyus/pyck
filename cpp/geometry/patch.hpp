@@ -3,11 +3,13 @@
 
 #include <utility>
 #include <vector>
+#include <memory>
 #include <Eigen/Core>
 
 #include "basis.hpp"
 #include "tensor.hpp"
 #include "dof_mapper.hpp"
+#include "boundary_patch.hpp"
 #include "../types.hpp"
 
 namespace pyck
@@ -18,7 +20,7 @@ namespace pyck
  * basis functions.
  */
 template <std::floating_point T, std::size_t d>
-class Patch
+class Patch : public std::enable_shared_from_this<Patch<T, d>>
 {
 public:
 
@@ -95,6 +97,23 @@ public:
             pts.row(i) = control_pts_.row(dofs[i]);
         }
         return pts;
+    }
+
+    /**
+     * @brief Extract a boundary face of this patch.
+     *
+     * @param param_dim Parametric direction normal to the boundary.
+     * @param at_start  True for the start boundary, false for the end.
+     * @return A BoundaryPatch storing the DOF mapping back to this patch.
+     */
+    Ptr<BoundaryPatch<T, d>> boundary(std::size_t param_dim, bool at_start) const
+    {
+        // We need a non-const shared_ptr to 'this'. BoundaryPatch stores
+        // a Ptr<Patch> for lifetime safety; we use const_pointer_cast here
+        // since BoundaryPatch only reads through the parent.
+        auto self = std::const_pointer_cast<Patch<T, d>>(
+            std::dynamic_pointer_cast<const Patch<T, d>>(this->shared_from_this()));
+        return std::make_shared<BoundaryPatch<T, d>>(self, param_dim, at_start);
     }
 
     /**

@@ -8,6 +8,7 @@ import numpy.typing as npt
 import pyck._pyck as _pyck
 
 from pyck.basis import Basis, BSpline
+from pyck.geometry.boundary_patch import BoundaryPatch
 
 
 class CurvePatch:
@@ -84,6 +85,25 @@ class CurvePatch:
     def __repr__(self) -> str:
         n = self.num_control_pts
         return f"CurvePatch(name='{self._name}', basis={self._basis!r}, control_points={n})"
+
+    def boundary(self, side: str) -> BoundaryPatch:
+        """Extract a boundary from this patch.
+
+        Parameters
+        ----------
+        side : ``"start"`` or ``"end"``
+            Which end of the parametric domain.
+
+        Returns
+        -------
+        BoundaryPatch
+            Object carrying the DOF indices on this boundary.
+        """
+        if side not in ("start", "end"):
+            raise ValueError(f"side must be 'start' or 'end', got '{side}'")
+        at_start = side == "start"
+        cpp_bp = self._cpp_object.boundary(0, at_start)
+        return BoundaryPatch(cpp_bp, parent=self)
 
 
 def create_curve_patch(basis: BSpline, control_pts: npt.ArrayLike, *, name: str = "patch") -> CurvePatch:

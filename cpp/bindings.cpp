@@ -5,6 +5,7 @@
 #include "bspline.hpp"
 #include "tensor.hpp"
 #include "curve.hpp"
+#include "boundary_patch.hpp"
 #include "dof_mapper.hpp"
 #include "quadrature.hpp"
 #include "quadrature_utils.hpp"
@@ -13,6 +14,8 @@
 #include "euler_bernoulli_beam_1p.hpp"
 #include "condition.hpp"
 #include "load_condition.hpp"
+#include "displacement_condition.hpp"
+#include "rotation_condition.hpp"
 #include "assign_scalar.hpp"
 #include "linear_elastic_problem.hpp"
 
@@ -64,6 +67,16 @@ PYBIND11_MODULE(_pyck, m) {
                  py::cast(&bs));
          });
 
+    // === BoundaryPatch (1D parent) ================================================
+
+    using BoundaryPatch1D = pyck::BoundaryPatch<double, 1>;
+    py::class_<BoundaryPatch1D, pyck::Ptr<BoundaryPatch1D>>(m, "BoundaryPatch1D")
+        .def("boundary_dofs", &BoundaryPatch1D::boundary_dofs)
+        .def("displacement_dofs", &BoundaryPatch1D::displacement_dofs)
+        .def("rotation_dofs", &BoundaryPatch1D::rotation_dofs)
+        .def("param_dim", &BoundaryPatch1D::param_dim)
+        .def("at_start", &BoundaryPatch1D::at_start);
+
     using Patch3D1D = pyck::Patch<double, 1>;
     py::class_<Patch3D1D, pyck::Ptr<Patch3D1D>>(m, "Patch3D1D")
         .def("gdim", &Patch3D1D::gdim)
@@ -78,7 +91,10 @@ PYBIND11_MODULE(_pyck, m) {
         .def("dof_mapper", &Patch3D1D::dof_mapper,
              py::return_value_policy::reference_internal)
         .def("active_control_pts", &Patch3D1D::active_control_pts,
-             py::arg("spans"));
+             py::arg("spans"))
+        .def("boundary", &Patch3D1D::boundary,
+             py::arg("param_dim"), py::arg("at_start"),
+             "Extract a boundary face of this patch.");
 
     using CurvePatch3D = pyck::CurvePatch<double>;
     py::class_<CurvePatch3D, Patch3D1D, pyck::Ptr<CurvePatch3D>>(m, "CurvePatch")
@@ -114,6 +130,10 @@ PYBIND11_MODULE(_pyck, m) {
     using DofMapper1D = pyck::DofMapper<1>;
     py::class_<DofMapper1D>(m, "DofMapper1D")
         .def("get_boundary_dofs", &DofMapper1D::get_boundary_dofs,
+             py::arg("param_dim"), py::arg("at_start"))
+        .def("get_displacement_boundary_dofs", &DofMapper1D::get_displacement_boundary_dofs,
+             py::arg("param_dim"), py::arg("at_start"))
+        .def("get_rotation_boundary_dofs", &DofMapper1D::get_rotation_boundary_dofs,
              py::arg("param_dim"), py::arg("at_start"))
         .def("get_element_dofs",
              py::overload_cast<pyck::Index>(&DofMapper1D::get_element_dofs, py::const_),
@@ -180,27 +200,15 @@ PYBIND11_MODULE(_pyck, m) {
         .def(py::init<const Patch3D1D&, const QR&, const pyck::Vector<double>&>(),
              py::arg("patch"), py::arg("quadrature"), py::arg("load_values"));
 
-    m.def("assign_scalar",
-        [](const std::vector<pyck::Index>& dofs,
-           const std::vector<double>& values,
-           pyck::Matrix<double> K,
-           pyck::Vector<double> F) {
-            pyck::assign_scalar<double>(dofs, values, K, F);
-            return py::make_tuple(std::move(K), std::move(F));
-        },
-        py::arg("dofs"), py::arg("values"),
-        py::arg("stiffness"), py::arg("load"),
-        "Apply Dirichlet BCs with prescribed values. Returns (K, F).");
+    using DispD = pyck::DisplacementCondition<double>;
+    py::class_<DispD, CondD, pyck::Ptr<DispD>>(m, "DisplacementCondition")
+        .def(py::init<std::vector<pyck::Index>, double>(),
+             py::arg("dofs"), py::arg("value") = 0.0);
 
-    m.def("assign_zeros",
-        [](const std::vector<pyck::Index>& dofs,
-           pyck::Matrix<double> K,
-           pyck::Vector<double> F) {
-            pyck::assign_zeros<double>(dofs, K, F);
-            return py::make_tuple(std::move(K), std::move(F));
-        },
-        py::arg("dofs"), py::arg("stiffness"), py::arg("load"),
-        "Apply homogeneous Dirichlet BCs. Returns (K, F).");
+    using RotD = pyck::RotationCondition<double>;
+    py::class_<RotD, CondD, pyck::Ptr<RotD>>(m, "RotationCondition")
+        .def(py::init<std::vector<pyck::Index>, double>(),
+             py::arg("dofs"), py::arg("value") = 0.0);
 
     // === Assembly ===================================================================
 
@@ -288,7 +296,10 @@ PYBIND11_MODULE(_pyck, m) {
         .def("boundary_dofs", &Patch3D1DF::boundary_dofs,
              py::arg("param_dim"), py::arg("at_start"))
         .def("dof_mapper", &Patch3D1DF::dof_mapper,
-             py::return_value_policy::reference_internal);
+             py::return_value_policy::reference_internal)
+        .def("boundary", &Patch3D1DF::boundary,
+             py::arg("param_dim"), py::arg("at_start"),
+             "Extract a boundary face of this patch.");
 
     using CurvePatch3DF = pyck::CurvePatch<float>;
     py::class_<CurvePatch3DF, Patch3D1DF, pyck::Ptr<CurvePatch3DF>>(m, "CurvePatch32")

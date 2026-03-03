@@ -70,7 +70,24 @@ class LoadCondition:
             _pyck.eval_physical_quadrature_points(self._patch._cpp_object, quadrature._cpp_object)
         )
 
-        vals = np.asarray(self._load_func(x), dtype=np.float64).ravel()
+        try:
+            raw = self._load_func(x)
+        except (TypeError, ValueError, AttributeError):
+            # Fallback for functions that don't support array inputs
+            # e.g. math.sin (TypeError) or if/else blocks (ValueError)
+            raw = np.array([self._load_func(xi) for xi in x])
+
+        vals = np.asarray(raw, dtype=np.float64)
+
+        # Handle scalar / 0-d returns from load functions (e.g. constant
+        # loads that simply ``return -1000.0``).  The C++ side expects one
+        # value per quadrature point.
+        if vals.ndim == 0:
+            vals = np.broadcast_to(vals, x.shape).copy()
+        else:
+            vals = vals.ravel()
+            if vals.size == 1 and x.size > 1:
+                vals = np.broadcast_to(vals, x.shape).copy()
 
         self._cpp_object = _pyck.LoadCondition1D(
             self._patch._cpp_object, quadrature._cpp_object, vals

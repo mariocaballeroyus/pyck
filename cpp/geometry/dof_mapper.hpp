@@ -34,12 +34,31 @@ public:
     Index to_global(const std::array<Index, d>& logical_idx) const;
 
     /**
-     * @brief Get the global DOF indices for the fully clamped boundary layers.
+     * @brief Get the global DOF indices for the fully clamped boundary layers
+     *        (both displacement and rotation layers).
      *
      * @param param_dim The boundary dimension (0 for u, 1 for v, etc.)
      * @param at_start If true, clamped at u=0. If false, clamped at u=1.
      */
     std::vector<Index> get_boundary_dofs(Index param_dim, bool at_start) const;
+
+    /**
+     * @brief Get the global DOF indices on the boundary surface itself
+     *        (single outermost layer — the displacement DOFs).
+     *
+     * @param param_dim The boundary dimension.
+     * @param at_start True for u=0, false for u=1.
+     */
+    std::vector<Index> get_displacement_boundary_dofs(Index param_dim, bool at_start) const;
+
+    /**
+     * @brief Get the global DOF indices on the layer adjacent to the boundary
+     *        (the "rotation" DOFs used to enforce slope = 0).
+     *
+     * @param param_dim The boundary dimension.
+     * @param at_start True for u=0, false for u=1.
+     */
+    std::vector<Index> get_rotation_boundary_dofs(Index param_dim, bool at_start) const;
 
     /**
      * @brief Get the active global DOF indices for a specific element.
