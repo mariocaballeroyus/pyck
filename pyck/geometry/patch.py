@@ -1,30 +1,34 @@
-"""Abstract base class for parametric patches."""
+"""Protocol for parametric patches."""
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from typing import Protocol, runtime_checkable
 
 import numpy as np
 import numpy.typing as npt
 
 
-class Patch(ABC):
-    """Abstract base class for tensor-product parametric patches."""
+@runtime_checkable
+class Patch(Protocol):
+    """Interface for tensor-product parametric patches."""
 
     @property
-    @abstractmethod
-    def gdim(self) -> int:
-        """Geometric (embedding) dimension."""
+    def name(self) -> str:
+        """Human-readable label for the patch."""
         ...
 
     @property
-    @abstractmethod
     def tdim(self) -> int:
         """Topological (parametric) dimension."""
         ...
 
     @property
-    @abstractmethod
     def control_points(self) -> npt.NDArray[np.float64]:
-        """Control-point matrix of shape ``(n_cp, gdim)``."""
+        """Control-point matrix, shape ``(n, gdim)``."""
         ...
+
+    @property
+    def num_control_pts(self) -> int:
+        """Number of control points."""
+        ...
+    

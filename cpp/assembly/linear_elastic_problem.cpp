@@ -1,15 +1,22 @@
 #include "linear_elastic_problem.hpp"
 #include "../basis/bspline.hpp"
 
+#include <stdexcept>
+
 namespace pyck
 {
 
 template <std::floating_point T, std::size_t d>
 LinearElasticProblem<T, d>::LinearElasticProblem(const Ptr<Patch<T, d>>& patch,
-                                                 const Ptr<Element<T, d>>& element,
-                                                 const Ptr<QuadratureRule<T, d>>& quadrature)
-    : patch_(patch), element_(element), quadrature_(quadrature)
+                                                 const Ptr<Element<T, d>>& element)
+    : patch_(patch), element_(element), quadrature_(nullptr)
 {
+}
+
+template <std::floating_point T, std::size_t d>
+void LinearElasticProblem<T, d>::set_quadrature(const Ptr<QuadratureRule<T>>& quadrature)
+{
+    quadrature_ = quadrature;
 }
 
 template <std::floating_point T, std::size_t d>
@@ -21,6 +28,12 @@ void LinearElasticProblem<T, d>::add_condition(const Ptr<Condition<T>>& conditio
 template <std::floating_point T, std::size_t d>
 void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
 {
+    if (!quadrature_) {
+        throw std::runtime_error("LinearElasticProblem::assemble: "
+                                 "quadrature rule not set. "
+        );
+    }
+
     // Determine the total number of global DOFs
     const auto& mapper = patch_->dof_mapper();
     std::size_t global_dofs = 1;
@@ -76,7 +89,9 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
         if (zero_volume) continue;
 
         // Create mapped quadrature rule points and weights for the element
-        auto [mapped_pts, mapped_weights] = quadrature_->map_to_domain(u_a, u_b);
+        std::array<const QuadratureRule<T>*, d> q_rules;
+        q_rules.fill(quadrature_.get());
+        auto [mapped_pts, mapped_weights] = tensor_product_mapped<T, d>(q_rules, u_a, u_b);
         
         // Gather element contributions (span-local stiffness)
         element_->compute_local_stiffness(*patch_, mapped_pts, mapped_weights, span_indices, Ke);

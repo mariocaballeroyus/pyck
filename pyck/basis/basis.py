@@ -1,42 +1,40 @@
-"""Abstract base class for basis functions."""
+"""Protocol for univariate basis functions."""
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from typing import Protocol, runtime_checkable
 
 import numpy as np
 import numpy.typing as npt
 
+from pyck.basis.knot_vector import KnotVector
 
-class Basis(ABC):
-    """Abstract base class for 1-D basis functions."""
+
+@runtime_checkable
+class Basis(Protocol):
+    """Interface for one-dimensional basis function families."""
 
     @property
-    @abstractmethod
     def degree(self) -> int:
-        """Polynomial degree of the basis functions."""
+        """Polynomial degree."""
         ...
 
     @property
-    @abstractmethod
     def num_basis(self) -> int:
         """Number of basis functions."""
         ...
 
-    @abstractmethod
-    def eval(
-        self,
-        u: npt.NDArray[np.float64],
-        order: int = 0,
-    ) -> list[npt.NDArray[np.float64]]:
-        """Evaluate basis functions and derivatives up to *order*.
-
-        Args:
-            u: Parameter values, shape ``(M,)``.
-            order: Maximum derivative order (0 = values only).
-
-        Returns:
-            A list of ``(M, num_basis)`` arrays where ``result[k]`` is
-            the *k*-th derivative for *k = 0 … order*.
-        """
+    @property
+    def knot_vector(self) -> KnotVector:
+        """The :class:`KnotVector` associated with this basis."""
         ...
+
+    @property
+    def knots(self) -> npt.NDArray[np.float64]:
+        """Zero-copy view of the raw knot values."""
+        ...
+
+    def __repr__(self) -> str:
+        """String representation of the basis."""
+        ...
+        

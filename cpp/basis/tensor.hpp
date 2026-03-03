@@ -32,26 +32,22 @@ public:
      * 
      * @param bases An array of shared pointers to 1D basis objects.
      */
-    explicit TensorProduct(std::array<Ptr<const Basis<T>>, d> bases)
-        : bases_(std::move(bases)) {}
+    explicit TensorProduct(std::array<Ptr<const Basis<T>>, d> bases);
 
     /// @brief Construct a tensor product basis for a 1D curve
     explicit TensorProduct(Ptr<const Basis<T>> b0)
-    requires (d == 1)
-        : bases_{std::move(b0)} {}
+    requires (d == 1);
 
     /// @brief Construct a tensor product basis for a 2D surface
     TensorProduct(Ptr<const Basis<T>> b0, 
                   Ptr<const Basis<T>> b1)
-    requires (d == 2)
-        : bases_{std::move(b0), std::move(b1)} {}
+    requires (d == 2);
 
     /// @brief Construct a tensor product basis for a 3D volume
     TensorProduct(Ptr<const Basis<T>> b0, 
                   Ptr<const Basis<T>> b1, 
                   Ptr<const Basis<T>> b2)
-    requires (d == 3)
-        : bases_{std::move(b0), std::move(b1), std::move(b2)} {}
+    requires (d == 3);
 
     // === Evaluation =================================================================
 

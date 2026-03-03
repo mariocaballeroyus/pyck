@@ -24,26 +24,7 @@ class CurvePatch : public Patch<T, 1>
 {
 public:
 
-    // === Constructors & Factory Methods =============================================
-
-    CurvePatch(Ptr<const Basis<T>> basis_u, const ColMatrix<T, 3>& control_pts)
-    : Patch<T, 1>(control_pts),
-      tensor_product_(std::move(basis_u)),
-      dof_mapper_({tensor_product_.basis(0).num_basis()},
-                  {tensor_product_.basis(0).degree()})
-    {}
-
-    // === Properties =================================================================
-
-    /// @brief Get the basis functions for the parametric direction
-    const Basis<T>& basis(std::size_t dir) const override 
-    { return tensor_product_.basis(dir); }
-
-    /// @brief Get the tensor product object
-    const TensorProduct<T, 1>& tensor_product() const override 
-    { return tensor_product_; }
-
-    // === Evaluation =================================================================
+    CurvePatch(Ptr<const Basis<T>> basis_u, const ColMatrix<T, 3>& control_pts);
 
     /**
      * @brief Evaluate the non-zero raw basis functions and their parametric derivatives
@@ -86,18 +67,18 @@ public:
                                                const std::array<Index, 1>& spans,
                                                std::size_t order = 0) const override;
 
-    /**
-     * @brief Evaluate the Jacobian determinant (arc-length increment) at each point
-     *        within a given knot span.
-     *
-     * @param points Evaluation points in parametric coordinates as a (Q × 1) matrix.
-     * @param spans  Knot-span index array (single element for 1D).
-     * @return A vector of size (Q) containing ||dX/du|| at each point.
-     */
-    // === DOF Mapping ================================================================
+    
+    /// @brief Get the basis functions for the parametric direction
+    const Basis<T>& basis(std::size_t dir) const override 
+    { return tensor_product_.basis(dir); }
+
+    /// @brief Get the tensor product object
+    const TensorProduct<T, 1>& tensor_product() const override 
+    { return tensor_product_; }
     
     /// @brief Get the DOF Mapper for this patch
-    const DofMapper<1>& dof_mapper() const override { return dof_mapper_; }
+    const DofMapper<1>& dof_mapper() const override 
+    { return dof_mapper_; }
 
 private:
 

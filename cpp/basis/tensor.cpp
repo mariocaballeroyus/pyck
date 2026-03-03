@@ -6,6 +6,54 @@
 namespace pyck
 {
 
+
+template <std::floating_point T, std::size_t d>
+TensorProduct<T, d>::TensorProduct(std::array<Ptr<const Basis<T>>, d> bases)
+    : bases_(std::move(bases)) 
+{
+    for (std::size_t i = 0; i < d; ++i) {
+        if (!bases_[i]) {
+            throw std::invalid_argument("TensorProduct: "
+                                        "Basis pointer is null.");
+        }
+    }
+}
+
+template <std::floating_point T, std::size_t d>
+TensorProduct<T, d>::TensorProduct(Ptr<const Basis<T>> b0)
+requires (d == 1)
+    : bases_{std::move(b0)} 
+{
+    if (!bases_[0]) {
+        throw std::invalid_argument("TensorProduct: "
+                                    "Basis pointer is null.");
+    }
+}
+
+template <std::floating_point T, std::size_t d>
+TensorProduct<T, d>::TensorProduct(Ptr<const Basis<T>> b0, 
+                                   Ptr<const Basis<T>> b1)
+requires (d == 2)
+    : bases_{std::move(b0), std::move(b1)} 
+{
+    if (!bases_[0] || !bases_[1]) {
+        throw std::invalid_argument("TensorProduct: "
+                                    "Basis pointer is null.");
+    }
+}
+
+template <std::floating_point T, std::size_t d>
+TensorProduct<T, d>::TensorProduct(Ptr<const Basis<T>> b0, 
+                                   Ptr<const Basis<T>> b1, 
+                                   Ptr<const Basis<T>> b2)
+requires (d == 3)
+    : bases_{std::move(b0), std::move(b1), std::move(b2)} 
+{
+    if (!bases_[0] || !bases_[1] || !bases_[2]) {
+        throw std::invalid_argument("TensorProduct: Basis pointer is null.");
+    }
+}
+
 template <std::floating_point T, std::size_t d>
 Index TensorProduct<T, d>::num_basis() const
 {

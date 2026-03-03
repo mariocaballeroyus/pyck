@@ -10,6 +10,31 @@ namespace pyck
 {
 
 template <std::floating_point T>
+CurvePatch<T>::CurvePatch(Ptr<const Basis<T>> basis_u, const ColMatrix<T, 3>& control_pts)
+    : Patch<T, 1>(control_pts),
+      tensor_product_(std::move(basis_u)),
+      dof_mapper_({tensor_product_.basis(0).num_basis()},
+                  {tensor_product_.basis(0).degree()})
+{
+    if (control_pts.cols() != 3) {
+        throw std::invalid_argument("CurvePatch: "
+                                    "Control points must be embedded in 3D space."
+        );
+    }
+
+    const Index expected_n = tensor_product_.basis(0).num_basis();
+    const Index actual_n = static_cast<Index>(control_pts.rows());
+
+    if (actual_n != expected_n) {
+        throw std::invalid_argument("CurvePatch: "
+                                    "Dimension mismatch. Expected "
+                                    + std::to_string(expected_n) + " control points"
+        );
+    }
+
+}
+
+template <std::floating_point T>
 std::vector<Matrix<T>> CurvePatch<T>::eval_basis_functions(const ColMatrix<T, 1>& points,
                                                            const std::array<Index, 1>& spans,
                                                            Index order) const
@@ -141,9 +166,11 @@ CurvePatch<T> line_segment(Ptr<const pyck::Basis<T>> basis,
 // === Template Instantiations ========================================================
 
 template class CurvePatch<double>;
+template CurvePatch<double> line_segment<double>(Ptr<const Basis<double>>, double);
 
 #ifdef PYCK_BUILD_SINGLE_PRECISION
 template class CurvePatch<float>;
+template CurvePatch<float> line_segment<float>(Ptr<const Basis<float>>, float);
 #endif
 
 } // namespace pyck

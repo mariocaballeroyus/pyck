@@ -30,20 +30,21 @@ class LinearElasticProblem
 {
 public:
 
-    // === Constructors ===============================================================
-
     /**
      * @brief Construct a new LinearElasticProblem object
      * 
      * @param patch The geometric patch over which to assemble.
      * @param element The finite element formulation (e.g. EulerBernoulliBeam1P).
-     * @param quadrature The quadrature rule used for element-level numerical integration.
      */
     LinearElasticProblem(const Ptr<Patch<T, d>>& patch,
-              const Ptr<Element<T, d>>& element,
-              const Ptr<QuadratureRule<T, d>>& quadrature);
+              const Ptr<Element<T, d>>& element);
 
-    // === Operations =================================================================
+    /**
+     * @brief Set the quadrature rule for numerical integration.
+     * 
+     * @param quadrature A 1D quadrature rule applied as a tensor product along each parametric direction.
+     */
+    void set_quadrature(const Ptr<QuadratureRule<T>>& quadrature);
 
     /**
      * @brief Add a boundary condition (e.g. LoadCondition, DirichletCondition) to the system.
@@ -71,7 +72,7 @@ private:
 
     Ptr<Element<T, d>> element_;
 
-    Ptr<QuadratureRule<T, d>> quadrature_;
+    Ptr<QuadratureRule<T>> quadrature_;
 
     std::vector<Ptr<Condition<T>>> conditions_;
 

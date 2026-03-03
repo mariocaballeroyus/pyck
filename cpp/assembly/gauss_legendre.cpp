@@ -34,46 +34,27 @@ static const StaticVector<double, 8> weights8 = (StaticVector<double, 8>() << 0.
 } // namespace
 
 
-template <std::floating_point T, std::size_t d>
-GaussLegendre<T, d>::GaussLegendre(std::size_t num_pts)
+template <std::floating_point T>
+GaussLegendre<T>::GaussLegendre(std::size_t num_pts)
 {
-    if constexpr (d == 1) {
-        ColMatrix<T, 1> nodes_temp;
-        // Try to find the precomputed constants first.
-        if (!this->lookup_reference(num_pts, nodes_temp, this->weights_))
-        {
-            // If not found, compute them.
-            this->compute_reference(num_pts, nodes_temp, this->weights_);
-        }
-        
-        // Size the dimension statically to avoid type mismatch during d > 1 instantiations
-        this->points_.resize(num_pts, Eigen::NoChange);
-        this->points_.col(0) = nodes_temp;
-    } else {
-        std::array<std::size_t, d> arr;
-        arr.fill(num_pts);
-        this->build_tensor_product(arr);
+    if (!this->lookup_reference(num_pts, this->points_, this->weights_))
+    {
+        this->compute_reference(num_pts, this->points_, this->weights_);
     }
 }
 
-template <std::floating_point T, std::size_t d>
-GaussLegendre<T, d>::GaussLegendre(const std::array<std::size_t, d>& num_pts)
-{
-    this->build_tensor_product(num_pts);
-}
-
-template <std::floating_point T, std::size_t d>
-void GaussLegendre<T, d>::compute_reference(std::size_t num_pts, ColMatrix<T, 1>& nodes, Vector<T>& weights) const
+template <std::floating_point T>
+void GaussLegendre<T>::compute_reference(std::size_t num_pts, Vector<T>& nodes, Vector<T>& weights) const
 {
     if (num_pts == 0)
     {
-        nodes.resize(0, 1);
+        nodes.resize(0);
         weights.resize(0);
         return;
     }
 
     // Resize outputs
-    nodes.resize(num_pts, 1);
+    nodes.resize(num_pts);
     weights.resize(num_pts);
 
     // Build symmetric tridiagonal Jacobi matrix
@@ -88,7 +69,7 @@ void GaussLegendre<T, d>::compute_reference(std::size_t num_pts, ColMatrix<T, 1>
 
     // Solve Eigenvalue problem
     Eigen::SelfAdjointEigenSolver<Matrix<T>> solver(J);
-    nodes.col(0) = solver.eigenvalues();
+    nodes = solver.eigenvalues();
 
     // Extract weights
     Vector<T> v0 = solver.eigenvectors().row(0);
@@ -98,8 +79,8 @@ void GaussLegendre<T, d>::compute_reference(std::size_t num_pts, ColMatrix<T, 1>
     }
 }
 
-template <std::floating_point T, std::size_t d>
-bool GaussLegendre<T, d>::lookup_reference(std::size_t num_pts, ColMatrix<T, 1>& nodes, Vector<T>& weights) const
+template <std::floating_point T>
+bool GaussLegendre<T>::lookup_reference(std::size_t num_pts, Vector<T>& nodes, Vector<T>& weights) const
 {
     switch (num_pts)
     {
@@ -120,14 +101,10 @@ bool GaussLegendre<T, d>::lookup_reference(std::size_t num_pts, ColMatrix<T, 1>&
 
 // === Template Instantiations ========================================================
 
-template class pyck::GaussLegendre<double, 1>;
-template class pyck::GaussLegendre<double, 2>;
-template class pyck::GaussLegendre<double, 3>;
+template class pyck::GaussLegendre<double>;
 
 #ifdef PYCK_BUILD_SINGLE_PRECISION
-template class pyck::GaussLegendre<float, 1>;
-template class pyck::GaussLegendre<float, 2>;
-template class pyck::GaussLegendre<float, 3>;
+template class pyck::GaussLegendre<float>;
 #endif
 
 } // namespace pyck

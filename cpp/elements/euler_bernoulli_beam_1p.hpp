@@ -16,14 +16,9 @@ class EulerBernoulliBeam1P : public Element<T, 1>
 {
 public:
 
-    using ScalarType = T;
-
-    // === Constructors ===============================================================
-
-    EulerBernoulliBeam1P(ScalarType E, ScalarType A, ScalarType I)
-    : E_(E), A_(A), I_(I), Kb_(E * I) {}
-
-    // === Local Element Assemblies ===================================================
+    EulerBernoulliBeam1P(T youngs_modulus,
+                         T section_area,
+                         T moment_inertia);
 
     /**
      * @brief Compute the local stiffness matrix for the element.
@@ -41,17 +36,9 @@ public:
 
 private:
 
-    /// @brief Young's Modulus of the beam material
-    ScalarType E_;
+    /// @brief Material Parameters
+    T E_, I_, A_, Kb_;
 
-    /// @brief Area moment of inertia of the beam cross-section
-    ScalarType I_;
-
-    /// @brief Cross-sectional area of the beam
-    ScalarType A_;
-    
-    /// @brief Bending stiffness of the beam (E * I)
-    ScalarType Kb_;
 };
 
 } // namespace pyck

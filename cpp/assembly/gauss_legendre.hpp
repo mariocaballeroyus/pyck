@@ -10,15 +10,12 @@
 namespace pyck
 {
 
-/// @brief Gauss-Legendre quadrature rule.
+/// @brief Gauss-Legendre quadrature rule (strictly one-dimensional).
 /// @tparam T Scalar type
-/// @tparam d Dimension
-template <std::floating_point T, std::size_t d>
-class GaussLegendre : public QuadratureRule<T, d>
+template <std::floating_point T>
+class GaussLegendre : public QuadratureRule<T>
 {
 public:
-
-    // === Constructors ===============================================================
 
     /**
      * @brief Default constructor.
@@ -26,41 +23,32 @@ public:
     GaussLegendre() = default;
 
     /**
-     * @brief Construct an isotropic d-dimensional GaussLegendre object.
+     * @brief Construct a 1D GaussLegendre rule with the given number of points.
      * 
-     * @param num_pts The number of points for each dimension uniformly.
+     * @param num_pts The number of quadrature points.
      */
     explicit GaussLegendre(std::size_t num_pts);
 
-    /**
-     * @brief Construct an anisotropic d-dimensional GaussLegendre object.
-     * 
-     * @param num_pts An array of quadrature dimension points.
-     */
-    explicit GaussLegendre(const std::array<std::size_t, d>& num_pts);
-
 private:
 
-    // === Utility Methods =============================================================
-
     /**
-     * @brief Compute the reference Gauss-Legendre quadrature rule for a given number of points.
+     * @brief Compute the reference Gauss-Legendre nodes and weights for a given number of points.
      * 
      * @param num_pts The number of quadrature points.
-     * @param nodes The quadrature points.
-     * @param weights The quadrature weights.
+     * @param nodes   Output nodes on [-1, 1].
+     * @param weights Output quadrature weights.
      */
-    void compute_reference(std::size_t num_pts, ColMatrix<T, 1>& nodes, Vector<T>& weights) const override;
+    void compute_reference(std::size_t num_pts, Vector<T>& nodes, Vector<T>& weights) const override;
 
     /**
-     * @brief Look up the reference Gauss-Legendre quadrature rule for a given number of points.
+     * @brief Look up precomputed Gauss-Legendre nodes and weights.
      * 
      * @param num_pts The number of quadrature points.
-     * @param nodes The quadrature points.
-     * @param weights The quadrature weights.
-     * @return true if the quadrature rule was found, false otherwise.
+     * @param nodes   Output nodes on [-1, 1].
+     * @param weights Output quadrature weights.
+     * @return true if the lookup succeeded, false otherwise.
      */
-    bool lookup_reference(std::size_t num_pts, ColMatrix<T, 1>& nodes, Vector<T>& weights) const override;
+    bool lookup_reference(std::size_t num_pts, Vector<T>& nodes, Vector<T>& weights) const override;
 
 };
 

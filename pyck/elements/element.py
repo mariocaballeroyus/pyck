@@ -1,36 +1,14 @@
-"""Abstract base class for finite element formulations."""
+"""Abstract base for finite elements."""
 
 from __future__ import annotations
 
-import numpy as np
-import numpy.typing as npt
+from typing import Any, Protocol, runtime_checkable
 
-from pyck.geometry.patch import Patch
-from pyck.conditions.neumann import NeumannBC
+@runtime_checkable
+class Element(Protocol):
+    """Base class for isogeometric finite element formulations."""
 
-
-class Element:
-    """Abstract base class for finite element formulations."""
-
-    @staticmethod
-    def assemble_local_stiffness(
-        patch: Patch, 
-        quadrature: tuple | None = None
-    ) -> npt.NDArray[np.float64]:
-        """Assemble the local stiffness matrix."""
-        # For now ignore the quadrature as an argument
-        # Just build a legendre guadrature based on the patch basis degree
-        pass
-
-    @staticmethod
-    def assemble_local_load(
-        patch: Patch, 
-        neumann_bcs: list[NeumannBC], 
-        quadrature: tuple | None = None
-    ) -> npt.NDArray[np.float64]:
-        """Assemble the local load vector."""
-        # For now ignore the quadrature as an argument
-        # Ignore the Neumann boundary conditions for now too
-        # Just build a legendre guadrature based on the patch basis degree
-        pass
-
+    @property
+    def _cpp_object(self) -> Any:
+        """The underlying C++ element object."""
+        ...

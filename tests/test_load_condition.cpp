@@ -29,7 +29,7 @@ TEST_CASE("LoadCondition 1D", "[conditions][load_condition]") {
     CurvePatch<double> curve(basis, control_pts);
 
     // 2. Create a quadrature rule (Gauss-Legendre, 2 points per element should be enough for linear shape funcs)
-    GaussLegendre<double, 1> quad(2);
+    GaussLegendre<double> quad(2);
 
     SECTION("Constant Body Force") {
         // t(x) = 10.0, with 2 non-zero elements and 2 quad points each = 4 total

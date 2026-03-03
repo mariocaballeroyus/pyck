@@ -7,11 +7,14 @@ namespace pyck
 
 template <std::floating_point T, std::size_t d>
 LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
-                                   const QuadratureRule<T, d>& quadrature,
+                                   const QuadratureRule<T>& quadrature,
                                    const Vector<T>& load_values)
 {
-    const auto& points = quadrature.points();
-    const auto& weights = quadrature.weights();
+    // Compute total tensor-product quadrature points per element
+    std::size_t Q_1d = quadrature.num_points();
+    std::size_t Q = 1;
+    for (std::size_t i = 0; i < d; ++i) Q *= Q_1d;
+
     // Initialize the element load vector with zeros
     std::size_t num_basis = patch.dof_mapper().num_basis()[0]; 
     for (std::size_t i = 1; i < d; ++i) {
@@ -19,8 +22,6 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
     }
     
     element_load_.setZero(num_basis);
-
-    std::size_t Q = quadrature.num_points();
     
     // Determine number of intervals per dimension
     std::array<std::size_t, d> intervals;
@@ -32,6 +33,10 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
     }
 
     const auto& mapper = patch.dof_mapper();
+
+    // Build the tensor-product rule array (isotropic: same 1D rule in every direction)
+    std::array<const QuadratureRule<T>*, d> q_rules;
+    q_rules.fill(&quadrature);
 
     // Track quadrature point offset into load_values
     std::size_t qp_offset = 0;
@@ -66,7 +71,7 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
         if (zero_volume) continue;
 
         // Map quadrature points from [-1, 1]^d to the parametric element box
-        auto [mapped_pts, mapped_weights] = quadrature.map_to_domain(u_a, u_b);
+        auto [mapped_pts, mapped_weights] = tensor_product_mapped<T, d>(q_rules, u_a, u_b);
         
         // Evaluate span-local basis functions and Jacobian
         auto [shape_derivs, jacobian] = patch.eval_shape_functions(mapped_pts, span_indices, 0);

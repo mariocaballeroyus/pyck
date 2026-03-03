@@ -13,28 +13,10 @@ class Condition
 {
 public:
 
-    // === Constructors ===============================================================
-
     /**
      * @brief Virtual destructor
      */
     virtual ~Condition() = default;
-
-    /**
-     * @brief Set the degrees of freedom where the condition is applied
-     *
-     * @param dofs Degrees of freedom where the condition is applied
-     */
-    void set_dofs(std::vector<Index> dofs)
-    { dofs_ = std::move(dofs); }
-
-    // === Properties =================================================================
-
-    /// @brief Get the degrees of freedom where the condition is applied
-    const std::vector<Index>& dofs() const
-    { return dofs_; }
-
-    // === Utiliy Methods =============================================================
 
     /**
      * @brief Apply the condition to the stiffness matrix and load vector
@@ -44,9 +26,19 @@ public:
      */
     virtual void apply(Matrix<T>& stiffness, Vector<T>& load) const = 0;
 
-protected:
+    /**
+     * @brief Set the degrees of freedom where the condition is applied
+     *
+     * @param dofs Degrees of freedom where the condition is applied
+     */
+    void set_dofs(std::vector<Index> dofs)
+    { dofs_ = std::move(dofs); }
 
-    // === Member Variables ===========================================================
+    /// @brief Get the degrees of freedom where the condition is applied
+    const std::vector<Index>& dofs() const
+    { return dofs_; }
+
+protected:
 
     /// @brief Degrees of freedom where the condition is applied
     std::vector<Index> dofs_;

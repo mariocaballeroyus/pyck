@@ -7,6 +7,7 @@
 #include "curve.hpp"
 #include "dof_mapper.hpp"
 #include "quadrature.hpp"
+#include "quadrature_utils.hpp"
 #include "gauss_legendre.hpp"
 #include "element.hpp"
 #include "euler_bernoulli_beam_1p.hpp"
@@ -23,8 +24,6 @@ PYBIND11_MODULE(_pyck, m) {
     py::class_<BasisD, pyck::Ptr<BasisD>>(m, "Basis")
         .def("degree", &BasisD::degree)
         .def("num_basis", &BasisD::num_basis)
-        .def("find_span", &BasisD::find_span,
-             py::arg("u"))
         .def("eval", &BasisD::eval_derivs,
              py::arg("u"), py::arg("span"), py::arg("order") = 0);
 
@@ -37,12 +36,17 @@ PYBIND11_MODULE(_pyck, m) {
         .def("size", &KnotVectorD::size)
         .def("num_basis", &KnotVectorD::num_basis,
              py::arg("degree"))
-        .def("find_span", &KnotVectorD::find_span,
-             py::arg("degree"), py::arg("u"))
         .def("num_spans", &KnotVectorD::num_spans)
         .def("span_bounds", &KnotVectorD::span_bounds,
              py::arg("span"))
-        .def("data", &KnotVectorD::data)
+        .def("find_span", &KnotVectorD::find_span,
+             py::arg("degree"), py::arg("u"))
+        .def("data", [](KnotVectorD& kv) {
+             return py::array_t<double>(
+                 kv.size(),
+                 kv.data().data(),
+                 py::cast(&kv));
+         })
         .def("__getitem__", [](const KnotVectorD& kv, std::size_t i) {
              return kv[i];
          })
@@ -50,11 +54,15 @@ PYBIND11_MODULE(_pyck, m) {
 
     using BSplineD = pyck::BSpline<double>;
     py::class_<BSplineD, BasisD, pyck::Ptr<BSplineD>>(m, "BSpline")
-        .def(py::init([](std::size_t degree, const std::vector<double>& knots) {
-                 return std::make_shared<BSplineD>(degree, KnotVectorD(knots));
-             }),
-             py::arg("degree"), py::arg("knots"))
-        .def("knots", &BSplineD::knots);
+        .def(py::init<std::size_t, KnotVectorD>(),
+             py::arg("degree"), py::arg("knot_vector"))
+        .def("knots", [](BSplineD& bs) {
+             const auto& v = bs.knots();
+             return py::array_t<double>(
+                 v.size(),
+                 v.data(),
+                 py::cast(&bs));
+         });
 
     using Patch3D1D = pyck::Patch<double, 1>;
     py::class_<Patch3D1D, pyck::Ptr<Patch3D1D>>(m, "Patch3D1D")
@@ -65,8 +73,6 @@ PYBIND11_MODULE(_pyck, m) {
                  &Patch3D1D::control_pts),
              py::return_value_policy::reference_internal)
         .def("num_control_pts", &Patch3D1D::num_control_pts)
-        .def("eval_jacobian", &Patch3D1D::eval_jacobian,
-             py::arg("params"), py::arg("spans"))
         .def("boundary_dofs", &Patch3D1D::boundary_dofs,
              py::arg("param_dim"), py::arg("at_start"))
         .def("dof_mapper", &Patch3D1D::dof_mapper,
@@ -92,9 +98,7 @@ PYBIND11_MODULE(_pyck, m) {
              },
              py::arg("params"), py::arg("spans"), py::arg("order") = 0)
         .def("eval_geometry", &CurvePatch3D::eval_geometry,
-             py::arg("params"), py::arg("spans"), py::arg("order") = 0)
-        .def("eval_jacobian", &CurvePatch3D::eval_jacobian,
-             py::arg("params"), py::arg("spans"));
+             py::arg("params"), py::arg("spans"), py::arg("order") = 0);
 
     // line_segment factory
     m.def("line_segment", [](pyck::Ptr<BSplineD> basis, double length) {
@@ -119,15 +123,42 @@ PYBIND11_MODULE(_pyck, m) {
 
     // === Quadrature =================================================================
 
-    using QR1D = pyck::QuadratureRule<double, 1>;
-    py::class_<QR1D, pyck::Ptr<QR1D>>(m, "QuadratureRule1D")
-        .def("points", &QR1D::points, py::return_value_policy::reference_internal)
-        .def("weights", &QR1D::weights, py::return_value_policy::reference_internal)
-        .def("num_points", &QR1D::num_points);
+    using QR = pyck::QuadratureRule<double>;
+    py::class_<QR, pyck::Ptr<QR>>(m, "QuadratureRule")
+        .def("points", &QR::points, py::return_value_policy::reference_internal)
+        .def("weights", &QR::weights, py::return_value_policy::reference_internal)
+        .def("num_points", &QR::num_points)
+        .def("map_to_domain", &QR::map_to_domain,
+             py::arg("lo"), py::arg("hi"));
 
-    using GL1D = pyck::GaussLegendre<double, 1>;
-    py::class_<GL1D, QR1D, pyck::Ptr<GL1D>>(m, "GaussLegendre1D")
+    using GL = pyck::GaussLegendre<double>;
+    py::class_<GL, QR, pyck::Ptr<GL>>(m, "GaussLegendre")
         .def(py::init<std::size_t>(), py::arg("num_pts"));
+
+    // Tensor-product utilities exposed to Python
+    m.def("tensor_product_1d",
+        [](const QR& rule) {
+            std::array<const QR*, 1> rules = {&rule};
+            return pyck::tensor_product<double, 1>(rules);
+        },
+        py::arg("rule"),
+        "Return (points, weights) for a 1D tensor product (identity).");
+
+    m.def("tensor_product_2d",
+        [](const QR& rule_u, const QR& rule_v) {
+            std::array<const QR*, 2> rules = {&rule_u, &rule_v};
+            return pyck::tensor_product<double, 2>(rules);
+        },
+        py::arg("rule_u"), py::arg("rule_v"),
+        "Form the 2D tensor product of two 1D quadrature rules.");
+
+    m.def("tensor_product_3d",
+        [](const QR& rule_u, const QR& rule_v, const QR& rule_w) {
+            std::array<const QR*, 3> rules = {&rule_u, &rule_v, &rule_w};
+            return pyck::tensor_product<double, 3>(rules);
+        },
+        py::arg("rule_u"), py::arg("rule_v"), py::arg("rule_w"),
+        "Form the 3D tensor product of three 1D quadrature rules.");
 
     // === Elements ===================================================================
 
@@ -146,7 +177,7 @@ PYBIND11_MODULE(_pyck, m) {
 
     using LC1D = pyck::LoadCondition<double, 1>;
     py::class_<LC1D, CondD, pyck::Ptr<LC1D>>(m, "LoadCondition1D")
-        .def(py::init<const Patch3D1D&, const QR1D&, const pyck::Vector<double>&>(),
+        .def(py::init<const Patch3D1D&, const QR&, const pyck::Vector<double>&>(),
              py::arg("patch"), py::arg("quadrature"), py::arg("load_values"));
 
     m.def("assign_scalar",
@@ -173,12 +204,23 @@ PYBIND11_MODULE(_pyck, m) {
 
     // === Assembly ===================================================================
 
+    // --- Quadrature utilities ---
+    m.def("eval_physical_quadrature_points",
+        [](const pyck::CurvePatch<double>& patch,
+           const pyck::QuadratureRule<double>& quad) {
+            return pyck::eval_physical_quadrature_points<double>(patch, quad);
+        },
+        py::arg("patch"), py::arg("quadrature"),
+        "Physical x-coordinates of all active quadrature points "
+        "(assembly layer, correct dependency direction).");
+
     using LEP1D = pyck::LinearElasticProblem<double, 1>;
     py::class_<LEP1D>(m, "LinearElasticProblem1D")
         .def(py::init<const pyck::Ptr<Patch3D1D>&,
-                      const pyck::Ptr<Elem1D>&,
-                      const pyck::Ptr<QR1D>&>(),
-             py::arg("patch"), py::arg("element"), py::arg("quadrature"))
+                      const pyck::Ptr<Elem1D>&>(),
+             py::arg("patch"), py::arg("element"))
+        .def("set_quadrature", &LEP1D::set_quadrature,
+             py::arg("quadrature"))
         .def("add_condition", &LEP1D::add_condition,
              py::arg("condition"))
         .def("assemble", [](const LEP1D& p) {
@@ -211,7 +253,12 @@ PYBIND11_MODULE(_pyck, m) {
              py::arg("degree"), py::arg("u"))
         .def("span_bounds", &KnotVectorF::span_bounds,
              py::arg("span"))
-        .def("data", &KnotVectorF::data)
+        .def("data", [](KnotVectorF& kv) {
+             return py::array_t<float>(
+                 kv.size(),
+                 kv.data().data(),
+                 py::cast(&kv));
+         })
         .def("__getitem__", [](const KnotVectorF& kv, std::size_t i) {
              return kv[i];
          })
@@ -219,11 +266,15 @@ PYBIND11_MODULE(_pyck, m) {
 
     using BSplineF = pyck::BSpline<float>;
     py::class_<BSplineF, BasisF, pyck::Ptr<BSplineF>>(m, "BSpline32")
-        .def(py::init([](std::size_t degree, const std::vector<float>& knots) {
-                 return std::make_shared<BSplineF>(degree, KnotVectorF(knots));
-             }),
-             py::arg("degree"), py::arg("knots"))
-        .def("knots", &BSplineF::knots);
+        .def(py::init<std::size_t, KnotVectorF>(),
+             py::arg("degree"), py::arg("knot_vector"))
+        .def("knots", [](BSplineF& bs) {
+             const auto& v = bs.knots();
+             return py::array_t<float>(
+                 v.size(),
+                 v.data(),
+                 py::cast(&bs));
+         });
 
     using Patch3D1DF = pyck::Patch<float, 1>;
     py::class_<Patch3D1DF, pyck::Ptr<Patch3D1DF>>(m, "Patch3D1D32")
@@ -234,8 +285,6 @@ PYBIND11_MODULE(_pyck, m) {
                  &Patch3D1DF::control_pts),
              py::return_value_policy::reference_internal)
         .def("num_control_pts", &Patch3D1DF::num_control_pts)
-        .def("eval_jacobian", &Patch3D1DF::eval_jacobian,
-             py::arg("params"), py::arg("spans"))
         .def("boundary_dofs", &Patch3D1DF::boundary_dofs,
              py::arg("param_dim"), py::arg("at_start"))
         .def("dof_mapper", &Patch3D1DF::dof_mapper,
@@ -259,8 +308,6 @@ PYBIND11_MODULE(_pyck, m) {
              },
              py::arg("params"), py::arg("spans"), py::arg("order") = 0)
         .def("eval_geometry", &CurvePatch3DF::eval_geometry,
-             py::arg("params"), py::arg("spans"), py::arg("order") = 0)
-        .def("eval_jacobian", &CurvePatch3DF::eval_jacobian,
-             py::arg("params"), py::arg("spans"));
+             py::arg("params"), py::arg("spans"), py::arg("order") = 0);
 #endif
 }
