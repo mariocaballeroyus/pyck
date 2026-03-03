@@ -120,6 +120,42 @@ std::vector<Matrix<T>> BSpline<T>::eval_derivs(const Vector<T>& points,
     return results;
 }
 
+template <std::floating_point T>
+std::vector<Matrix<T>> BSpline<T>::eval_all(const Vector<T>& points,
+                                            Index order) const
+{
+    Index m = points.size();
+    Index n = this->num_basis();
+    Index p = this->degree_;
+
+    std::vector<Matrix<T>> results(order + 1);
+    for (Index k = 0; k <= order; ++k) {
+        results[k] = Matrix<T>::Zero(m, n);
+    }
+
+    // Sort points into spans to use the efficient span-local evaluators
+    for (Index i = 0; i < m; ++i)
+    {
+        T u = points[i];
+        Index span = this->find_span(u);
+        
+        Vector<T> pt(1); pt[0] = u;
+        auto deriv_vals = this->eval_derivs(pt, span, order);
+
+        for (Index k = 0; k <= order; ++k)
+        {
+            // The span-local results have p+1 columns. 
+            // Local column j corresponds to global index (span - p + j).
+            for (Index j = 0; j <= p; ++j)
+            {
+                results[k](i, span - p + j) = deriv_vals[k](0, j);
+            }
+        }
+    }
+
+    return results;
+}
+
 // === Template Instantiations ========================================================
 
 template class BSpline<double>;

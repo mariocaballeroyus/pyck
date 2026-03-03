@@ -6,6 +6,7 @@ from pyck.basis.bspline import BSpline, create_bspline
 
 
 __all__ = [
+    "Basis",
     "BSpline",
     "KnotVector",
     "create_bspline",

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Protocol, runtime_checkable
 
-from pyck.assembly import QuadratureRule
+from pyck.assembly.quadrature import QuadratureRule
 
 
 @runtime_checkable

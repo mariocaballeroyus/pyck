@@ -28,7 +28,10 @@ PYBIND11_MODULE(_pyck, m) {
         .def("degree", &BasisD::degree)
         .def("num_basis", &BasisD::num_basis)
         .def("eval", &BasisD::eval_derivs,
-             py::arg("u"), py::arg("span"), py::arg("order") = 0);
+             py::arg("u"), py::arg("span"), py::arg("order") = 0)
+        .def("eval_all", &BasisD::eval_all,
+             py::arg("u"), py::arg("order") = 0,
+             "Evaluate all basis functions and derivatives (vector of matrices).");
 
     using KnotVectorD = pyck::KnotVector<double>;
     py::class_<KnotVectorD>(m, "KnotVector")

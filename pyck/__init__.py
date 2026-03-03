@@ -1,6 +1,7 @@
 from pyck import assembly, basis, conditions, elements, geometry
 
 from pyck.basis import (
+    Basis,
     BSpline,
     KnotVector,
     create_bspline,
@@ -38,6 +39,7 @@ __all__ = [
     "conditions",
     "elements",
     "geometry",
+    "Basis",
     "BSpline",
     "KnotVector",
     "create_bspline",

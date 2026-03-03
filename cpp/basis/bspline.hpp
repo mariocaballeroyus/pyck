@@ -62,6 +62,16 @@ public:
                                        Index span,
                                        Index order = 0) const override;
 
+    /**
+     * @brief Evaluate all basis functions and their derivatives at given parameter values.
+     * 
+     * @param points Parameter values.
+     * @param order  Highest order of derivatives to compute (default 0).
+     * @return A vector of (order+1) matrices, each of size (m, n).
+     */
+    std::vector<Matrix<T>> eval_all(const Vector<T>& points,
+                                    Index order = 0) const override;
+
 private:
 
     // === Internal Methods =======================================================
