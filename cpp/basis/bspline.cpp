@@ -137,18 +137,89 @@ std::vector<Matrix<T>> BSpline<T>::eval_all(const Vector<T>& points,
     for (Index i = 0; i < m; ++i)
     {
         T u = points[i];
-        Index span = this->find_span(u);
         
-        Vector<T> pt(1); pt[0] = u;
-        auto deriv_vals = this->eval_derivs(pt, span, order);
+        // Find the true span, ignoring clamped bounds for eval_all 
+        // which might evaluate points outside [u_p, u_{n+1}]
+        Index span;
+        Index num_knots = this->knots_.size();
+        
+        // Handle u < u_0 or u >= u_last
+        if (u < this->knots_[0] || u >= this->knots_.back()) {
+            if (u == this->knots_.back()) {
+                span = num_knots - 2;
+                while (span > 0 && this->knots_[span] == this->knots_[span + 1]) {
+                    span--;
+                }
+            } else {
+                continue; // Outside absolute domain, evaluates to 0
+            }
+        } else {
+            auto it = std::upper_bound(this->knots_.begin(), this->knots_.end(), u);
+            span = static_cast<Index>(std::distance(this->knots_.begin(), it) - 1);
+        }
 
-        for (Index k = 0; k <= order; ++k)
+        Vector<T> pt(1); pt[0] = u;
+        
+        if (span >= p && span <= num_knots - p - 2) 
         {
-            // The span-local results have p+1 columns. 
-            // Local column j corresponds to global index (span - p + j).
-            for (Index j = 0; j <= p; ++j)
+            // Safe to use efficient span-local evaluator
+            auto deriv_vals = this->eval_derivs(pt, span, order);
+            for (Index k = 0; k <= order; ++k)
             {
-                results[k](i, span - p + j) = deriv_vals[k](0, j);
+                for (Index j = 0; j <= p; ++j)
+                {
+                    results[k](i, span - p + j) = deriv_vals[k](0, j);
+                }
+            }
+        } 
+        else 
+        {           
+            for (Index basis_idx = 0; basis_idx < n; ++basis_idx) 
+            {
+                // Determine if u is in the support [u_i, u_{i+p+1})
+                if (u < this->knots_[basis_idx] || u >= this->knots_[basis_idx + p + 1]) {
+                    if (u != this->knots_.back() || basis_idx != n - 1) {
+                        continue;
+                    }
+                }
+                
+                if (order == 0) {
+                    // Recursive array
+                    std::vector<T> N(p + 1, 0.0);
+                    // Base case degree 0
+                    for (Index j = 0; j <= p; ++j) 
+                    {
+                        Index knot_idx = basis_idx + j;
+                        if (u >= this->knots_[knot_idx] && u < this->knots_[knot_idx + 1]) {
+                            N[j] = 1.0;
+                        } else if (u == this->knots_.back() && u == this->knots_[knot_idx + 1] && knot_idx + 1 == num_knots - 1) {
+                            N[j] = 1.0; // Last point inclusion
+                        }
+                    }
+                    
+                    // Degree 1 to degree p
+                    for (Index d = 1; d <= p; ++d) 
+                    {
+                        for (Index j = 0; j <= p - d; ++j) 
+                        {
+                            Index knot_idx = basis_idx + j;
+                            T left = 0.0, right = 0.0;
+                            
+                            T denom_left = this->knots_[knot_idx + d] - this->knots_[knot_idx];
+                            if (denom_left > 1e-14) {
+                                left = (u - this->knots_[knot_idx]) / denom_left * N[j];
+                            }
+                            
+                            T denom_right = this->knots_[knot_idx + d + 1] - this->knots_[knot_idx + 1];
+                            if (denom_right > 1e-14) {
+                                right = (this->knots_[knot_idx + d + 1] - u) / denom_right * N[j + 1];
+                            }
+                            
+                            N[j] = left + right;
+                        }
+                    }
+                    results[0](i, basis_idx) = N[0];
+                }
             }
         }
     }
