@@ -60,56 +60,6 @@ class Basis(ABC):
         results = [np.asarray(m) for m in deriv_list]
         return results[0] if order == 0 else results
 
-    def plot(self, order: int = 0, n_points: int = 200, ax: Optional[Any] = None, **kwargs) -> Any:
-        """Plot the basis functions and the knot vector.
-
-        Parameters
-        ----------
-        order : int, optional
-            Derivative order to plot (default 0).
-        n_points : int, optional
-            Number of points for the plot (default 200).
-        ax : matplotlib.axes.Axes, optional
-            Existing axes to plot onto.
-        **kwargs : dict
-            Additional arguments passed to ``ax.plot()``.
-
-        Returns
-        -------
-        ax : matplotlib.axes.Axes
-            The axes object.
-        """
-        import matplotlib.pyplot as plt
-
-        if ax is None:
-            fig, ax = plt.subplots(figsize=(8, 4))
-
-        u_min, u_max = self.knots[0], self.knots[-1]
-        u = np.linspace(u_min, u_max, n_points)
-        
-        # Evaluate
-        vals = self.eval_all(u, order=order)
-        if order > 0:
-            vals = vals[order]
-            ylabel = f"$d^{{{order}}}N / du^{{{order}}}$"
-        else:
-            ylabel = "$N(u)$"
-
-        # Plot functions
-        ax.plot(u, vals, **kwargs)
-        
-        # Plot knots on the axis
-        unique_knots = np.unique(self.knots)
-        ax.vlines(unique_knots, 0, ax.get_ylim()[1] if order > 0 else 1.1, 
-                  colors='gray', linestyles='--', alpha=0.3, label='Knots' if order == 0 else None)
-        
-        ax.set_xlabel("$u$")
-        ax.set_ylabel(ylabel)
-        ax.set_title(f"Basis degree={self.degree} (order={order})")
-        ax.grid(True, alpha=0.2)
-        
-        return ax
-
     def __repr__(self) -> str:
         """String representation of the basis."""
         return f"Basis(degree={self.degree}, num_basis={self.num_basis})"

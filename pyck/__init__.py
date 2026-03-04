@@ -1,4 +1,4 @@
-from pyck import assembly, basis, conditions, elements, geometry
+from pyck import assembly, basis, conditions, elements, geometry, io
 
 from pyck.basis import (
     Basis,
@@ -31,7 +31,9 @@ from pyck.assembly import (
     create_gauss_legendre,
     create_linear_elastic_problem,
 )
+from pyck.io import basis_plot, plot_basis_functions, plot_knots, plot_partition_of_unity
 from pyck.solver import solve
+import pyck.solver as solver
 
 __all__ = [
     "assembly",
@@ -39,6 +41,7 @@ __all__ = [
     "conditions",
     "elements",
     "geometry",
+    "io",
     "Basis",
     "BSpline",
     "KnotVector",
@@ -60,5 +63,10 @@ __all__ = [
     "LinearElasticProblem",
     "create_gauss_legendre",
     "create_linear_elastic_problem",
+    "basis_plot",
+    "plot_basis_functions",
+    "plot_knots",
+    "plot_partition_of_unity",
     "solve",
+    "solver",
 ]
