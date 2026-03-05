@@ -25,13 +25,13 @@ public:
      * @param patch The patch of the element.
      * @param q_points Quadrature points.
      * @param q_weights Quadrature weights.
-     * @param spans Per-direction knot-span indices.
+     * @param spans Knot-span index.
      * @param stiffness The local stiffness matrix to be computed (size (p+1) × (p+1)).
      */
     void compute_local_stiffness(const Patch<T, 1>& patch,
                                  const ColMatrix<T, 1>& q_points,
                                  const Vector<T>& q_weights,
-                                 const std::array<Index, 1>& spans,
+                                 Index span,
                                  Matrix<T>& stiffness) const override;
 
 private:

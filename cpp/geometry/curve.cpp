@@ -36,18 +36,20 @@ CurvePatch<T>::CurvePatch(Ptr<const Basis<T>> basis_u, const ColMatrix<T, 3>& co
 
 template <std::floating_point T>
 std::vector<Matrix<T>> CurvePatch<T>::eval_basis_functions(const ColMatrix<T, 1>& points,
-                                                           const std::array<Index, 1>& spans,
+                                                           Index span,
                                                            Index order) const
 {
+    std::array<Index, 1> spans = {span};
     return tensor_product_.eval_on_span(points, spans, order);
 }
 
 template <std::floating_point T>
 std::pair<std::vector<Matrix<T>>, Vector<T>> CurvePatch<T>::eval_shape_functions(
     const ColMatrix<T, 1>& points,
-    const std::array<Index, 1>& spans,
+    Index span,
     Index order) const
 {
+    std::array<Index, 1> spans = {span};
     order = std::max(Index(1), std::min(order, Index(3)));
     const Index Q = points.rows();
 
@@ -98,17 +100,44 @@ std::pair<std::vector<Matrix<T>>, Vector<T>> CurvePatch<T>::eval_shape_functions
 }
 
 template <std::floating_point T>
-std::vector<ColMatrix<T, 3>> CurvePatch<T>::eval_geometry(const ColMatrix<T, 1>& points,
-                                                          const std::array<Index, 1>& spans,
-                                                          Index order) const
+ColMatrix<T, 3> CurvePatch<T>::eval_geometry(const ColMatrix<T, 1>& points,
+                                             Index span) const
 {
-    auto basis_derivs = tensor_product_.eval_on_span(points, spans, order);
-    auto act_pts = this->active_control_pts(spans);
+    const Index Q = points.rows();
+    const Index p = tensor_product_.basis(0).degree();
+    const auto& knots = tensor_product_.basis(0).knots();
 
-    std::vector<ColMatrix<T, 3>> result(order + 1);
-    for (Index i = 0; i <= order; ++i) {
-        result[i] = basis_derivs[i] * act_pts;
+    std::array<Index, 1> span_arr = {span};
+    auto act_pts = this->active_control_pts(span_arr);
+
+    ColMatrix<T, 3> result(Q, 3);
+
+    for (Index q = 0; q < Q; ++q)
+    {
+        const T u = points(q, 0);
+        ColMatrix<T, 3> d = act_pts;
+
+        // De Boor's recursion: triangular scheme
+        for (Index r = 1; r <= p; ++r)
+        {
+            for (Index j = p; j >= r; --j)
+            {
+                Index knot_idx = span - p + j;
+                T left  = knots[knot_idx];
+                T right = knots[knot_idx + p + 1 - r];
+                T denom = right - left;
+
+                T alpha = (std::abs(denom) > T(1e-14))
+                        ? (u - left) / denom
+                        : T(0);
+
+                d.row(j) = (T(1) - alpha) * d.row(j - 1) + alpha * d.row(j);
+            }
+        }
+
+        result.row(q) = d.row(p);
     }
+
     return result;
 }
 

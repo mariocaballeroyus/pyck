@@ -28,11 +28,11 @@ template <std::floating_point T>
 void EulerBernoulliBeam1P<T>::compute_local_stiffness(const Patch<T, 1>& patch,
                                                       const ColMatrix<T, 1>& q_points,
                                                       const Vector<T>& q_weights,
-                                                      const std::array<Index, 1>& spans,
+                                                      Index span,
                                                       Matrix<T>& stiffness) const
 {
     // Extract shape function values + derivatives (up to 2nd order) and Jacobian
-    auto [shape_fns, jac] = patch.eval_shape_functions(q_points, spans, 2);
+    auto [shape_fns, jac] = patch.eval_shape_functions(q_points, span, 2);
     Vector<T> dV = q_weights.cwiseProduct(jac);
 
     // Trigger SIMD vectorization by scaling B before the matrix multiplication

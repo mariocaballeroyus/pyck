@@ -108,16 +108,16 @@ PYBIND11_MODULE(_pyck, m) {
              py::arg("basis"),
              py::arg("control_points"))
         .def("eval_basis_functions", &CurvePatch3D::eval_basis_functions,
-             py::arg("params"), py::arg("spans"), py::arg("order") = 0)
+             py::arg("params"), py::arg("span"), py::arg("order") = 0)
         .def("eval_shape_functions", [](const CurvePatch3D& p,
                  const pyck::ColMatrix<double, 1>& pts,
-                 const std::array<pyck::Index, 1>& spans,
+                 pyck::Index span,
                  std::size_t order) {
-                 return p.eval_shape_functions(pts, spans, order);
+                 return p.eval_shape_functions(pts, span, order);
              },
-             py::arg("params"), py::arg("spans"), py::arg("order") = 0)
+             py::arg("params"), py::arg("span"), py::arg("order") = 0)
         .def("eval_geometry", &CurvePatch3D::eval_geometry,
-             py::arg("params"), py::arg("spans"), py::arg("order") = 0);
+             py::arg("params"), py::arg("span"));
 
     // line_segment factory
     m.def("line_segment", [](pyck::Ptr<BSplineD> basis, double length) {
@@ -313,15 +313,15 @@ PYBIND11_MODULE(_pyck, m) {
              py::arg("basis"),
              py::arg("control_points"))
         .def("eval_basis_functions", &CurvePatch3DF::eval_basis_functions,
-             py::arg("params"), py::arg("spans"), py::arg("order") = 0)
+             py::arg("params"), py::arg("span"), py::arg("order") = 0)
         .def("eval_shape_functions", [](const CurvePatch3DF& p,
                  const pyck::ColMatrix<float, 1>& pts,
-                 const std::array<pyck::Index, 1>& spans,
+                 pyck::Index span,
                  std::size_t order) {
-                 return p.eval_shape_functions(pts, spans, order);
+                 return p.eval_shape_functions(pts, span, order);
              },
-             py::arg("params"), py::arg("spans"), py::arg("order") = 0)
+             py::arg("params"), py::arg("span"), py::arg("order") = 0)
         .def("eval_geometry", &CurvePatch3DF::eval_geometry,
-             py::arg("params"), py::arg("spans"), py::arg("order") = 0);
+             py::arg("params"), py::arg("span"));
 #endif
 }

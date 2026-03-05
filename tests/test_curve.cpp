@@ -52,7 +52,7 @@ TEST_CASE("CurvePatch: Analytical Push-Forward Verification", "[geometry][curve]
             double Gamma = x_1.dot(x_11) / g11;
             double Gamma_u = (x_11.dot(x_11) + x_1.dot(x_111)) / g11 - 2.0 * std::pow(Gamma, 2);
 
-            auto [r, jac] = curve.eval_shape_functions(params, std::array<Index, 1>{3}, 3);
+            auto [r, jac] = curve.eval_shape_functions(params, 3, 3);
             
             const auto& dN  = r[1];
             const auto& d2N = r[2];
@@ -91,7 +91,7 @@ TEST_CASE("CurvePatch: External AD Numerical Validation", "[geometry][curve]") {
 
     SECTION("Evaluation at u = 0.15") {
         Eigen::MatrixXd u(1, 1); u << 0.15;
-        auto [results, jac15] = curve.eval_shape_functions(u, std::array<Index, 1>{3}, 3);
+        auto [results, jac15] = curve.eval_shape_functions(u, 3, 3);
 
         Eigen::Vector4d expected_N(0.6141250000000000, 0.3251250000000000, 0.0573750000000000, 0.0033750000000000);
         Eigen::Vector4d expected_dN(-0.5807828087105747, 0.3758006409303719, 0.1868955059172438, 0.0180866618629591);
@@ -108,7 +108,7 @@ TEST_CASE("CurvePatch: External AD Numerical Validation", "[geometry][curve]") {
 
     SECTION("Evaluation at u = 0.5") {
         Eigen::MatrixXd u(1, 1); u << 0.5;
-        auto [results, jac50] = curve.eval_shape_functions(u, std::array<Index, 1>{3}, 3);
+        auto [results, jac50] = curve.eval_shape_functions(u, 3, 3);
 
         Eigen::Vector4d expected_N(0.1250000000000000, 0.3750000000000000, 0.3750000000000000, 0.1250000000000000);
         Eigen::Vector4d expected_dN(-0.1961161351381840, -0.1961161351381840, 0.1961161351381840, 0.1961161351381840);
@@ -125,7 +125,7 @@ TEST_CASE("CurvePatch: External AD Numerical Validation", "[geometry][curve]") {
 
     SECTION("Evaluation at u = 0.85") {
         Eigen::MatrixXd u(1, 1); u << 0.85;
-        auto [results, jac85] = curve.eval_shape_functions(u, std::array<Index, 1>{3}, 3);
+        auto [results, jac85] = curve.eval_shape_functions(u, 3, 3);
 
         Eigen::Vector4d expected_N(0.0033750000000000, 0.0573750000000000, 0.3251250000000000, 0.6141249999999999);
         Eigen::Vector4d expected_dN(-0.0203825545637234, -0.2106197304918083, -0.4235041892684746, 0.6545064743240061);
@@ -142,7 +142,7 @@ TEST_CASE("CurvePatch: External AD Numerical Validation", "[geometry][curve]") {
 
     SECTION("Partition of Unity") {
         Eigen::MatrixXd u(1, 1); u << 0.42;
-        auto [results, jacPU] = curve.eval_shape_functions(u, std::array<Index, 1>{3}, 3);
+        auto [results, jacPU] = curve.eval_shape_functions(u, 3, 3);
 
         CHECK(results[0].row(0).sum() == Approx(1.0).margin(1e-14));
         

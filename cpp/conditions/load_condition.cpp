@@ -74,7 +74,7 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
         auto [mapped_pts, mapped_weights] = tensor_product_mapped<T, d>(q_rules, u_a, u_b);
         
         // Evaluate span-local basis functions and Jacobian
-        auto [shape_derivs, jacobian] = patch.eval_shape_functions(mapped_pts, span_indices, 0);
+        auto [shape_derivs, jacobian] = patch.eval_shape_functions(mapped_pts, elem_idx, 0);
         const auto& shape_funcs = shape_derivs[0];
         
         // Extract load values for this element's quadrature points

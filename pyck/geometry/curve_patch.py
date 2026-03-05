@@ -105,6 +105,51 @@ class CurvePatch:
         cpp_bp = self._cpp_object.boundary(0, at_start)
         return BoundaryPatch(cpp_bp, parent=self)
 
+    def eval_geometry(self, u: npt.ArrayLike) -> npt.NDArray[np.float64]:
+        """Evaluate curve coordinates at given parametric values.
+
+        Uses De Boor's algorithm for pure geometric evaluation
+        (no derivatives).
+
+        Parameters
+        ----------
+        u : array_like, shape (Q,)
+            Parametric values at which to evaluate.
+
+        Returns
+        -------
+        ndarray, shape (Q, 3)
+            Physical coordinates.
+        """
+        u = np.atleast_1d(np.asarray(u, dtype=np.float64))
+        degree = self._basis.degree
+        kv_cpp = self._basis.knot_vector._cpp_object
+        coords = np.empty((len(u), 3), dtype=np.float64)
+
+        for i, ui in enumerate(u):
+            span = kv_cpp.find_span(degree, float(ui))
+            pt = np.array([[ui]], dtype=np.float64)
+            coords[i, :] = self._cpp_object.eval_geometry(pt, span)[0, :]
+
+        return coords
+
+    def evaluate(self, n_points: int = 200) -> npt.NDArray[np.float64]:
+        """Evaluate the curve at uniformly spaced parametric points.
+
+        Parameters
+        ----------
+        n_points : int, optional
+            Number of evaluation points (default 200).
+
+        Returns
+        -------
+        ndarray, shape (n_points, 3)
+            Physical coordinates along the curve.
+        """
+        knots = self._basis.knots
+        u = np.linspace(knots[0], knots[-1], n_points)
+        return self.eval_geometry(u)
+
 
 def create_curve_patch(basis: BSpline, control_pts: npt.ArrayLike, *, name: str = "patch") -> CurvePatch:
     """Create a curve patch from a basis and control points.

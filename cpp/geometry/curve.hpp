@@ -31,12 +31,12 @@ public:
      *        within a given knot span.
      * 
      * @param points Evaluation points in parametric coordinates as a (Q × 1) matrix.
-     * @param spans  Knot-span index array (single element for 1D).
+     * @param span   Knot-span index.
      * @param order The highest order of derivatives to compute.
      * @return A vector of matrices, each of size (Q, p+1).
      */
     std::vector<Matrix<T>> eval_basis_functions(const ColMatrix<T, 1>& points,
-                                                const std::array<Index, 1>& spans,
+                                                Index span,
                                                 std::size_t order = 0) const override;
     
     /**
@@ -45,27 +45,25 @@ public:
      *        with the Jacobian determinant (arc-length increment).
      * 
      * @param points Evaluation points in parametric coordinates as a (Q × 1) matrix.
-     * @param spans  Knot-span index array (single element for 1D).
+     * @param span   Knot-span index.
      * @param order  The highest order of physical derivatives to compute.
      * @return A pair of (vector of matrices each (Q, p+1), Jacobian vector of size Q).
      */          
     std::pair<std::vector<Matrix<T>>, Vector<T>>
     eval_shape_functions(const ColMatrix<T, 1>& points,
-                         const std::array<Index, 1>& spans,
+                         Index span,
                          std::size_t order = 0) const override;
 
     /**
-     * @brief Evaluate the physical curve mapping and its parametric derivatives
-     *        using only the active control points for the given knot span.
+     * @brief Evaluate the physical curve coordinates at parametric points
+     *        using De Boor's algorithm (no derivatives).
      * 
      * @param points Evaluation points in parametric coordinates as a (Q × 1) matrix.
-     * @param spans  Knot-span index array (single element for 1D).
-     * @param order The highest order of parametric derivatives to compute.
-     * @return A vector of matrices, each of size (Q, 3).
+     * @param span   Knot-span index.
+     * @return A matrix of size (Q, 3) with the physical coordinates.
      */
-    std::vector<ColMatrix<T, 3>> eval_geometry(const ColMatrix<T, 1>& points,
-                                               const std::array<Index, 1>& spans,
-                                               std::size_t order = 0) const override;
+    ColMatrix<T, 3> eval_geometry(const ColMatrix<T, 1>& points,
+                                  Index span) const override;
 
     
     /// @brief Get the basis functions for the parametric direction

@@ -43,12 +43,12 @@ public:
      * @brief Evaluate the raw basis functions and their parametric derivatives.
      * 
      * @param points Evaluation points in parametric coordinates as a (Q × d) matrix.
-     * @param spans  Per-direction knot-span indices.
+     * @param span   Knot-span index.
      * @param order The highest order of derivatives to compute.
      * @return A vector of matrices.  Each matrix has size (Q, K) where K = prod(p_i + 1).
      */
     virtual std::vector<Matrix<T>> eval_basis_functions(const ColMatrix<T, d>& points,
-                                                        const std::array<Index, d>& spans,
+                                                        Index span,
                                                         std::size_t order = 0) const = 0;
     
     /**
@@ -57,27 +57,25 @@ public:
      *        Jacobian determinant (integration measure) at each point.
      * 
      * @param points Evaluation points in parametric coordinates as a (Q × d) matrix.
-     * @param spans  Per-direction knot-span indices.
+     * @param span   Knot-span index.
      * @param order  The highest order of manifold derivatives to compute.
      * @return A pair of (vector of matrices each (Q, K), Jacobian vector of size Q).
      */          
     virtual std::pair<std::vector<Matrix<T>>, Vector<T>>
     eval_shape_functions(const ColMatrix<T, d>& points,
-                         const std::array<Index, d>& spans,
+                         Index span,
                          std::size_t order = 0) const = 0;
 
     /**
-     * @brief Evaluate the physical geometry mapping and its parametric derivatives
-     *        using only the active control points for the given knot span.
+     * @brief Evaluate the physical coordinates at parametric points
+     *        using De Boor's algorithm (no derivatives).
      * 
      * @param points Evaluation points in parametric coordinates as a (Q × d) matrix.
-     * @param spans  Per-direction knot-span indices.
-     * @param order The highest order of parametric derivatives to compute.
-     * @return A vector of matrices, each of size (Q, 3).
+     * @param span   Knot-span index.
+     * @return A matrix of size (Q, 3) with the physical coordinates.
      */
-    virtual std::vector<ColMatrix<T, 3>> eval_geometry(const ColMatrix<T, d>& points,
-                                                       const std::array<Index, d>& spans,
-                                                       std::size_t order = 0) const = 0;
+    virtual ColMatrix<T, 3> eval_geometry(const ColMatrix<T, d>& points,
+                                          Index span) const = 0;
 
     /**
      * @brief Extract the subset of control points that are active (non-zero) in

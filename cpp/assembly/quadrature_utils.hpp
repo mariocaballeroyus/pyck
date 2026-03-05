@@ -45,9 +45,8 @@ Vector<T> eval_physical_quadrature_points(
 
         auto [mapped_pts, mapped_weights] = quadrature.map_to_domain(lo, hi);
 
-        std::array<Index, 1> span_arr = {s};
-        auto geom = patch.eval_geometry(mapped_pts, span_arr, 0);
-        result.segment(out, Q) = geom[0].col(0);
+        auto geom = patch.eval_geometry(mapped_pts, s);
+        result.segment(out, Q) = geom.col(0);
         out += Q;
     }
 

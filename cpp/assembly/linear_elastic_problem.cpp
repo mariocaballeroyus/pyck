@@ -94,7 +94,7 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
         auto [mapped_pts, mapped_weights] = tensor_product_mapped<T, d>(q_rules, u_a, u_b);
         
         // Gather element contributions (span-local stiffness)
-        element_->compute_local_stiffness(*patch_, mapped_pts, mapped_weights, span_indices, Ke);
+        element_->compute_local_stiffness(*patch_, mapped_pts, mapped_weights, elem_idx, Ke);
 
         // Scatter local stiffness into global matrix
         auto elem_dofs = mapper.get_element_dofs(elem_idx);

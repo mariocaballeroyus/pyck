@@ -25,7 +25,7 @@ public:
     virtual void compute_local_stiffness(const Patch<T, d>& patch,
                                          const ColMatrix<T, d>& q_points,
                                          const Vector<T>& q_weights,
-                                         const std::array<Index, d>& spans,
+                                         Index span,
                                          Matrix<T>& stiffness) const = 0;
 
 };

@@ -90,8 +90,7 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load", "[assembly][eul
     ColMatrix<double, 1> param(1);
     param(0) = 0.5;
     Index span = basis->find_span(0.5);
-    std::array<Index, 1> spans = {span};
-    auto [sf, jac_eval] = curve->eval_shape_functions(param, spans, 0);
+    auto [sf, jac_eval] = curve->eval_shape_functions(param, span, 0);
     auto& shape_funcs = sf[0];
     
     double v_num = (shape_funcs * u)(0, 0);
@@ -175,8 +174,7 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load (Cubic Approximat
     ColMatrix<double, 1> param(1);
     param(0) = 0.5;
     Index span2 = basis->find_span(0.5);
-    std::array<Index, 1> spans2 = {span2};
-    auto [sf2, jac_eval2] = curve->eval_shape_functions(param, spans2, 0);
+    auto [sf2, jac_eval2] = curve->eval_shape_functions(param, span2, 0);
     auto& shape_funcs = sf2[0];
     
     // Extract active DOFs for this span
