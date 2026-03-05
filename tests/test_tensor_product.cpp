@@ -47,14 +47,14 @@ TEST_CASE("TensorProduct: partition of unity", "[basis][tensor]") {
                 bu->find_span(u_pts(p)),
                 bv->find_span(v_pts(q))
             };
-            Eigen::MatrixXd R = tp.eval(params, spans);
+            Eigen::MatrixXd R = tp.eval_on_span(params, spans, 0)[0];
             REQUIRE(R.row(0).sum() == Approx(1.0).margin(1e-12));
         }
     }
 }
 
 /**
- * Lexicographical ordering of eval_derivs.
+ * Lexicographical ordering of eval_on_span.
  */
 TEST_CASE("TensorProduct: lexicographical ordering", "[basis][tensor]") {
     std::vector<double> knots = {0, 0, 0, 1, 1, 1};
@@ -70,10 +70,10 @@ TEST_CASE("TensorProduct: lexicographical ordering", "[basis][tensor]") {
     Eigen::VectorXd u(1);
     u << 0.5;
     Index span_1d = 2;
-    auto du = bu->eval_derivs(u, span_1d, 1);  // [N_u, dN_u]
-    auto dv = bv->eval_derivs(u, span_1d, 1);  // [N_v, dN_v]
+    auto du = bu->eval_on_span(u, span_1d, 1);  // [N_u, dN_u]
+    auto dv = bv->eval_on_span(u, span_1d, 1);  // [N_v, dN_v]
 
-    auto derivs = tp.eval_derivs(params, spans, Index(1));
+    auto derivs = tp.eval_on_span(params, spans, Index(1));
     REQUIRE(derivs.size() == 4);
 
     std::size_t n_u = du[0].cols();  // p+1 = 3
@@ -123,7 +123,7 @@ TEST_CASE("TensorProduct: bilinear consistency", "[basis][tensor]") {
     std::array<Index, 2> spans = {1, 1};
     auto params = make_grid(Eigen::VectorXd::LinSpaced(7, 0.0, 1.0),
                             Eigen::VectorXd::LinSpaced(7, 0.0, 1.0));
-    Eigen::MatrixXd R = tp.eval(params, spans);  // (49 x 4)
+    Eigen::MatrixXd R = tp.eval_on_span(params, spans, 0)[0];  // (49 x 4)
 
     // Compute f(u,v) = R * ctrl and compare to analytical
     Eigen::VectorXd f_computed = R * ctrl;
@@ -154,10 +154,10 @@ TEST_CASE("TensorProduct: derivative Kronecker check", "[basis][tensor]") {
     vv << 0.7;
 
     Index span_1d = 2;
-    auto du = bu->eval_derivs(uu, span_1d, 1);
-    auto dv = bv->eval_derivs(vv, span_1d, 1);
+    auto du = bu->eval_on_span(uu, span_1d, 1);
+    auto dv = bv->eval_on_span(vv, span_1d, 1);
     
-    auto derivs = tp.eval_derivs(params, spans, Index(1));
+    auto derivs = tp.eval_on_span(params, spans, Index(1));
 
     std::size_t n_u = du[0].cols();  // p+1 = 3
     std::size_t n_v = dv[0].cols();  // p+1 = 3
@@ -199,13 +199,13 @@ TEST_CASE("TensorProduct: finite-difference derivative check", "[basis][tensor]"
         bv->find_span(0.6)
     };
 
-    auto derivs = tp.eval_derivs(params, spans, Index(1));
+    auto derivs = tp.eval_on_span(params, spans, Index(1));
 
     // ∂/∂u  (use same spans — for small h they don't change)
     Eigen::MatrixXd p_fwd(1, 2), p_bwd(1, 2);
     p_fwd << 0.4 + h, 0.6;
     p_bwd << 0.4 - h, 0.6;
-    Eigen::MatrixXd dRdu_fd = (tp.eval(p_fwd, spans) - tp.eval(p_bwd, spans)) / (2.0 * h);
+    Eigen::MatrixXd dRdu_fd = (tp.eval_on_span(p_fwd, spans, 0)[0] - tp.eval_on_span(p_bwd, spans, 0)[0]) / (2.0 * h);
 
     for (int j = 0; j < dRdu_fd.cols(); ++j)
         REQUIRE(derivs[2](0, j) == Approx(dRdu_fd(0, j)).margin(1e-5));
@@ -213,7 +213,7 @@ TEST_CASE("TensorProduct: finite-difference derivative check", "[basis][tensor]"
     // ∂/∂v
     p_fwd << 0.4, 0.6 + h;
     p_bwd << 0.4, 0.6 - h;
-    Eigen::MatrixXd dRdv_fd = (tp.eval(p_fwd, spans) - tp.eval(p_bwd, spans)) / (2.0 * h);
+    Eigen::MatrixXd dRdv_fd = (tp.eval_on_span(p_fwd, spans, 0)[0] - tp.eval_on_span(p_bwd, spans, 0)[0]) / (2.0 * h);
 
     for (int j = 0; j < dRdv_fd.cols(); ++j)
         REQUIRE(derivs[1](0, j) == Approx(dRdv_fd(0, j)).margin(1e-5));

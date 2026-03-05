@@ -38,17 +38,6 @@ public:
     // === Evaluation =================================================================
 
     /**
-     * @brief Evaluate the (p+1) non-zero basis functions at given parameter values
-     *        within a single knot span.
-     * 
-     * @param points Parameter values (all assumed to lie in knot span `span`).
-     * @param span   Knot-span index (as returned by KnotVector::find_span).
-     * @return A matrix of size (m, p+1) containing only the non-zero basis function
-     *         values.  Column k corresponds to global basis function (span - p + k).
-     */
-    virtual Matrix<T> eval(const Vector<T>& points, Index span) const = 0;
-
-    /**
      * @brief Evaluate the (p+1) non-zero basis functions and their derivatives
      *        at given parameter values within a single knot span.
      * 
@@ -58,7 +47,7 @@ public:
      * @return A vector of (order+1) matrices, each of size (m, p+1).
      *         results[k](i, j) = d^k N_{span-p+j,p} / du^k (points[i])
      */
-    virtual std::vector<Matrix<T>> eval_derivs(const Vector<T>& points,
+    virtual std::vector<Matrix<T>> eval_on_span(const Vector<T>& points,
                                                Index span,
                                                Index order = 0) const = 0;
 

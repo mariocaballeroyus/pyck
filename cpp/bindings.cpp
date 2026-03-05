@@ -27,7 +27,7 @@ PYBIND11_MODULE(_pyck, m) {
     py::class_<BasisD, pyck::Ptr<BasisD>>(m, "Basis")
         .def("degree", &BasisD::degree)
         .def("num_basis", &BasisD::num_basis)
-        .def("eval", &BasisD::eval_derivs,
+        .def("eval", &BasisD::eval_on_span,
              py::arg("u"), py::arg("span"), py::arg("order") = 0)
         .def("eval_all", &BasisD::eval_all,
              py::arg("u"), py::arg("order") = 0,
@@ -247,7 +247,7 @@ PYBIND11_MODULE(_pyck, m) {
         .def("degree", &BasisF::degree)
         .def("num_basis", &BasisF::num_basis)
         .def("find_span", &BasisF::find_span, py::arg("u"))
-        .def("eval", &BasisF::eval_derivs,
+        .def("eval", &BasisF::eval_on_span,
              py::arg("u"), py::arg("span"), py::arg("order") = 0);
 
     using KnotVectorF = pyck::KnotVector<float>;

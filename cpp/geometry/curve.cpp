@@ -39,7 +39,7 @@ std::vector<Matrix<T>> CurvePatch<T>::eval_basis_functions(const ColMatrix<T, 1>
                                                            const std::array<Index, 1>& spans,
                                                            Index order) const
 {
-    return tensor_product_.eval_derivs(points, spans, order);
+    return tensor_product_.eval_on_span(points, spans, order);
 }
 
 template <std::floating_point T>
@@ -51,7 +51,7 @@ std::pair<std::vector<Matrix<T>>, Vector<T>> CurvePatch<T>::eval_shape_functions
     order = std::max(Index(1), std::min(order, Index(3)));
     const Index Q = points.rows();
 
-    auto basis_derivs = tensor_product_.eval_derivs(points, spans, order);
+    auto basis_derivs = tensor_product_.eval_on_span(points, spans, order);
     const Index K = basis_derivs[0].cols();
 
     auto act_pts = this->active_control_pts(spans);
@@ -102,7 +102,7 @@ std::vector<ColMatrix<T, 3>> CurvePatch<T>::eval_geometry(const ColMatrix<T, 1>&
                                                           const std::array<Index, 1>& spans,
                                                           Index order) const
 {
-    auto basis_derivs = tensor_product_.eval_derivs(points, spans, order);
+    auto basis_derivs = tensor_product_.eval_on_span(points, spans, order);
     auto act_pts = this->active_control_pts(spans);
 
     std::vector<ColMatrix<T, 3>> result(order + 1);

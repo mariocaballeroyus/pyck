@@ -6,6 +6,61 @@
 
 using namespace pyck;
 
+namespace {
+
+/**
+ * Naive Cox-de Boor recursion for a single basis function N_{i,p}(u).
+ * This is used ONLY for verification of any optimized implementations.
+ */
+template <typename T>
+T naive_cox_de_boor(T u, int i, int p, const KnotVector<T>& knots) {
+    if (p == 0) {
+        if (u >= knots[i] && u < knots[i + 1]) return 1.0;
+        // Last point convention: if u is exactly the upper bound of the last non-empty span
+        if (u == knots.back()) {
+            // Find the last span that is actually non-empty
+            std::size_t last_span = knots.size() - 2;
+            while (last_span > 0 && knots[last_span] == knots[last_span + 1]) last_span--;
+            if (i == static_cast<int>(last_span)) return 1.0;
+        }
+        return 0.0;
+    }
+    T left = 0.0;
+    T den1 = knots[i + p] - knots[i];
+    if (std::abs(den1) > 1e-15)
+        left = (u - knots[i]) / den1 * naive_cox_de_boor(u, i, p - 1, knots);
+
+    T right = 0.0;
+    T den2 = knots[i + p + 1] - knots[i + 1];
+    if (std::abs(den2) > 1e-15)
+        right = (knots[i + p + 1] - u) / den2 * naive_cox_de_boor(u, i + 1, p - 1, knots);
+
+    return left + right;
+}
+
+/**
+ * Naive Cox-de Boor recursion for the k-th derivative of N_{i,p}(u).
+ */
+template <typename T>
+T naive_cox_de_boor_deriv(T u, int i, int p, int k, const KnotVector<T>& knots) {
+    if (k == 0) return naive_cox_de_boor(u, i, p, knots);
+    if (p < k) return 0.0;
+
+    T left = 0.0;
+    T den1 = knots[i + p] - knots[i];
+    if (std::abs(den1) > 1e-15)
+        left = static_cast<T>(p) / den1 * naive_cox_de_boor_deriv(u, i, p - 1, k - 1, knots);
+
+    T right = 0.0;
+    T den2 = knots[i + p + 1] - knots[i + 1];
+    if (std::abs(den2) > 1e-15)
+        right = static_cast<T>(p) / den2 * naive_cox_de_boor_deriv(u, i + 1, p - 1, k - 1, knots);
+
+    return left - right;
+}
+
+} // namespace
+
 /**
  * Partition of unity.
  *
@@ -26,7 +81,7 @@ TEST_CASE("BSpline: partition of unity", "[basis][bspline]") {
             Eigen::VectorXd pt(1);
             pt << u(i);
             auto span = bs.find_span(u(i));
-            auto N = bs.eval(pt, span);
+            auto N = bs.eval_on_span(pt, span, 0)[0];
             REQUIRE(N.row(0).sum() == Approx(1.0).margin(1e-12));
         }
     }
@@ -48,7 +103,7 @@ TEST_CASE("BSpline: non-negativity", "[basis][bspline]") {
         Eigen::VectorXd pt(1);
         pt << u(i);
         auto span = bs.find_span(u(i));
-        auto N = bs.eval(pt, span);
+        auto N = bs.eval_on_span(pt, span, 0)[0];
         for (int j = 0; j < N.cols(); ++j)
             REQUIRE(N(0, j) >= -1e-15);
     }
@@ -79,7 +134,7 @@ TEST_CASE("BSpline: local support", "[basis][bspline]") {
         Eigen::VectorXd pt(1);
         pt << u(i);
         auto span = bs.find_span(u(i));
-        auto N_local = bs.eval(pt, span);
+        auto N_local = bs.eval_on_span(pt, span, 0)[0];
         for (int j = 0; j <= 2; ++j) {
             int global = static_cast<int>(span) - 2 + j;
             if (global >= 0 && global < static_cast<int>(n))
@@ -119,7 +174,7 @@ TEST_CASE("BSpline: derivative sum to zero", "[basis][bspline]") {
         Eigen::VectorXd pt(1);
         pt << u(i);
         auto span = bs.find_span(u(i));
-        auto derivs = bs.eval_derivs(pt, span, 2);
+        auto derivs = bs.eval_on_span(pt, span, 2);
         for (int k = 1; k <= 2; ++k)
             REQUIRE(derivs[k].row(0).sum() == Approx(0.0).margin(1e-10));
     }
@@ -153,8 +208,8 @@ TEST_CASE("BSpline: C-continuity at internal knot", "[basis][bspline]") {
     auto span_right = bs.find_span(xi + eps);
 
     // Evaluate up to 3rd derivative on both sides
-    auto left  = bs.eval_derivs(u_left,  span_left,  3);
-    auto right = bs.eval_derivs(u_right, span_right, 3);
+    auto left  = bs.eval_on_span(u_left,  span_left,  3);
+    auto right = bs.eval_on_span(u_right, span_right, 3);
 
     // Reconstruct full basis vectors and compare overlapping functions
     // Orders 0, 1, 2 must be continuous (C^2 for a simple knot with p=3)
@@ -194,7 +249,7 @@ TEST_CASE("BSpline: analytical values", "[basis][bspline]") {
         KnotVector kv_1({0, 0, 1, 1});
         BSpline<double> bs(1, kv_1);
         auto span = bs.find_span(0.5);
-        auto N = bs.eval(u, span);
+        auto N = bs.eval_on_span(u, span, 0)[0];
 
         for (int i = 0; i < 5; ++i) {
             REQUIRE(N(i, 0) == Approx(1.0 - u(i)).margin(1e-14));
@@ -206,7 +261,7 @@ TEST_CASE("BSpline: analytical values", "[basis][bspline]") {
         KnotVector kv_2({0, 0, 0, 1, 1, 1});
         BSpline<double> bs(2, kv_2);
         auto span = bs.find_span(0.5);
-        auto N = bs.eval(u, span);
+        auto N = bs.eval_on_span(u, span, 0)[0];
 
         for (int i = 0; i < 5; ++i) {
             double t = u(i);
@@ -238,7 +293,7 @@ TEST_CASE("BSpline: analytical derivatives", "[basis][bspline]") {
         KnotVector kv_1({0, 0, 1, 1});
         BSpline<double> bs(1, kv_1);
         auto span = bs.find_span(0.5);
-        auto dN = bs.eval_derivs(u, span, 1)[1];
+        auto dN = bs.eval_on_span(u, span, 1)[1];
 
         for (int i = 0; i < 3; ++i) {
             REQUIRE(dN(i, 0) == Approx(-1.0).margin(1e-12));
@@ -250,7 +305,7 @@ TEST_CASE("BSpline: analytical derivatives", "[basis][bspline]") {
         KnotVector kv_2({0, 0, 0, 1, 1, 1});
         BSpline<double> bs(2, kv_2);
         auto span = bs.find_span(0.5);
-        auto dN = bs.eval_derivs(u, span, 1)[1];
+        auto dN = bs.eval_on_span(u, span, 1)[1];
 
         for (int i = 0; i < 3; ++i) {
             double t = u(i);
@@ -264,7 +319,7 @@ TEST_CASE("BSpline: analytical derivatives", "[basis][bspline]") {
         KnotVector kv_2({0, 0, 0, 1, 1, 1});
         BSpline<double> bs(2, kv_2);
         auto span = bs.find_span(0.5);
-        auto d2N = bs.eval_derivs(u, span, 2)[2];
+        auto d2N = bs.eval_on_span(u, span, 2)[2];
 
         for (int i = 0; i < 3; ++i) {
             REQUIRE(d2N(i, 0) == Approx( 2.0).margin(1e-10));
@@ -277,7 +332,7 @@ TEST_CASE("BSpline: analytical derivatives", "[basis][bspline]") {
         KnotVector kv_2({0, 0, 0, 1, 1, 1});
         BSpline<double> bs(2, kv_2);
         auto span = bs.find_span(0.5);
-        auto d3N = bs.eval_derivs(u, span, 3)[3];
+        auto d3N = bs.eval_on_span(u, span, 3)[3];
 
         for (int i = 0; i < d3N.rows(); ++i)
             for (int j = 0; j < d3N.cols(); ++j)
@@ -314,9 +369,9 @@ TEST_CASE("BSpline: finite-difference derivative check", "[basis][bspline][deriv
         auto span_fwd = bs.find_span(u(i) + h);
         auto span_bwd = bs.find_span(u(i) - h);
 
-        auto dN_local = bs.eval_derivs(pt, span, 1)[1];
-        auto N_fwd    = bs.eval(u_fwd, span_fwd);
-        auto N_bwd    = bs.eval(u_bwd, span_bwd);
+        auto dN_local = bs.eval_on_span(pt, span, 1)[1];
+        auto N_fwd    = bs.eval_on_span(u_fwd, span_fwd, 0)[0];
+        auto N_bwd    = bs.eval_on_span(u_bwd, span_bwd, 0)[0];
 
         // Reconstruct full basis vectors for comparison
         Eigen::VectorXd dN_full      = Eigen::VectorXd::Zero(n);
@@ -334,5 +389,117 @@ TEST_CASE("BSpline: finite-difference derivative check", "[basis][bspline][deriv
         Eigen::VectorXd dN_fd = (N_fwd_full - N_bwd_full) / (2.0 * h);
         for (std::size_t j = 0; j < n; ++j)
             REQUIRE(dN_full(j) == Approx(dN_fd(j)).margin(1e-5));
+    }
+}
+
+/**
+ * BSpline: compare with naive Cox-de Boor.
+ * 
+ * We verify the optimized BSpline::eval_on_span() implementation against the
+ * standard Cox-de Boor recursion formula.
+ */
+TEST_CASE("BSpline: compare with naive Cox-de Boor", "[basis][bspline]") {
+    for (int p = 1; p <= 3; ++p) {
+        // Create a non-uniform knot vector
+        std::vector<double> knots;
+        for (int i = 0; i <= p; ++i) knots.push_back(0.0);
+        knots.push_back(0.3);
+        knots.push_back(0.7);
+        for (int i = 0; i <= p; ++i) knots.push_back(1.0);
+        
+        KnotVector kv(knots);
+        BSpline<double> bs(p, kv);
+        
+        // Points to evaluate
+        Eigen::VectorXd u = Eigen::VectorXd::LinSpaced(50, 0.0, 1.0);
+        
+        for (int i = 0; i < u.size(); ++i) {
+            double val = u(i);
+            Index span = bs.find_span(val);
+            
+            Eigen::VectorXd pt(1);
+            pt << val;
+            auto N_fast = bs.eval_on_span(pt, span, 0)[0];
+            
+            for (int k = 0; k <= p; ++k) {
+                int global_idx = static_cast<int>(span) - p + k;
+                double N_naive = naive_cox_de_boor(val, global_idx, p, kv);
+                REQUIRE(N_fast(0, k) == Approx(N_naive).margin(1e-12));
+            }
+        }
+    }
+}
+
+/**
+ * BSpline: non-clamped knot vector.
+ * 
+ * We verify that the evaluation algorithm (De Boor) works correctly
+ * even for non-clamped knot vectors (no repeated end knots).
+ * In this case, the valid domain is [xi_p, xi_{n+1}].
+ */
+TEST_CASE("BSpline: non-clamped knot vector", "[basis][bspline]") {
+    for (int p = 1; p <= 3; ++p) {
+        // Create a uniform, non-clamped knot vector: {0, 1, 2, 3, 4, 5, ...}
+        std::vector<double> knots;
+        int n = 7; // Number of basis functions
+        for (int i = 0; i < n + p + 1; ++i) {
+            knots.push_back(static_cast<double>(i));
+        }
+        
+        KnotVector kv(knots);
+        BSpline<double> bs(p, kv);
+        
+        // Valid domain is [knots[p], knots[n]]
+        double u_min = knots[p];
+        double u_max = knots[n];
+        Eigen::VectorXd u = Eigen::VectorXd::LinSpaced(50, u_min, u_max);
+        
+        for (int i = 0; i < u.size(); ++i) {
+            double val = u(i);
+            Index span = bs.find_span(val);
+            
+            Eigen::VectorXd pt(1);
+            pt << val;
+            auto N_fast = bs.eval_on_span(pt, span, 0)[0];
+            
+            for (int k = 0; k <= p; ++k) {
+                int global_idx = static_cast<int>(span) - p + k;
+                double N_naive = naive_cox_de_boor(val, global_idx, p, kv);
+                REQUIRE(N_fast(0, k) == Approx(N_naive).margin(1e-12));
+            }
+        }
+    }
+}
+
+/**
+ * BSpline: compare eval_on_span with naive.
+ * 
+ * We verify the optimized BSpline::eval_on_span() implementation against the
+ * standard Cox-de Boor derivative recursion formula.
+ */
+TEST_CASE("BSpline: compare eval_on_span with naive", "[basis][bspline][deriv]") {
+    for (int p = 1; p <= 3; ++p) {
+        auto kv = clamped_uniform_knots<double>(p, p + 5);
+        BSpline<double> bs(p, kv);
+        
+        Eigen::VectorXd u = Eigen::VectorXd::LinSpaced(20, 0.0, 1.0);
+        int max_order = p + 1;
+        
+        for (int i = 0; i < u.size(); ++i) {
+            double val = u(i);
+            Index span = bs.find_span(val);
+            
+            Eigen::VectorXd pt(1);
+            pt << val;
+            auto derivs = bs.eval_on_span(pt, span, max_order);
+            
+            for (int k = 0; k <= max_order; ++k) {
+                for (int j = 0; j <= p; ++j) {
+                    int global_idx = static_cast<int>(span) - p + j;
+                    double dN_naive = naive_cox_de_boor_deriv(val, global_idx, p, k, kv);
+                    REQUIRE(derivs[k](0, j) == Approx(dN_naive).margin(1e-10));
+                }
+            }
+        }
     }
 }

@@ -74,7 +74,7 @@
 
 2. **Lexicographical Ordering**
 
-   Verify that `eval_derivs` returns matrices in the expected order: index $= i_u \cdot (k_v + 1) + i_v$, i.e. $v$-derivatives vary fastest. Verified against manually computed Kronecker products for all four entries of order $(1,1)$.
+   Verify that `eval_on_span` returns matrices in the expected order: index $= i_u \cdot (k_v + 1) + i_v$, i.e. $v$-derivatives vary fastest. Verified against manually computed Kronecker products for all four entries of order $(1,1)$.
 
 3. **Linear Consistency (Bilinear Patch)**
 

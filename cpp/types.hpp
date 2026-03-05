@@ -32,9 +32,25 @@ using Matrix = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
 template <std::floating_point T, std::size_t Cols>
 using ColMatrix = Eigen::Matrix<T, Eigen::Dynamic, Cols>;
 
+/// @brief Dense matrix of type T with fixed number of rows and dynamic number of columns
+template <std::floating_point T, std::size_t Rows>
+using RowMatrix = Eigen::Matrix<T, Rows, Eigen::Dynamic>;
+
 /// @brief Vector of type T with a fixed compile-time size N
 template <std::floating_point T, std::size_t N>
 using StaticVector = Eigen::Vector<T, N>;
+
+/// @brief Dynamic-sized dense array of type T
+template <std::floating_point T>
+using Array = Eigen::Array<T, Eigen::Dynamic, Eigen::Dynamic>;
+
+/// @brief Dense array of type T with dynamic number of rows and fixed number of columns
+template <std::floating_point T, std::size_t Cols>
+using ColArray = Eigen::Array<T, Eigen::Dynamic, Cols>;
+
+/// @brief Dense array of type T with fixed number of rows and dynamic number of columns
+template <std::floating_point T, std::size_t Rows>
+using RowArray = Eigen::Array<T, Rows, Eigen::Dynamic>;
 
 } // namespace pyck
 

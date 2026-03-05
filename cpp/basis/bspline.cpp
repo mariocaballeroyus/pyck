@@ -1,122 +1,134 @@
 #include "bspline.hpp"
 
+#include <algorithm>
+#include <cmath>
+
 namespace pyck
 {
 
 template <std::floating_point T>
-std::vector<Matrix<T>> BSpline<T>::compute_basis_table(const Vector<T>& points,
-                                                       Index span) const
+std::vector<Matrix<T>> BSpline<T>::eval_on_span(const Vector<T>& points,
+                                                Index span,
+                                                Index order) const
 {
-    Index num_points = points.size();
+    const T eps = 1e-14;
+    const Index m = points.size();
+    const Index p = this->degree_;
+    const Index n = order;
+    const Index max_k = std::min(n, p);
+    const Index stride = p + 1;
 
-    // table[d] has (d+1) columns: the non-zero degree-d basis functions
-    // at the given span.  Column k corresponds to global index (span - d + k).
-    std::vector<Matrix<T>> table(this->degree_ + 1);
-    for (Index d = 0; d <= this->degree_; ++d) {
-        table[d] = Matrix<T>::Zero(num_points, d + 1);
-    }
+    // Preallocate output matrices up to k-th derivatives
+    std::vector<Matrix<T>> results(n + 1);
+    for (Index k = 0; k <= n; ++k)
+        results[k] = Matrix<T>::Zero(m, stride);
 
-    // 0-th degree: single non-zero function N_{span,0} = 1
-    table[0].col(0).setOnes();
+    // --- Pass 1: triangle construction for basis values ---
+    // ndu_fn: Stores the triangular table of basis function values N_{i,p}(u).
+    // ndu_kd: Stores knot differences (denominators) for each degree.
 
-    // Recursive computation for degrees 1 .. p (vectorised over all points)
-    for (Index d = 1; d <= this->degree_; ++d) {
-        for (Index k = 0; k <= d; ++k) {
-            // Global basis function index j = span - d + k
-            Index j = span - d + k;
+    // Preallocate ndu matrices
+    Matrix<T> ndu_fn = Matrix<T>::Zero(m, stride * stride);
+    ColArray<T, 1> ndu_kd = ColArray<T, 1>::Zero(stride * stride);
 
-            // Left term:  ((u - xi_j) / (xi_{j+d} - xi_j)) * table[d-1](:, k-1)
-            if (k >= 1) 
-            {
-                T denom = this->knots_[j + d] - this->knots_[j];
-                if (denom > static_cast<T>(1e-14)) {
-                    table[d].col(k).array() +=
-                        ((points.array() - this->knots_[j]) / denom)
-                        * table[d - 1].col(k - 1).array();
-                }
-            }
+    // Helper lambdas for ndu array access
+    auto fn_col = [&](Index r, Index j) { return ndu_fn.col(r * stride + j); };
+    auto kd     = [&](Index j, Index r) -> T& { return ndu_kd[j * stride + r]; };
 
-            // Right term: ((xi_{j+d+1} - u) / (xi_{j+d+1} - xi_{j+1})) * table[d-1](:, k)
-            if (k < d) 
-            {
-                T denom = this->knots_[j + d + 1] - this->knots_[j + 1];
-                if (denom > static_cast<T>(1e-14)) {
-                    table[d].col(k).array() +=
-                        ((this->knots_[j + d + 1] - points.array()) / denom)
-                        * table[d - 1].col(k).array();
-                }
-            }
-        }
-    }
-    return table;
-}
+    // Initialize Level 0: N_{i,0}(u) = 1 if u_{i} <= u < u_{i+1}
+    //                                  0 otherwise
+    fn_col(0, 0).setOnes();
 
-template <std::floating_point T>
-Matrix<T> BSpline<T>::eval(const Vector<T>& points, Index span) const
-{
-    return std::move(compute_basis_table(points, span)[this->degree_]);
-}
+    // Precompute left and right arrays for the recursion
+    Matrix<T> left (m, stride);
+    Matrix<T> right(m, stride);
 
-template <std::floating_point T>
-std::vector<Matrix<T>> BSpline<T>::eval_derivs(const Vector<T>& points,
-                                               Index span,
-                                               Index order) const
-{
-    Index num_points = points.size();
-    Index p = this->degree_;
-
-    std::vector<Matrix<T>> results(order + 1);
-    std::vector<Matrix<T>> table = compute_basis_table(points, span);
-    results[0] = table[p]; // (m × (p+1))
-
-    // Iteratively compute derivatives
-    for (Index k = 1; k <= order; ++k)
+    // Level 1 … p: Cox–de Boor recursion
+    for (Index j = 1; j <= p; ++j)
     {
-        // Derivatives higher than the polynomial degree are strictly zero
-        if (k > p) {
-            results[k] = Matrix<T>::Zero(num_points, p + 1);
-            continue;
-        }
+        // Compute left and right span lengths for this polynomial degree
+        left .col(j).array() = points.array() - this->knots_[span + 1 - j];
+        right.col(j).array() = this->knots_[span + j] - points.array();
 
-        std::vector<Matrix<T>> next_table(p + 1);
+        // Initialize saved value for this level
+        auto saved = fn_col(j, j);
+        saved.setZero();
 
-        // Compute derivatives from degree k .. p
-        for (Index d = k; d <= p; ++d)
+        // Level 0 .. j-1: compute N_{i,j}(u) for i = span-j .. span
+        for (Index r = 0; r < j; ++r)
         {
-            // table[d-1] has d columns (local indices 0..d-1).
-            // next_table[d] has d+1 columns (local indices 0..d).
-            next_table[d] = Matrix<T>::Zero(num_points, d + 1);
+            kd(j, r) = this->knots_[span + r + 1]
+                      - this->knots_[span + r + 1 - j];
 
-            for (Index kl = 0; kl <= d; ++kl)
-            {
-                // Global basis function index
-                Index j = span - d + kl;
+            const T inv = (std::abs(kd(j, r)) > eps)
+                        ? T(1) / kd(j, r)
+                        : T(0);
 
-                // Left term:  d / denom * table[d-1].col(kl-1)
-                if (kl >= 1) 
-                {
-                    T denom = this->knots_[j + d] - this->knots_[j];
-                    if (denom > static_cast<T>(1e-14)) {
-                        next_table[d].col(kl) += (static_cast<T>(d) / denom) *
-                                                  table[d - 1].col(kl - 1);
-                    }
-                }
+            auto prev = fn_col(r, j - 1);
+            auto dest = fn_col(r, j);
 
-                // Right term: -d / denom * table[d-1].col(kl)
-                if (kl < d) 
-                {
-                    T denom = this->knots_[j + d + 1] - this->knots_[j + 1];
-                    if (denom > static_cast<T>(1e-14)) {
-                        next_table[d].col(kl) -= (static_cast<T>(d) / denom) *
-                                                  table[d - 1].col(kl);
-                    }
-                }
-            }
+            dest.noalias()  = saved + right.col(r + 1).cwiseProduct(prev) * inv;
+            saved.noalias() = left.col(j - r).cwiseProduct(prev) * inv;
         }
-
-        table = std::move(next_table);
-        results[k] = table[p]; // (m, (p+1))
     }
+
+    // Load degree-p basis values
+    for (Index j = 0; j <= p; ++j)
+        results[0].col(j) = fn_col(j, p);
+
+    // --- Pass 2: derivatives ---
+
+    // Level 0 .. p: compute derivatives of N_{i,j}(u)
+    for (Index r = 0; r <= p; ++r)
+    {
+        RowArray<T, 2> a = RowArray<T, 2>::Zero(2, stride);
+        Index s1 = 0, s2 = 1;
+        a(0, 0) = T(1);
+
+        // Level 1 .. max_k: compute derivatives of N_{i,j}^{(k)}(u)
+        for (Index k = 1; k <= max_k; ++k)
+        {
+            int rk = static_cast<int>(r) - static_cast<int>(k);
+            int pk = static_cast<int>(p) - static_cast<int>(k);
+
+            auto d = results[k].col(r);
+            d.setZero();
+
+            if (r >= k)
+            {
+                a(s2, 0) = a(s1, 0) / kd(pk + 1, rk);
+                d.array() += a(s2, 0) * fn_col(rk, pk).array();
+            }
+
+            int j1 = (rk >= -1) ? 1 : -rk;
+            int j2 = (static_cast<int>(r) - 1 <= pk)
+                   ? static_cast<int>(k) - 1
+                   : static_cast<int>(p) - static_cast<int>(r);
+
+            for (int j = j1; j <= j2; ++j)
+            {
+                a(s2, j) = (a(s1, j) - a(s1, j - 1)) / kd(pk + 1, rk + j);
+                d.array() += a(s2, j) * fn_col(rk + j, pk).array();
+            }
+
+            if (static_cast<int>(r) <= pk)
+            {
+                a(s2, k) = -a(s1, k - 1) / kd(pk + 1, r);
+                d.array() += a(s2, k) * fn_col(r, pk).array();
+            }
+
+            std::swap(s1, s2);
+        }
+    }
+
+    // Multiply through by the correct factors p!/(p-k)!
+    T r_factor = static_cast<T>(p);
+    for (Index k = 1; k <= max_k; ++k)
+    {
+        results[k] *= r_factor;
+        r_factor *= static_cast<T>(p - k);
+    }
+
     return results;
 }
 
@@ -124,102 +136,116 @@ template <std::floating_point T>
 std::vector<Matrix<T>> BSpline<T>::eval_all(const Vector<T>& points,
                                             Index order) const
 {
-    Index m = points.size();
-    Index n = this->num_basis();
-    Index p = this->degree_;
+    const T eps = T(1e-15);
+    const Index m = points.size();
+    const Index n = this->num_basis();
+    const Index p = this->degree_;
+    const Index num_knots = this->knots_.size();
 
+    // Preallocate output matrices up to k-th derivatives
     std::vector<Matrix<T>> results(order + 1);
-    for (Index k = 0; k <= order; ++k) {
+    for (Index k = 0; k <= order; ++k)
         results[k] = Matrix<T>::Zero(m, n);
-    }
 
-    // Sort points into spans to use the efficient span-local evaluators
-    for (Index i = 0; i < m; ++i)
+    for (Index pt = 0; pt < m; ++pt)
     {
-        T u = points[i];
-        
-        // Find the true span, ignoring clamped bounds for eval_all 
-        // which might evaluate points outside [u_p, u_{n+1}]
-        Index span;
-        Index num_knots = this->knots_.size();
-        
-        // Handle u < u_0 or u >= u_last
-        if (u < this->knots_[0] || u >= this->knots_.back()) {
-            if (u == this->knots_.back()) {
-                span = num_knots - 2;
-                while (span > 0 && this->knots_[span] == this->knots_[span + 1]) {
-                    span--;
-                }
-            } else {
-                continue; // Outside absolute domain, evaluates to 0
-            }
-        } else {
-            auto it = std::upper_bound(this->knots_.begin(), this->knots_.end(), u);
-            span = static_cast<Index>(std::distance(this->knots_.begin(), it) - 1);
+        const T u = points[pt];
+        const Index n_0 = num_knots - 1;
+
+        // Preallocate table for level 0
+        std::vector<ColArray<T, 1>> table(p + 1);
+        table[0].resize(n_0);
+        table[0].setZero();
+
+        // Initialize table for level 0
+        // N_{i,0}(u) = 1 if u_{i} <= u < u_{i+1}
+        //              0 otherwise
+        for (Index i = 0; i < n_0; ++i)
+        {
+            if (u >= this->knots_[i] && u < this->knots_[i + 1])
+                table[0][i] = T(1);
+            // Include right boundary of the last non-zero span
+            else if (u == this->knots_[num_knots - 1]
+                     && this->knots_[i] < this->knots_[i + 1]
+                     && this->knots_[i + 1] == u)
+                table[0][i] = T(1);
         }
 
-        Vector<T> pt(1); pt[0] = u;
-        
-        if (span >= p && span <= num_knots - p - 2) 
+        // Levels 1 … p: Cox–de Boor recursion
+        //
+        // N_{i,j}(u) = (u - u_i) / (u_{i+j} - u_i) N_{i,j-1}(u)
+        //            + (u_{i+j+1} - u) / (u_{i+j+1} - u_{i+1}) N_{i+1,j-1}(u)
+        for (Index j = 1; j <= p; ++j)
         {
-            // Safe to use efficient span-local evaluator
-            auto deriv_vals = this->eval_derivs(pt, span, order);
-            for (Index k = 0; k <= order; ++k)
+            // Preallocate table for level j
+            const Index n_j = num_knots - j - 1;
+            table[j].resize(n_j);
+            table[j].setZero();
+
+            for (Index i = 0; i < n_j; ++i)
             {
-                for (Index j = 0; j <= p; ++j)
-                {
-                    results[k](i, span - p + j) = deriv_vals[k](0, j);
-                }
+                const T d_left  = this->knots_[i + j]     - this->knots_[i];
+                const T d_right = this->knots_[i + j + 1] - this->knots_[i + 1];
+
+                if (std::abs(d_left) > eps)
+                    table[j][i] += (u - this->knots_[i]) / d_left * table[j - 1][i];
+
+                if (std::abs(d_right) > eps)
+                    table[j][i] += (this->knots_[i + j + 1] - u) / d_right * table[j - 1][i + 1];
             }
-        } 
-        else 
-        {           
-            for (Index basis_idx = 0; basis_idx < n; ++basis_idx) 
+        }
+
+        // 0th derivative: degree-p basis values
+        for (Index i = 0; i < n; ++i)
+            results[0](pt, i) = table[p][i];
+
+        const Index max_k = std::min(order, p);
+
+        // Derivatives via α-coefficient recursion
+        // N^(k)_{i,p}(u) = p!/(p-k)! · Σ_{j=0}^{k} α_{k,j} · N_{i+j, p-k}(u)
+        //
+        // α_{0,0} = 1
+        // α_{k,0} = α_{k-1,0} / (u_{i+p-k+1} - u_i)
+        // α_{k,j} = (α_{k-1,j} - α_{k-1,j-1}) / (u_{i+j+p-k+1} - u_{i+j})
+        // α_{k,k} = -α_{k-1,k-1} / (u_{i+p+1} - u_{i+k})
+        for (Index i = 0; i < n; ++i)
+        {
+            ColArray<T, 1> alpha_prev(1);
+            alpha_prev(0) = T(1);         // α_{0,·}
+            T factor = static_cast<T>(p); // running product p!/(p-k)!
+
+            for (Index k = 1; k <= max_k; ++k)
             {
-                // Determine if u is in the support [u_i, u_{i+p+1})
-                if (u < this->knots_[basis_idx] || u >= this->knots_[basis_idx + p + 1]) {
-                    if (u != this->knots_.back() || basis_idx != n - 1) {
-                        continue;
-                    }
+                ColArray<T, 1> alpha = ColArray<T, 1>::Zero(k + 1);
+
+                // α_{k,0}
+                T d = this->knots_[i + p - k + 1] - this->knots_[i];
+                alpha[0] = (std::abs(d) > eps)
+                         ? alpha_prev[0] / d : T(0);
+
+                // α_{k,j}  for j = 1 … k-1
+                for (Index j = 1; j < k; ++j)
+                {
+                    d = this->knots_[i + j + p - k + 1] - this->knots_[i + j];
+                    alpha[j] = (std::abs(d) > eps)
+                             ? (alpha_prev[j] - alpha_prev[j - 1]) / d : T(0);
                 }
-                
-                if (order == 0) {
-                    // Recursive array
-                    std::vector<T> N(p + 1, 0.0);
-                    // Base case degree 0
-                    for (Index j = 0; j <= p; ++j) 
-                    {
-                        Index knot_idx = basis_idx + j;
-                        if (u >= this->knots_[knot_idx] && u < this->knots_[knot_idx + 1]) {
-                            N[j] = 1.0;
-                        } else if (u == this->knots_.back() && u == this->knots_[knot_idx + 1] && knot_idx + 1 == num_knots - 1) {
-                            N[j] = 1.0; // Last point inclusion
-                        }
-                    }
-                    
-                    // Degree 1 to degree p
-                    for (Index d = 1; d <= p; ++d) 
-                    {
-                        for (Index j = 0; j <= p - d; ++j) 
-                        {
-                            Index knot_idx = basis_idx + j;
-                            T left = 0.0, right = 0.0;
-                            
-                            T denom_left = this->knots_[knot_idx + d] - this->knots_[knot_idx];
-                            if (denom_left > 1e-14) {
-                                left = (u - this->knots_[knot_idx]) / denom_left * N[j];
-                            }
-                            
-                            T denom_right = this->knots_[knot_idx + d + 1] - this->knots_[knot_idx + 1];
-                            if (denom_right > 1e-14) {
-                                right = (this->knots_[knot_idx + d + 1] - u) / denom_right * N[j + 1];
-                            }
-                            
-                            N[j] = left + right;
-                        }
-                    }
-                    results[0](i, basis_idx) = N[0];
-                }
+
+                // α_{k,k}
+                d = this->knots_[i + p + 1] - this->knots_[i + k];
+                alpha[k] = (std::abs(d) > eps)
+                         ? -alpha_prev[k - 1] / d : T(0);
+
+                // Assemble: N^(k)_{i,p}(u) = factor · Σ_j α_{k,j} · table[p-k][i+j]
+                T val = T(0);
+                for (Index j = 0; j <= k; ++j)
+                    val += alpha[j] * table[p - k][i + j];
+
+                results[k](pt, i) = factor * val;
+
+                alpha_prev = std::move(alpha);
+                if (k < max_k)
+                    factor *= static_cast<T>(p - k);
             }
         }
     }

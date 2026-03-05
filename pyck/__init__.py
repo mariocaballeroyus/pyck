@@ -31,7 +31,16 @@ from pyck.assembly import (
     create_gauss_legendre,
     create_linear_elastic_problem,
 )
-from pyck.io import basis_plot, plot_basis_functions, plot_knots, plot_partition_of_unity
+from pyck.io import (
+    basis_plot,
+    highlight_incomplete_support,
+    plot_basis,
+    plot_basis_functions,
+    plot_basis_derivatives,
+    plot_knots,
+    plot_knot_markers,
+    plot_partition_of_unity,
+)
 from pyck.solver import solve
 import pyck.solver as solver
 
@@ -64,9 +73,13 @@ __all__ = [
     "create_gauss_legendre",
     "create_linear_elastic_problem",
     "basis_plot",
+    "plot_basis",
     "plot_basis_functions",
+    "plot_basis_derivatives",
     "plot_knots",
+    "plot_knot_markers",
     "plot_partition_of_unity",
+    "highlight_incomplete_support",
     "solve",
     "solver",
 ]

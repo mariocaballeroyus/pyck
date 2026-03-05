@@ -25,8 +25,6 @@ class TensorProduct
 {
 public:
 
-    // === Constructors ===============================================================
-
     /**
      * @brief Construct a tensor product basis from an array of 1D basis pointers
      * 
@@ -49,20 +47,6 @@ public:
                   Ptr<const Basis<T>> b2)
     requires (d == 3);
 
-    // === Evaluation =================================================================
-
-    /**
-     * @brief Evaluate the non-zero tensor-product basis functions within a given
-     *        multi-dimensional knot span.
-     *
-     * @param params A matrix of (m × d) parametric coordinates (all in the same span).
-     * @param spans  Per-direction knot-span indices.
-     * @return A matrix of size (m × K) where K = prod(p_i + 1).  The column ordering
-     *         follows the same tensor-product layout as the 1D bases.
-     */
-    Matrix<T> eval(const Matrix<T>& params,
-                   const std::array<Index, d>& spans) const;
-
     /**
      * @brief Evaluate non-zero basis functions and mixed partial derivatives for the
      *        tensor product space within a given multi-dimensional knot span.
@@ -72,11 +56,9 @@ public:
      * @param order  Maximum derivative order to compute (same for all directions).
      * @return A flat std::vector of matrices (one per derivative multi-index).
      */
-    std::vector<Matrix<T>> eval_derivs(const Matrix<T>& params,
+    std::vector<Matrix<T>> eval_on_span(const Matrix<T>& params,
                                        const std::array<Index, d>& spans,
                                        Index order) const;
-
-    // === Properties =================================================================
 
     /// @brief Get the parametric dimension (e.g., 2 for a surface)
     static constexpr std::size_t dim() 
