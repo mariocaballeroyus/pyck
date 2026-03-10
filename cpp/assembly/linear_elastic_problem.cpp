@@ -26,6 +26,12 @@ void LinearElasticProblem<T, d>::add_condition(const Ptr<Condition<T>>& conditio
 }
 
 template <std::floating_point T, std::size_t d>
+void LinearElasticProblem<T, d>::add_constraint(const Ptr<Constraint<T>>& constraint)
+{
+    constraints_.push_back(constraint);
+}
+
+template <std::floating_point T, std::size_t d>
 void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
 {
     if (!quadrature_) {
@@ -108,8 +114,12 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
     // Apply boundary / load conditions
     for (const auto& cond : conditions_) {
         // Evaluate the condition on K and F.
-        // Dirichlet condition will modify both; Load condition just adds to F.
         cond->apply(K, F);
+    }
+
+    // Apply exact constraints (e.g. Dirichlet, Master-Slave)
+    for (const auto& constraint : constraints_) {
+        constraint->apply(K, F);
     }
 }
 

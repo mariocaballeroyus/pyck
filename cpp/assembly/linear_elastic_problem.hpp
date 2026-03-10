@@ -9,6 +9,7 @@
 #include "basis.hpp"
 #include "element.hpp"
 #include "condition.hpp"
+#include "constraint.hpp"
 #include "quadrature.hpp"
 #include "../types.hpp"
 
@@ -54,6 +55,13 @@ public:
     void add_condition(const Ptr<Condition<T>>& condition);
 
     /**
+     * @brief Add a constraint (e.g. StrongDirichletConstraint, MasterSlaveConstraint) to the system.
+     * 
+     * @param constraint Shared pointer to the constraint.
+     */
+    void add_constraint(const Ptr<Constraint<T>>& constraint);
+
+    /**
      * @brief Assemble the global stiffness matrix K and load vector F.
      * 
      *        1. Initializes K to 0 and F to 0.
@@ -75,6 +83,8 @@ private:
     Ptr<QuadratureRule<T>> quadrature_;
 
     std::vector<Ptr<Condition<T>>> conditions_;
+
+    std::vector<Ptr<Constraint<T>>> constraints_;
 
 };
 

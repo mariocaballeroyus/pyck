@@ -12,8 +12,8 @@
 #include "quadrature.hpp"
 #include "gauss_legendre.hpp"
 #include "linear_elastic_problem.hpp"
-#include "assign_scalar.hpp"
 #include "load_condition.hpp"
+#include "strong_dirichlet_constraint.hpp"
 #include <Eigen/Dense>
 
 using namespace pyck;
@@ -70,7 +70,8 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load", "[assembly][eul
     std::vector<Index> constrained_dofs = {0, 4}; 
     std::vector<double> constrained_vals = {0.0, 0.0};
     
-    assign_scalar(constrained_dofs, constrained_vals, K, F);
+    StrongDirichletConstraint<double> dirichlet(constrained_dofs, constrained_vals);
+    dirichlet.apply(K, F);
 
     // 7. Solve Ku = F
     Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
@@ -158,7 +159,8 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load (Cubic Approximat
     std::vector<Index> constrained_dofs = {0, 4}; 
     std::vector<double> constrained_vals = {0.0, 0.0};
     
-    assign_scalar(constrained_dofs, constrained_vals, K, F);
+    StrongDirichletConstraint<double> dirichlet(constrained_dofs, constrained_vals);
+    dirichlet.apply(K, F);
 
     // 7. Solve Ku = F
     Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;

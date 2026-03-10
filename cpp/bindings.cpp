@@ -14,9 +14,6 @@
 #include "euler_bernoulli_beam_1p.hpp"
 #include "condition.hpp"
 #include "load_condition.hpp"
-#include "displacement_condition.hpp"
-#include "rotation_condition.hpp"
-#include "assign_scalar.hpp"
 #include "linear_elastic_problem.hpp"
 
 namespace py = pybind11;
@@ -202,16 +199,6 @@ PYBIND11_MODULE(_pyck, m) {
     py::class_<LC1D, CondD, pyck::Ptr<LC1D>>(m, "LoadCondition1D")
         .def(py::init<const Patch3D1D&, const QR&, const pyck::Vector<double>&>(),
              py::arg("patch"), py::arg("quadrature"), py::arg("load_values"));
-
-    using DispD = pyck::DisplacementCondition<double>;
-    py::class_<DispD, CondD, pyck::Ptr<DispD>>(m, "DisplacementCondition")
-        .def(py::init<std::vector<pyck::Index>, double>(),
-             py::arg("dofs"), py::arg("value") = 0.0);
-
-    using RotD = pyck::RotationCondition<double>;
-    py::class_<RotD, CondD, pyck::Ptr<RotD>>(m, "RotationCondition")
-        .def(py::init<std::vector<pyck::Index>, double>(),
-             py::arg("dofs"), py::arg("value") = 0.0);
 
     // === Assembly ===================================================================
 
