@@ -197,8 +197,8 @@ PYBIND11_MODULE(_pyck, m) {
 
     using LC1D = pyck::LoadCondition<double, 1>;
     py::class_<LC1D, CondD, pyck::Ptr<LC1D>>(m, "LoadCondition1D")
-        .def(py::init<const Patch3D1D&, const QR&, const pyck::Vector<double>&>(),
-             py::arg("patch"), py::arg("quadrature"), py::arg("load_values"));
+        .def(py::init<const Patch3D1D&, const Elem1D&, const QR&, const pyck::Vector<double>&>(),
+             py::arg("patch"), py::arg("element"), py::arg("quadrature"), py::arg("load_values"));
 
     // === Assembly ===================================================================
 

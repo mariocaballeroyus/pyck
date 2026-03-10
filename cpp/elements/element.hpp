@@ -28,6 +28,14 @@ public:
                                          Index span,
                                          Matrix<T>& stiffness) const = 0;
 
+    /// @brief Compute the generalized shape function matrix N.
+    /// @param shape_derivs Pre-evaluated shape functions and their derivatives.
+    virtual Matrix<T> shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const = 0;
+
+    /// @brief Compute the generalized strain-displacement matrix B.
+    /// @param shape_derivs Pre-evaluated shape functions and their derivatives.
+    virtual Matrix<T> strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const = 0;
+
 };
 
 } // namespace pyck

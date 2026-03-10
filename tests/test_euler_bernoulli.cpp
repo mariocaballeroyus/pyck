@@ -55,7 +55,7 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load", "[assembly][eul
 
     // 4. Conditions: Uniform Dist Load (1 element, 5 quad points = 5 total)
     Vector<double> load_values = Vector<double>::Constant(5, q);
-    auto load_cond = std::make_shared<LoadCondition<double, 1>>(*curve, *quad, load_values);
+    auto load_cond = std::make_shared<LoadCondition<double, 1>>(*curve, *element, *quad, load_values);
     problem.add_condition(load_cond);
 
     // 5. Assemble Global System
@@ -147,7 +147,7 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load (Cubic Approximat
 
     // 4. Conditions: Uniform Dist Load (2 elements, 4 quad points each = 8 total)
     Vector<double> load_values = Vector<double>::Constant(8, q);
-    auto load_cond = std::make_shared<LoadCondition<double, 1>>(*curve, *quad, load_values);
+    auto load_cond = std::make_shared<LoadCondition<double, 1>>(*curve, *element, *quad, load_values);
     problem.add_condition(load_cond);
 
     // 5. Assemble Global System

@@ -34,6 +34,10 @@ public:
                                  Index span,
                                  Matrix<T>& stiffness) const override;
 
+    Matrix<T> shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
+
+    Matrix<T> strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
+
 private:
 
     /// @brief Material Parameters

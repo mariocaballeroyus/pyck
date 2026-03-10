@@ -8,6 +8,7 @@
 #include "condition.hpp"
 #include "patch.hpp"
 #include "quadrature.hpp"
+#include "element.hpp"
 #include "../types.hpp"
 
 namespace pyck
@@ -22,9 +23,11 @@ class LoadCondition : public Condition<T>
 public:
     /// @brief Construct a generic load condition by numerically integrating the load values.
     /// @param patch The geometric patch over which to integrate.
+    /// @param element The generalized element providing the shape functions formulation.
     /// @param quadrature A 1D quadrature rule applied as a tensor product per element.
     /// @param load_values Pre-evaluated load values at the quadrature points.
     LoadCondition(const Patch<T, d>& patch,
+                  const Element<T, d>& element,
                   const QuadratureRule<T>& quadrature,
                   const Vector<T>& load_values);
 

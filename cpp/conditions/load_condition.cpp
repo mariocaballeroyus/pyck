@@ -7,6 +7,7 @@ namespace pyck
 
 template <std::floating_point T, std::size_t d>
 LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
+                                   const Element<T, d>& element,
                                    const QuadratureRule<T>& quadrature,
                                    const Vector<T>& load_values)
 {
@@ -75,7 +76,9 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
         
         // Evaluate span-local basis functions and Jacobian
         auto [shape_derivs, jacobian] = patch.eval_shape_functions(mapped_pts, elem_idx, 0);
-        const auto& shape_funcs = shape_derivs[0];
+        
+        // Use generalized formulation shape matrix N
+        Matrix<T> N_mat = element.shape_matrix(shape_derivs);
         
         // Extract load values for this element's quadrature points
         Vector<T> t_vals = load_values.segment(qp_offset, Q);
@@ -83,7 +86,7 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
 
         // Integrate local load: f_local = N^T * (t * |J| * w)
         Vector<T> W_J_T = mapped_weights.cwiseProduct(jacobian).cwiseProduct(t_vals);
-        Vector<T> local_load = shape_funcs.transpose() * W_J_T;
+        Vector<T> local_load = N_mat.transpose() * W_J_T;
 
         // Scatter into global load vector
         auto elem_dofs = mapper.get_element_dofs(elem_idx);
