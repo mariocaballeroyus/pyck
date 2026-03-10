@@ -12,64 +12,17 @@ from matplotlib.axes import Axes
 
 from pyck.basis.basis import Basis
 
-
-@contextmanager
-def basis_plot(
-    title: Optional[str] = None,
-    xlabel: str = "$u$",
-    ylabel: Optional[str] = None,
-    figsize: tuple[float, float] = (8, 4),
-    ax: Optional[Axes] = None,
-    grid: bool = True,
-    legend: Optional[bool] = None,
-) -> Iterator[Axes]:
-    """Context manager for setting up and tearing down a basis plot.
-
-    Parameters
-    ----------
-    title : str, optional
-        Title of the plot.
-    xlabel : str, optional
-        Label for the x-axis (default "$u$").
-    ylabel : str, optional
-        Label for the y-axis.
-    figsize : tuple, optional
-        Size of the figure (default (8, 4)).
-    ax : matplotlib.axes.Axes, optional
-        Existing axes to use. If None, a new figure and axes are created.
-    grid : bool, optional
-        Whether to show the grid (default True).
-    legend : bool, optional
-        Whether to show the legend. If None, shown if labels exist.
-    """
-    created_fig = False
-    if ax is None:
-        fig, ax = plt.subplots(figsize=figsize)
-        created_fig = True
-
-    try:
-        yield ax
-    finally:
-        if title:
-            ax.set_title(title)
-        if xlabel:
-            ax.set_xlabel(xlabel)
-        if ylabel:
-            ax.set_ylabel(ylabel)
-
-        if grid:
-            ax.grid(True, alpha=0.2)
-
-        # Only show legend if the user added labeled plots or explicitly requested it
-        show_legend = legend
-        if show_legend is None:
-            show_legend = bool(ax.get_legend_handles_labels()[0])
-
-        if show_legend:
-            ax.legend()
-
-        if created_fig:
-            plt.tight_layout()
+__all__ = [
+    "basis_plot",
+    "plot_basis",
+    "plot_basis_functions",
+    "plot_basis_function",
+    "plot_basis_derivatives",
+    "plot_knots",
+    "plot_partition_of_unity",
+    "highlight_incomplete_support",
+    "plot_knot_markers",
+]
 
 
 def plot_basis(
@@ -181,6 +134,81 @@ def plot_basis_functions(
     vals = plot_basis_obj.eval_all(u, order=0)
     ax.plot(u, vals, **kwargs)
     return ax
+
+
+def plot_basis_function(
+    basis: Basis,
+    index: int,
+    order: Optional[int] = None,
+    n_points: int = 200,
+    span: Optional[int] = None,
+    ax: Optional[Axes] = None,
+    tol: float = 1e-5,
+    fill_alpha: Optional[float] = None,
+    **kwargs: Any,
+) -> Axes:
+    """Plots a single basis function, optionally restricted to a specific knot span.
+
+    Parameters
+    ----------
+    basis : Basis
+        The basis function family to plot.
+    index : int
+        The index of the basis function to plot.
+    order : int, optional
+        Polynomial degree to plot. If None, uses basis.degree.
+    n_points : int, optional
+        Number of points for plotting (default 200).
+    span : int, optional
+        If provided, only plots the function within the specified knot span [u_span, u_{span+1}].
+    ax : matplotlib.axes.Axes, optional
+        Axes to plot on. If None, uses current axes.
+    tol : float, optional
+        Tolerance below which the function is considered zero and not plotted (default 1e-5).
+    fill_alpha : float, optional
+        Transparency for filling the area under the curve. If None, no fill is applied.
+    **kwargs : dict
+        Arguments passed to ``ax.plot()``.
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+    """
+    if ax is None:
+        ax = plt.gca()
+
+    p = order if order is not None else basis.degree
+
+    if p != basis.degree:
+        from pyck.basis.bspline import BSpline
+
+        eval_basis = BSpline(p, basis.knot_vector)
+    else:
+        eval_basis = basis
+
+    if span is not None:
+        u_min = eval_basis.knots[span]
+        u_max = eval_basis.knots[span + 1]
+        if abs(u_max - u_min) < 1e-12:
+            return ax  # Empty span
+        # Omit the endpoint to prevent drawing vertical "walls" at discontinuities
+        u = np.linspace(u_min, u_max, n_points, endpoint=False)
+    else:
+        u_min, u_max = eval_basis.knots[0], eval_basis.knots[-1]
+        u = np.linspace(u_min, u_max, n_points)
+
+    vals = eval_basis.eval_all(u, order=0)
+    y = vals[:, index]
+
+    # Only plot if there's any non-zero value
+    if np.max(np.abs(y)) > tol:
+        line, = ax.plot(u, y, **kwargs)
+        if fill_alpha is not None:
+            color = kwargs.get("color", line.get_color())
+            ax.fill_between(u, y, alpha=fill_alpha, color=color)
+
+    return ax
+
 
 
 def plot_basis_derivatives(
