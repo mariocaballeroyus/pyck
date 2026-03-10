@@ -43,6 +43,7 @@ def plot_curve(
     n_points: int = 200,
     ax: Optional[Axes] = None,
     show_control_points: bool = True,
+    annotate_control_points: bool = False,
     show_control_polygon: bool = True,
     show_knots: bool = False,
     curve_kwargs: Optional[dict[str, Any]] = None,
@@ -61,6 +62,8 @@ def plot_curve(
         Axes to plot on. If None, a new figure is created.
     show_control_points : bool, optional
         Whether to show control points (default True).
+    annotate_control_points : bool, optional
+        Whether to annotate control points with their indices (default False).
     show_control_polygon : bool, optional
         Whether to show the control polygon (default True).
     show_knots : bool, optional
@@ -100,6 +103,12 @@ def plot_curve(
             cpkw.update(cp_kwargs)
         ax.scatter(cpts[:, 0], cpts[:, 1], **cpkw)
 
+        if annotate_control_points:
+            color = cpkw.get("color", "#e84855")
+            for i, (x, y) in enumerate(cpts[:, :2]):
+                ax.annotate(str(i), (x, y), textcoords="offset points", xytext=(5, 5), 
+                            fontsize=8, color=color)
+
     # Knot locations on the curve
     if show_knots:
         _plot_knot_points(curve, ax)
@@ -116,6 +125,7 @@ def plot_curve_3d(
     n_points: int = 200,
     ax: Optional[Axes3D] = None,
     show_control_points: bool = True,
+    annotate_control_points: bool = False,
     show_control_polygon: bool = True,
     curve_kwargs: Optional[dict[str, Any]] = None,
     cp_kwargs: Optional[dict[str, Any]] = None,
@@ -133,6 +143,8 @@ def plot_curve_3d(
         3D axes to plot on. If None, a new figure is created.
     show_control_points : bool, optional
         Whether to show control points (default True).
+    annotate_control_points : bool, optional
+        Whether to annotate control points with their indices (default False).
     show_control_polygon : bool, optional
         Whether to show the control polygon (default True).
     curve_kwargs : dict, optional
@@ -171,6 +183,11 @@ def plot_curve_3d(
             cpkw.update(cp_kwargs)
         ax.scatter(cpts[:, 0], cpts[:, 1], cpts[:, 2], **cpkw)
 
+        if annotate_control_points:
+            color = cpkw.get("color", "#e84855")
+            for i, (x, y, z) in enumerate(cpts[:, :3]):
+                ax.text(x, y, z, str(i), fontsize=8, color=color)
+
     ax.legend()
     return ax
 
@@ -207,6 +224,48 @@ def plot_control_polygon(
 
     ax.plot(cpts[:, 0], cpts[:, 1], **kwargs)
     return ax
+
+
+def plot_control_points(
+    curve: CurvePatch,
+    ax: Optional[Axes] = None,
+    annotate: bool = False,
+    **kwargs: Any,
+) -> Axes:
+    """Plot only the control points (2D projection).
+
+    Parameters
+    ----------
+    curve : CurvePatch
+        The curve patch whose control points to plot.
+    ax : matplotlib.axes.Axes, optional
+        Axes to plot on. If None, uses current axes.
+    annotate : bool, optional
+        Whether to annotate each point with its index.
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+    """
+    if ax is None:
+        ax = plt.gca()
+
+    cpts = curve.control_points
+    kwargs.setdefault("color", "#e84855")
+    kwargs.setdefault("marker", "o")
+    kwargs.setdefault("s", 40)
+    kwargs.setdefault("zorder", 5)
+    kwargs.setdefault("label", "Control points")
+
+    ax.scatter(cpts[:, 0], cpts[:, 1], **kwargs)
+    
+    if annotate:
+        for i, (x, y) in enumerate(cpts[:, :2]):
+            ax.annotate(str(i), (x, y), textcoords="offset points", xytext=(5, 5), 
+                        fontsize=8, color=kwargs.get("color", "#e84855"))
+                        
+    return ax
+
 
 
 def _plot_knot_points(

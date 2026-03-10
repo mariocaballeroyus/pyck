@@ -21,6 +21,7 @@ __all__ = [
     "plot_partition_of_unity",
     "highlight_incomplete_support",
     "plot_knot_markers",
+    "plot_greville_abscissae",
 ]
 
 
@@ -481,3 +482,59 @@ def plot_knot_markers(
     ax.vlines(x_coords, -size / 2, size / 2, colors=color, **kwargs)
 
     return ax
+
+
+def plot_greville_abscissae(
+    basis: Basis,
+    ax: Optional[Axes] = None,
+    y: float = 0.0,
+    **kwargs: Any,
+) -> Axes:
+    """Plots markers at the Greville abscissae of the basis space.
+
+    Greville abscissae are natural parametric coordinate averages defined for
+    each basis function that are typically used as initial parameterization
+    nodes or to construct exact linear embeddings (e.g. `create_line_segment`).
+
+    Parameters
+    ----------
+    basis : Basis
+        The basis function family providing the knot space.
+    ax : matplotlib.axes.Axes, optional
+        Axes to plot on. If None, uses current axes.
+    y : float, optional
+        Y-coordinate at which to place the markers (default 0.0).
+    **kwargs : dict
+        Arguments passed to `ax.scatter()`.
+
+    Returns
+    -------
+    matplotlib.axes.Axes
+    """
+    if ax is None:
+        ax = plt.gca()
+
+    p = basis.degree
+    knots = basis.knots
+    n = len(knots) - p - 1
+
+    # Calculate Greville abscissae
+    # xi_i = 1/p * sum(u_{i+1:i+p+1}) for i = 0, ..., n-1
+    if p > 0:
+        xi = np.array([
+            np.sum(knots[i + 1 : i + p + 1]) / p for i in range(n)
+        ])
+    else:
+        # For p=0, standard abscissae logic typically falls back to the left knot
+        # or interval midpoints. We'll use the left distinct interval endpoints.
+        xi = np.array([knots[i] for i in range(n)])
+
+    kwargs.setdefault("color", "#e84855")
+    kwargs.setdefault("s", 30)
+    kwargs.setdefault("zorder", 6)
+    kwargs.setdefault("marker", "x")
+    kwargs.setdefault("label", "Greville abscissae")
+
+    ax.scatter(xi, np.full_like(xi, y), **kwargs)
+    return ax
+
