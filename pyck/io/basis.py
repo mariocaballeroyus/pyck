@@ -13,7 +13,6 @@ from matplotlib.axes import Axes
 from pyck.basis.basis import Basis
 
 __all__ = [
-    "basis_plot",
     "plot_basis",
     "plot_basis_functions",
     "plot_basis_function",

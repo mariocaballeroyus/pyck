@@ -29,11 +29,7 @@ from pyck.assembly import (
 )
 from pyck.io import (
     basis,
-    evaluate_curve,
-    plot_control_polygon,
-    plot_curve,
-    plot_curve_3d,
-    plot_knot_marks,
+    curve,
 )
 from pyck.solver import solve
 import pyck.solver as solver
@@ -63,11 +59,7 @@ __all__ = [
     "create_gauss_legendre",
     "create_linear_elastic_problem",
     "basis",
-    "evaluate_curve",
-    "plot_curve",
-    "plot_curve_3d",
-    "plot_control_polygon",
-    "plot_knot_marks",
+    "curve",
     "solve",
     "solver",
 ]
