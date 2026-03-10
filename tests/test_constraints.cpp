@@ -2,8 +2,9 @@
 #include "catch.hpp"
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
+#include <vector> // Added this include as it's used in the constructor
 
-#include "strong_dirichlet_constraint.hpp"
+#include "dirichlet_bc.hpp" // Changed from strong_dirichlet_constraint.hpp
 #include "master_slave_constraint.hpp"
 
 using namespace pyck;
@@ -16,7 +17,7 @@ TEST_CASE("StrongDirichletConstraint forces values", "[constraints]") {
     Vector<double> F(3);
     F << 1, 2, 3;
 
-    StrongDirichletConstraint<double> dirichlet_cond({0, 2}, std::vector<double>{10.0, -5.0});
+    DirichletBC<double> dirichlet_cond({0, 2}, std::vector<double>{10.0, -5.0}); // Changed StrongDirichletConstraint to DirichletBC
     dirichlet_cond.apply(K, F);
 
     // After assign_scalar:

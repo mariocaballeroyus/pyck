@@ -44,12 +44,12 @@ class GaussLegendre:
 
     @property
     def points(self) -> npt.NDArray[np.float64]:
-        """1D quadrature points on the reference element, shape ``(Q,)``."""
+        """1D quadrature points on the reference element, shape `(Q,)`."""
         return self._points_view
 
     @property
     def weights(self) -> npt.NDArray[np.float64]:
-        """1D quadrature weights, shape ``(Q,)``."""
+        """1D quadrature weights, shape `(Q,)`."""
         return self._weights_view
 
     @property
@@ -73,9 +73,9 @@ class GaussLegendre:
 
         Returns
         -------
-        points : ndarray, shape ``(Q,)``
+        points : ndarray, shape `(Q,)`
             Mapped quadrature points.
-        weights : ndarray, shape ``(Q,)``
+        weights : ndarray, shape `(Q,)`
             Mapped quadrature weights.
         """
         pts, wts = self._cpp_object.map_to_domain(lo, hi)
@@ -90,7 +90,7 @@ class GaussLegendre:
         """Form the tensor product of this rule with zero or more additional 1D rules.
 
         When called with no arguments, the result is identical to the 1D rule
-        itself (points reshaped to ``(Q, 1)``).
+        itself (points reshaped to `(Q, 1)`).
 
         Parameters
         ----------
@@ -99,9 +99,9 @@ class GaussLegendre:
 
         Returns
         -------
-        points : ndarray, shape ``(Q_total, d)``
+        points : ndarray, shape `(Q_total, d)`
             Tensor-product quadrature points.
-        weights : ndarray, shape ``(Q_total,)``
+        weights : ndarray, shape `(Q_total,)`
             Tensor-product quadrature weights.
 
         Examples

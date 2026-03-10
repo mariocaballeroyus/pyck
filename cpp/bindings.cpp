@@ -14,6 +14,9 @@
 #include "euler_bernoulli_beam_1p.hpp"
 #include "condition.hpp"
 #include "load_condition.hpp"
+#include "dirichlet_bc.hpp"
+#include "constraint.hpp"
+#include "master_slave_constraint.hpp"
 #include "linear_elastic_problem.hpp"
 
 namespace py = pybind11;
@@ -200,6 +203,30 @@ PYBIND11_MODULE(_pyck, m) {
         .def(py::init<const Patch3D1D&, const Elem1D&, const QR&, const pyck::Vector<double>&>(),
              py::arg("patch"), py::arg("element"), py::arg("quadrature"), py::arg("load_values"));
 
+    // === Constraints ================================================================
+
+    using ConstD = pyck::Constraint<double>;
+    py::class_<ConstD, pyck::Ptr<ConstD>>(m, "Constraint");
+
+    using DBC = pyck::DirichletBC<double>;
+    py::class_<DBC, pyck::Ptr<DBC>>(m, "DirichletBC")
+        .def(py::init<std::vector<pyck::Index>, std::vector<double>>(),
+             py::arg("dofs"), py::arg("values"))
+        .def(py::init<std::vector<pyck::Index>, double>(),
+             py::arg("dofs"), py::arg("value") = 0.0)
+        .def("dofs", &DBC::dofs)
+        .def("values", &DBC::values)
+        .def("apply", &DBC::apply, py::arg("stiffness"), py::arg("load"));
+
+    using MSC = pyck::MasterSlaveConstraint<double>;
+    py::class_<MSC, ConstD, pyck::Ptr<MSC>>(m, "MasterSlaveConstraint")
+        .def(py::init<std::vector<std::pair<pyck::Index, pyck::Index>>>(),
+             py::arg("master_slave_pairs"))
+        .def("pairs", &MSC::pairs)
+        .def("apply", &MSC::apply, py::arg("stiffness"), py::arg("load"));
+
+
+
     // === Assembly ===================================================================
 
     // --- Quadrature utilities ---
@@ -221,6 +248,12 @@ PYBIND11_MODULE(_pyck, m) {
              py::arg("quadrature"))
         .def("add_condition", &LEP1D::add_condition,
              py::arg("condition"))
+        .def("add_constraint", &LEP1D::add_constraint,
+             py::arg("constraint"))
+        .def("add_constraint", &LEP1D::add_dirichlet_bc,
+             py::arg("dirichlet_bc"))
+        .def("add_dirichlet_bc", &LEP1D::add_dirichlet_bc,
+             py::arg("bc"))
         .def("assemble", [](const LEP1D& p) {
             pyck::Matrix<double> K;
             pyck::Vector<double> F;

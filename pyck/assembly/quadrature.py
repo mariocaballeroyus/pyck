@@ -12,19 +12,19 @@ import numpy.typing as npt
 class QuadratureRule(Protocol):
     """Protocol for strictly one-dimensional quadrature rules.
 
-    A ``QuadratureRule`` stores 1D reference points and weights on [-1, 1].
+    A :class:`QuadratureRule` stores 1D reference points and weights on [-1, 1].
     Tensor-product methods are provided to extrapolate to surface or volume
     geometries.
     """
 
     @property
     def points(self) -> npt.NDArray[np.float64]:
-        """1D quadrature points on the reference element, shape ``(Q,)``."""
+        """1D quadrature points on the reference element, shape `(Q,)`."""
         ...
 
     @property
     def weights(self) -> npt.NDArray[np.float64]:
-        """1D quadrature weights, shape ``(Q,)``."""
+        """1D quadrature weights, shape `(Q,)`."""
         ...
 
     @property

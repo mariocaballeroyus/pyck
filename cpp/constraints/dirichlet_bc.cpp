@@ -1,25 +1,25 @@
-#include "strong_dirichlet_constraint.hpp"
+#include "dirichlet_bc.hpp"
 #include <stdexcept>
 
 namespace pyck
 {
 
 template <std::floating_point T>
-StrongDirichletConstraint<T>::StrongDirichletConstraint(std::vector<Index> dofs, std::vector<T> values)
+DirichletBC<T>::DirichletBC(std::vector<Index> dofs, std::vector<T> values)
     : dofs_(std::move(dofs)), values_(std::move(values))
 {
     if (dofs_.size() != values_.size()) {
-        throw std::invalid_argument("StrongDirichletConstraint: "
+        throw std::invalid_argument("DirichletBC: "
                                     "dofs and values must have the same size.");
     }
 }
 
 template <std::floating_point T>
-StrongDirichletConstraint<T>::StrongDirichletConstraint(std::vector<Index> dofs, T value)
+DirichletBC<T>::DirichletBC(std::vector<Index> dofs, T value)
     : dofs_(dofs), values_(dofs.size(), value) {}
 
 template <std::floating_point T>
-void StrongDirichletConstraint<T>::apply(Matrix<T>& stiffness, Vector<T>& load) const
+void DirichletBC<T>::apply(Matrix<T>& stiffness, Vector<T>& load) const
 {
     // Move the influence from the LHS to the RHS load vector
     for (std::size_t i = 0; i < dofs_.size(); ++i)
@@ -53,10 +53,10 @@ void StrongDirichletConstraint<T>::apply(Matrix<T>& stiffness, Vector<T>& load) 
 
 // === Template Instantiations ========================================================
 
-template class StrongDirichletConstraint<double>;
+template class DirichletBC<double>;
 
 #ifdef PYCK_BUILD_SINGLE_PRECISION
-template class StrongDirichletConstraint<float>;
+template class DirichletBC<float>;
 #endif
 
 } // namespace pyck

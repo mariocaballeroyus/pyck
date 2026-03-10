@@ -18,22 +18,22 @@ if TYPE_CHECKING:
 class LoadCondition:
     """Distributed load condition applied to a patch.
 
-    Wraps ``pyck::LoadCondition<double, 1>``.
+    Wraps :class:`pyck::LoadCondition<double, 1>`.
 
     The condition is *lazy*: the C++ object is built only when the condition
     is added to a :class:`~pyck.assembly.LinearElasticProblem` via
-    ``problem.add_condition()``.  At that point the problem supplies its
+    `problem.add_condition()`.  At that point the problem supplies its
     quadrature rule; the physical quadrature-point x-coordinates are computed
-    entirely in C++ (``pyck::eval_physical_quadrature_points``), the Python
+    entirely in C++ (`pyck::eval_physical_quadrature_points`), the Python
     callable is evaluated on the resulting array, and the values are forwarded
-    to the C++ ``LoadCondition``.
+    to the C++ :class:`LoadCondition`.
 
     Parameters
     ----------
     patch : CurvePatch
         Geometry patch on which the load is applied.
     load_func : callable
-        ``f(x: ndarray) -> array_like``.  Receives the physical
+        `f(x: ndarray) -> array_like`.  Receives the physical
         x-coordinates of all active quadrature points (computed in C++) and
         must return the corresponding load values.
 
@@ -57,13 +57,13 @@ class LoadCondition:
         self._load_func = load_func
         self._cpp_object = None  # built lazily in bind
 
-    def bind(self, quadrature: QuadratureRule) -> None:
+    def bind(self, quadrature: QuadratureRule, element=None) -> None:
         """Evaluate load and build the C++ LoadCondition.
 
         Called by :meth:`~pyck.assembly.LinearElasticProblem.add_condition`.
 
         The physical quadrature points are obtained from C++
-        (``_pyck.eval_physical_quadrature_points``); only the load function
+        (`_pyck.eval_physical_quadrature_points`); only the load function
         evaluation and the final scalar-to-vector conversion happen in Python.
         """
         x = np.asarray(
@@ -80,7 +80,7 @@ class LoadCondition:
         vals = np.asarray(raw, dtype=np.float64)
 
         # Handle scalar / 0-d returns from load functions (e.g. constant
-        # loads that simply ``return -1000.0``).  The C++ side expects one
+        # loads that simply `return -1000.0`).  The C++ side expects one
         # value per quadrature point.
         if vals.ndim == 0:
             vals = np.broadcast_to(vals, x.shape).copy()
@@ -89,8 +89,9 @@ class LoadCondition:
             if vals.size == 1 and x.size > 1:
                 vals = np.broadcast_to(vals, x.shape).copy()
 
+        cpp_element = element._cpp_object if element is not None else None
         self._cpp_object = _pyck.LoadCondition1D(
-            self._patch._cpp_object, quadrature._cpp_object, vals
+            self._patch._cpp_object, cpp_element, quadrature._cpp_object, vals
         )
 
     def __repr__(self) -> str:
@@ -109,7 +110,7 @@ def create_load_condition(
     patch : CurvePatch
         Geometry patch on which the load acts.
     load_func : callable
-        ``f(x: ndarray) -> array_like``.  Called with the physical
+        `f(x: ndarray) -> array_like`.  Called with the physical
         x-coordinates of the active quadrature points (a numpy array computed
         in C++) and must return the load values at those points.
 
@@ -117,7 +118,7 @@ def create_load_condition(
     -------
     LoadCondition
         A pending condition.  Finalised when passed to
-        ``problem.add_condition()``.
+        `problem.add_condition()`.
 
     Examples
     --------

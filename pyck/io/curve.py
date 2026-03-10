@@ -20,7 +20,7 @@ def evaluate_curve(
 ) -> npt.NDArray[np.float64]:
     """Evaluate a curve patch at uniformly spaced parametric points.
 
-    Uses De Boor's algorithm (via ``eval_geometry``) to compute physical
+    Uses De Boor's algorithm (via `eval_geometry`) to compute physical
     coordinates across the full parametric domain.
 
     Parameters
@@ -242,7 +242,7 @@ def plot_knot_marks(
     ax : matplotlib.axes.Axes, optional
         Axes to plot on. If None, uses current axes.
     **kwargs : dict
-        Arguments passed to ``ax.scatter()``.
+        Arguments passed to `ax.scatter()`.
 
     Returns
     -------

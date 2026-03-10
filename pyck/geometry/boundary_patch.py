@@ -55,7 +55,7 @@ class BoundaryPatch:
 
     @property
     def side(self) -> str:
-        """``'start'`` or ``'end'``."""
+        """`'start'` or `'end'`."""
         return "start" if self.at_start else "end"
 
     @property

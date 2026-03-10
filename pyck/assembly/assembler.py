@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 class LinearElasticProblem:
     """Assemble global stiffness and load from per-element contributions.
 
-    Wraps ``pyck::LinearElasticProblem<double, 1>``.
+    Wraps :class:`pyck::LinearElasticProblem<double, 1>`.
 
     A problem contains a list of named patches and a single element
     formulation shared by all patches. Quadrature rules and conditions
@@ -28,7 +28,7 @@ class LinearElasticProblem:
     Parameters
     ----------
     patches : sequence of CurvePatch
-        The geometry patches.  Each must have a unique ``name``.
+        The geometry patches.  Each must have a unique `name`.
         Currently only a single patch is supported.
     element : Element
         Finite element providing local stiffness.
@@ -79,7 +79,7 @@ class LinearElasticProblem:
     def _resolve_patch_names(self, patch: str | None) -> list[str]:
         """Return the list of patch names targeted by *patch*.
 
-        If *patch* is ``None`` the operation targets every patch.
+        If *patch* is `None` the operation targets every patch.
         """
         if patch is None:
             return list(self._patches.keys())
@@ -107,7 +107,7 @@ class LinearElasticProblem:
         quadrature : QuadratureRule
             Quadrature rule for numerical integration.
         patch : str or None
-            Name of the target patch.  If ``None`` (default), the
+            Name of the target patch.  If `None` (default), the
             quadrature is applied to every patch.
         """
         for name in self._resolve_patch_names(patch):
@@ -136,7 +136,7 @@ class LinearElasticProblem:
             A condition, e.g. :class:`~pyck.conditions.LoadCondition` or a
             Dirichlet condition.
         patch : str or None
-            Name of the target patch.  If ``None`` (default), the
+            Name of the target patch.  If `None` (default), the
             condition is added to every patch.
         """
         for name in self._resolve_patch_names(patch):
@@ -148,9 +148,29 @@ class LinearElasticProblem:
                         "no quadrature rule has been set. "
                         "Call set_quadrature() first."
                     )
-                condition.bind(quad)
+                condition.bind(quad, self._element)
             self._conditions[name].append(condition)
             self._cpp_objects[name].add_condition(condition._cpp_object)
+
+    def add_constraint(
+        self,
+        constraint,
+        *,
+        patch: str | None = None,
+    ) -> None:
+        """Register a constraint for one or all patches.
+
+        Parameters
+        ----------
+        constraint : Constraint
+            A constraint, e.g. StrongDirichletConstraint.
+        patch : str or None
+            Name of the target patch.  If `None` (default), the
+            constraint is added to every patch.
+        """
+        cpp = getattr(constraint, "_cpp_object", constraint)
+        for name in self._resolve_patch_names(patch):
+            self._cpp_objects[name].add_constraint(cpp)
 
     # ------------------------------------------------------------------
     # Assembly

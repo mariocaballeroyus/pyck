@@ -44,7 +44,7 @@ def plot_basis(
     ax : matplotlib.axes.Axes, optional
         Axes to plot on. If None, a new figure is created.
     **kwargs : dict
-        Arguments passed to ``ax.plot()``.
+        Arguments passed to `ax.plot()`.
 
     Returns
     -------
@@ -108,7 +108,7 @@ def plot_basis_functions(
     ax : matplotlib.axes.Axes, optional
         Axes to plot on. If None, uses current axes.
     **kwargs : dict
-        Arguments passed to ``ax.plot()``.
+        Arguments passed to `ax.plot()`.
 
     Returns
     -------
@@ -167,7 +167,7 @@ def plot_basis_function(
     fill_alpha : float, optional
         Transparency for filling the area under the curve. If None, no fill is applied.
     **kwargs : dict
-        Arguments passed to ``ax.plot()``.
+        Arguments passed to `ax.plot()`.
 
     Returns
     -------
@@ -233,7 +233,7 @@ def plot_basis_derivatives(
     ax : matplotlib.axes.Axes, optional
         Axes to plot on. If None, uses current axes.
     **kwargs : dict
-        Arguments passed to ``ax.plot()``.
+        Arguments passed to `ax.plot()`.
 
     Returns
     -------
@@ -285,7 +285,7 @@ def plot_knots(
     ax : matplotlib.axes.Axes, optional
         Axes to plot on. If None, uses current axes.
     **kwargs : dict
-        Arguments passed to ``ax.vlines()``.
+        Arguments passed to `ax.vlines()`.
 
     Returns
     -------
@@ -326,7 +326,7 @@ def plot_partition_of_unity(
     ax : matplotlib.axes.Axes, optional
         Axes to plot on. If None, uses current axes.
     **kwargs : dict
-        Arguments passed to ``ax.plot()``.
+        Arguments passed to `ax.plot()`.
 
     Returns
     -------
@@ -386,7 +386,7 @@ def highlight_incomplete_support(
     alpha : float, optional
         Transparency of the highlighting (default 0.1).
     **kwargs : dict
-        Arguments passed to ``ax.axvspan()``.
+        Arguments passed to `ax.axvspan()`.
 
     Returns
     -------
@@ -446,7 +446,7 @@ def plot_knot_markers(
     color : str, optional
         Color of the marks (default '#005682' - teal blue).
     **kwargs : dict
-        Arguments passed to ``ax.vlines()``.
+        Arguments passed to `ax.vlines()`.
 
     Returns
     -------

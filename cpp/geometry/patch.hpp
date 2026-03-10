@@ -6,8 +6,8 @@
 #include <memory>
 #include <Eigen/Core>
 
-#include "basis.hpp"
-#include "tensor.hpp"
+#include "../basis/basis.hpp"
+#include "../basis/tensor.hpp"
 #include "dof_mapper.hpp"
 #include "boundary_patch.hpp"
 #include "../types.hpp"

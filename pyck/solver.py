@@ -1,7 +1,7 @@
 """Simple linear solver for assembled systems.
 
 Since elements now return stiffness and load with BCs already applied,
-the solver is just a thin wrapper around ``numpy.linalg.solve``.
+the solver is just a thin wrapper around `numpy.linalg.solve`.
 """
 
 from __future__ import annotations
@@ -17,13 +17,13 @@ def solve(
     """Solve the linear system K d = f.
 
     BCs are expected to be already enforced in K and f (the element
-    handles this). This function simply calls ``numpy.linalg.solve``.
+    handles this). This function simply calls `numpy.linalg.solve`.
 
     Args:
-        K: Stiffness matrix ``(n, n)`` with BCs applied.
-        f: Load vector ``(n,)`` with BCs applied.
+        K: Stiffness matrix `(n, n)` with BCs applied.
+        f: Load vector `(n,)` with BCs applied.
 
     Returns:
-        Solution vector ``(n,)``.
+        Solution vector `(n,)`.
     """
     return np.linalg.solve(K, f)

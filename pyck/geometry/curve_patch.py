@@ -22,9 +22,9 @@ class CurvePatch:
         basis : Basis
             Univariate B-spline basis for the parametric direction.
         control_pts : ndarray, shape (n, 3)
-            Control-point coordinates. Rows must equal ``basis.num_basis``.
+            Control-point coordinates. Rows must equal `basis.num_basis`.
         name : str, optional
-            Human-readable label for the patch (default ``"patch"``).
+            Human-readable label for the patch (default `"patch"`).
         """
         if not isinstance(basis, Basis):
             raise TypeError(
@@ -69,7 +69,7 @@ class CurvePatch:
 
     @property
     def control_points(self) -> npt.NDArray[np.float64]:
-        """Control-point matrix, shape ``(n, gdim)`` — zero-copy view into C++."""
+        """Control-point matrix, shape `(n, gdim)` — zero-copy view into C++."""
         return self._cpts_view
 
     @property
@@ -91,7 +91,7 @@ class CurvePatch:
 
         Parameters
         ----------
-        side : ``"start"`` or ``"end"``
+        side : `"start"` or `"end"`
             Which end of the parametric domain.
 
         Returns
@@ -161,7 +161,7 @@ def create_curve_patch(basis: BSpline, control_pts: npt.ArrayLike, *, name: str 
     control_pts : ndarray, shape (n, 3)
         Control-point coordinates.
     name : str, optional
-        Human-readable label for the patch (default ``"patch"``).
+        Human-readable label for the patch (default `"patch"`).
 
     Returns
     -------
@@ -183,7 +183,7 @@ def create_line_segment(basis: BSpline, length: float, *, name: str = "patch") -
     length : float
         Physical length of the segment.
     name : str, optional
-        Human-readable label for the patch (default ``"patch"``).
+        Human-readable label for the patch (default `"patch"`).
 
     Returns
     -------

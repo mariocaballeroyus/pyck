@@ -1,5 +1,6 @@
 #include "linear_elastic_problem.hpp"
-#include "../basis/bspline.hpp"
+#include "bspline.hpp"
+#include "dirichlet_bc.hpp"
 
 #include <stdexcept>
 
@@ -29,6 +30,12 @@ template <std::floating_point T, std::size_t d>
 void LinearElasticProblem<T, d>::add_constraint(const Ptr<Constraint<T>>& constraint)
 {
     constraints_.push_back(constraint);
+}
+
+template <std::floating_point T, std::size_t d>
+void LinearElasticProblem<T, d>::add_dirichlet_bc(const Ptr<DirichletBC<T>>& bc)
+{
+    dirichlet_bcs_.push_back(bc);
 }
 
 template <std::floating_point T, std::size_t d>
@@ -117,9 +124,15 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
         cond->apply(K, F);
     }
 
-    // Apply exact constraints (e.g. Dirichlet, Master-Slave)
+    // Apply exact constraints (e.g. Master-Slave FIRST, Dirichlet LAST)
+    // By keeping them in separate lists, Dirichlet boundaries are guaranteed 
+    // to cleanly zero out and overwrite any scattered data from relative equations.
     for (const auto& constraint : constraints_) {
         constraint->apply(K, F);
+    }
+    
+    for (const auto& bc : dirichlet_bcs_) {
+        bc->apply(K, F);
     }
 }
 

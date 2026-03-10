@@ -1,4 +1,4 @@
-from pyck import assembly, basis, conditions, elements, geometry, io
+from pyck import assembly, basis, conditions, constraints, elements, geometry, io
 
 from pyck.basis import (
     Basis,
@@ -21,6 +21,13 @@ from pyck.conditions import (
     LoadCondition,
     create_load_condition,
 )
+from pyck.constraints import (
+    Constraint,
+    DirichletBC,
+    MasterSlaveConstraint,
+    create_displacement_constraint,
+    create_rotation_constraint,
+)
 from pyck.assembly import (
     GaussLegendre,
     LinearElasticProblem,
@@ -38,6 +45,7 @@ __all__ = [
     "assembly",
     "basis",
     "conditions",
+    "constraints",
     "elements",
     "geometry",
     "io",
@@ -54,6 +62,11 @@ __all__ = [
     "create_euler_bernoulli_beam",
     "LoadCondition",
     "create_load_condition",
+    "Constraint",
+    "DirichletBC",
+    "MasterSlaveConstraint",
+    "create_displacement_constraint",
+    "create_rotation_constraint",
     "GaussLegendre",
     "LinearElasticProblem",
     "create_gauss_legendre",

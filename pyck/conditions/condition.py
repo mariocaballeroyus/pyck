@@ -11,10 +11,10 @@ from pyck.assembly.quadrature import QuadratureRule
 class Condition(Protocol):
     """Base class for conditions constributing to the global system."""
 
-    def bind(self, quadrature: QuadratureRule) -> None:
+    def bind(self, quadrature: QuadratureRule, element=None) -> None:
         """Bind the condition to a quadrature rule and physical geometry.
 
-        This is called during assembly (e.g., by ``problem.add_condition()``)
+        This is called during assembly (e.g., by `problem.add_condition()`)
         to finalize any lazy-initialized components like load values.
         """
         pass
