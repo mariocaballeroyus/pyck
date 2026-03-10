@@ -36,6 +36,9 @@ public:
     /// @param shape_derivs Pre-evaluated shape functions and their derivatives.
     virtual Matrix<T> strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const = 0;
 
+    /// @brief Get the number of degrees of freedom per node.
+    virtual std::size_t num_dofs_per_node() const = 0;
+
 };
 
 } // namespace pyck

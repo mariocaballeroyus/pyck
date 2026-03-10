@@ -17,12 +17,13 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
     for (std::size_t i = 0; i < d; ++i) Q *= Q_1d;
 
     // Initialize the element load vector with zeros
-    std::size_t num_basis = patch.dof_mapper().num_basis()[0]; 
+    std::size_t ndof = element.num_dofs_per_node();
+    std::size_t num_nodes = patch.dof_mapper().num_basis()[0]; 
     for (std::size_t i = 1; i < d; ++i) {
-        num_basis *= patch.dof_mapper().num_basis()[i];
+        num_nodes *= patch.dof_mapper().num_basis()[i];
     }
     
-    element_load_.setZero(num_basis);
+    element_load_.setZero(num_nodes * ndof);
     
     // Determine number of intervals per dimension
     std::array<std::size_t, d> intervals;
@@ -81,17 +82,25 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
         Matrix<T> N_mat = element.shape_matrix(shape_derivs);
         
         // Extract load values for this element's quadrature points
-        Vector<T> t_vals = load_values.segment(qp_offset, Q);
+        Vector<T> t_vals = load_values.segment(qp_offset * ndof, Q * ndof);
         qp_offset += Q;
 
         // Integrate local load: f_local = N^T * (t * |J| * w)
-        Vector<T> W_J_T = mapped_weights.cwiseProduct(jacobian).cwiseProduct(t_vals);
+        Vector<T> W_J_T(Q * ndof);
+        for (std::size_t k = 0; k < Q; ++k) {
+            T scale = mapped_weights(k) * jacobian(k);
+            for (std::size_t v = 0; v < ndof; ++v) {
+                W_J_T(k * ndof + v) = t_vals(k * ndof + v) * scale;
+            }
+        }
         Vector<T> local_load = N_mat.transpose() * W_J_T;
 
         // Scatter into global load vector
-        auto elem_dofs = mapper.get_element_dofs(elem_idx);
-        for (std::size_t k = 0; k < elem_dofs.size(); ++k) {
-            element_load_(elem_dofs[k]) += local_load(k);
+        auto elem_nodes = mapper.get_element_dofs(elem_idx);
+        for (std::size_t k = 0; k < elem_nodes.size(); ++k) {
+            for (std::size_t v = 0; v < ndof; ++v) {
+                element_load_(elem_nodes[k] * ndof + v) += local_load(k * ndof + v);
+            }
         }
     }
 

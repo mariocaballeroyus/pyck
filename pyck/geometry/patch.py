@@ -24,7 +24,7 @@ class Patch(Protocol):
 
     @property
     def control_points(self) -> npt.NDArray[np.float64]:
-        """Control-point matrix, shape `(n, gdim)`.""""""
+        """Control-point matrix, shape `(n, gdim)`."""
         ...
 
     @property

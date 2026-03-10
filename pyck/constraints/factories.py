@@ -9,9 +9,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import numpy as np
+
 from pyck.constraints.dirichlet_bc import DirichletBC
 from pyck.constraints.constraint import MasterSlaveConstraint
 from pyck.elements.euler_bernoulli_beam import EulerBernoulliBeam
+from pyck.elements.timoshenko_beam_2p import TimoshenkoBeam2P
 
 if TYPE_CHECKING:
     from pyck.elements.element import Element
@@ -30,6 +33,7 @@ def create_displacement_constraint(
     *,
     at: str,
     value: float = 0.0,
+    element: Element | None = None,
 ) -> DirichletBC:
     """Create a constraint prescribing displacement at a patch boundary.
 
@@ -45,9 +49,15 @@ def create_displacement_constraint(
         Which boundary.
     value : float
         Prescribed displacement (default 0).
+    element : Element | None
+        The element formulation, used to scale DOFs if `num_dofs_per_node > 1`.
     """
     bnd = patch.boundary(_resolve_side(at))
-    return DirichletBC(bnd.displacement_dofs, value)
+    dofs = np.asarray(bnd.displacement_dofs, dtype=int)
+    if element is not None:
+        ndof = element._cpp_object.num_dofs_per_node()
+        dofs = dofs * ndof
+    return DirichletBC(dofs.tolist(), value)
 
 
 def create_rotation_constraint(
@@ -78,8 +88,11 @@ def create_rotation_constraint(
         Prescribed rotation (default 0).
     """
     bnd = patch.boundary(_resolve_side(at))
+    ndof = element._cpp_object.num_dofs_per_node()
     if isinstance(element, EulerBernoulliBeam):
         pairs = list(zip(bnd.displacement_dofs, bnd.rotation_dofs))
         return MasterSlaveConstraint(pairs)
     else:
-        return DirichletBC(bnd.rotation_dofs, value)
+        # For Timoshenko, rotation is an independent DOF at index 1 of the node
+        dofs = np.asarray(bnd.displacement_dofs, dtype=int) * ndof + 1
+        return DirichletBC(dofs.tolist(), value)

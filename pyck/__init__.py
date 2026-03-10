@@ -15,7 +15,9 @@ from pyck.geometry import (
 )
 from pyck.elements import (
     EulerBernoulliBeam,
+    TimoshenkoBeam2P,
     create_euler_bernoulli_beam,
+    create_timoshenko_beam,
 )
 from pyck.conditions import (
     LoadCondition,
@@ -59,7 +61,9 @@ __all__ = [
     "create_curve_patch",
     "create_line_segment",
     "EulerBernoulliBeam",
+    "TimoshenkoBeam2P",
     "create_euler_bernoulli_beam",
+    "create_timoshenko_beam",
     "LoadCondition",
     "create_load_condition",
     "Constraint",

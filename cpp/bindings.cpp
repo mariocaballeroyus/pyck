@@ -12,6 +12,7 @@
 #include "gauss_legendre.hpp"
 #include "element.hpp"
 #include "euler_bernoulli_beam_1p.hpp"
+#include "timoshenko_beam_2p.hpp"
 #include "condition.hpp"
 #include "load_condition.hpp"
 #include "dirichlet_bc.hpp"
@@ -186,12 +187,18 @@ PYBIND11_MODULE(_pyck, m) {
     // === Elements ===================================================================
 
     using Elem1D = pyck::Element<double, 1>;
-    py::class_<Elem1D, pyck::Ptr<Elem1D>>(m, "Element1D");
+    py::class_<Elem1D, pyck::Ptr<Elem1D>>(m, "Element1D")
+        .def("num_dofs_per_node", &Elem1D::num_dofs_per_node);
 
     using EBB = pyck::EulerBernoulliBeam1P<double>;
     py::class_<EBB, Elem1D, pyck::Ptr<EBB>>(m, "EulerBernoulliBeam1P")
         .def(py::init<double, double, double>(),
              py::arg("E"), py::arg("A"), py::arg("I"));
+
+    using TBB = pyck::TimoshenkoBeam2P<double>;
+    py::class_<TBB, Elem1D, pyck::Ptr<TBB>>(m, "TimoshenkoBeam2P")
+        .def(py::init<double, double, double, double, double>(),
+             py::arg("E"), py::arg("A"), py::arg("I"), py::arg("G"), py::arg("k") = 5.0 / 6.0);
 
     // === Conditions =================================================================
 

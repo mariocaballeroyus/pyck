@@ -49,7 +49,8 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
 
     // Determine the total number of global DOFs
     const auto& mapper = patch_->dof_mapper();
-    std::size_t global_dofs = 1;
+    std::size_t ndof = element_->num_dofs_per_node();
+    std::size_t global_dofs = ndof;
     const auto& num_basis_array = mapper.num_basis();
     for (std::size_t i = 0; i < d; ++i) {
         global_dofs *= num_basis_array[i];
@@ -110,10 +111,14 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
         element_->compute_local_stiffness(*patch_, mapped_pts, mapped_weights, elem_idx, Ke);
 
         // Scatter local stiffness into global matrix
-        auto elem_dofs = mapper.get_element_dofs(elem_idx);
-        for (std::size_t i = 0; i < elem_dofs.size(); ++i) {
-            for (std::size_t j = 0; j < elem_dofs.size(); ++j) {
-                K(elem_dofs[i], elem_dofs[j]) += Ke(i, j);
+        auto elem_nodes = mapper.get_element_dofs(elem_idx);
+        for (std::size_t i = 0; i < elem_nodes.size(); ++i) {
+            for (std::size_t j = 0; j < elem_nodes.size(); ++j) {
+                for (std::size_t di = 0; di < ndof; ++di) {
+                    for (std::size_t dj = 0; dj < ndof; ++dj) {
+                        K(elem_nodes[i] * ndof + di, elem_nodes[j] * ndof + dj) += Ke(i * ndof + di, j * ndof + dj);
+                    }
+                }
             }
         }
     }

@@ -67,6 +67,7 @@ target_link_libraries(pyck_conditions PUBLIC pyck_geometry pyck_assembly)
 # Elements library
 add_library(pyck_elements
     cpp/elements/euler_bernoulli_beam_1p.cpp
+    cpp/elements/timoshenko_beam_2p.cpp
 )
 target_include_directories(pyck_elements PUBLIC cpp/elements)
 target_link_libraries(pyck_elements PUBLIC pyck_geometry pyck_assembly)

@@ -38,6 +38,8 @@ public:
 
     Matrix<T> strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
 
+    std::size_t num_dofs_per_node() const override { return 1; }
+
 private:
 
     /// @brief Material Parameters
