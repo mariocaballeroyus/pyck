@@ -44,6 +44,7 @@ target_link_libraries(pyck_geometry PUBLIC pyck_basis)
 add_library(pyck_constraints
     cpp/constraints/dirichlet_bc.cpp
     cpp/constraints/master_slave_constraint.cpp
+    cpp/constraints/multipoint_constraint.cpp
 )
 target_include_directories(pyck_constraints PUBLIC cpp/constraints)
 target_link_libraries(pyck_constraints PUBLIC eigen)

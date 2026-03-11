@@ -6,6 +6,7 @@
 
 #include "dirichlet_bc.hpp" // Changed from strong_dirichlet_constraint.hpp
 #include "master_slave_constraint.hpp"
+#include "multipoint_constraint.hpp"
 
 using namespace pyck;
 
@@ -73,4 +74,33 @@ TEST_CASE("MasterSlaveConstraint enforces equality and preserves symmetry", "[co
 
     // slave 2 = master 0
     REQUIRE(u(2) == Approx(u(0)).margin(1e-12));
+}
+
+TEST_CASE("MultipointConstraint enforces linear combination and preserves symmetry", "[constraints]") {
+    Matrix<double> K(4, 4);
+    K << 2, -1,  0, -1,
+        -1,  3, -2,  0,
+         0, -2,  4, -1,
+        -1,  0, -1,  5;
+    Vector<double> F(4);
+    F << 10, 20, 30, 40;
+
+    // Enforce u_3 = 0.5 * u_0 + (-0.3) * u_1 + 2.0
+    // slave = 3, masters = (0, 0.5), (1, -0.3), c = 2.0
+    MultipointConstraint<double> mpc_cond(3, {{0, 0.5}, {1, -0.3}}, 2.0);
+    mpc_cond.apply(K, F);
+
+    // Check symmetry
+    for(int i=0; i<4; ++i) {
+        for(int j=0; j<4; ++j) {
+            REQUIRE(K(i, j) == Approx(K(j, i)).margin(1e-12));
+        }
+    }
+
+    // Since K was arbitrary and positive definite, let's solve it and verify the constraint holds exactly
+    Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
+    solver.compute(K.sparseView());
+    Vector<double> u = solver.solve(F);
+
+    REQUIRE(u(3) == Approx(0.5 * u(0) - 0.3 * u(1) + 2.0).margin(1e-12));
 }

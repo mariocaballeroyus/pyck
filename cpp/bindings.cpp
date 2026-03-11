@@ -18,6 +18,7 @@
 #include "dirichlet_bc.hpp"
 #include "constraint.hpp"
 #include "master_slave_constraint.hpp"
+#include "multipoint_constraint.hpp"
 #include "linear_elastic_problem.hpp"
 
 namespace py = pybind11;
@@ -232,6 +233,11 @@ PYBIND11_MODULE(_pyck, m) {
         .def("pairs", &MSC::pairs)
         .def("apply", &MSC::apply, py::arg("stiffness"), py::arg("load"));
 
+    using MPC = pyck::MultipointConstraint<double>;
+    py::class_<MPC, ConstD, pyck::Ptr<MPC>>(m, "MultipointConstraint")
+        .def(py::init<pyck::Index, std::vector<std::pair<pyck::Index, double>>, double>(),
+             py::arg("slave"), py::arg("masters_weights"), py::arg("constant") = 0.0)
+        .def("apply", &MPC::apply, py::arg("stiffness"), py::arg("load"));
 
 
     // === Assembly ===================================================================

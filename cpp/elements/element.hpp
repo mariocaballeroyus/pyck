@@ -39,6 +39,9 @@ public:
     /// @brief Get the number of degrees of freedom per node.
     virtual std::size_t num_dofs_per_node() const = 0;
 
+    /// @brief Get the minimum required derivative order for shape_matrix evaluation in LoadCondition.
+    virtual std::size_t required_shape_order() const { return 0; }
+
 };
 
 } // namespace pyck

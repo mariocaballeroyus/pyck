@@ -27,6 +27,7 @@ from pyck.constraints import (
     Constraint,
     DirichletBC,
     MasterSlaveConstraint,
+    MultipointConstraint,
     create_displacement_constraint,
     create_rotation_constraint,
 )
@@ -69,6 +70,7 @@ __all__ = [
     "Constraint",
     "DirichletBC",
     "MasterSlaveConstraint",
+    "MultipointConstraint",
     "create_displacement_constraint",
     "create_rotation_constraint",
     "GaussLegendre",
