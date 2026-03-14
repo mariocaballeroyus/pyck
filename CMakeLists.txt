@@ -42,7 +42,7 @@ target_link_libraries(pyck_geometry PUBLIC pyck_basis)
 
 # Constraints library
 add_library(pyck_constraints
-    cpp/constraints/dirichlet_bc.cpp
+    cpp/constraints/direct_constraint.cpp
     cpp/constraints/master_slave_constraint.cpp
     cpp/constraints/multipoint_constraint.cpp
 )
@@ -68,6 +68,7 @@ target_link_libraries(pyck_conditions PUBLIC pyck_geometry pyck_assembly)
 # Elements library
 add_library(pyck_elements
     cpp/elements/euler_bernoulli_beam_1p.cpp
+    cpp/elements/timoshenko_beam_1p.cpp
     cpp/elements/timoshenko_beam_2p.cpp
 )
 target_include_directories(pyck_elements PUBLIC cpp/elements)

@@ -1,6 +1,6 @@
 #include "linear_elastic_problem.hpp"
 #include "bspline.hpp"
-#include "dirichlet_bc.hpp"
+#include "direct_constraint.hpp"
 
 #include <stdexcept>
 
@@ -33,9 +33,9 @@ void LinearElasticProblem<T, d>::add_constraint(const Ptr<Constraint<T>>& constr
 }
 
 template <std::floating_point T, std::size_t d>
-void LinearElasticProblem<T, d>::add_dirichlet_bc(const Ptr<DirichletBC<T>>& bc)
+void LinearElasticProblem<T, d>::add_direct_constraint(const Ptr<DirectConstraint<T>>& constraint)
 {
-    dirichlet_bcs_.push_back(bc);
+    direct_constraints_.push_back(constraint);
 }
 
 template <std::floating_point T, std::size_t d>
@@ -136,8 +136,8 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
         constraint->apply(K, F);
     }
     
-    for (const auto& bc : dirichlet_bcs_) {
-        bc->apply(K, F);
+    for (const auto& constraint : direct_constraints_) {
+        constraint->apply(K, F);
     }
 }
 

@@ -15,9 +15,11 @@ from pyck.geometry import (
 )
 from pyck.elements import (
     EulerBernoulliBeam,
+    TimoshenkoBeam1P,
     TimoshenkoBeam2P,
     create_euler_bernoulli_beam,
     create_timoshenko_beam,
+    create_rotation_free_timoshenko_beam,
 )
 from pyck.conditions import (
     LoadCondition,
@@ -25,11 +27,11 @@ from pyck.conditions import (
 )
 from pyck.constraints import (
     Constraint,
-    DirichletBC,
+    DirectConstraint,
     MasterSlaveConstraint,
     MultipointConstraint,
-    create_displacement_constraint,
-    create_rotation_constraint,
+    create_direct_displacement_constraint,
+    create_direct_rotation_constraint,
 )
 from pyck.assembly import (
     GaussLegendre,
@@ -62,17 +64,19 @@ __all__ = [
     "create_curve_patch",
     "create_line_segment",
     "EulerBernoulliBeam",
+    "TimoshenkoBeam1P",
     "TimoshenkoBeam2P",
     "create_euler_bernoulli_beam",
     "create_timoshenko_beam",
+    "create_rotation_free_timoshenko_beam",
     "LoadCondition",
     "create_load_condition",
     "Constraint",
-    "DirichletBC",
+    "DirectConstraint",
     "MasterSlaveConstraint",
     "MultipointConstraint",
-    "create_displacement_constraint",
-    "create_rotation_constraint",
+    "create_direct_displacement_constraint",
+    "create_direct_rotation_constraint",
     "GaussLegendre",
     "LinearElasticProblem",
     "create_gauss_legendre",

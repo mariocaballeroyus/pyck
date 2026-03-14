@@ -13,7 +13,8 @@ if TYPE_CHECKING:
     from pyck.assembly.quadrature import QuadratureRule
     from pyck.conditions.condition import Condition
     from pyck.elements.element import Element
-    from pyck.geometry.curve_patch import CurvePatch
+from pyck.constraints.direct_constraint import DirectConstraint
+from pyck.geometry.curve_patch import CurvePatch
 
 
 class LinearElasticProblem:
@@ -163,14 +164,19 @@ class LinearElasticProblem:
         Parameters
         ----------
         constraint : Constraint
-            A constraint, e.g. StrongDirichletConstraint.
+            A constraint, e.g. StrongDirectConstraint.
         patch : str or None
             Name of the target patch.  If `None` (default), the
             constraint is added to every patch.
         """
-        cpp = getattr(constraint, "_cpp_object", constraint)
-        for name in self._resolve_patch_names(patch):
-            self._cpp_objects[name].add_constraint(cpp)
+        if isinstance(constraint, DirectConstraint):
+            cpp = constraint._cpp_object
+            for name in self._resolve_patch_names(patch):
+                self._cpp_objects[name].add_direct_constraint(cpp)
+        else:
+            cpp = getattr(constraint, "_cpp_object", constraint)
+            for name in self._resolve_patch_names(patch):
+                self._cpp_objects[name].add_constraint(cpp)
 
     # ------------------------------------------------------------------
     # Assembly

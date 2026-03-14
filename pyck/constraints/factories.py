@@ -1,7 +1,7 @@
 """Python factory functions for boundary constraints.
 
 These functions inspect the element formulation and return the appropriate
-low-level :class:`Constraint` object (:class:`DirichletBC` or
+low-level :class:`Constraint` object (:class:`DirectConstraint` or
 :class:`MasterSlaveConstraint`).
 """
 
@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from pyck.constraints.dirichlet_bc import DirichletBC
+from pyck.constraints.direct_constraint import DirectConstraint
 from pyck.constraints.constraint import MasterSlaveConstraint
 from pyck.elements.euler_bernoulli_beam import EulerBernoulliBeam
 from pyck.elements.timoshenko_beam_2p import TimoshenkoBeam2P
@@ -28,16 +28,16 @@ def _resolve_side(at: str) -> str:
     return side
 
 
-def create_displacement_constraint(
+def create_direct_displacement_constraint(
     patch: CurvePatch,
     *,
     at: str,
     value: float = 0.0,
     element: Element | None = None,
-) -> DirichletBC:
+) -> DirectConstraint:
     """Create a constraint prescribing displacement at a patch boundary.
 
-    Always returns a :class:`DirichletBC` regardless of element
+    Always returns a :class:`DirectConstraint` regardless of element
     formulation — displacement DOFs are treated identically for all beam
     theories.
 
@@ -57,10 +57,10 @@ def create_displacement_constraint(
     if element is not None:
         ndof = element._cpp_object.num_dofs_per_node()
         dofs = dofs * ndof
-    return DirichletBC(dofs.tolist(), value)
+    return DirectConstraint(dofs.tolist(), value)
 
 
-def create_rotation_constraint(
+def create_direct_rotation_constraint(
     patch: CurvePatch,
     *,
     element: Element,
@@ -73,7 +73,7 @@ def create_rotation_constraint(
 
     * **Euler–Bernoulli** → :class:`MasterSlaveConstraint` coupling the
       boundary and adjacent control-point DOFs.
-    * **Timoshenko** (or any other) → :class:`DirichletBC`
+    * **Timoshenko** (or any other) → :class:`DirectConstraint`
       directly prescribing the independent rotation DOFs.
 
     Parameters
@@ -95,4 +95,4 @@ def create_rotation_constraint(
     else:
         # For Timoshenko, rotation is an independent DOF at index 1 of the node
         dofs = np.asarray(bnd.displacement_dofs, dtype=int) * ndof + 1
-        return DirichletBC(dofs.tolist(), value)
+        return DirectConstraint(dofs.tolist(), value)

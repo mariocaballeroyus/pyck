@@ -4,13 +4,13 @@
 #include <Eigen/Sparse>
 #include <vector> // Added this include as it's used in the constructor
 
-#include "dirichlet_bc.hpp" // Changed from strong_dirichlet_constraint.hpp
+#include "direct_constraint.hpp"
 #include "master_slave_constraint.hpp"
 #include "multipoint_constraint.hpp"
 
 using namespace pyck;
 
-TEST_CASE("StrongDirichletConstraint forces values", "[constraints]") {
+TEST_CASE("StrongDirectConstraint forces values", "[constraints]") {
     Matrix<double> K(3, 3);
     K << 2, -1, 0,
         -1, 2, -1,
@@ -18,7 +18,7 @@ TEST_CASE("StrongDirichletConstraint forces values", "[constraints]") {
     Vector<double> F(3);
     F << 1, 2, 3;
 
-    DirichletBC<double> dirichlet_cond({0, 2}, std::vector<double>{10.0, -5.0}); // Changed StrongDirichletConstraint to DirichletBC
+    DirectConstraint<double> dirichlet_cond({0, 2}, std::vector<double>{10.0, -5.0});
     dirichlet_cond.apply(K, F);
 
     // After assign_scalar:

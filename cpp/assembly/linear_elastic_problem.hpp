@@ -9,7 +9,7 @@
 #include "basis.hpp"
 #include "element.hpp"
 #include "condition.hpp"
-#include "../constraints/dirichlet_bc.hpp"
+#include "../constraints/direct_constraint.hpp"
 #include "constraint.hpp"
 #include "quadrature.hpp"
 #include "../types.hpp"
@@ -63,11 +63,11 @@ public:
     void add_constraint(const Ptr<Constraint<T>>& constraint);
 
     /**
-     * @brief Add a strong Dirichlet boundary condition.
+     * @brief Add a strong direct boundary constraint.
      * 
-     * @param bc Shared pointer to the DirichletBC.
+     * @param constraint Shared pointer to the DirectConstraint.
      */
-    void add_dirichlet_bc(const Ptr<DirichletBC<T>>& bc);
+    void add_direct_constraint(const Ptr<DirectConstraint<T>>& constraint);
 
     /**
      * @brief Assemble the global stiffness matrix K and load vector F.
@@ -94,7 +94,7 @@ private:
 
     std::vector<Ptr<Constraint<T>>> constraints_;
 
-    std::vector<Ptr<DirichletBC<T>>> dirichlet_bcs_;
+    std::vector<Ptr<DirectConstraint<T>>> direct_constraints_;
 
 };
 

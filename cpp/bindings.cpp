@@ -12,10 +12,11 @@
 #include "gauss_legendre.hpp"
 #include "element.hpp"
 #include "euler_bernoulli_beam_1p.hpp"
+#include "timoshenko_beam_1p.hpp"
 #include "timoshenko_beam_2p.hpp"
 #include "condition.hpp"
 #include "load_condition.hpp"
-#include "dirichlet_bc.hpp"
+#include "direct_constraint.hpp"
 #include "constraint.hpp"
 #include "master_slave_constraint.hpp"
 #include "multipoint_constraint.hpp"
@@ -196,6 +197,11 @@ PYBIND11_MODULE(_pyck, m) {
         .def(py::init<double, double, double>(),
              py::arg("E"), py::arg("A"), py::arg("I"));
 
+    using TBB1P = pyck::TimoshenkoBeam1P<double>;
+    py::class_<TBB1P, Elem1D, pyck::Ptr<TBB1P>>(m, "TimoshenkoBeam1P")
+        .def(py::init<double, double, double, double, double>(),
+             py::arg("E"), py::arg("A"), py::arg("I"), py::arg("G"), py::arg("k") = 5.0 / 6.0);
+
     using TBB = pyck::TimoshenkoBeam2P<double>;
     py::class_<TBB, Elem1D, pyck::Ptr<TBB>>(m, "TimoshenkoBeam2P")
         .def(py::init<double, double, double, double, double>(),
@@ -216,15 +222,15 @@ PYBIND11_MODULE(_pyck, m) {
     using ConstD = pyck::Constraint<double>;
     py::class_<ConstD, pyck::Ptr<ConstD>>(m, "Constraint");
 
-    using DBC = pyck::DirichletBC<double>;
-    py::class_<DBC, pyck::Ptr<DBC>>(m, "DirichletBC")
+    using DC = pyck::DirectConstraint<double>;
+    py::class_<DC, ConstD, pyck::Ptr<DC>>(m, "DirectConstraint")
         .def(py::init<std::vector<pyck::Index>, std::vector<double>>(),
              py::arg("dofs"), py::arg("values"))
         .def(py::init<std::vector<pyck::Index>, double>(),
              py::arg("dofs"), py::arg("value") = 0.0)
-        .def("dofs", &DBC::dofs)
-        .def("values", &DBC::values)
-        .def("apply", &DBC::apply, py::arg("stiffness"), py::arg("load"));
+        .def("dofs", &DC::dofs)
+        .def("values", &DC::values)
+        .def("apply", &DC::apply, py::arg("stiffness"), py::arg("load"));
 
     using MSC = pyck::MasterSlaveConstraint<double>;
     py::class_<MSC, ConstD, pyck::Ptr<MSC>>(m, "MasterSlaveConstraint")
@@ -263,10 +269,10 @@ PYBIND11_MODULE(_pyck, m) {
              py::arg("condition"))
         .def("add_constraint", &LEP1D::add_constraint,
              py::arg("constraint"))
-        .def("add_constraint", &LEP1D::add_dirichlet_bc,
-             py::arg("dirichlet_bc"))
-        .def("add_dirichlet_bc", &LEP1D::add_dirichlet_bc,
-             py::arg("bc"))
+        .def("add_constraint", &LEP1D::add_direct_constraint,
+             py::arg("direct_constraint"))
+        .def("add_direct_constraint", &LEP1D::add_direct_constraint,
+             py::arg("constraint"))
         .def("assemble", [](const LEP1D& p) {
             pyck::Matrix<double> K;
             pyck::Vector<double> F;
