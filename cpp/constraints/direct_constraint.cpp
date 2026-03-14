@@ -17,7 +17,7 @@ DirectConstraint<T>::DirectConstraint(std::vector<Index> dofs,
 
 template <std::floating_point T>
 DirectConstraint<T>::DirectConstraint(std::vector<Index> dofs, 
-                                            T value)
+                                      T value)
     : dofs_(std::move(dofs)),
       values_(dofs_.size(), value) {}
 
@@ -30,8 +30,8 @@ void DirectConstraint<T>::apply(Matrix<T>& stiffness,
         Index dof = dofs_[i];
         T value = values_[i];
         
+        // Move the influence from the LHS to the RHS load vector
         if (value != T(0.0)) {
-            // Move the influence from the LHS to the RHS load vector
             // f_i = f_i - K_ij * u_j
             load.noalias() -= stiffness.col(dof) * value;
         }

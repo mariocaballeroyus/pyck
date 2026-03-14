@@ -18,8 +18,7 @@
 #include "load_condition.hpp"
 #include "direct_constraint.hpp"
 #include "constraint.hpp"
-#include "master_slave_constraint.hpp"
-#include "multipoint_constraint.hpp"
+#include "linear_constraint.hpp"
 #include "linear_elastic_problem.hpp"
 
 namespace py = pybind11;
@@ -232,18 +231,15 @@ PYBIND11_MODULE(_pyck, m) {
         .def("values", &DC::values)
         .def("apply", &DC::apply, py::arg("stiffness"), py::arg("load"));
 
-    using MSC = pyck::MasterSlaveConstraint<double>;
-    py::class_<MSC, ConstD, pyck::Ptr<MSC>>(m, "MasterSlaveConstraint")
-        .def(py::init<std::vector<std::pair<pyck::Index, pyck::Index>>>(),
-             py::arg("master_slave_pairs"))
-        .def("pairs", &MSC::pairs)
-        .def("apply", &MSC::apply, py::arg("stiffness"), py::arg("load"));
-
-    using MPC = pyck::MultipointConstraint<double>;
-    py::class_<MPC, ConstD, pyck::Ptr<MPC>>(m, "MultipointConstraint")
-        .def(py::init<pyck::Index, std::vector<std::pair<pyck::Index, double>>, double>(),
-             py::arg("slave"), py::arg("masters_weights"), py::arg("constant") = 0.0)
-        .def("apply", &MPC::apply, py::arg("stiffness"), py::arg("load"));
+    using LC = pyck::LinearConstraint<double>;
+    py::class_<LC, ConstD, pyck::Ptr<LC>>(m, "LinearConstraint")
+        .def(py::init<std::vector<pyck::Index>, pyck::IndexMatrix, std::vector<double>, double>(),
+             py::arg("slaves"), py::arg("masters"), py::arg("weights"), py::arg("constant") = 0.0)
+        .def("slaves", &LC::slaves)
+        .def("masters", &LC::masters)
+        .def("weights", &LC::weights)
+        .def("constant", &LC::constant)
+        .def("apply", &LC::apply, py::arg("stiffness"), py::arg("load"));
 
 
     // === Assembly ===================================================================

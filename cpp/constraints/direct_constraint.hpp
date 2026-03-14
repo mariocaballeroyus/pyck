@@ -12,7 +12,10 @@ namespace pyck
 {
 
 /**
- * @brief Strong enforcement of DOF values through symmetric row-column elimination.
+ * @brief Strong enforcement of prescribed DOF values: `u[dofs[i]] = values[i]`.
+ *
+ *        Applies symmetric row-column elimination to the system of equations
+ *        to enforce fixed displacement/boundary conditions.
  *
  * @tparam T Scalar floating point type
  */

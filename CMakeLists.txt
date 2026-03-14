@@ -43,8 +43,7 @@ target_link_libraries(pyck_geometry PUBLIC pyck_basis)
 # Constraints library
 add_library(pyck_constraints
     cpp/constraints/direct_constraint.cpp
-    cpp/constraints/master_slave_constraint.cpp
-    cpp/constraints/multipoint_constraint.cpp
+    cpp/constraints/linear_constraint.cpp
 )
 target_include_directories(pyck_constraints PUBLIC cpp/constraints)
 target_link_libraries(pyck_constraints PUBLIC eigen)

@@ -28,8 +28,7 @@ from pyck.conditions import (
 from pyck.constraints import (
     Constraint,
     DirectConstraint,
-    MasterSlaveConstraint,
-    MultipointConstraint,
+    LinearConstraint,
     create_direct_displacement_constraint,
     create_direct_rotation_constraint,
 )
@@ -73,8 +72,7 @@ __all__ = [
     "create_load_condition",
     "Constraint",
     "DirectConstraint",
-    "MasterSlaveConstraint",
-    "MultipointConstraint",
+    "LinearConstraint",
     "create_direct_displacement_constraint",
     "create_direct_rotation_constraint",
     "GaussLegendre",

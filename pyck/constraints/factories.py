@@ -2,7 +2,7 @@
 
 These functions inspect the element formulation and return the appropriate
 low-level :class:`Constraint` object (:class:`DirectConstraint` or
-:class:`MasterSlaveConstraint`).
+:class:`LinearConstraint`).
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from pyck.constraints.direct_constraint import DirectConstraint
-from pyck.constraints.constraint import MasterSlaveConstraint
+from pyck.constraints.constraint import LinearConstraint
 from pyck.elements.euler_bernoulli_beam import EulerBernoulliBeam
 from pyck.elements.timoshenko_beam_2p import TimoshenkoBeam2P
 
@@ -71,7 +71,7 @@ def create_direct_rotation_constraint(
 
     The concrete constraint type depends on the element formulation:
 
-    * **Euler–Bernoulli** → :class:`MasterSlaveConstraint` coupling the
+    * **Euler–Bernoulli** → :class:`LinearConstraint` coupling the
       boundary and adjacent control-point DOFs.
     * **Timoshenko** (or any other) → :class:`DirectConstraint`
       directly prescribing the independent rotation DOFs.
@@ -91,7 +91,7 @@ def create_direct_rotation_constraint(
     ndof = element._cpp_object.num_dofs_per_node()
     if isinstance(element, EulerBernoulliBeam):
         pairs = list(zip(bnd.displacement_dofs, bnd.rotation_dofs))
-        return MasterSlaveConstraint(pairs)
+        return LinearConstraint(pairs)
     else:
         # For Timoshenko, rotation is an independent DOF at index 1 of the node
         dofs = np.asarray(bnd.displacement_dofs, dtype=int) * ndof + 1

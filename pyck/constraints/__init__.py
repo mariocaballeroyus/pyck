@@ -2,9 +2,8 @@
 
 from pyck.constraints.constraint import (
     Constraint,
-    MasterSlaveConstraint,
+    LinearConstraint,
 )
-from pyck.constraints.multipoint_constraint import MultipointConstraint
 from pyck.constraints.direct_constraint import DirectConstraint
 from pyck.constraints.factories import (
     create_direct_displacement_constraint,
@@ -14,8 +13,7 @@ from pyck.constraints.factories import (
 __all__ = [
     "Constraint",
     "DirectConstraint",
-    "MasterSlaveConstraint",
-    "MultipointConstraint",
+    "LinearConstraint",
     "create_direct_displacement_constraint",
     "create_direct_rotation_constraint",
 ]

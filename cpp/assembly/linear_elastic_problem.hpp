@@ -56,7 +56,7 @@ public:
     void add_condition(const Ptr<Condition<T>>& condition);
 
     /**
-     * @brief Add a constraint (e.g. MasterSlaveConstraint) to the system.
+     * @brief Add a constraint (e.g. LinearConstraint) to the system.
      * 
      * @param constraint Shared pointer to the constraint.
      */
