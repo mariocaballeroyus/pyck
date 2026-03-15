@@ -5,6 +5,7 @@
 #include "bspline.hpp"
 #include "tensor.hpp"
 #include "curve.hpp"
+#include "surface.hpp"
 #include "boundary_patch.hpp"
 #include "dof_mapper.hpp"
 #include "quadrature.hpp"
@@ -131,6 +132,95 @@ PYBIND11_MODULE(_pyck, m) {
         },
         py::arg("basis"), py::arg("length"),
         "Create a straight line segment C(u) = (L*u, 0, 0) along the x-axis.");
+
+    // === Surface Patch (2D) =========================================================
+
+    using BoundaryPatch2D = pyck::BoundaryPatch<double, 2>;
+    py::class_<BoundaryPatch2D, pyck::Ptr<BoundaryPatch2D>>(m, "BoundaryPatch2D")
+        .def("boundary_dofs", &BoundaryPatch2D::boundary_dofs)
+        .def("displacement_dofs", &BoundaryPatch2D::displacement_dofs)
+        .def("rotation_dofs", &BoundaryPatch2D::rotation_dofs)
+        .def("param_dim", &BoundaryPatch2D::param_dim)
+        .def("at_start", &BoundaryPatch2D::at_start);
+
+    using Patch3D2D = pyck::Patch<double, 2>;
+    py::class_<Patch3D2D, pyck::Ptr<Patch3D2D>>(m, "Patch3D2D")
+        .def("gdim", &Patch3D2D::gdim)
+        .def("tdim", &Patch3D2D::tdim)
+        .def("control_pts",
+             static_cast<const pyck::ColMatrix<double, 3>& (Patch3D2D::*)() const>(
+                 &Patch3D2D::control_pts),
+             py::return_value_policy::reference_internal)
+        .def("num_control_pts", &Patch3D2D::num_control_pts)
+        .def("boundary_dofs", &Patch3D2D::boundary_dofs,
+             py::arg("param_dim"), py::arg("at_start"))
+        .def("dof_mapper", &Patch3D2D::dof_mapper,
+             py::return_value_policy::reference_internal)
+        .def("active_control_pts", &Patch3D2D::active_control_pts,
+             py::arg("spans"))
+        .def("boundary", [](pyck::Ptr<Patch3D2D> self, std::size_t param_dim, bool at_start) {
+                 return pyck::create_boundary<double, 2>(self, param_dim, at_start);
+             },
+             py::arg("param_dim"), py::arg("at_start"),
+             "Extract a boundary face of this patch.")
+        .def("eval_physical_points", &Patch3D2D::eval_physical_points,
+             py::arg("quadrature"),
+             "Coordinate mapping of all quadrature points in active elements.");
+
+    using SurfacePatch3D = pyck::SurfacePatch<double>;
+    py::class_<SurfacePatch3D, Patch3D2D, pyck::Ptr<SurfacePatch3D>>(m, "SurfacePatch")
+        .def(py::init([](pyck::Ptr<BSplineD> basis_u,
+                         pyck::Ptr<BSplineD> basis_v,
+                         const pyck::ColMatrix<double, 3>& cp) {
+                 return std::make_shared<SurfacePatch3D>(
+                     std::static_pointer_cast<BasisD>(basis_u),
+                     std::static_pointer_cast<BasisD>(basis_v),
+                     cp);
+             }),
+             py::arg("basis_u"),
+             py::arg("basis_v"),
+             py::arg("control_points"))
+        .def("eval_basis_functions", &SurfacePatch3D::eval_basis_functions,
+             py::arg("params"), py::arg("span"), py::arg("order") = 0)
+        .def("eval_shape_functions", [](const SurfacePatch3D& p,
+                 const pyck::ColMatrix<double, 2>& pts,
+                 pyck::Index span,
+                 std::size_t order) {
+                 return p.eval_shape_functions(pts, span, order);
+             },
+             py::arg("params"), py::arg("span"), py::arg("order") = 0)
+        .def("eval_geometry", &SurfacePatch3D::eval_geometry,
+             py::arg("params"), py::arg("span"));
+
+    // rectangle factory
+    m.def("rectangle", [](pyck::Ptr<BSplineD> basis_u,
+                           pyck::Ptr<BSplineD> basis_v,
+                           double width, double height) {
+            return std::make_shared<SurfacePatch3D>(
+                pyck::rectangle<double>(
+                    std::static_pointer_cast<const BasisD>(basis_u),
+                    std::static_pointer_cast<const BasisD>(basis_v),
+                    width, height));
+        },
+        py::arg("basis_u"), py::arg("basis_v"),
+        py::arg("width"), py::arg("height"),
+        "Create a flat rectangular surface patch in the xy-plane.");
+
+    // === DOF Mapping ================================================================
+
+    using DofMapper2D = pyck::DofMapper<2>;
+    py::class_<DofMapper2D>(m, "DofMapper2D")
+        .def("get_boundary_dofs", &DofMapper2D::get_boundary_dofs,
+             py::arg("param_dim"), py::arg("at_start"))
+        .def("get_displacement_boundary_dofs", &DofMapper2D::get_displacement_boundary_dofs,
+             py::arg("param_dim"), py::arg("at_start"))
+        .def("get_rotation_boundary_dofs", &DofMapper2D::get_rotation_boundary_dofs,
+             py::arg("param_dim"), py::arg("at_start"))
+        .def("get_element_dofs",
+             py::overload_cast<pyck::Index>(&DofMapper2D::get_element_dofs, py::const_),
+             py::arg("elem_idx"))
+        .def("num_basis", &DofMapper2D::num_basis)
+        .def("degree", &DofMapper2D::degree);
 
     // === DOF Mapping ================================================================
 

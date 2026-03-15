@@ -12,6 +12,9 @@ from pyck.geometry import (
     CurvePatch,
     create_curve_patch,
     create_line_segment,
+    SurfacePatch,
+    create_surface_patch,
+    create_rectangle,
 )
 from pyck.elements import (
     EulerBernoulliBeam,
@@ -62,6 +65,9 @@ __all__ = [
     "CurvePatch",
     "create_curve_patch",
     "create_line_segment",
+    "SurfacePatch",
+    "create_surface_patch",
+    "create_rectangle",
     "EulerBernoulliBeam",
     "TimoshenkoBeam1P",
     "TimoshenkoBeam2P",

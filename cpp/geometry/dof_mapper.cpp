@@ -215,7 +215,9 @@ std::vector<Index> DofMapper<d>::get_element_dofs(const std::array<Index, d>& sp
     };
 
     iterate(iterate, 0);
-    std::sort(dofs.begin(), dofs.end());
+    // NOTE: Do NOT sort — the order must match the tensor-product column
+    // ordering (dim-0 outer, dim-1 inner, …) so that basis function
+    // column k corresponds to control-point / DOF entry k.
     return dofs;
 }
 

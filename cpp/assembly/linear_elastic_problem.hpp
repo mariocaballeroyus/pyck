@@ -11,6 +11,7 @@
 #include "condition.hpp"
 #include "direct_constraint.hpp"
 #include "constraint.hpp"
+#include "quadrature.hpp"
 #include "../types.hpp"
 
 namespace pyck
@@ -30,41 +31,49 @@ template <std::floating_point T, std::size_t d>
 class LinearElasticProblem
 {
 public:
-
     /**
-     * @brief Construct a new LinearElasticProblem object
+     * @brief Construct a new `LinearElasticProblem` object
      * 
      * @param patch The geometric patch over which to assemble.
      * @param element The finite element formulation (e.g. EulerBernoulliBeam1P).
      */
     LinearElasticProblem(const Ptr<Patch<T, d>>& patch,
-              const Ptr<Element<T, d>>& element);
+                         const Ptr<Element<T, d>>& element)
+        : patch_(patch), element_(element), quadrature_(nullptr) {}
 
     /**
      * @param quadrature A d-dimensional quadrature rule.
      */
-    void set_quadrature(const Ptr<QuadratureRule<T, d>>& quadrature);
+    void set_quadrature(const Ptr<QuadratureRule<T, d>>& quadrature) {
+        quadrature_ = quadrature;
+    }
 
     /**
      * @brief Add a boundary condition (e.g. LoadCondition, DisplacementCondition, RotationCondition) to the system.
      * 
      * @param condition Shared pointer to the condition.
      */
-    void add_condition(const Ptr<Condition<T>>& condition);
+    void add_condition(const Ptr<Condition<T>>& condition) {
+        conditions_.push_back(condition);
+    }
 
     /**
      * @brief Add a constraint (e.g. LinearConstraint) to the system.
      * 
      * @param constraint Shared pointer to the constraint.
      */
-    void add_constraint(const Ptr<Constraint<T>>& constraint);
+    void add_constraint(const Ptr<Constraint<T>>& constraint) {
+        constraints_.push_back(constraint);
+    }
 
     /**
      * @brief Add a strong direct boundary constraint.
      * 
      * @param constraint Shared pointer to the DirectConstraint.
      */
-    void add_direct_constraint(const Ptr<DirectConstraint<T>>& constraint);
+    void add_direct_constraint(const Ptr<DirectConstraint<T>>& constraint) {
+        direct_constraints_.push_back(constraint);
+    }
 
     /**
      * @brief Assemble the global stiffness matrix K and load vector F.

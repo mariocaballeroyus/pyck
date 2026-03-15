@@ -25,11 +25,6 @@ template <std::floating_point T, std::size_t d>
 class Patch
 {
 public:
-
-    using ScalarType = T;
-
-    // === Constructors ===============================================================
-
     /// @brief Virtual destructor
     virtual ~Patch() = default;
 
@@ -153,7 +148,6 @@ public:
     virtual const TensorProduct<T, d>& tensor_product() const = 0;
 
 protected:
-
     /// @brief Control points of the patch, stored as a matrix where each row is a control point
     ColMatrix<T, 3> control_pts_;
 

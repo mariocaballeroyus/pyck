@@ -66,9 +66,13 @@ class LoadCondition:
         (`Patch.eval_physical_points`); only the load function
         evaluation and the final scalar-to-vector conversion happen in Python.
         """
-        x = np.asarray(
+        x_3d = np.asarray(
             self._patch._cpp_object.eval_physical_points(quadrature._cpp_object)
         )
+
+        # Pass the first physical coordinate (x) to the load function,
+        # not the full 3D embedding coordinates.
+        x = x_3d[:, 0]
 
         try:
             raw = self._load_func(x)

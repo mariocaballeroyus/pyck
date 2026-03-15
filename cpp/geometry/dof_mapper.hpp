@@ -96,9 +96,6 @@ public:
     const std::array<Index, d>& degree() const { return degree_; }
 
 private:
-
-    // === Member Variables ===========================================================
-
     /// @brief Number of basis functions in each direction
     std::array<Index, d> num_basis_;
 

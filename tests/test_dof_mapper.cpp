@@ -162,12 +162,13 @@ TEST_CASE("DofMapper 2D get_element_dofs", "[geometry][dof_mapper]") {
         // elem_idx for span (1,1): 1*4 + 1 = 5
         // u-span=1, degree=1: active u-basis = {0, 1}
         // v-span=1, degree=1: active v-basis = {0, 1}
-        // DOFs: (0,0)=0, (1,0)=1, (0,1)=3, (1,1)=4
+        // DOFs in tensor-product order (u outer, v inner):
+        //   (0,0)=0, (0,1)=3, (1,0)=1, (1,1)=4
         auto dofs = mapper.get_element_dofs(5);
         REQUIRE(dofs.size() == 4);
         REQUIRE(dofs[0] == 0);
-        REQUIRE(dofs[1] == 1);
-        REQUIRE(dofs[2] == 3);
+        REQUIRE(dofs[1] == 3);
+        REQUIRE(dofs[2] == 1);
         REQUIRE(dofs[3] == 4);
     }
 
@@ -175,12 +176,13 @@ TEST_CASE("DofMapper 2D get_element_dofs", "[geometry][dof_mapper]") {
         // elem_idx for span (2,2): 2*4 + 2 = 10
         // u-span=2, degree=1: active u-basis = {1, 2}
         // v-span=2, degree=1: active v-basis = {1, 2}
-        // DOFs: (1,1)=4, (2,1)=5, (1,2)=7, (2,2)=8
+        // DOFs in tensor-product order (u outer, v inner):
+        //   (1,1)=4, (1,2)=7, (2,1)=5, (2,2)=8
         auto dofs = mapper.get_element_dofs(10);
         REQUIRE(dofs.size() == 4);
         REQUIRE(dofs[0] == 4);
-        REQUIRE(dofs[1] == 5);
-        REQUIRE(dofs[2] == 7);
+        REQUIRE(dofs[1] == 7);
+        REQUIRE(dofs[2] == 5);
         REQUIRE(dofs[3] == 8);
     }
 }

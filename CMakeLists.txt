@@ -35,6 +35,7 @@ target_link_libraries(pyck_basis PUBLIC eigen)
 add_library(pyck_geometry
     cpp/geometry/dof_mapper.cpp
     cpp/geometry/curve.cpp
+    cpp/geometry/surface.cpp
     cpp/geometry/boundary_patch.cpp
 )
 target_include_directories(pyck_geometry PUBLIC cpp/geometry)
@@ -117,6 +118,9 @@ target_link_libraries(test_euler_bernoulli PRIVATE pyck_elements pyck_conditions
 add_executable(test_constraints tests/test_constraints.cpp)
 target_link_libraries(test_constraints PRIVATE pyck_constraints pyck_assembly catch)
 
+add_executable(test_surface tests/test_surface.cpp)
+target_link_libraries(test_surface PRIVATE pyck_geometry catch)
+
 enable_testing()
 add_test(NAME knot_vector_tests COMMAND test_knot_vector)
 add_test(NAME bspline_tests COMMAND test_bspline)
@@ -127,3 +131,4 @@ add_test(NAME dof_mapper_tests COMMAND test_dof_mapper)
 add_test(NAME load_condition_tests COMMAND test_load_condition)
 add_test(NAME euler_bernoulli_tests COMMAND test_euler_bernoulli)
 add_test(NAME constraints_tests COMMAND test_constraints)
+add_test(NAME surface_tests COMMAND test_surface)

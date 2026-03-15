@@ -8,37 +8,6 @@ namespace pyck
 {
 
 template <std::floating_point T, std::size_t d>
-LinearElasticProblem<T, d>::LinearElasticProblem(const Ptr<Patch<T, d>>& patch,
-                                                 const Ptr<Element<T, d>>& element)
-    : patch_(patch), element_(element), quadrature_(nullptr)
-{
-}
-
-template <std::floating_point T, std::size_t d>
-void LinearElasticProblem<T, d>::set_quadrature(const Ptr<QuadratureRule<T, d>>& quadrature)
-{
-    quadrature_ = quadrature;
-}
-
-template <std::floating_point T, std::size_t d>
-void LinearElasticProblem<T, d>::add_condition(const Ptr<Condition<T>>& condition)
-{
-    conditions_.push_back(condition);
-}
-
-template <std::floating_point T, std::size_t d>
-void LinearElasticProblem<T, d>::add_constraint(const Ptr<Constraint<T>>& constraint)
-{
-    constraints_.push_back(constraint);
-}
-
-template <std::floating_point T, std::size_t d>
-void LinearElasticProblem<T, d>::add_direct_constraint(const Ptr<DirectConstraint<T>>& constraint)
-{
-    direct_constraints_.push_back(constraint);
-}
-
-template <std::floating_point T, std::size_t d>
 void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
 {
     if (!quadrature_) {
@@ -127,9 +96,7 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
         cond->apply(K, F);
     }
 
-    // Apply exact constraints (e.g. Master-Slave FIRST, Dirichlet LAST)
-    // By keeping them in separate lists, Dirichlet boundaries are guaranteed 
-    // to cleanly zero out and overwrite any scattered data from relative equations.
+    // Apply exact constraints (Master-Slave FIRST, Dirichlet LAST)
     for (const auto& constraint : constraints_) {
         constraint->apply(K, F);
     }
