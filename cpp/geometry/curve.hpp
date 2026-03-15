@@ -65,6 +65,15 @@ public:
     ColMatrix<T, 3> eval_geometry(const ColMatrix<T, 1>& points,
                                   Index span) const override;
 
+    /**
+     * @brief Evaluate the physical x-coordinates of all active quadrature points
+     *        across the entire 1D curve.
+     *
+     * @param quadrature Quadrature rule to use for integration.
+     * @return Matrix of physical coordinates, size (n_active_elements * Q, 3).
+     */
+    ColMatrix<T, 3> eval_physical_points(const QuadratureRule<T, 1>& quadrature) const override;
+
     
     /// @brief Get the basis functions for the parametric direction
     const Basis<T>& basis(std::size_t dir) const override 

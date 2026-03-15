@@ -9,9 +9,8 @@
 #include "basis.hpp"
 #include "element.hpp"
 #include "condition.hpp"
-#include "../constraints/direct_constraint.hpp"
+#include "direct_constraint.hpp"
 #include "constraint.hpp"
-#include "quadrature.hpp"
 #include "../types.hpp"
 
 namespace pyck
@@ -42,11 +41,9 @@ public:
               const Ptr<Element<T, d>>& element);
 
     /**
-     * @brief Set the quadrature rule for numerical integration.
-     * 
-     * @param quadrature A 1D quadrature rule applied as a tensor product along each parametric direction.
+     * @param quadrature A d-dimensional quadrature rule.
      */
-    void set_quadrature(const Ptr<QuadratureRule<T>>& quadrature);
+    void set_quadrature(const Ptr<QuadratureRule<T, d>>& quadrature);
 
     /**
      * @brief Add a boundary condition (e.g. LoadCondition, DisplacementCondition, RotationCondition) to the system.
@@ -88,7 +85,7 @@ private:
 
     Ptr<Element<T, d>> element_;
 
-    Ptr<QuadratureRule<T>> quadrature_;
+    Ptr<QuadratureRule<T, d>> quadrature_;
 
     std::vector<Ptr<Condition<T>>> conditions_;
 

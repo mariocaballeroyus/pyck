@@ -15,7 +15,7 @@ LinearElasticProblem<T, d>::LinearElasticProblem(const Ptr<Patch<T, d>>& patch,
 }
 
 template <std::floating_point T, std::size_t d>
-void LinearElasticProblem<T, d>::set_quadrature(const Ptr<QuadratureRule<T>>& quadrature)
+void LinearElasticProblem<T, d>::set_quadrature(const Ptr<QuadratureRule<T, d>>& quadrature)
 {
     quadrature_ = quadrature;
 }
@@ -102,10 +102,8 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
 
         if (zero_volume) continue;
 
-        // Create mapped quadrature rule points and weights for the element
-        std::array<const QuadratureRule<T>*, d> q_rules;
-        q_rules.fill(quadrature_.get());
-        auto [mapped_pts, mapped_weights] = tensor_product_mapped<T, d>(q_rules, u_a, u_b);
+        // Simplify: Map quadrature points using the rule's built-in multi-dimensional logic
+        auto [mapped_pts, mapped_weights] = quadrature_->map_to_domain(u_a, u_b);
         
         // Gather element contributions (span-local stiffness)
         element_->compute_local_stiffness(*patch_, mapped_pts, mapped_weights, elem_idx, Ke);

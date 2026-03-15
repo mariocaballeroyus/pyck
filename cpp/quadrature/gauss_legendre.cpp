@@ -2,6 +2,7 @@
 
 namespace pyck
 {
+
 namespace
 {
 
@@ -33,9 +34,12 @@ static const StaticVector<double, 8> weights8 = (StaticVector<double, 8>() << 0.
 
 } // namespace
 
+template <std::floating_point T, std::size_t d>
+GaussLegendre<T, d>::GaussLegendre(std::size_t num_pts)
+    : QuadratureRule<T, d>(GaussLegendre<T, 1>(num_pts)) {}
 
 template <std::floating_point T>
-GaussLegendre<T>::GaussLegendre(std::size_t num_pts)
+GaussLegendre<T, 1>::GaussLegendre(std::size_t num_pts)
 {
     if (!this->lookup_reference(num_pts, this->points_, this->weights_))
     {
@@ -44,7 +48,9 @@ GaussLegendre<T>::GaussLegendre(std::size_t num_pts)
 }
 
 template <std::floating_point T>
-void GaussLegendre<T>::compute_reference(std::size_t num_pts, Vector<T>& nodes, Vector<T>& weights) const
+void GaussLegendre<T, 1>::compute_reference(std::size_t num_pts, 
+                                            Vector<T>& nodes, 
+                                            Vector<T>& weights) const
 {
     if (num_pts == 0)
     {
@@ -54,7 +60,7 @@ void GaussLegendre<T>::compute_reference(std::size_t num_pts, Vector<T>& nodes, 
     }
 
     // Resize outputs
-    nodes.resize(num_pts);
+    nodes.resize(num_pts, 1);
     weights.resize(num_pts);
 
     // Build symmetric tridiagonal Jacobi matrix
@@ -80,7 +86,7 @@ void GaussLegendre<T>::compute_reference(std::size_t num_pts, Vector<T>& nodes, 
 }
 
 template <std::floating_point T>
-bool GaussLegendre<T>::lookup_reference(std::size_t num_pts, Vector<T>& nodes, Vector<T>& weights) const
+bool GaussLegendre<T, 1>::lookup_reference(std::size_t num_pts, Vector<T>& nodes, Vector<T>& weights) const
 {
     switch (num_pts)
     {
@@ -91,6 +97,7 @@ bool GaussLegendre<T>::lookup_reference(std::size_t num_pts, Vector<T>& nodes, V
         case 5: nodes = nodes5.template cast<T>(); weights = weights5.template cast<T>(); return true;
         case 6: nodes = nodes6.template cast<T>(); weights = weights6.template cast<T>(); return true;
     }
+
     switch (num_pts)
     {
         case 7: nodes = nodes7.template cast<T>(); weights = weights7.template cast<T>(); return true;
@@ -101,10 +108,14 @@ bool GaussLegendre<T>::lookup_reference(std::size_t num_pts, Vector<T>& nodes, V
 
 // === Template Instantiations ========================================================
 
-template class pyck::GaussLegendre<double>;
+template class pyck::GaussLegendre<double, 1>;
+template class pyck::GaussLegendre<double, 2>;
+template class pyck::GaussLegendre<double, 3>;
 
 #ifdef PYCK_BUILD_SINGLE_PRECISION
-template class pyck::GaussLegendre<float>;
+template class pyck::GaussLegendre<float, 1>;
+template class pyck::GaussLegendre<float, 2>;
+template class pyck::GaussLegendre<float, 3>;
 #endif
 
 } // namespace pyck

@@ -77,6 +77,24 @@ private:
     std::vector<Index> rotation_dofs_;
 };
 
+/**
+ * @brief Factory function to create a BoundaryPatch.
+ * 
+ * @tparam T Scalars type
+ * @tparam d Parametric dimension of the parent patch
+ * @param parent Pointer to the parent patch
+ * @param param_dim Parametric dimension normal to the boundary
+ * @param at_start True for start boundary, false for end
+ * @return A shared pointer to the new BoundaryPatch
+ */
+template <std::floating_point T, std::size_t d>
+Ptr<BoundaryPatch<T, d>> create_boundary(const Ptr<Patch<T, d>>& parent,
+                                         std::size_t param_dim,
+                                         bool at_start)
+{
+    return std::make_shared<BoundaryPatch<T, d>>(parent, param_dim, at_start);
+}
+
 } // namespace pyck
 
 #endif // PYCK_BOUNDARY_PATCH_HPP

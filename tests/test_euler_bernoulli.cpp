@@ -47,15 +47,15 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load", "[assembly][eul
     // 2. Element & Quadrature
     auto element = std::make_shared<EulerBernoulliBeam1P<double>>(E, A, I);
     // Quartic basis requires 5 points for exact bending integral (order 2p-2 = 6, 4 pts gives degree 7)
-    auto quad = std::make_shared<GaussLegendre<double>>(5);
+    auto gauss_rule = std::make_shared<GaussLegendre<double, 1>>(5);
 
     // 3. Problem construction
     LinearElasticProblem<double, 1> problem(curve, element);
-    problem.set_quadrature(quad);
+    problem.set_quadrature(gauss_rule);
 
     // 4. Conditions: Uniform Dist Load (1 element, 5 quad points = 5 total)
     Vector<double> load_values = Vector<double>::Constant(5, q);
-    auto load_cond = std::make_shared<LoadCondition<double, 1>>(*curve, *element, *quad, load_values);
+    auto load_cond = std::make_shared<LoadCondition<double, 1>>(*curve, *element, *gauss_rule, load_values);
     problem.add_condition(load_cond);
 
     // 5. Assemble Global System
@@ -117,7 +117,7 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load (Cubic Approximat
     double L = 10.0;  // Length of the beam (m)
     double q = -5000;  // Uniform distributed load (N/m) downward
 
-    // 1. Geometry: Single patch line from x=0 to x=L
+    // Geometry: Single patch line from x=0 to x=L
     // A simply supported Euler-Bernoulli beam under uniform load has a quartic O(x^4) deflection profile.
     // By providing a cubic basis (p=3), we force the system to approximate the solution.
     // However, by inserting an intermediate knot at ξ=0.5, we split the domain into two 
@@ -136,26 +136,26 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load (Cubic Approximat
 
     auto curve = std::make_shared<CurvePatch<double>>(basis, control_pts);
 
-    // 2. Element & Quadrature
+    // Element & Quadrature
     auto element = std::make_shared<EulerBernoulliBeam1P<double>>(E, A, I);
     // Cubic basis requires 4 points for exact bending integral (order 2p-2 = 4)
-    auto quad = std::make_shared<GaussLegendre<double>>(4);
+    auto gauss_rule = std::make_shared<GaussLegendre<double, 1>>(4);
 
-    // 3. Problem construction
+    // Problem construction
     LinearElasticProblem<double, 1> problem(curve, element);
-    problem.set_quadrature(quad);
+    problem.set_quadrature(gauss_rule);
 
-    // 4. Conditions: Uniform Dist Load (2 elements, 4 quad points each = 8 total)
+    // Conditions: Uniform Dist Load (2 elements, 4 quad points each = 8 total)
     Vector<double> load_values = Vector<double>::Constant(8, q);
-    auto load_cond = std::make_shared<LoadCondition<double, 1>>(*curve, *element, *quad, load_values);
+    auto load_cond = std::make_shared<LoadCondition<double, 1>>(*curve, *element, *gauss_rule, load_values);
     problem.add_condition(load_cond);
 
-    // 5. Assemble Global System
+    // Assemble Global System
     Matrix<double> K;
     Vector<double> F;
     problem.assemble(K, F);
 
-    // 6. Apply Essential Boundary Conditions (Simply Supported)
+    // Apply Essential Boundary Conditions (Simply Supported)
     std::vector<Index> constrained_dofs = {0, 4}; 
     std::vector<double> constrained_vals = {0.0, 0.0};
     

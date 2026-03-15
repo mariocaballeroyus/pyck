@@ -8,37 +8,26 @@ namespace pyck
 template <std::floating_point T, std::size_t d>
 LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
                                    const Element<T, d>& element,
-                                   const QuadratureRule<T>& quadrature,
+                                   const QuadratureRule<T, d>& quadrature,
                                    const Vector<T>& load_values)
 {
-    // Compute total tensor-product quadrature points per element
-    std::size_t Q_1d = quadrature.num_points();
-    std::size_t Q = 1;
-    for (std::size_t i = 0; i < d; ++i) Q *= Q_1d;
-
-    // Initialize the element load vector with zeros
-    std::size_t ndof = element.num_dofs_per_node();
-    std::size_t num_nodes = patch.dof_mapper().num_basis()[0]; 
-    for (std::size_t i = 1; i < d; ++i) {
+    const Index ndof = element.num_dofs_per_node();
+    Index num_nodes = patch.dof_mapper().num_basis()[0]; 
+    for (Index i = 1; i < d; ++i) {
         num_nodes *= patch.dof_mapper().num_basis()[i];
     }
-    
-    element_load_.setZero(num_nodes * ndof);
-    
-    // Determine number of intervals per dimension
+
     std::array<std::size_t, d> intervals;
     std::size_t total_elements = 1;
-
     for (std::size_t i = 0; i < d; ++i) {
         intervals[i] = patch.basis(i).knot_vector().num_spans();
         total_elements *= intervals[i];
     }
 
-    const auto& mapper = patch.dof_mapper();
+    // Initialize the element load vector with zeros
+    element_load_.setZero(num_nodes * ndof);
 
-    // Build the tensor-product rule array (isotropic: same 1D rule in every direction)
-    std::array<const QuadratureRule<T>*, d> q_rules;
-    q_rules.fill(&quadrature);
+    const std::size_t Q = quadrature.num_points();
 
     // Track quadrature point offset into load_values
     std::size_t qp_offset = 0;
@@ -72,8 +61,8 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
 
         if (zero_volume) continue;
 
-        // Map quadrature points from [-1, 1]^d to the parametric element box
-        auto [mapped_pts, mapped_weights] = tensor_product_mapped<T, d>(q_rules, u_a, u_b);
+        // Simplify: Map quadrature points using the rule's built-in multi-dimensional logic
+        auto [mapped_pts, mapped_weights] = quadrature.map_to_domain(u_a, u_b);
         
         // Evaluate span-local basis functions and Jacobian
         std::size_t req_order = element.required_shape_order();
@@ -97,7 +86,7 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
         Vector<T> local_load = N_mat.transpose() * W_J_T;
 
         // Scatter into global load vector
-        auto elem_nodes = mapper.get_element_dofs(elem_idx);
+        auto elem_nodes = patch.dof_mapper().get_element_dofs(elem_idx);
         for (std::size_t k = 0; k < elem_nodes.size(); ++k) {
             for (std::size_t v = 0; v < ndof; ++v) {
                 element_load_(elem_nodes[k] * ndof + v) += local_load(k * ndof + v);

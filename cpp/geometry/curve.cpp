@@ -6,6 +6,8 @@
 #include <cmath>
 #include <stdexcept>
 
+#include "../quadrature/quadrature.hpp"
+
 namespace pyck
 {
 
@@ -138,6 +140,32 @@ ColMatrix<T, 3> CurvePatch<T>::eval_geometry(const ColMatrix<T, 1>& points,
         result.row(q) = d.row(p);
     }
 
+    return result;
+}
+
+template <std::floating_point T>
+ColMatrix<T, 3> CurvePatch<T>::eval_physical_points(const QuadratureRule<T, 1>& quadrature) const
+{
+    const Index Q = static_cast<Index>(quadrature.num_points());
+    const Index num_spans = static_cast<Index>(this->basis(0).knot_vector().num_spans());
+
+    ColMatrix<T, 3> result(num_spans * Q, 3);
+    Index out = 0;
+
+    for (Index s = 0; s < num_spans; ++s)
+    {
+        auto [lo, hi] = this->basis(0).knot_vector().span_bounds(s);
+        if (std::abs(hi - lo) < static_cast<T>(1e-14))
+            continue; // skip zero-volume clamped span
+
+        auto [mapped_pts, mapped_weights] = quadrature.map_to_domain(lo, hi);
+
+        auto geom = this->eval_geometry(mapped_pts, s);
+        result.block(out, 0, Q, 3) = geom;
+        out += Q;
+    }
+
+    result.conservativeResize(out, Eigen::NoChange);
     return result;
 }
 

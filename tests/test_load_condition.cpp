@@ -30,7 +30,7 @@ TEST_CASE("LoadCondition 1D", "[conditions][load_condition]") {
     CurvePatch<double> curve(basis, control_pts);
 
     // 2. Create a quadrature rule (Gauss-Legendre, 2 points per element should be enough for linear shape funcs)
-    GaussLegendre<double> quad(2);
+    GaussLegendre<double, 1> gauss_rule(2);
     
     // 2.5 Element to provide N matrix (EulerBernoulli dummy parameters)
     EulerBernoulliBeam1P<double> element(1.0, 1.0, 1.0);
@@ -39,7 +39,7 @@ TEST_CASE("LoadCondition 1D", "[conditions][load_condition]") {
         // t(x) = 10.0, with 2 non-zero elements and 2 quad points each = 4 total
         Vector<double> load_values = Vector<double>::Constant(4, 10.0);
         
-        LoadCondition<double, 1> load_cond(curve, element, quad, load_values);
+        LoadCondition<double, 1> load_cond(curve, element, gauss_rule, load_values);
         
         Vector<double> F(num_pts);
         F.setZero();

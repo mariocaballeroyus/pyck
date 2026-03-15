@@ -38,7 +38,7 @@ add_library(pyck_geometry
     cpp/geometry/boundary_patch.cpp
 )
 target_include_directories(pyck_geometry PUBLIC cpp/geometry)
-target_link_libraries(pyck_geometry PUBLIC pyck_basis)
+target_link_libraries(pyck_geometry PUBLIC pyck_basis pyck_quadrature)
 
 # Constraints library
 add_library(pyck_constraints
@@ -48,14 +48,20 @@ add_library(pyck_constraints
 target_include_directories(pyck_constraints PUBLIC cpp/constraints)
 target_link_libraries(pyck_constraints PUBLIC eigen)
 
+# Quadrature library
+add_library(pyck_quadrature
+    cpp/quadrature/quadrature.cpp
+    cpp/quadrature/gauss_legendre.cpp
+)
+target_include_directories(pyck_quadrature PUBLIC cpp/quadrature)
+target_link_libraries(pyck_quadrature PUBLIC eigen)
+
 # Assembler library
 add_library(pyck_assembly
-    cpp/assembly/quadrature.cpp
-    cpp/assembly/gauss_legendre.cpp
     cpp/assembly/linear_elastic_problem.cpp
 )
 target_include_directories(pyck_assembly PUBLIC cpp/assembly)
-target_link_libraries(pyck_assembly PUBLIC eigen pyck_elements pyck_conditions pyck_constraints)
+target_link_libraries(pyck_assembly PUBLIC eigen pyck_elements pyck_conditions pyck_constraints pyck_quadrature)
 
 # Conditions library
 add_library(pyck_conditions
@@ -103,7 +109,7 @@ add_executable(test_load_condition tests/test_load_condition.cpp)
 target_link_libraries(test_load_condition PRIVATE pyck_conditions pyck_assembly pyck_basis catch)
 
 add_executable(test_quadrature tests/test_quadrature.cpp)
-target_link_libraries(test_quadrature PRIVATE pyck_assembly catch)
+target_link_libraries(test_quadrature PRIVATE pyck_quadrature catch)
 
 add_executable(test_euler_bernoulli tests/test_euler_bernoulli.cpp)
 target_link_libraries(test_euler_bernoulli PRIVATE pyck_elements pyck_conditions pyck_constraints pyck_assembly pyck_geometry pyck_basis catch)

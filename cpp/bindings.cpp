@@ -8,7 +8,6 @@
 #include "boundary_patch.hpp"
 #include "dof_mapper.hpp"
 #include "quadrature.hpp"
-#include "quadrature_utils.hpp"
 #include "gauss_legendre.hpp"
 #include "element.hpp"
 #include "euler_bernoulli_beam_1p.hpp"
@@ -16,8 +15,6 @@
 #include "timoshenko_beam_2p.hpp"
 #include "condition.hpp"
 #include "load_condition.hpp"
-#include "direct_constraint.hpp"
-#include "constraint.hpp"
 #include "linear_constraint.hpp"
 #include "linear_elastic_problem.hpp"
 
@@ -97,9 +94,14 @@ PYBIND11_MODULE(_pyck, m) {
              py::return_value_policy::reference_internal)
         .def("active_control_pts", &Patch3D1D::active_control_pts,
              py::arg("spans"))
-        .def("boundary", &Patch3D1D::boundary,
+        .def("boundary", [](pyck::Ptr<Patch3D1D> self, std::size_t param_dim, bool at_start) {
+                 return pyck::create_boundary<double, 1>(self, param_dim, at_start);
+             },
              py::arg("param_dim"), py::arg("at_start"),
-             "Extract a boundary face of this patch.");
+             "Extract a boundary face of this patch.")
+        .def("eval_physical_points", &Patch3D1D::eval_physical_points,
+             py::arg("quadrature"),
+             "Coordinate mapping of all quadrature points in active elements.");
 
     using CurvePatch3D = pyck::CurvePatch<double>;
     py::class_<CurvePatch3D, Patch3D1D, pyck::Ptr<CurvePatch3D>>(m, "CurvePatch")
@@ -148,42 +150,67 @@ PYBIND11_MODULE(_pyck, m) {
 
     // === Quadrature =================================================================
 
-    using QR = pyck::QuadratureRule<double>;
-    py::class_<QR, pyck::Ptr<QR>>(m, "QuadratureRule")
-        .def("points", &QR::points, py::return_value_policy::reference_internal)
-        .def("weights", &QR::weights, py::return_value_policy::reference_internal)
-        .def("num_points", &QR::num_points)
-        .def("map_to_domain", &QR::map_to_domain,
-             py::arg("lo"), py::arg("hi"));
+    using QR1D = pyck::QuadratureRule<double, 1>;
+    py::class_<QR1D, pyck::Ptr<QR1D>>(m, "QuadratureRule1D")
+        .def("points", &QR1D::points, py::return_value_policy::reference_internal)
+        .def("weights", &QR1D::weights, py::return_value_policy::reference_internal)
+        .def("num_points", &QR1D::num_points)
+        .def("map_to_domain", [](const QR1D& self, double lo, double hi) {
+            return self.map_to_domain(std::array<double, 1>{lo}, std::array<double, 1>{hi});
+        }, py::arg("lo"), py::arg("hi"));
 
-    using GL = pyck::GaussLegendre<double>;
-    py::class_<GL, QR, pyck::Ptr<GL>>(m, "GaussLegendre")
+    using QR2D = pyck::QuadratureRule<double, 2>;
+    py::class_<QR2D, pyck::Ptr<QR2D>>(m, "QuadratureRule2D")
+        .def(py::init<const QR1D&>(), py::arg("rule"))
+        .def(py::init<std::array<const QR1D*, 2>>(), py::arg("rules"))
+        .def("points", &QR2D::points, py::return_value_policy::reference_internal)
+        .def("weights", &QR2D::weights, py::return_value_policy::reference_internal)
+        .def("num_points", &QR2D::num_points);
+
+    using QR3D = pyck::QuadratureRule<double, 3>;
+    py::class_<QR3D, pyck::Ptr<QR3D>>(m, "QuadratureRule3D")
+        .def(py::init<const QR1D&>(), py::arg("rule"))
+        .def(py::init<std::array<const QR1D*, 3>>(), py::arg("rules"))
+        .def("points", &QR3D::points, py::return_value_policy::reference_internal)
+        .def("weights", &QR3D::weights, py::return_value_policy::reference_internal)
+        .def("num_points", &QR3D::num_points);
+
+    using GL1D = pyck::GaussLegendre<double, 1>;
+    py::class_<GL1D, QR1D, pyck::Ptr<GL1D>>(m, "GaussLegendre")
         .def(py::init<std::size_t>(), py::arg("num_pts"));
 
-    // Tensor-product utilities exposed to Python
+    using GL2D = pyck::GaussLegendre<double, 2>;
+    py::class_<GL2D, QR2D, pyck::Ptr<GL2D>>(m, "GaussLegendre2D")
+        .def(py::init<std::size_t>(), py::arg("num_pts"));
+
+    using GL3D = pyck::GaussLegendre<double, 3>;
+    py::class_<GL3D, QR3D, pyck::Ptr<GL3D>>(m, "GaussLegendre3D")
+        .def(py::init<std::size_t>(), py::arg("num_pts"));
+
+    // Legacy Tensor-product utilities (can be deprecated eventually)
     m.def("tensor_product_1d",
-        [](const QR& rule) {
-            std::array<const QR*, 1> rules = {&rule};
-            return pyck::tensor_product<double, 1>(rules);
+        [](const QR1D& rule) {
+            std::array<const QR1D*, 1> rules = {&rule};
+            return pyck::QuadratureRule<double, 1>::tensor_product(rules);
         },
         py::arg("rule"),
         "Return (points, weights) for a 1D tensor product (identity).");
 
     m.def("tensor_product_2d",
-        [](const QR& rule_u, const QR& rule_v) {
-            std::array<const QR*, 2> rules = {&rule_u, &rule_v};
-            return pyck::tensor_product<double, 2>(rules);
+        [](const QR1D& rule_u, const QR1D& rule_v) {
+            std::array<const QR1D*, 2> rules = {&rule_u, &rule_v};
+            return pyck::QuadratureRule<double, 2>::tensor_product(rules);
         },
         py::arg("rule_u"), py::arg("rule_v"),
         "Form the 2D tensor product of two 1D quadrature rules.");
 
-    m.def("tensor_product_3d",
-        [](const QR& rule_u, const QR& rule_v, const QR& rule_w) {
-            std::array<const QR*, 3> rules = {&rule_u, &rule_v, &rule_w};
-            return pyck::tensor_product<double, 3>(rules);
-        },
-        py::arg("rule_u"), py::arg("rule_v"), py::arg("rule_w"),
-        "Form the 3D tensor product of three 1D quadrature rules.");
+    m.def("tensor_product", &pyck::QuadratureRule<double, 2>::tensor_product,
+          py::arg("rules"),
+          "Form the tensor product of 2 one-dimensional quadrature rules.");
+
+    m.def("tensor_product", &pyck::QuadratureRule<double, 3>::tensor_product,
+          py::arg("rules"),
+          "Form the tensor product of 3 one-dimensional quadrature rules.");
 
     // === Elements ===================================================================
 
@@ -213,7 +240,7 @@ PYBIND11_MODULE(_pyck, m) {
 
     using LC1D = pyck::LoadCondition<double, 1>;
     py::class_<LC1D, CondD, pyck::Ptr<LC1D>>(m, "LoadCondition1D")
-        .def(py::init<const Patch3D1D&, const Elem1D&, const QR&, const pyck::Vector<double>&>(),
+        .def(py::init<const Patch3D1D&, const Elem1D&, const QR1D&, const pyck::Vector<double>&>(),
              py::arg("patch"), py::arg("element"), py::arg("quadrature"), py::arg("load_values"));
 
     // === Constraints ================================================================
@@ -243,16 +270,6 @@ PYBIND11_MODULE(_pyck, m) {
 
 
     // === Assembly ===================================================================
-
-    // --- Quadrature utilities ---
-    m.def("eval_physical_quadrature_points",
-        [](const pyck::CurvePatch<double>& patch,
-           const pyck::QuadratureRule<double>& quad) {
-            return pyck::eval_physical_quadrature_points<double>(patch, quad);
-        },
-        py::arg("patch"), py::arg("quadrature"),
-        "Physical x-coordinates of all active quadrature points "
-        "(assembly layer, correct dependency direction).");
 
     using LEP1D = pyck::LinearElasticProblem<double, 1>;
     py::class_<LEP1D>(m, "LinearElasticProblem1D")
