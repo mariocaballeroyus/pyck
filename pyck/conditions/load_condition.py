@@ -13,6 +13,7 @@ from pyck.conditions.condition import Condition
 if TYPE_CHECKING:
     from pyck.assembly.quadrature import QuadratureRule
     from pyck.geometry.curve_patch import CurvePatch
+    from pyck.geometry.surface_patch import SurfacePatch
 
 
 class LoadCondition:
@@ -50,12 +51,15 @@ class LoadCondition:
 
     def __init__(
         self,
-        patch: CurvePatch,
+        patch: CurvePatch | SurfacePatch,
         load_func,
     ) -> None:
         self._patch = patch
         self._load_func = load_func
         self._cpp_object = None  # built lazily in bind
+        # Detect dimension
+        from pyck.geometry.surface_patch import SurfacePatch as _SP
+        self._dim = 2 if isinstance(patch, _SP) else 1
 
     def bind(self, quadrature: QuadratureRule, element=None) -> None:
         """Evaluate load and build the C++ LoadCondition.
@@ -70,20 +74,24 @@ class LoadCondition:
             self._patch._cpp_object.eval_physical_points(quadrature._cpp_object)
         )
 
-        # Pass the first physical coordinate (x) to the load function,
-        # not the full 3D embedding coordinates.
-        x = x_3d[:, 0]
+        ndof = element._cpp_object.num_dofs_per_node()
+        num_pts = x_3d.shape[0]
 
-        try:
-            raw = self._load_func(x)
-        except (TypeError, ValueError, AttributeError):
-            # Fallback for functions that don't support array inputs
-            # e.g. math.sin (TypeError) or if/else blocks (ValueError)
-            raw = np.array([self._load_func(xi) for xi in x])
+        if self._dim == 2:
+            # For 2D patches, pass the full (x, y) or (x, y, z) array
+            try:
+                raw = self._load_func(x_3d)
+            except (TypeError, ValueError, AttributeError):
+                raw = np.array([self._load_func(row) for row in x_3d])
+        else:
+            # Pass the first physical coordinate (x) to the load function
+            x = x_3d[:, 0]
+            try:
+                raw = self._load_func(x)
+            except (TypeError, ValueError, AttributeError):
+                raw = np.array([self._load_func(xi) for xi in x])
 
         vals = np.asarray(raw, dtype=np.float64)
-        ndof = element._cpp_object.num_dofs_per_node()
-        num_pts = x.shape[0]
 
         # 1. Handle projection from 3D vectors (either single vector or per-point)
         #    We assume the Y-component is the transversal force.
@@ -116,9 +124,14 @@ class LoadCondition:
         vals = np.ascontiguousarray(vals.ravel(), dtype=np.float64)
 
         cpp_element = element._cpp_object if element is not None else None
-        self._cpp_object = _pyck.LoadCondition1D(
-            self._patch._cpp_object, cpp_element, quadrature._cpp_object, vals
-        )
+        if self._dim == 2:
+            self._cpp_object = _pyck.LoadCondition2D(
+                self._patch._cpp_object, cpp_element, quadrature._cpp_object, vals
+            )
+        else:
+            self._cpp_object = _pyck.LoadCondition1D(
+                self._patch._cpp_object, cpp_element, quadrature._cpp_object, vals
+            )
 
     def __repr__(self) -> str:
         status = "pending" if self._cpp_object is None else "active"

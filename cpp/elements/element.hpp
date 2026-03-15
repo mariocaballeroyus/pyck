@@ -44,6 +44,52 @@ public:
 
 };
 
+/// @brief Specialized base class for 1D elements.
+template <std::floating_point T>
+class Element<T, 1>
+{
+public:
+    virtual ~Element() = default;
+
+    virtual void compute_local_stiffness(const Patch<T, 1>& patch,
+                                         const ColMatrix<T, 1>& q_points,
+                                         const Vector<T>& q_weights,
+                                         Index span,
+                                         Matrix<T>& stiffness) const = 0;
+
+    virtual Matrix<T> shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const = 0;
+    virtual Matrix<T> strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const = 0;
+    virtual std::size_t num_dofs_per_node() const = 0;
+    virtual std::size_t required_shape_order() const { return 0; }
+
+protected:
+    /// @brief Derivative mapping
+    enum idx { fn = 0, u = 1, uu = 2, uuu = 3 };
+};
+
+/// @brief Specialized base class for 2D elements.
+template <std::floating_point T>
+class Element<T, 2>
+{
+public:
+    virtual ~Element() = default;
+
+    virtual void compute_local_stiffness(const Patch<T, 2>& patch,
+                                         const ColMatrix<T, 2>& q_points,
+                                         const Vector<T>& q_weights,
+                                         Index span,
+                                         Matrix<T>& stiffness) const = 0;
+
+    virtual Matrix<T> shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const = 0;
+    virtual Matrix<T> strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const = 0;
+    virtual std::size_t num_dofs_per_node() const = 0;
+    virtual std::size_t required_shape_order() const { return 0; }
+
+protected:
+    /// @brief Derivative mapping
+    enum idx { fn = 0, u = 1, v = 2, uu = 3, uv = 4, vv = 5, uuu = 6, uuv = 7, uvv = 8, vvv = 9 };
+};
+
 } // namespace pyck
 
 #endif // PYCK_ELEMENT_HPP

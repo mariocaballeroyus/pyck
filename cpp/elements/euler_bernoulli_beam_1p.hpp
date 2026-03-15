@@ -14,8 +14,17 @@ namespace pyck
 template <std::floating_point T>
 class EulerBernoulliBeam1P : public Element<T, 1>
 {
-public:
+    
+    using idx = typename Element<T, 1>::idx;
 
+public:
+    /**
+     * @brief Construct an Euler-Bernoulli beam element.
+     *
+     * @param youngs_modulus Young's modulus E.
+     * @param section_area Cross-section area A.
+     * @param moment_inertia Moment of inertia I.
+     */
     EulerBernoulliBeam1P(T youngs_modulus,
                          T section_area,
                          T moment_inertia);

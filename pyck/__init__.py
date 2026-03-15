@@ -18,9 +18,11 @@ from pyck.geometry import (
 )
 from pyck.elements import (
     EulerBernoulliBeam,
+    KirchhoffLovePlate,
     TimoshenkoBeam1P,
     TimoshenkoBeam2P,
     create_euler_bernoulli_beam,
+    create_kirchhoff_love_plate,
     create_timoshenko_beam,
     create_rotation_free_timoshenko_beam,
 )
@@ -34,11 +36,15 @@ from pyck.constraints import (
     LinearConstraint,
     create_direct_displacement_constraint,
     create_direct_rotation_constraint,
+    create_plate_displacement_constraint,
+    create_plate_clamped_constraint,
 )
 from pyck.assembly import (
     GaussLegendre,
+    GaussLegendre2D,
     LinearElasticProblem,
     create_gauss_legendre,
+    create_gauss_legendre_2d,
     create_linear_elastic_problem,
 )
 from pyck.io import (
@@ -69,9 +75,11 @@ __all__ = [
     "create_surface_patch",
     "create_rectangle",
     "EulerBernoulliBeam",
+    "KirchhoffLovePlate",
     "TimoshenkoBeam1P",
     "TimoshenkoBeam2P",
     "create_euler_bernoulli_beam",
+    "create_kirchhoff_love_plate",
     "create_timoshenko_beam",
     "create_rotation_free_timoshenko_beam",
     "LoadCondition",
@@ -81,9 +89,13 @@ __all__ = [
     "LinearConstraint",
     "create_direct_displacement_constraint",
     "create_direct_rotation_constraint",
+    "create_plate_displacement_constraint",
+    "create_plate_clamped_constraint",
     "GaussLegendre",
+    "GaussLegendre2D",
     "LinearElasticProblem",
     "create_gauss_legendre",
+    "create_gauss_legendre_2d",
     "create_linear_elastic_problem",
     "basis",
     "curve",

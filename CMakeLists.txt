@@ -76,6 +76,7 @@ add_library(pyck_elements
     cpp/elements/euler_bernoulli_beam_1p.cpp
     cpp/elements/timoshenko_beam_1p.cpp
     cpp/elements/timoshenko_beam_2p.cpp
+    cpp/elements/kirchhoff_love_plate.cpp
 )
 target_include_directories(pyck_elements PUBLIC cpp/elements)
 target_link_libraries(pyck_elements PUBLIC pyck_geometry pyck_assembly)
@@ -121,6 +122,9 @@ target_link_libraries(test_constraints PRIVATE pyck_constraints pyck_assembly ca
 add_executable(test_surface tests/test_surface.cpp)
 target_link_libraries(test_surface PRIVATE pyck_geometry catch)
 
+add_executable(test_kirchhoff_love_plate tests/test_kirchhoff_love_plate.cpp)
+target_link_libraries(test_kirchhoff_love_plate PRIVATE pyck_elements pyck_conditions pyck_constraints pyck_assembly pyck_geometry pyck_basis catch)
+
 enable_testing()
 add_test(NAME knot_vector_tests COMMAND test_knot_vector)
 add_test(NAME bspline_tests COMMAND test_bspline)
@@ -132,3 +136,4 @@ add_test(NAME load_condition_tests COMMAND test_load_condition)
 add_test(NAME euler_bernoulli_tests COMMAND test_euler_bernoulli)
 add_test(NAME constraints_tests COMMAND test_constraints)
 add_test(NAME surface_tests COMMAND test_surface)
+add_test(NAME kirchhoff_love_plate_tests COMMAND test_kirchhoff_love_plate)

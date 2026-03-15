@@ -19,6 +19,7 @@ from pyck.elements.timoshenko_beam_2p import TimoshenkoBeam2P
 if TYPE_CHECKING:
     from pyck.elements.element import Element
     from pyck.geometry.curve_patch import CurvePatch
+    from pyck.geometry.surface_patch import SurfacePatch
 
 
 def _resolve_side(at: str) -> str:
@@ -96,3 +97,50 @@ def create_direct_rotation_constraint(
         # For Timoshenko, rotation is an independent DOF at index 1 of the node
         dofs = np.asarray(bnd.displacement_dofs, dtype=int) * ndof + 1
         return DirectConstraint(dofs.tolist(), value)
+
+
+# ======================================================================
+# Surface-patch constraint factories (Kirchhoff-Love plate, etc.)
+# ======================================================================
+
+
+def create_plate_displacement_constraint(
+    patch: SurfacePatch,
+    *,
+    at: str,
+    value: float = 0.0,
+) -> DirectConstraint:
+    """Constrain displacement DOFs on a surface patch boundary edge.
+
+    Parameters
+    ----------
+    patch : SurfacePatch
+        The surface geometry patch.
+    at : ``"u0"``, ``"u1"``, ``"v0"``, ``"v1"``
+        Which boundary edge.
+    value : float
+        Prescribed displacement (default 0).
+    """
+    bnd = patch.boundary(at)
+    return DirectConstraint(list(bnd.displacement_dofs), value)
+
+
+def create_plate_clamped_constraint(
+    patch: SurfacePatch,
+    *,
+    at: str,
+    value: float = 0.0,
+) -> DirectConstraint:
+    """Constrain both displacement and rotation DOFs (clamped BC).
+
+    Parameters
+    ----------
+    patch : SurfacePatch
+        The surface geometry patch.
+    at : ``"u0"``, ``"u1"``, ``"v0"``, ``"v1"``
+        Which boundary edge.
+    value : float
+        Prescribed displacement/rotation (default 0).
+    """
+    bnd = patch.boundary(at)
+    return DirectConstraint(list(bnd.boundary_dofs), value)

@@ -14,8 +14,18 @@ namespace pyck
 template <std::floating_point T>
 class TimoshenkoBeam1P : public Element<T, 1>
 {
-public:
+    using idx = typename Element<T, 1>::idx;
 
+public:
+    /**
+     * @brief Construct a Timoshenko beam element.
+     *
+     * @param youngs_modulus Young's modulus E.
+     * @param section_area Cross-section area A.
+     * @param moment_inertia Moment of inertia I.
+     * @param shear_modulus Shear modulus G.
+     * @param shear_coefficient Shear coefficient k.
+     */
     TimoshenkoBeam1P(T youngs_modulus,
                      T section_area,
                      T moment_inertia,
@@ -48,7 +58,7 @@ private:
 
     /// @brief Material Parameters
     T E_, I_, A_, G_, k_;
-    T kGA_, Kb_;
+    T Ks_, Kb_;
 
 };
 

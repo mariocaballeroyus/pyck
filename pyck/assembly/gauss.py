@@ -153,3 +153,41 @@ def create_gauss_legendre(num_points: int) -> GaussLegendre:
     GaussLegendre
     """
     return GaussLegendre(num_points)
+
+
+class GaussLegendre2D:
+    """Gauss-Legendre tensor-product quadrature rule for 2D patches.
+
+    Parameters
+    ----------
+    num_points : int
+        Number of integration points **per direction**.  The total number
+        of quadrature points is ``num_points ** 2``.
+    """
+
+    _cpp_object: _pyck.GaussLegendre2D
+
+    def __init__(self, num_points: int) -> None:
+        self._cpp_object = _pyck.GaussLegendre2D(int(num_points))
+
+    @property
+    def num_points(self) -> int:
+        return self._cpp_object.num_points()
+
+    def __repr__(self) -> str:
+        return f"GaussLegendre2D(num_points={self.num_points})"
+
+
+def create_gauss_legendre_2d(num_points: int) -> GaussLegendre2D:
+    """Create a 2D tensor-product Gauss-Legendre quadrature rule.
+
+    Parameters
+    ----------
+    num_points : int
+        Number of integration points per direction.
+
+    Returns
+    -------
+    GaussLegendre2D
+    """
+    return GaussLegendre2D(num_points)

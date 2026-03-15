@@ -15,6 +15,7 @@ if TYPE_CHECKING:
     from pyck.elements.element import Element
 from pyck.constraints.direct_constraint import DirectConstraint
 from pyck.geometry.curve_patch import CurvePatch
+from pyck.geometry.surface_patch import SurfacePatch
 
 
 class LinearElasticProblem:
@@ -37,7 +38,7 @@ class LinearElasticProblem:
 
     def __init__(
         self,
-        patches: Sequence[CurvePatch],
+        patches: Sequence[CurvePatch | SurfacePatch],
         element: Element,
     ) -> None:
         if len(patches) != 1:
@@ -47,7 +48,7 @@ class LinearElasticProblem:
             )
 
         # Build name → patch mapping
-        self._patches: dict[str, CurvePatch] = {}
+        self._patches: dict[str, CurvePatch | SurfacePatch] = {}
         for p in patches:
             if p.name in self._patches:
                 raise ValueError(f"Duplicate patch name: '{p.name}'")
@@ -55,18 +56,27 @@ class LinearElasticProblem:
 
         self._element = element
 
+        # Detect dimension from patch type
+        first_patch = patches[0]
+        self._dim = 2 if isinstance(first_patch, SurfacePatch) else 1
+
         # Per-patch state
         self._quadratures: dict[str, QuadratureRule] = {}
         self._conditions: dict[str, list[Condition]] = {
             name: [] for name in self._patches
         }
 
-        # Build one C++ problem object per patch (only 1 for now)
-        self._cpp_objects: dict[str, _pyck.LinearElasticProblem1D] = {}
+        # Build one C++ problem object per patch
+        self._cpp_objects = {}
         for name, patch in self._patches.items():
-            self._cpp_objects[name] = _pyck.LinearElasticProblem1D(
-                patch._cpp_object, element._cpp_object
-            )
+            if self._dim == 2:
+                self._cpp_objects[name] = _pyck.LinearElasticProblem2D(
+                    patch._cpp_object, element._cpp_object
+                )
+            else:
+                self._cpp_objects[name] = _pyck.LinearElasticProblem1D(
+                    patch._cpp_object, element._cpp_object
+                )
 
     # ------------------------------------------------------------------
     # Patch helpers
@@ -203,14 +213,14 @@ class LinearElasticProblem:
 
 
 def create_linear_elastic_problem(
-    patches: Sequence[CurvePatch] | CurvePatch,
+    patches: Sequence[CurvePatch | SurfacePatch] | CurvePatch | SurfacePatch,
     element: Element,
 ) -> LinearElasticProblem:
     """Create a :class:`LinearElasticProblem` assembler.
 
     Parameters
     ----------
-    patches : CurvePatch or list of CurvePatch
+    patches : CurvePatch, SurfacePatch, or list thereof
         The geometry patches.  A single patch may be passed directly
         (it will be wrapped in a list).  Currently only a single patch
         is supported.

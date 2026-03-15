@@ -14,6 +14,7 @@
 #include "euler_bernoulli_beam_1p.hpp"
 #include "timoshenko_beam_1p.hpp"
 #include "timoshenko_beam_2p.hpp"
+#include "kirchhoff_love_plate.hpp"
 #include "condition.hpp"
 #include "load_condition.hpp"
 #include "linear_constraint.hpp"
@@ -323,6 +324,17 @@ PYBIND11_MODULE(_pyck, m) {
         .def(py::init<double, double, double, double, double>(),
              py::arg("E"), py::arg("A"), py::arg("I"), py::arg("G"), py::arg("k") = 5.0 / 6.0);
 
+    // --- 2D Elements ---
+
+    using Elem2D = pyck::Element<double, 2>;
+    py::class_<Elem2D, pyck::Ptr<Elem2D>>(m, "Element2D")
+        .def("num_dofs_per_node", &Elem2D::num_dofs_per_node);
+
+    using KLP = pyck::KirchhoffLovePlate<double>;
+    py::class_<KLP, Elem2D, pyck::Ptr<KLP>>(m, "KirchhoffLovePlate")
+        .def(py::init<double, double, double>(),
+             py::arg("E"), py::arg("nu"), py::arg("h"));
+
     // === Conditions =================================================================
 
     using CondD = pyck::Condition<double>;
@@ -331,6 +343,11 @@ PYBIND11_MODULE(_pyck, m) {
     using LC1D = pyck::LoadCondition<double, 1>;
     py::class_<LC1D, CondD, pyck::Ptr<LC1D>>(m, "LoadCondition1D")
         .def(py::init<const Patch3D1D&, const Elem1D&, const QR1D&, const pyck::Vector<double>&>(),
+             py::arg("patch"), py::arg("element"), py::arg("quadrature"), py::arg("load_values"));
+
+    using LC2D = pyck::LoadCondition<double, 2>;
+    py::class_<LC2D, CondD, pyck::Ptr<LC2D>>(m, "LoadCondition2D")
+        .def(py::init<const Patch3D2D&, const Elem2D&, const QR2D&, const pyck::Vector<double>&>(),
              py::arg("patch"), py::arg("element"), py::arg("quadrature"), py::arg("load_values"));
 
     // === Constraints ================================================================
@@ -377,6 +394,28 @@ PYBIND11_MODULE(_pyck, m) {
         .def("add_direct_constraint", &LEP1D::add_direct_constraint,
              py::arg("constraint"))
         .def("assemble", [](const LEP1D& p) {
+            pyck::Matrix<double> K;
+            pyck::Vector<double> F;
+            p.assemble(K, F);
+            return py::make_tuple(std::move(K), std::move(F));
+        }, "Assemble global stiffness matrix and load vector. Returns (K, F).");
+
+    using LEP2D = pyck::LinearElasticProblem<double, 2>;
+    py::class_<LEP2D>(m, "LinearElasticProblem2D")
+        .def(py::init<const pyck::Ptr<Patch3D2D>&,
+                      const pyck::Ptr<Elem2D>&>(),
+             py::arg("patch"), py::arg("element"))
+        .def("set_quadrature", &LEP2D::set_quadrature,
+             py::arg("quadrature"))
+        .def("add_condition", &LEP2D::add_condition,
+             py::arg("condition"))
+        .def("add_constraint", &LEP2D::add_constraint,
+             py::arg("constraint"))
+        .def("add_constraint", &LEP2D::add_direct_constraint,
+             py::arg("direct_constraint"))
+        .def("add_direct_constraint", &LEP2D::add_direct_constraint,
+             py::arg("constraint"))
+        .def("assemble", [](const LEP2D& p) {
             pyck::Matrix<double> K;
             pyck::Vector<double> F;
             p.assemble(K, F);

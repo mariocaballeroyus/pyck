@@ -27,16 +27,13 @@ EulerBernoulliBeam1P<T>::EulerBernoulliBeam1P(T youngs_modulus,
 template <std::floating_point T>
 Matrix<T> EulerBernoulliBeam1P<T>::shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const
 {
-    // Shape functions for transversal displacement (0-th derivative)
     return shape_derivs[0];
 }
 
 template <std::floating_point T>
 Matrix<T> EulerBernoulliBeam1P<T>::strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const
 {
-    // Strain-displacement matrix (second derivatives for curvature)
-    // To ask for [2], caller must evaluate eval_shape_functions with order >= 2
-    return shape_derivs[2];
+    return shape_derivs[idx::uu];
 }
 
 template <std::floating_point T>
