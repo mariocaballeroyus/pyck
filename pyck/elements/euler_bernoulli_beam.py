@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import pyck._pyck as _pyck
+from pyck.materials import SlenderBeam1d
 
 
 class EulerBernoulliBeam:
@@ -10,51 +11,36 @@ class EulerBernoulliBeam:
 
     Parameters
     ----------
-    E : float
-        Young's modulus.
-    A : float
-        Cross-section area.
-    I : float
-        Second moment of area (moment of inertia).
+    material : SlenderBeam1d
+        Beam material model.
     """
 
-    def __init__(self, E: float, A: float, I: float) -> None:
-        self._cpp_object = _pyck.EulerBernoulliBeam1P(float(E), float(A), float(I))
-        self._E, self._A, self._I = E, A, I
+    def __init__(self, material: SlenderBeam1d) -> None:
+        if not isinstance(material, SlenderBeam1d):
+            raise TypeError("material must be an instance of SlenderBeam1d")
+        self._material = material
+        self._cpp_object = _pyck.EulerBernoulliBeam1p(self._material._cpp_object)
+
+    @property
+    def material(self) -> SlenderBeam1d:
+        return self._material
 
     @property
     def youngs_modulus(self) -> float:
-        """Young's modulus."""
-        return self._E
+        return self._material.youngs_modulus
 
     @property
     def section_area(self) -> float:
-        """Cross-section area."""
-        return self._A
+        return self._material.section_area
 
     @property
     def moment_inertia(self) -> float:
-        """Second moment of area."""
-        return self._I
+        return self._material.moment_inertia
 
     def __repr__(self) -> str:
-        return f"EulerBernoulliBeam(E={self._E}, A={self._A}, I={self._I})"
+        return f"EulerBernoulliBeam(material={self._material})"
 
 
-def create_euler_bernoulli_beam(E: float, A: float, I: float) -> EulerBernoulliBeam:  # noqa: E741
-    """Create an :class:`EulerBernoulliBeam` element.
-
-    Parameters
-    ----------
-    E : float
-        Young's modulus.
-    A : float
-        Cross-section area.
-    I : float
-        Second moment of area (moment of inertia).
-
-    Returns
-    -------
-    EulerBernoulliBeam
-    """
-    return EulerBernoulliBeam(E, A, I)
+def create_euler_bernoulli_beam(material: SlenderBeam1d) -> EulerBernoulliBeam:
+    """Create an :class:`EulerBernoulliBeam` element."""
+    return EulerBernoulliBeam(material)

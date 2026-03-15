@@ -4,40 +4,16 @@ namespace pyck
 {
 
 template <std::floating_point T>
-TimoshenkoBeam1P<T>::TimoshenkoBeam1P(T youngs_modulus,
-                                      T section_area,   
-                                      T moment_inertia,
-                                      T shear_modulus,
-                                      T shear_coefficient)
-    : E_(youngs_modulus), A_(section_area), I_(moment_inertia),
-      G_(shear_modulus), k_(shear_coefficient),
-      Ks_(shear_coefficient * shear_modulus * section_area), 
-      Kb_(youngs_modulus * moment_inertia)
+TimoshenkoBeam1p<T>::TimoshenkoBeam1p(Ptr<SlenderBeam1d<T>> material)
+    : material_(material)
 {
-    if (E_ <= 0) {
-        throw std::invalid_argument("TimoshenkoBeam1P: "
-                                    "Young's modulus must be positive.");
-    }
-    if (A_ <= 0) {
-        throw std::invalid_argument("TimoshenkoBeam1P: "
-                                    "cross-section area must be positive.");
-    }
-    if (I_ <= 0) {
-        throw std::invalid_argument("TimoshenkoBeam1P: "
-                                    "moment of inertia must be positive.");
-    }
-    if (G_ <= 0) {
-        throw std::invalid_argument("TimoshenkoBeam1P: "
-                                    "shear modulus must be positive.");
-    }
-    if (k_ <= 0) {
-        throw std::invalid_argument("TimoshenkoBeam1P: "
-                                    "shear coefficient must be positive.");
+    if (!material_) {
+        throw std::invalid_argument("TimoshenkoBeam1p: material is null.");
     }
 }
 
 template <std::floating_point T>
-Matrix<T> TimoshenkoBeam1P<T>::shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const
+Matrix<T> TimoshenkoBeam1p<T>::shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const
 {
     // Evaluates the generalized shape matrix N_tilde used for load vectors.
     // N_tilde = [N - (Kb/Ks)*N'']
@@ -47,7 +23,7 @@ Matrix<T> TimoshenkoBeam1P<T>::shape_matrix(const std::vector<Matrix<T>>& shape_
     std::size_t n = N[idx::fn].cols();
     
     Matrix<T> N_mat(Q, n);
-    T ratio = Kb_ / Ks_;
+    T ratio = material_->bending_stiffness() / material_->shear_stiffness();
     for (std::size_t q = 0; q < Q; ++q) {
         for (std::size_t i = 0; i < n; ++i) {
             N_mat(q, i) = N[idx::fn](q, i) - ratio * N[idx::uu](q, i);
@@ -57,13 +33,13 @@ Matrix<T> TimoshenkoBeam1P<T>::shape_matrix(const std::vector<Matrix<T>>& shape_
 }
 
 template <std::floating_point T>
-Matrix<T> TimoshenkoBeam1P<T>::strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const
+Matrix<T> TimoshenkoBeam1p<T>::strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const
 {
     const auto& N = shape_derivs;
     std::size_t n = N[idx::uu].cols();
     
     Matrix<T> B(2, n);
-    T ratio = Kb_ / Ks_;
+    T ratio = material_->bending_stiffness() / material_->shear_stiffness();
     for (std::size_t i = 0; i < n; ++i) {
         B(0, i) = N[idx::uu](0, i);
         B(1, i) = -ratio * N[idx::uuu](0, i);
@@ -72,7 +48,7 @@ Matrix<T> TimoshenkoBeam1P<T>::strain_displacement_matrix(const std::vector<Matr
 }
 
 template <std::floating_point T>
-void TimoshenkoBeam1P<T>::compute_local_stiffness(const Patch<T, 1>& patch,
+void TimoshenkoBeam1p<T>::compute_local_stiffness(const Patch<T, 1>& patch,
                                                   const ColMatrix<T, 1>& q_points,
                                                   const Vector<T>& q_weights,
                                                   Index span,
@@ -87,10 +63,10 @@ void TimoshenkoBeam1P<T>::compute_local_stiffness(const Patch<T, 1>& patch,
     stiffness.setZero(n, n);
 
     Matrix<T> D = Matrix<T>::Zero(2, 2);
-    D(0, 0) = Kb_;
-    D(1, 1) = Ks_;
+    D(0, 0) = material_->bending_stiffness();
+    D(1, 1) = material_->shear_stiffness();
     
-    T ratio = Kb_ / Ks_;
+    T ratio = material_->bending_stiffness() / material_->shear_stiffness();
 
     for (std::size_t q = 0; q < Q; ++q) {
         const auto& N = shape_fns;
@@ -108,10 +84,10 @@ void TimoshenkoBeam1P<T>::compute_local_stiffness(const Patch<T, 1>& patch,
 
 // === Template Instantiations ========================================================
 
-template class TimoshenkoBeam1P<double>;
+template class TimoshenkoBeam1p<double>;
 
 #ifdef PYCK_BUILD_SINGLE_PRECISION
-template class TimoshenkoBeam1P<float>;
+template class TimoshenkoBeam1p<float>;
 #endif
 
 } // namespace pyck

@@ -12,13 +12,16 @@
 #include "gauss_legendre.hpp"
 #include "element.hpp"
 #include "euler_bernoulli_beam_1p.hpp"
-#include "timoshenko_beam_1p.hpp"
-#include "timoshenko_beam_2p.hpp"
-#include "kirchhoff_love_plate.hpp"
 #include "condition.hpp"
 #include "load_condition.hpp"
 #include "linear_constraint.hpp"
+#include "timoshenko_beam_1p.hpp"
+#include "timoshenko_beam_2p.hpp"
+#include "kirchhoff_love_plate.hpp"
 #include "linear_elastic_problem.hpp"
+#include "material.hpp"
+#include "slender_beam_1d.hpp"
+#include "plane_stress_2d.hpp"
 
 namespace py = pybind11;
 
@@ -303,26 +306,60 @@ PYBIND11_MODULE(_pyck, m) {
           py::arg("rules"),
           "Form the tensor product of 3 one-dimensional quadrature rules.");
 
+    // === Materials ==================================================================
+
+    using Material1D = pyck::Material<double, 1>;
+    py::class_<Material1D, pyck::Ptr<Material1D>>(m, "Material1D")
+        .def("name", &Material1D::name)
+        .def("youngs_modulus", &Material1D::youngs_modulus)
+        .def("poisson_ratio", &Material1D::poisson_ratio)
+        .def("shear_modulus", &Material1D::shear_modulus)
+        .def("bending_stiffness", &Material1D::bending_stiffness)
+        .def("shear_stiffness", &Material1D::shear_stiffness);
+
+    using SB1D = pyck::SlenderBeam1d<double>;
+    py::class_<SB1D, Material1D, pyck::Ptr<SB1D>>(m, "SlenderBeam1d")
+        .def(py::init<double, double, double, double, double>(),
+             py::arg("E"), py::arg("nu"), py::arg("A"), py::arg("I"), py::arg("k") = 5.0 / 6.0)
+        .def("section_area", &SB1D::section_area)
+        .def("moment_inertia", &SB1D::moment_inertia)
+        .def("shear_coefficient", &SB1D::shear_coefficient);
+
+    using Material2D = pyck::Material<double, 2>;
+    py::class_<Material2D, pyck::Ptr<Material2D>>(m, "Material2D")
+        .def("name", &Material2D::name)
+        .def("youngs_modulus", &Material2D::youngs_modulus)
+        .def("poisson_ratio", &Material2D::poisson_ratio)
+        .def("shear_modulus", &Material2D::shear_modulus)
+        .def("bending_stiffness", &Material2D::bending_stiffness)
+        .def("shear_stiffness", &Material2D::shear_stiffness);
+
+    using PS2D = pyck::PlaneStress2d<double>;
+    py::class_<PS2D, Material2D, pyck::Ptr<PS2D>>(m, "PlaneStress2d")
+        .def(py::init<double, double, double>(),
+             py::arg("E"), py::arg("nu") = 0.3, py::arg("h") = 1.0)
+        .def("thickness", &PS2D::thickness);
+
     // === Elements ===================================================================
 
     using Elem1D = pyck::Element<double, 1>;
     py::class_<Elem1D, pyck::Ptr<Elem1D>>(m, "Element1D")
         .def("num_dofs_per_node", &Elem1D::num_dofs_per_node);
 
-    using EBB = pyck::EulerBernoulliBeam1P<double>;
-    py::class_<EBB, Elem1D, pyck::Ptr<EBB>>(m, "EulerBernoulliBeam1P")
-        .def(py::init<double, double, double>(),
-             py::arg("E"), py::arg("A"), py::arg("I"));
+    using EBB = pyck::EulerBernoulliBeam1p<double>;
+    py::class_<EBB, Elem1D, pyck::Ptr<EBB>>(m, "EulerBernoulliBeam1p")
+        .def(py::init<pyck::Ptr<pyck::SlenderBeam1d<double>>>(),
+             py::arg("material"));
 
-    using TBB1P = pyck::TimoshenkoBeam1P<double>;
-    py::class_<TBB1P, Elem1D, pyck::Ptr<TBB1P>>(m, "TimoshenkoBeam1P")
-        .def(py::init<double, double, double, double, double>(),
-             py::arg("E"), py::arg("A"), py::arg("I"), py::arg("G"), py::arg("k") = 5.0 / 6.0);
+    using TBB1p = pyck::TimoshenkoBeam1p<double>;
+    py::class_<TBB1p, Elem1D, pyck::Ptr<TBB1p>>(m, "TimoshenkoBeam1p")
+        .def(py::init<pyck::Ptr<pyck::SlenderBeam1d<double>>>(),
+             py::arg("material"));
 
-    using TBB = pyck::TimoshenkoBeam2P<double>;
-    py::class_<TBB, Elem1D, pyck::Ptr<TBB>>(m, "TimoshenkoBeam2P")
-        .def(py::init<double, double, double, double, double>(),
-             py::arg("E"), py::arg("A"), py::arg("I"), py::arg("G"), py::arg("k") = 5.0 / 6.0);
+    using TBB2p = pyck::TimoshenkoBeam2p<double>;
+    py::class_<TBB2p, Elem1D, pyck::Ptr<TBB2p>>(m, "TimoshenkoBeam2p")
+        .def(py::init<pyck::Ptr<pyck::SlenderBeam1d<double>>>(),
+             py::arg("material"));
 
     // --- 2D Elements ---
 
@@ -332,8 +369,8 @@ PYBIND11_MODULE(_pyck, m) {
 
     using KLP = pyck::KirchhoffLovePlate<double>;
     py::class_<KLP, Elem2D, pyck::Ptr<KLP>>(m, "KirchhoffLovePlate")
-        .def(py::init<double, double, double>(),
-             py::arg("E"), py::arg("nu"), py::arg("h"));
+        .def(py::init<pyck::Ptr<pyck::PlaneStress2d<double>>>(),
+             py::arg("material"));
 
     // === Conditions =================================================================
 

@@ -1,39 +1,52 @@
-"""Timoshenko beam 1-parameter element."""
+"""1-parameter Timoshenko beam element."""
 
 from __future__ import annotations
 
 import pyck._pyck as _pyck
-from pyck.elements.element import Element
+from pyck.materials import SlenderBeam1d
 
 
-class TimoshenkoBeam1P:
+class TimoshenkoBeam1p:
     """1-parameter Timoshenko beam element.
 
-    Wraps :class:`pyck::TimoshenkoBeam1P<double>`.
+    Wraps :class:`pyck::TimoshenkoBeam1p<double>`.
 
     Parameters
     ----------
-    E : float
-        Young's modulus.
-    A : float
-        Cross-sectional area.
-    I : float
-        Moment of inertia.
-    G : float
-        Shear modulus.
-    k : float, default=5/6
-        Shear correction factor.
+    material : SlenderBeam1d
+        Beam material model.
     """
 
-    def __init__(self, E: float, A: float, I: float, G: float, k: float = 5.0 / 6.0) -> None:
-        self._cpp_object = _pyck.TimoshenkoBeam1P(
-            float(E), float(A), float(I), float(G), float(k)
-        )
-        self.E = float(E)
-        self.A = float(A)
-        self.I = float(I)
-        self.G = float(G)
-        self.k = float(k)
+    def __init__(self, material: SlenderBeam1d) -> None:
+        if not isinstance(material, SlenderBeam1d):
+            raise TypeError("material must be an instance of SlenderBeam1d")
+            
+        self._material = material
+        self._cpp_object = _pyck.TimoshenkoBeam1p(self._material._cpp_object)
+
+    @property
+    def material(self) -> SlenderBeam1d:
+        return self._material
+
+    @property
+    def youngs_modulus(self) -> float:
+        return self._material.youngs_modulus
+
+    @property
+    def shear_modulus(self) -> float:
+        return self._material.shear_modulus
+
+    @property
+    def section_area(self) -> float:
+        return self._material.section_area
+
+    @property
+    def moment_inertia(self) -> float:
+        return self._material.moment_inertia
+
+    @property
+    def shear_coefficient(self) -> float:
+        return self._material.shear_coefficient
 
     def __repr__(self) -> str:
-        return f"TimoshenkoBeam1P({self.E=}, {self.A=}, {self.I=}, {self.G=}, {self.k=})"
+        return f"TimoshenkoBeam1p(material={self._material})"

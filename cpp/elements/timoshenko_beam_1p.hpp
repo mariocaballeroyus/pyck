@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "element.hpp"
+#include "../materials/slender_beam_1d.hpp"
 #include "../types.hpp"
 
 namespace pyck
@@ -12,7 +13,7 @@ namespace pyck
 /// @brief Single-Variable Timoshenko beam element.
 /// @tparam T Scalar type.
 template <std::floating_point T>
-class TimoshenkoBeam1P : public Element<T, 1>
+class TimoshenkoBeam1p : public Element<T, 1>
 {
     using idx = typename Element<T, 1>::idx;
 
@@ -20,24 +21,16 @@ public:
     /**
      * @brief Construct a Timoshenko beam element.
      *
-     * @param youngs_modulus Young's modulus E.
-     * @param section_area Cross-section area A.
-     * @param moment_inertia Moment of inertia I.
-     * @param shear_modulus Shear modulus G.
-     * @param shear_coefficient Shear coefficient k.
+     * @param material Pointer to the beam material model.
      */
-    TimoshenkoBeam1P(T youngs_modulus,
-                     T section_area,
-                     T moment_inertia,
-                     T shear_modulus,
-                     T shear_coefficient = 5.0 / 6.0);
+    TimoshenkoBeam1p(Ptr<SlenderBeam1d<T>> material);
 
     /**
      * @brief Compute the local stiffness matrix for the element.
      * @param patch The patch of the element.
      * @param q_points Quadrature points.
      * @param q_weights Quadrature weights.
-     * @param spans Knot-span index.
+     * @param span Knot-span index.
      * @param stiffness The local stiffness matrix to be computed.
      */
     void compute_local_stiffness(const Patch<T, 1>& patch,
@@ -56,9 +49,8 @@ public:
 
 private:
 
-    /// @brief Material Parameters
-    T E_, I_, A_, G_, k_;
-    T Ks_, Kb_;
+    /// @brief Material and cross section geometry
+    Ptr<SlenderBeam1d<T>> material_;
 
 };
 

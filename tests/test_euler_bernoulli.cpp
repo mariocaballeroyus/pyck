@@ -14,6 +14,8 @@
 #include "linear_elastic_problem.hpp"
 #include "load_condition.hpp"
 #include "direct_constraint.hpp"
+#include "../cpp/materials/slender_beam_1d.hpp"
+#include "../cpp/materials/plane_stress_2d.hpp"
 #include <Eigen/Dense>
 
 using namespace pyck;
@@ -44,18 +46,20 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load", "[assembly][eul
 
     auto curve = std::make_shared<CurvePatch<double>>(basis, control_pts);
 
+    auto material = std::make_shared<SlenderBeam1d<double>>(E, 0.3, A, I);
+
     // 2. Element & Quadrature
-    auto element = std::make_shared<EulerBernoulliBeam1P<double>>(E, A, I);
+    auto beam_elem = std::make_shared<EulerBernoulliBeam1p<double>>(material);
     // Quartic basis requires 5 points for exact bending integral (order 2p-2 = 6, 4 pts gives degree 7)
     auto gauss_rule = std::make_shared<GaussLegendre<double, 1>>(5);
 
     // 3. Problem construction
-    LinearElasticProblem<double, 1> problem(curve, element);
+    LinearElasticProblem<double, 1> problem(curve, beam_elem);
     problem.set_quadrature(gauss_rule);
 
     // 4. Conditions: Uniform Dist Load (1 element, 5 quad points = 5 total)
     Vector<double> load_values = Vector<double>::Constant(5, q);
-    auto load_cond = std::make_shared<LoadCondition<double, 1>>(*curve, *element, *gauss_rule, load_values);
+    auto load_cond = std::make_shared<LoadCondition<double, 1>>(*curve, *beam_elem, *gauss_rule, load_values);
     problem.add_condition(load_cond);
 
     // 5. Assemble Global System
@@ -64,7 +68,7 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load", "[assembly][eul
     problem.assemble(K, F);
 
     // 6. Apply Essential Boundary Conditions (Simply Supported)
-    // - Left end (x=0) constrained vertically (v = 0). For 1P beam, DOFs represent transversal disp.
+    // - Left end (x=0) constrained vertically (v = 0). For 1p beam, DOFs represent transversal disp.
     // - Right end (x=L) constrained vertically (v = 0).
     // In our single patch scalar mapping, DOF 0 is at x=0, and DOF 4 is at x=L.
     std::vector<Index> constrained_dofs = {0, 4}; 
@@ -101,7 +105,7 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load", "[assembly][eul
     double U_num = 0.5 * u.dot(K * u);
     double U_exact = (q * q * std::pow(L, 5)) / (240.0 * E * I);
 
-    // Note: Due to 1P beam approximation and scalar DOF mapping, there might be slight
+    // Note: Due to 1p beam approximation and scalar DOF mapping, there might be slight
     // deviations compared to a full Timoshenko implementation, but for a cubic
     // spline it should be capable of recovering the exact polynomial!
     REQUIRE(v_num == Approx(v_exact).margin(1e-16));
@@ -137,7 +141,8 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load (Cubic Approximat
     auto curve = std::make_shared<CurvePatch<double>>(basis, control_pts);
 
     // Element & Quadrature
-    auto element = std::make_shared<EulerBernoulliBeam1P<double>>(E, A, I);
+    auto material = std::make_shared<SlenderBeam1d<double>>(E, 0.3, A, I);
+    auto element = std::make_shared<EulerBernoulliBeam1p<double>>(material);
     // Cubic basis requires 4 points for exact bending integral (order 2p-2 = 4)
     auto gauss_rule = std::make_shared<GaussLegendre<double, 1>>(4);
 

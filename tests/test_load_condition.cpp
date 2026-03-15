@@ -12,6 +12,8 @@
 #include "euler_bernoulli_beam_1p.hpp"
 #include "load_condition.hpp"
 
+#include "../cpp/materials/slender_beam_1d.hpp"
+
 using namespace pyck;
 
 TEST_CASE("LoadCondition 1D", "[conditions][load_condition]") {
@@ -33,7 +35,8 @@ TEST_CASE("LoadCondition 1D", "[conditions][load_condition]") {
     GaussLegendre<double, 1> gauss_rule(2);
     
     // 2.5 Element to provide N matrix (EulerBernoulli dummy parameters)
-    EulerBernoulliBeam1P<double> element(1.0, 1.0, 1.0);
+    auto material = std::make_shared<SlenderBeam1d<double>>(1.0, 0.3, 1.0, 1.0);
+    EulerBernoulliBeam1p<double> element(material);
 
     SECTION("Constant Body Force") {
         // t(x) = 10.0, with 2 non-zero elements and 2 quad points each = 4 total

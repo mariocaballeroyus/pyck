@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import pyck._pyck as _pyck
 
+from pyck.materials import PlaneStress2d
+
 
 class KirchhoffLovePlate:
     """Kirchhoff-Love thin plate element.
@@ -14,34 +16,36 @@ class KirchhoffLovePlate:
 
     Parameters
     ----------
-    E : float
-        Young's modulus.
-    nu : float
-        Poisson's ratio (must be in [0, 0.5)).
-    h : float
-        Plate thickness.
+    material : PlaneStress2d
+        Plate material model.
     """
 
-    def __init__(self, E: float, nu: float, h: float) -> None:
-        self._cpp_object = _pyck.KirchhoffLovePlate(float(E), float(nu), float(h))
-        self._E, self._nu, self._h = E, nu, h
+    def __init__(self, material: PlaneStress2d) -> None:
+        if not isinstance(material, PlaneStress2d):
+            raise TypeError("material must be an instance of PlaneStress2d")
+        self._material = material
+        self._cpp_object = _pyck.KirchhoffLovePlate(self._material._cpp_object)
+
+    @property
+    def material(self) -> PlaneStress2d:
+        return self._material
 
     @property
     def youngs_modulus(self) -> float:
-        return self._E
+        return self._material.youngs_modulus
 
     @property
     def poisson_ratio(self) -> float:
-        return self._nu
+        return self._material.poisson_ratio
 
     @property
     def thickness(self) -> float:
-        return self._h
+        return self._material.thickness
 
     @property
     def flexural_rigidity(self) -> float:
         """D = E h^3 / (12 (1 - nu^2))."""
-        return self._E * self._h ** 3 / (12.0 * (1.0 - self._nu ** 2))
+        return self.youngs_modulus * self.thickness ** 3 / (12.0 * (1.0 - self.poisson_ratio ** 2))
 
     def __repr__(self) -> str:
-        return f"KirchhoffLovePlate(E={self._E}, nu={self._nu}, h={self._h})"
+        return f"KirchhoffLovePlate(material={self._material})"

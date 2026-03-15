@@ -4,40 +4,16 @@ namespace pyck
 {
 
 template <std::floating_point T>
-TimoshenkoBeam2P<T>::TimoshenkoBeam2P(T youngs_modulus,
-                                      T section_area,   
-                                      T moment_inertia,
-                                      T shear_modulus,
-                                      T shear_coefficient)
-    : E_(youngs_modulus), A_(section_area), I_(moment_inertia),
-      G_(shear_modulus), k_(shear_coefficient),
-      Ks_(shear_coefficient * shear_modulus * section_area), 
-      Kb_(youngs_modulus * moment_inertia)
+TimoshenkoBeam2p<T>::TimoshenkoBeam2p(Ptr<SlenderBeam1d<T>> material)
+    : material_(material)
 {
-    if (E_ <= 0) {
-        throw std::invalid_argument("TimoshenkoBeam2P: "
-                                    "Young's modulus must be positive.");
-    }
-    if (A_ <= 0) {
-        throw std::invalid_argument("TimoshenkoBeam2P: "
-                                    "cross-section area must be positive.");
-    }
-    if (I_ <= 0) {
-        throw std::invalid_argument("TimoshenkoBeam2P: "
-                                    "moment of inertia must be positive.");
-    }
-    if (G_ <= 0) {
-        throw std::invalid_argument("TimoshenkoBeam2P: "
-                                    "shear modulus must be positive.");
-    }
-    if (k_ <= 0) {
-        throw std::invalid_argument("TimoshenkoBeam2P: "
-                                    "shear coefficient must be positive.");
+    if (!material_) {
+        throw std::invalid_argument("TimoshenkoBeam2p: material is null.");
     }
 }
 
 template <std::floating_point T>
-Matrix<T> TimoshenkoBeam2P<T>::shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const
+Matrix<T> TimoshenkoBeam2p<T>::shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const
 {
     const auto& N = shape_derivs;
     std::size_t Q = N[idx::fn].rows();
@@ -54,7 +30,7 @@ Matrix<T> TimoshenkoBeam2P<T>::shape_matrix(const std::vector<Matrix<T>>& shape_
 }
 
 template <std::floating_point T>
-Matrix<T> TimoshenkoBeam2P<T>::strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const
+Matrix<T> TimoshenkoBeam2p<T>::strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const
 {
     // Return B for the first quadrature point (unused in assembly, but kept for interface consistency)
     const auto& N = shape_derivs;
@@ -70,7 +46,7 @@ Matrix<T> TimoshenkoBeam2P<T>::strain_displacement_matrix(const std::vector<Matr
 }
 
 template <std::floating_point T>
-void TimoshenkoBeam2P<T>::compute_local_stiffness(const Patch<T, 1>& patch,
+void TimoshenkoBeam2p<T>::compute_local_stiffness(const Patch<T, 1>& patch,
                                                   const ColMatrix<T, 1>& q_points,
                                                   const Vector<T>& q_weights,
                                                   Index span,
@@ -85,8 +61,8 @@ void TimoshenkoBeam2P<T>::compute_local_stiffness(const Patch<T, 1>& patch,
     stiffness.setZero(2 * n, 2 * n);
 
     Matrix<T> D = Matrix<T>::Zero(2, 2);
-    D(0, 0) = Kb_;
-    D(1, 1) = Ks_;
+    D(0, 0) = material_->bending_stiffness();
+    D(1, 1) = material_->shear_stiffness();
 
     for (std::size_t q = 0; q < Q; ++q) {
         const auto& N = shape_fns;
@@ -105,10 +81,10 @@ void TimoshenkoBeam2P<T>::compute_local_stiffness(const Patch<T, 1>& patch,
 
 // === Template Instantiations ========================================================
 
-template class TimoshenkoBeam2P<double>;
+template class TimoshenkoBeam2p<double>;
 
 #ifdef PYCK_BUILD_SINGLE_PRECISION
-template class TimoshenkoBeam2P<float>;
+template class TimoshenkoBeam2p<float>;
 #endif
 
 } // namespace pyck

@@ -19,12 +19,16 @@ from pyck.geometry import (
 from pyck.elements import (
     EulerBernoulliBeam,
     KirchhoffLovePlate,
-    TimoshenkoBeam1P,
-    TimoshenkoBeam2P,
+    TimoshenkoBeam1p,
+    TimoshenkoBeam2p,
     create_euler_bernoulli_beam,
     create_kirchhoff_love_plate,
     create_timoshenko_beam,
     create_rotation_free_timoshenko_beam,
+)
+from pyck.materials import (
+    SlenderBeam1d,
+    PlaneStress2d,
 )
 from pyck.conditions import (
     LoadCondition,
@@ -76,8 +80,10 @@ __all__ = [
     "create_rectangle",
     "EulerBernoulliBeam",
     "KirchhoffLovePlate",
-    "TimoshenkoBeam1P",
-    "TimoshenkoBeam2P",
+    "TimoshenkoBeam1p",
+    "TimoshenkoBeam2p",
+    "SlenderBeam1d",
+    "PlaneStress2d",
     "create_euler_bernoulli_beam",
     "create_kirchhoff_love_plate",
     "create_timoshenko_beam",

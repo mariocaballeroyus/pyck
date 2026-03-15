@@ -4,40 +4,28 @@ namespace pyck
 {
 
 template <std::floating_point T>
-EulerBernoulliBeam1P<T>::EulerBernoulliBeam1P(T youngs_modulus,
-                                              T section_area,   
-                                              T moment_inertia)
-    : E_(youngs_modulus), A_(section_area), I_(moment_inertia),
-      Kb_(youngs_modulus * moment_inertia)
+EulerBernoulliBeam1p<T>::EulerBernoulliBeam1p(Ptr<SlenderBeam1d<T>> material)
+    : material_(material)
 {
-    if (E_ <= 0) {
-        throw std::invalid_argument("EulerBernoulliBeam1P: "
-                                    "Young's modulus must be positive.");
-    }
-    if (A_ <= 0) {
-        throw std::invalid_argument("EulerBernoulliBeam1P: "
-                                    "cross-section area must be positive.");
-    }
-    if (I_ <= 0) {
-        throw std::invalid_argument("EulerBernoulliBeam1P: "
-                                    "moment of inertia must be positive.");
+    if (!material_) {
+        throw std::invalid_argument("EulerBernoulliBeam1p: material is null.");
     }
 }
 
 template <std::floating_point T>
-Matrix<T> EulerBernoulliBeam1P<T>::shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const
+Matrix<T> EulerBernoulliBeam1p<T>::shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const
 {
     return shape_derivs[0];
 }
 
 template <std::floating_point T>
-Matrix<T> EulerBernoulliBeam1P<T>::strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const
+Matrix<T> EulerBernoulliBeam1p<T>::strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const
 {
     return shape_derivs[idx::uu];
 }
 
 template <std::floating_point T>
-void EulerBernoulliBeam1P<T>::compute_local_stiffness(const Patch<T, 1>& patch,
+void EulerBernoulliBeam1p<T>::compute_local_stiffness(const Patch<T, 1>& patch,
                                                       const ColMatrix<T, 1>& q_points,
                                                       const Vector<T>& q_weights,
                                                       Index span,
@@ -51,16 +39,16 @@ void EulerBernoulliBeam1P<T>::compute_local_stiffness(const Patch<T, 1>& patch,
     // ( B^T EI B ) dV  --> (B * sqrt(EI * dV))^T * (B * sqrt(EI * dV)) = Beq^T Beq
     Matrix<T> B = this->strain_displacement_matrix(shape_fns);
     Matrix<T> Beq = B;
-    Beq.array().colwise() *= (Kb_ * dV).cwiseSqrt().array();
+    Beq.array().colwise() *= (material_->bending_stiffness() * dV).cwiseSqrt().array();
     stiffness.noalias() = Beq.transpose() * Beq;
 }
 
 // === Template Instantiations ========================================================
 
-template class EulerBernoulliBeam1P<double>;
+template class EulerBernoulliBeam1p<double>;
 
 #ifdef PYCK_BUILD_SINGLE_PRECISION
-template class EulerBernoulliBeam1P<float>;
+template class EulerBernoulliBeam1p<float>;
 #endif
 
 } // namespace pyck

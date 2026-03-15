@@ -14,7 +14,8 @@ import numpy as np
 from pyck.constraints.direct_constraint import DirectConstraint
 from pyck.constraints.constraint import LinearConstraint
 from pyck.elements.euler_bernoulli_beam import EulerBernoulliBeam
-from pyck.elements.timoshenko_beam_2p import TimoshenkoBeam2P
+from pyck.elements.timoshenko_beam_1p import TimoshenkoBeam1p
+from pyck.elements.timoshenko_beam_2p import TimoshenkoBeam2p
 
 if TYPE_CHECKING:
     from pyck.elements.element import Element
@@ -90,7 +91,7 @@ def create_direct_rotation_constraint(
     """
     bnd = patch.boundary(_resolve_side(at))
     ndof = element._cpp_object.num_dofs_per_node()
-    if isinstance(element, EulerBernoulliBeam):
+    if isinstance(element, (EulerBernoulliBeam, TimoshenkoBeam1p)):
         pairs = list(zip(bnd.displacement_dofs, bnd.rotation_dofs))
         return LinearConstraint(pairs)
     else:

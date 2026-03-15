@@ -4,30 +4,27 @@
 #include <vector>
 
 #include "element.hpp"
+#include "../materials/slender_beam_1d.hpp"
 #include "../types.hpp"
 
 namespace pyck
 {
 
-/// @brief Euler-Bernoulli beam element with one quadrature point.
-/// @tparam T Scalar type.
+/**
+ * @brief Euler-Bernoulli beam element with one quadrature point.
+ * @tparam T Scalar type.
+ */
 template <std::floating_point T>
-class EulerBernoulliBeam1P : public Element<T, 1>
+class EulerBernoulliBeam1p : public Element<T, 1>
 {
-    
-    using idx = typename Element<T, 1>::idx;
-
 public:
+    using idx = typename Element<T, 1>::idx;
     /**
      * @brief Construct an Euler-Bernoulli beam element.
      *
-     * @param youngs_modulus Young's modulus E.
-     * @param section_area Cross-section area A.
-     * @param moment_inertia Moment of inertia I.
+     * @param material Pointer to the beam material model.
      */
-    EulerBernoulliBeam1P(T youngs_modulus,
-                         T section_area,
-                         T moment_inertia);
+    EulerBernoulliBeam1p(Ptr<SlenderBeam1d<T>> material);
 
     /**
      * @brief Compute the local stiffness matrix for the element.
@@ -50,9 +47,8 @@ public:
     std::size_t num_dofs_per_node() const override { return 1; }
 
 private:
-
-    /// @brief Material Parameters
-    T E_, I_, A_, Kb_;
+    /// @brief Material and cross section geometry
+    Ptr<SlenderBeam1d<T>> material_;
 
 };
 
