@@ -18,7 +18,7 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
 
     // Determine the total number of global DOFs
     const auto& mapper = patch_->dof_mapper();
-    std::size_t ndof = element_->num_dofs_per_node();
+    std::size_t ndof = element_->num_node_dofs();
     std::size_t global_dofs = ndof;
     const auto& num_basis_array = mapper.num_basis();
     for (std::size_t i = 0; i < d; ++i) {
@@ -74,8 +74,11 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
         // Simplify: Map quadrature points using the rule's built-in multi-dimensional logic
         auto [mapped_pts, mapped_weights] = quadrature_->map_to_domain(u_a, u_b);
         
+        // Pre-compute shape functions and Jacobian once per element
+        auto [shape_fns, jac] = patch_->eval_shape_functions(mapped_pts, elem_idx, element_->min_order());
+
         // Gather element contributions (span-local stiffness)
-        element_->compute_local_stiffness(*patch_, mapped_pts, mapped_weights, elem_idx, Ke);
+        element_->compute_local_stiffness(shape_fns, jac, mapped_weights, Ke);
 
         // Scatter local stiffness into global matrix
         auto elem_nodes = mapper.get_element_dofs(elem_idx);

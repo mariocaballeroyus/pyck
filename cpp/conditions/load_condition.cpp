@@ -11,7 +11,7 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
                                    const QuadratureRule<T, d>& quadrature,
                                    const Vector<T>& load_values)
 {
-    const Index ndof = element.num_dofs_per_node();
+    const Index ndof = element.num_node_dofs();
     Index num_nodes = patch.dof_mapper().num_basis()[0]; 
     for (Index i = 1; i < d; ++i) {
         num_nodes *= patch.dof_mapper().num_basis()[i];
@@ -65,7 +65,7 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
         auto [mapped_pts, mapped_weights] = quadrature.map_to_domain(u_a, u_b);
         
         // Evaluate span-local basis functions and Jacobian
-        std::size_t req_order = element.required_shape_order();
+        std::size_t req_order = element.min_order();
         auto [shape_derivs, jacobian] = patch.eval_shape_functions(mapped_pts, elem_idx, req_order);
         
         // Use generalized formulation shape matrix N

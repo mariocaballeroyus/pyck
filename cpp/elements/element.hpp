@@ -22,10 +22,9 @@ class Element
 public:
     virtual ~Element() = default;
 
-    virtual void compute_local_stiffness(const Patch<T, d>& patch,
-                                         const ColMatrix<T, d>& q_points,
+    virtual void compute_local_stiffness(const std::vector<Matrix<T>>& shape_fns,
+                                         const Vector<T>& jacobian,
                                          const Vector<T>& q_weights,
-                                         Index span,
                                          Matrix<T>& stiffness) const = 0;
 
     /// @brief Compute the generalized shape function matrix N.
@@ -36,11 +35,11 @@ public:
     /// @param shape_derivs Pre-evaluated shape functions and their derivatives.
     virtual Matrix<T> strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const = 0;
 
-    /// @brief Get the number of degrees of freedom per node.
-    virtual std::size_t num_dofs_per_node() const = 0;
+    /// @brief Number of DOFs per node.
+    virtual std::size_t num_node_dofs() const = 0;
 
-    /// @brief Get the minimum required derivative order for shape_matrix evaluation in LoadCondition.
-    virtual std::size_t required_shape_order() const { return 0; }
+    /// @brief Required derivative order for shape function evaluation.
+    virtual std::size_t min_order() const = 0;
 
 };
 
@@ -51,20 +50,25 @@ class Element<T, 1>
 public:
     virtual ~Element() = default;
 
-    virtual void compute_local_stiffness(const Patch<T, 1>& patch,
-                                         const ColMatrix<T, 1>& q_points,
+    virtual void compute_local_stiffness(const std::vector<Matrix<T>>& shape_fns,
+                                         const Vector<T>& jacobian,
                                          const Vector<T>& q_weights,
-                                         Index span,
                                          Matrix<T>& stiffness) const = 0;
 
+    
     virtual Matrix<T> shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const = 0;
+
     virtual Matrix<T> strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const = 0;
-    virtual std::size_t num_dofs_per_node() const = 0;
-    virtual std::size_t required_shape_order() const { return 0; }
+    
+    /// @brief Number of DOFs per node
+    virtual std::size_t num_node_dofs() const = 0;
+    
+    /// @brief Minimum required derivative order for shape function evaluation
+    virtual std::size_t min_order() const { return 0; }
 
 protected:
     /// @brief Derivative mapping
-    enum idx { fn = 0, u = 1, uu = 2, uuu = 3 };
+    enum idx { val = 0, d1 = 1, d11 = 2, d111 = 3 };
 };
 
 /// @brief Specialized base class for 2D elements.
@@ -74,20 +78,22 @@ class Element<T, 2>
 public:
     virtual ~Element() = default;
 
-    virtual void compute_local_stiffness(const Patch<T, 2>& patch,
-                                         const ColMatrix<T, 2>& q_points,
+    virtual void compute_local_stiffness(const std::vector<Matrix<T>>& shape_fns,
+                                         const Vector<T>& jacobian,
                                          const Vector<T>& q_weights,
-                                         Index span,
                                          Matrix<T>& stiffness) const = 0;
 
     virtual Matrix<T> shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const = 0;
+
     virtual Matrix<T> strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const = 0;
-    virtual std::size_t num_dofs_per_node() const = 0;
-    virtual std::size_t required_shape_order() const { return 0; }
+    
+    virtual std::size_t num_node_dofs() const = 0;
+    
+    virtual std::size_t min_order() const { return 0; }
 
 protected:
     /// @brief Derivative mapping
-    enum idx { fn = 0, u = 1, v = 2, uu = 3, uv = 4, vv = 5, uuu = 6, uuv = 7, uvv = 8, vvv = 9 };
+    enum idx { val = 0, d1 = 1, d2 = 2, d11 = 3, d12 = 4, d22 = 5, d111 = 6, d112 = 7, d122 = 8, d222 = 9 };
 };
 
 } // namespace pyck

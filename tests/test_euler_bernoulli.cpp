@@ -8,7 +8,7 @@
 #include "curve.hpp"
 #include "bspline.hpp"
 #include "knots.hpp"
-#include "euler_bernoulli_beam_1p.hpp"
+#include "beam_euler_bernoulli_1p.hpp"
 #include "quadrature.hpp"
 #include "gauss_legendre.hpp"
 #include "linear_elastic_problem.hpp"
@@ -49,7 +49,7 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load", "[assembly][eul
     auto material = std::make_shared<SlenderBeam1d<double>>(E, 0.3, A, I);
 
     // 2. Element & Quadrature
-    auto beam_elem = std::make_shared<EulerBernoulliBeam1p<double>>(material);
+    auto beam_elem = std::make_shared<BeamEulerBernoulli1p<double>>(material);
     // Quartic basis requires 5 points for exact bending integral (order 2p-2 = 6, 4 pts gives degree 7)
     auto gauss_rule = std::make_shared<GaussLegendre<double, 1>>(5);
 
@@ -142,7 +142,7 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load (Cubic Approximat
 
     // Element & Quadrature
     auto material = std::make_shared<SlenderBeam1d<double>>(E, 0.3, A, I);
-    auto element = std::make_shared<EulerBernoulliBeam1p<double>>(material);
+    auto element = std::make_shared<BeamEulerBernoulli1p<double>>(material);
     // Cubic basis requires 4 points for exact bending integral (order 2p-2 = 4)
     auto gauss_rule = std::make_shared<GaussLegendre<double, 1>>(4);
 

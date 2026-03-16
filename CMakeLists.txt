@@ -77,11 +77,11 @@ target_link_libraries(pyck_conditions PUBLIC pyck_geometry pyck_assembly)
 
 # Elements library
 add_library(pyck_elements
-    cpp/elements/euler_bernoulli_beam_1p.cpp
-    cpp/elements/timoshenko_beam_1p.cpp
-    cpp/elements/timoshenko_beam_2p.cpp
-    cpp/elements/kirchhoff_love_plate.cpp
-    cpp/elements/reissner_mindlin_plate.cpp
+    cpp/elements/beam_euler_bernoulli_1p.cpp
+    cpp/elements/beam_timoshenko_1p.cpp
+    cpp/elements/beam_timoshenko_2p.cpp
+    cpp/elements/plate_kirchhoff_love_1p.cpp
+    cpp/elements/plate_reissner_mindlin_3p.cpp
 )
 target_include_directories(pyck_elements PUBLIC cpp/elements)
 target_link_libraries(pyck_elements PUBLIC pyck_geometry pyck_assembly pyck_materials)

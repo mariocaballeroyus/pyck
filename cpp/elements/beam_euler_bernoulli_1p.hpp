@@ -1,5 +1,5 @@
-#ifndef PYCK_TIMOSHENKO_BEAM_2P_HPP
-#define PYCK_TIMOSHENKO_BEAM_2P_HPP
+#ifndef PYCK_BEAM_EULER_BERNOULLI_1P_HPP
+#define PYCK_BEAM_EULER_BERNOULLI_1P_HPP
 
 #include <vector>
 
@@ -11,41 +11,46 @@ namespace pyck
 {
 
 /**
- * @brief Timoshenko beam element with two variables (w, theta).
+ * @brief Euler-Bernoulli beam element.
+ *
+ * Pure bending formulation for thin beams.
+ *
  * @tparam T Scalar type.
  */
 template <std::floating_point T>
-class TimoshenkoBeam2p : public Element<T, 1>
+class BeamEulerBernoulli1p : public Element<T, 1>
 {
-public:
+protected:
     using idx = typename Element<T, 1>::idx;
 
+public:
     /**
-     * @brief Construct a Timoshenko beam element.
+     * @brief Construct an Euler-Bernoulli beam element.
      *
-     * @param material Pointer to the beam material model.
+     * @param material Pointer to the slender beam material model.
      */
-    TimoshenkoBeam2p(Ptr<SlenderBeam1d<T>> material);
+    BeamEulerBernoulli1p(Ptr<SlenderBeam1d<T>> material);
 
     /**
      * @brief Compute the local stiffness matrix for the element.
-     * @param patch The patch of the element.
-     * @param q_points Quadrature points.
+     *
+     * @param shape_fns Pre-evaluated shape functions and their derivatives.
+     * @param jacobian Precomputed jacobian of the isoparametric mapping.
      * @param q_weights Quadrature weights.
-     * @param span Knot-span index.
      * @param stiffness The local stiffness matrix to be computed.
      */
-    void compute_local_stiffness(const Patch<T, 1>& patch,
-                                 const ColMatrix<T, 1>& q_points,
+    void compute_local_stiffness(const std::vector<Matrix<T>>& shape_fns,
+                                 const Vector<T>& jacobian,
                                  const Vector<T>& q_weights,
-                                 Index span,
                                  Matrix<T>& stiffness) const override;
 
     Matrix<T> shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
 
     Matrix<T> strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
 
-    std::size_t num_dofs_per_node() const override { return 2; }
+    std::size_t num_node_dofs() const override { return 1; }
+
+    std::size_t min_order() const override { return 2; }
 
 private:
     /// @brief Material and cross section geometry
@@ -55,4 +60,4 @@ private:
 
 } // namespace pyck
 
-#endif // PYCK_TIMOSHENKO_BEAM_2P_HPP
+#endif // PYCK_BEAM_EULER_BERNOULLI_1P_HPP

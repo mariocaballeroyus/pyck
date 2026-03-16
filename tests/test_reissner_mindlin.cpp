@@ -9,7 +9,7 @@
 #include "surface.hpp"
 #include "bspline.hpp"
 #include "knots.hpp"
-#include "reissner_mindlin_plate.hpp"
+#include "plate_reissner_mindlin_3p.hpp"
 #include "quadrature.hpp"
 #include "gauss_legendre.hpp"
 #include "linear_elastic_problem.hpp"
@@ -49,8 +49,10 @@ static Eigen::VectorXd solve_ss_rm_plate(
     auto surface = std::make_shared<SurfacePatch<double>>(
         rectangle<double>(bsp, bsp, a, a));
 
-    auto material = std::make_shared<PlaneStress2d<double>>(E, nu, h);
-    auto element  = std::make_shared<ReissnerMindlinPlate<double>>(material);
+    // 2. Setup Material and Element
+    double k  = 5.0 / 6.0;
+    auto material = std::make_shared<PlaneStress2d<double>>(E, nu, h, k);
+    auto element  = std::make_shared<PlateReissnerMindlin3p<double>>(material);
     auto gauss    = std::make_shared<GaussLegendre<double, 2>>(n_quad);
 
     LinearElasticProblem<double, 2> problem(surface, element);
@@ -70,7 +72,7 @@ static Eigen::VectorXd solve_ss_rm_plate(
     }
 
     const Index Q    = gauss->num_points();
-    const Index ndof = element->num_dofs_per_node();  // = 3
+    const Index ndof = element->num_node_dofs();  // = 3
 
     // load_vals: [q0, 0, 0,  q0, 0, 0, ...] — only the w-DOF gets the load
     Vector<double> load_vals = Vector<double>::Zero(active_elements * Q * ndof);
@@ -117,11 +119,11 @@ TEST_CASE("Reissner-Mindlin Plate element properties", "[RMPlate]")
     double nu = 0.3;
     double h = 0.01;
     auto material = std::make_shared<PlaneStress2d<double>>(E, nu, h);
-    ReissnerMindlinPlate<double> element(material);
+    PlateReissnerMindlin3p<double> element(material);
 
     SECTION("Basic properties") {
-        REQUIRE(element.num_dofs_per_node() == 3);
-        REQUIRE(element.required_shape_order() == 1);
+        REQUIRE(element.num_node_dofs() == 3);
+        REQUIRE(element.min_order() == 1);
     }
 
     SECTION("Constitutive matrices") {
@@ -149,7 +151,7 @@ TEST_CASE("Reissner-Mindlin Plate Stiffness Matrix Size", "[RMPlate]")
     auto surface = std::make_shared<SurfacePatch<double>>(knots, knots, P);
 
     auto material = std::make_shared<PlaneStress2d<double>>(1.0e6, 0.3, 0.1);
-    ReissnerMindlinPlate<double> element(material);
+    PlateReissnerMindlin3p<double> element(material);
 
     Matrix<double> stiffness;
     auto gauss = std::make_shared<GaussLegendre<double, 2>>(p + 1);
@@ -166,7 +168,8 @@ TEST_CASE("Reissner-Mindlin Plate Stiffness Matrix Size", "[RMPlate]")
     // Flat elem_idx = 2 * 5 + 2 = 12.
     Index elem_idx = 12;
 
-    element.compute_local_stiffness(*surface, q_points, q_weights, elem_idx, stiffness);
+    auto [shape_fns, jac] = surface->eval_shape_functions(q_points, elem_idx, element.min_order());
+    element.compute_local_stiffness(shape_fns, jac, q_weights, stiffness);
 
     // 9 nodes * 3 DOFs/node = 27
     REQUIRE(stiffness.rows() == 27);

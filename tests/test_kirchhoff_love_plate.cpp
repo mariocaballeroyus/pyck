@@ -9,7 +9,7 @@
 #include "surface.hpp"
 #include "bspline.hpp"
 #include "knots.hpp"
-#include "kirchhoff_love_plate.hpp"
+#include "plate_kirchhoff_love_1p.hpp"
 #include "quadrature.hpp"
 #include "gauss_legendre.hpp"
 #include "linear_elastic_problem.hpp"
@@ -59,7 +59,7 @@ static Eigen::VectorXd solve_ss_plate(
         rectangle<double>(knots, knots, a, a));
 
     auto material = std::make_shared<PlaneStress2d<double>>(E, nu, h);
-    auto element = std::make_shared<KirchhoffLovePlate<double>>(material);
+    auto element = std::make_shared<PlateKirchhoffLove1p<double>>(material);
     auto gauss   = std::make_shared<GaussLegendre<double, 2>>(n_quad);
 
     LinearElasticProblem<double, 2> problem(surface, element);
@@ -199,7 +199,7 @@ TEST_CASE("KL Plate: SS Uniform Load — Strain Energy Convergence",
     auto surf_f = std::make_shared<SurfacePatch<double>>(
         rectangle<double>(knots_f, knots_f, a, a));
     auto mat_f = std::make_shared<PlaneStress2d<double>>(E, nu, h);
-    auto elem_f = std::make_shared<KirchhoffLovePlate<double>>(mat_f);
+    auto elem_f = std::make_shared<PlateKirchhoffLove1p<double>>(mat_f);
     auto gauss_f = std::make_shared<GaussLegendre<double, 2>>(5);
 
     LinearElasticProblem<double, 2> prob_f(surf_f, elem_f);
@@ -249,7 +249,7 @@ TEST_CASE("KL Plate: SS Uniform Load — Strain Energy Convergence",
     auto surf_c = std::make_shared<SurfacePatch<double>>(
         rectangle<double>(knots_c, knots_c, a, a));
     auto mat_c = std::make_shared<PlaneStress2d<double>>(E, nu, h);
-    auto elem_c = std::make_shared<KirchhoffLovePlate<double>>(mat_c);
+    auto elem_c = std::make_shared<PlateKirchhoffLove1p<double>>(mat_c);
     auto gauss_c = std::make_shared<GaussLegendre<double, 2>>(4);
     LinearElasticProblem<double, 2> prob_c(surf_c, elem_c);
     prob_c.set_quadrature(gauss_c);
@@ -326,7 +326,7 @@ TEST_CASE("KL Plate: Clamped All Edges — Centre Deflection",
     auto surface = std::make_shared<SurfacePatch<double>>(
         rectangle<double>(knots, knots, a, a));
     auto mat = std::make_shared<PlaneStress2d<double>>(E, nu, h);
-    auto element = std::make_shared<KirchhoffLovePlate<double>>(mat);
+    auto element = std::make_shared<PlateKirchhoffLove1p<double>>(mat);
     auto gauss   = std::make_shared<GaussLegendre<double, 2>>(nq);
 
     LinearElasticProblem<double, 2> problem(surface, element);
@@ -420,7 +420,7 @@ TEST_CASE("KL Plate: Mixed BCs (SS/Clamped) — Symmetry Check",
     double h  = 0.01;
     double a  = 1.0;
     auto mat = std::make_shared<PlaneStress2d<double>>(E, nu, h);
-    auto element = std::make_shared<KirchhoffLovePlate<double>>(mat);
+    auto element = std::make_shared<PlateKirchhoffLove1p<double>>(mat);
     double q0 = -1.0;
 
     Index p = 3;

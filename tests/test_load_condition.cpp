@@ -9,7 +9,7 @@
 #include "bspline.hpp"
 #include "curve.hpp"
 #include "gauss_legendre.hpp"
-#include "euler_bernoulli_beam_1p.hpp"
+#include "beam_euler_bernoulli_1p.hpp"
 #include "load_condition.hpp"
 
 #include "../cpp/materials/slender_beam_1d.hpp"
@@ -36,7 +36,7 @@ TEST_CASE("LoadCondition 1D", "[conditions][load_condition]") {
     
     // 2.5 Element to provide N matrix (EulerBernoulli dummy parameters)
     auto material = std::make_shared<SlenderBeam1d<double>>(1.0, 0.3, 1.0, 1.0);
-    EulerBernoulliBeam1p<double> element(material);
+    BeamEulerBernoulli1p<double> element(material);
 
     SECTION("Constant Body Force") {
         // t(x) = 10.0, with 2 non-zero elements and 2 quad points each = 4 total

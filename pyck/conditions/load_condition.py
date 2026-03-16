@@ -74,7 +74,7 @@ class LoadCondition:
             self._patch._cpp_object.eval_physical_points(quadrature._cpp_object)
         )
 
-        ndof = element._cpp_object.num_dofs_per_node()
+        ndof = element._cpp_object.num_node_dofs()
         num_pts = x_3d.shape[0]
 
         if self._dim == 2:

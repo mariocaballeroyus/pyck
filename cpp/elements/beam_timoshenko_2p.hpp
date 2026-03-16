@@ -1,5 +1,5 @@
-#ifndef PYCK_TIMOSHENKO_BEAM_1P_HPP
-#define PYCK_TIMOSHENKO_BEAM_1P_HPP
+#ifndef PYCK_BEAM_TIMOSHENKO_2P_HPP
+#define PYCK_BEAM_TIMOSHENKO_2P_HPP
 
 #include <vector>
 
@@ -10,20 +10,30 @@
 namespace pyck
 {
 
-/// @brief Single-Variable Timoshenko beam element.
-/// @tparam T Scalar type.
+/**
+ * @brief Timoshenko beam element.
+ *
+ * Standard 2-parameter formulation (w, theta) accounting
+ * for shear deformation.
+ *
+ * Sign convention: kappa = theta,x; gamma = w,x + theta
+ *
+ * @tparam T Scalar type.
+ */
 template <std::floating_point T>
-class TimoshenkoBeam1p : public Element<T, 1>
+class BeamTimoshenko2p : public Element<T, 1>
 {
+protected:
     using idx = typename Element<T, 1>::idx;
 
 public:
+
     /**
      * @brief Construct a Timoshenko beam element.
      *
-     * @param material Pointer to the beam material model.
+     * @param material Pointer to the slender beam material model.
      */
-    TimoshenkoBeam1p(Ptr<SlenderBeam1d<T>> material);
+    BeamTimoshenko2p(Ptr<SlenderBeam1d<T>> material);
 
     /**
      * @brief Compute the local stiffness matrix for the element.
@@ -33,22 +43,20 @@ public:
      * @param span Knot-span index.
      * @param stiffness The local stiffness matrix to be computed.
      */
-    void compute_local_stiffness(const Patch<T, 1>& patch,
-                                 const ColMatrix<T, 1>& q_points,
+    void compute_local_stiffness(const std::vector<Matrix<T>>& shape_fns,
+                                 const Vector<T>& jacobian,
                                  const Vector<T>& q_weights,
-                                 Index span,
                                  Matrix<T>& stiffness) const override;
 
     Matrix<T> shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
 
     Matrix<T> strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
 
-    std::size_t num_dofs_per_node() const override { return 1; }
+    std::size_t num_node_dofs() const override { return 2; }
 
-    std::size_t required_shape_order() const override { return 2; }
+    std::size_t min_order() const override { return 1; }
 
 private:
-
     /// @brief Material and cross section geometry
     Ptr<SlenderBeam1d<T>> material_;
 
@@ -56,4 +64,4 @@ private:
 
 } // namespace pyck
 
-#endif // PYCK_TIMOSHENKO_BEAM_1P_HPP
+#endif // PYCK_BEAM_TIMOSHENKO_2P_HPP

@@ -13,9 +13,9 @@ import numpy as np
 
 from pyck.constraints.direct_constraint import DirectConstraint
 from pyck.constraints.constraint import LinearConstraint
-from pyck.elements.euler_bernoulli_beam import EulerBernoulliBeam
-from pyck.elements.timoshenko_beam_1p import TimoshenkoBeam1p
-from pyck.elements.timoshenko_beam_2p import TimoshenkoBeam2p
+from pyck.elements.beam_euler_bernoulli_1p import BeamEulerBernoulli1p
+from pyck.elements.beam_timoshenko_1p import BeamTimoshenko1p
+from pyck.elements.beam_timoshenko_2p import BeamTimoshenko2p
 
 if TYPE_CHECKING:
     from pyck.elements.element import Element
@@ -52,12 +52,12 @@ def create_direct_displacement_constraint(
     value : float
         Prescribed displacement (default 0).
     element : Element | None
-        The element formulation, used to scale DOFs if `num_dofs_per_node > 1`.
+        The element formulation, used to scale DOFs if `num_node_dofs > 1`.
     """
     bnd = patch.boundary(_resolve_side(at))
     dofs = np.asarray(bnd.displacement_dofs, dtype=int)
     if element is not None:
-        ndof = element._cpp_object.num_dofs_per_node()
+        ndof = element._cpp_object.num_node_dofs()
         dofs = dofs * ndof
     return DirectConstraint(dofs.tolist(), value)
 
@@ -90,8 +90,8 @@ def create_direct_rotation_constraint(
         Prescribed rotation (default 0).
     """
     bnd = patch.boundary(_resolve_side(at))
-    ndof = element._cpp_object.num_dofs_per_node()
-    if isinstance(element, (EulerBernoulliBeam, TimoshenkoBeam1p)):
+    ndof = element._cpp_object.num_node_dofs()
+    if isinstance(element, (BeamEulerBernoulli1p, BeamTimoshenko1p)):
         pairs = list(zip(bnd.displacement_dofs, bnd.rotation_dofs))
         return LinearConstraint(pairs)
     else:
@@ -128,7 +128,7 @@ def create_plate_displacement_constraint(
     bnd = patch.boundary(at)
     dofs = np.asarray(bnd.displacement_dofs, dtype=int)
     if element is not None:
-        ndof = element._cpp_object.num_dofs_per_node()
+        ndof = element._cpp_object.num_node_dofs()
         dofs = dofs * ndof
     return DirectConstraint(dofs.tolist(), value)
 
@@ -156,7 +156,7 @@ def create_plate_clamped_constraint(
     bnd = patch.boundary(at)
     nodal_indices = np.asarray(bnd.boundary_dofs, dtype=int)
     if element is not None:
-        ndof = element._cpp_object.num_dofs_per_node()
+        ndof = element._cpp_object.num_node_dofs()
         if ndof == 1:
             # Kirchhoff–Love: boundary_dofs includes both the outermost layer
             # and the adjacent layer — both are needed to enforce C1 (slope = 0).
