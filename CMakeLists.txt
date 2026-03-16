@@ -57,12 +57,16 @@ add_library(pyck_quadrature
 target_include_directories(pyck_quadrature PUBLIC cpp/quadrature)
 target_link_libraries(pyck_quadrature PUBLIC eigen)
 
+# Materials library (header-only)
+add_library(pyck_materials INTERFACE)
+target_include_directories(pyck_materials INTERFACE ${CMAKE_SOURCE_DIR}/cpp/materials)
+
 # Assembler library
 add_library(pyck_assembly
     cpp/assembly/linear_elastic_problem.cpp
 )
 target_include_directories(pyck_assembly PUBLIC cpp/assembly)
-target_link_libraries(pyck_assembly PUBLIC eigen pyck_elements pyck_conditions pyck_constraints pyck_quadrature)
+target_link_libraries(pyck_assembly PUBLIC eigen pyck_elements pyck_conditions pyck_constraints pyck_quadrature pyck_materials)
 
 # Conditions library
 add_library(pyck_conditions
@@ -77,9 +81,10 @@ add_library(pyck_elements
     cpp/elements/timoshenko_beam_1p.cpp
     cpp/elements/timoshenko_beam_2p.cpp
     cpp/elements/kirchhoff_love_plate.cpp
+    cpp/elements/reissner_mindlin_plate.cpp
 )
 target_include_directories(pyck_elements PUBLIC cpp/elements)
-target_link_libraries(pyck_elements PUBLIC pyck_geometry pyck_assembly)
+target_link_libraries(pyck_elements PUBLIC pyck_geometry pyck_assembly pyck_materials)
 
 
 # pybind11
@@ -87,7 +92,7 @@ add_subdirectory(external/pybind11)
 
 # Python module
 pybind11_add_module(_pyck cpp/bindings.cpp)
-target_link_libraries(_pyck PRIVATE pyck_basis pyck_geometry pyck_elements pyck_conditions pyck_constraints pyck_assembly)
+target_link_libraries(_pyck PRIVATE pyck_basis pyck_geometry pyck_elements pyck_conditions pyck_constraints pyck_assembly pyck_materials)
 set_target_properties(_pyck PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/pyck")
 install(TARGETS _pyck DESTINATION pyck)
 
@@ -108,13 +113,13 @@ add_executable(test_dof_mapper tests/test_dof_mapper.cpp)
 target_link_libraries(test_dof_mapper PRIVATE pyck_geometry catch)
 
 add_executable(test_load_condition tests/test_load_condition.cpp)
-target_link_libraries(test_load_condition PRIVATE pyck_conditions pyck_assembly pyck_basis catch)
+target_link_libraries(test_load_condition PRIVATE pyck_conditions pyck_assembly pyck_basis pyck_materials catch)
 
 add_executable(test_quadrature tests/test_quadrature.cpp)
 target_link_libraries(test_quadrature PRIVATE pyck_quadrature catch)
 
 add_executable(test_euler_bernoulli tests/test_euler_bernoulli.cpp)
-target_link_libraries(test_euler_bernoulli PRIVATE pyck_elements pyck_conditions pyck_constraints pyck_assembly pyck_geometry pyck_basis catch)
+target_link_libraries(test_euler_bernoulli PRIVATE pyck_elements pyck_conditions pyck_constraints pyck_assembly pyck_geometry pyck_basis pyck_materials catch)
 
 add_executable(test_constraints tests/test_constraints.cpp)
 target_link_libraries(test_constraints PRIVATE pyck_constraints pyck_assembly catch)
@@ -123,7 +128,10 @@ add_executable(test_surface tests/test_surface.cpp)
 target_link_libraries(test_surface PRIVATE pyck_geometry catch)
 
 add_executable(test_kirchhoff_love_plate tests/test_kirchhoff_love_plate.cpp)
-target_link_libraries(test_kirchhoff_love_plate PRIVATE pyck_elements pyck_conditions pyck_constraints pyck_assembly pyck_geometry pyck_basis catch)
+target_link_libraries(test_kirchhoff_love_plate PRIVATE pyck_elements pyck_conditions pyck_constraints pyck_assembly pyck_geometry pyck_basis pyck_materials catch)
+
+add_executable(test_reissner_mindlin tests/test_reissner_mindlin.cpp)
+target_link_libraries(test_reissner_mindlin PRIVATE pyck_elements pyck_conditions pyck_constraints pyck_assembly pyck_geometry pyck_basis pyck_materials catch)
 
 enable_testing()
 add_test(NAME knot_vector_tests COMMAND test_knot_vector)
@@ -137,3 +145,4 @@ add_test(NAME euler_bernoulli_tests COMMAND test_euler_bernoulli)
 add_test(NAME constraints_tests COMMAND test_constraints)
 add_test(NAME surface_tests COMMAND test_surface)
 add_test(NAME kirchhoff_love_plate_tests COMMAND test_kirchhoff_love_plate)
+add_test(NAME reissner_mindlin_tests COMMAND test_reissner_mindlin)

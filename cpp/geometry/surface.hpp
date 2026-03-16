@@ -114,10 +114,11 @@ public:
     const DofMapper<2>& dof_mapper() const override
     { return dof_mapper_; }
 
-private:
-
+public:
     /// @brief Decode a flat element index into per-direction span indices.
     std::array<Index, 2> decode_span(Index flat_idx) const;
+
+private:
 
     /// @brief Tensor product of the two 1D bases.
     TensorProduct<T, 2> tensor_product_;

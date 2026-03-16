@@ -110,6 +110,7 @@ def create_plate_displacement_constraint(
     *,
     at: str,
     value: float = 0.0,
+    element: Element | None = None,
 ) -> DirectConstraint:
     """Constrain displacement DOFs on a surface patch boundary edge.
 
@@ -121,9 +122,15 @@ def create_plate_displacement_constraint(
         Which boundary edge.
     value : float
         Prescribed displacement (default 0).
+    element : Element | None
+        The element formulation (to scale DOFs if ndof > 1).
     """
     bnd = patch.boundary(at)
-    return DirectConstraint(list(bnd.displacement_dofs), value)
+    dofs = np.asarray(bnd.displacement_dofs, dtype=int)
+    if element is not None:
+        ndof = element._cpp_object.num_dofs_per_node()
+        dofs = dofs * ndof
+    return DirectConstraint(dofs.tolist(), value)
 
 
 def create_plate_clamped_constraint(
@@ -131,6 +138,7 @@ def create_plate_clamped_constraint(
     *,
     at: str,
     value: float = 0.0,
+    element: Element | None = None,
 ) -> DirectConstraint:
     """Constrain both displacement and rotation DOFs (clamped BC).
 
@@ -142,6 +150,21 @@ def create_plate_clamped_constraint(
         Which boundary edge.
     value : float
         Prescribed displacement/rotation (default 0).
+    element : Element | None
+        The element formulation (to scale DOFs if ndof > 1).
     """
     bnd = patch.boundary(at)
-    return DirectConstraint(list(bnd.boundary_dofs), value)
+    nodal_indices = np.asarray(bnd.boundary_dofs, dtype=int)
+    if element is not None:
+        ndof = element._cpp_object.num_dofs_per_node()
+        if ndof == 1:
+            # Kirchhoff–Love: boundary_dofs includes both the outermost layer
+            # and the adjacent layer — both are needed to enforce C1 (slope = 0).
+            return DirectConstraint(nodal_indices.tolist(), value)
+        else:
+            # Reissner–Mindlin (ndof=3): constrain all DOFs [w, θ_x, θ_y]
+            # only at the outermost boundary nodes (displacement_dofs).
+            disp_nodes = np.asarray(bnd.displacement_dofs, dtype=int)
+            all_dofs = [int(i * ndof + d) for i in disp_nodes for d in range(ndof)]
+            return DirectConstraint(all_dofs, value)
+    return DirectConstraint(nodal_indices.tolist(), value)
