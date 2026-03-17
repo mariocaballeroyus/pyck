@@ -68,7 +68,7 @@ PYBIND11_MODULE(_pyck, m) {
     // === BoundaryPatch (1D parent) ================================================
 
     using BoundaryPatch1D = pyck::BoundaryPatch<double, 1>;
-    py::class_<BoundaryPatch1D, pyck::Ptr<BoundaryPatch1D>>(m, "BoundaryPatch1D")
+    py::class_<BoundaryPatch1D, pyck::Ptr<BoundaryPatch1D>>(m, "BoundaryPatch1d")
         .def("boundary_dofs", &BoundaryPatch1D::boundary_dofs)
         .def("displacement_dofs", &BoundaryPatch1D::displacement_dofs)
         .def("rotation_dofs", &BoundaryPatch1D::rotation_dofs)
@@ -87,7 +87,8 @@ PYBIND11_MODULE(_pyck, m) {
         .def("boundary_dofs", &Patch3D1D::boundary_dofs,
              py::arg("param_dim"), py::arg("at_start"))
         .def("dof_mapper", &Patch3D1D::dof_mapper,
-             py::return_value_policy::reference_internal)
+             py::return_value_policy::reference_internal,
+             "Return the DofMapper of this patch.")
         .def("active_control_pts", &Patch3D1D::active_control_pts,
              py::arg("spans"))
         .def("boundary", [](pyck::Ptr<Patch3D1D> self, std::size_t param_dim, bool at_start) {
@@ -130,7 +131,7 @@ PYBIND11_MODULE(_pyck, m) {
     // === Surface Patch (2D) =========================================================
 
     using BoundaryPatch2D = pyck::BoundaryPatch<double, 2>;
-    py::class_<BoundaryPatch2D, pyck::Ptr<BoundaryPatch2D>>(m, "BoundaryPatch2D")
+    py::class_<BoundaryPatch2D, pyck::Ptr<BoundaryPatch2D>>(m, "BoundaryPatch2d")
         .def("boundary_dofs", &BoundaryPatch2D::boundary_dofs)
         .def("displacement_dofs", &BoundaryPatch2D::displacement_dofs)
         .def("rotation_dofs", &BoundaryPatch2D::rotation_dofs)
@@ -149,7 +150,8 @@ PYBIND11_MODULE(_pyck, m) {
         .def("boundary_dofs", &Patch3D2D::boundary_dofs,
              py::arg("param_dim"), py::arg("at_start"))
         .def("dof_mapper", &Patch3D2D::dof_mapper,
-             py::return_value_policy::reference_internal)
+             py::return_value_policy::reference_internal,
+             "Return the DofMapper of this patch.")
         .def("active_control_pts", &Patch3D2D::active_control_pts,
              py::arg("spans"))
         .def("boundary", [](pyck::Ptr<Patch3D2D> self, std::size_t param_dim, bool at_start) {
@@ -200,7 +202,7 @@ PYBIND11_MODULE(_pyck, m) {
     // === DOF Mapping ================================================================
 
     using DofMapper2D = pyck::DofMapper<2>;
-    py::class_<DofMapper2D>(m, "DofMapper2D")
+    py::class_<DofMapper2D>(m, "DofMapper2d")
         .def("get_boundary_dofs", &DofMapper2D::get_boundary_dofs,
              py::arg("param_dim"), py::arg("at_start"))
         .def("get_displacement_boundary_dofs", &DofMapper2D::get_displacement_boundary_dofs,
@@ -216,7 +218,7 @@ PYBIND11_MODULE(_pyck, m) {
     // === DOF Mapping ================================================================
 
     using DofMapper1D = pyck::DofMapper<1>;
-    py::class_<DofMapper1D>(m, "DofMapper1D")
+    py::class_<DofMapper1D>(m, "DofMapper1d")
         .def("get_boundary_dofs", &DofMapper1D::get_boundary_dofs,
              py::arg("param_dim"), py::arg("at_start"))
         .def("get_displacement_boundary_dofs", &DofMapper1D::get_displacement_boundary_dofs,
@@ -232,16 +234,13 @@ PYBIND11_MODULE(_pyck, m) {
     // === Quadrature =================================================================
 
     using QR1D = pyck::QuadratureRule<double, 1>;
-    py::class_<QR1D, pyck::Ptr<QR1D>>(m, "QuadratureRule1D")
+    py::class_<QR1D, pyck::Ptr<QR1D>>(m, "QuadratureRule1d")
         .def("points", &QR1D::points, py::return_value_policy::reference_internal)
         .def("weights", &QR1D::weights, py::return_value_policy::reference_internal)
-        .def("num_points", &QR1D::num_points)
-        .def("map_to_domain", [](const QR1D& self, double lo, double hi) {
-            return self.map_to_domain(std::array<double, 1>{lo}, std::array<double, 1>{hi});
-        }, py::arg("lo"), py::arg("hi"));
+        .def("num_points", &QR1D::num_points);
 
     using QR2D = pyck::QuadratureRule<double, 2>;
-    py::class_<QR2D, pyck::Ptr<QR2D>>(m, "QuadratureRule2D")
+    py::class_<QR2D, pyck::Ptr<QR2D>>(m, "QuadratureRule2d")
         .def(py::init<const QR1D&>(), py::arg("rule"))
         .def(py::init<std::array<const QR1D*, 2>>(), py::arg("rules"))
         .def("points", &QR2D::points, py::return_value_policy::reference_internal)
@@ -249,7 +248,7 @@ PYBIND11_MODULE(_pyck, m) {
         .def("num_points", &QR2D::num_points);
 
     using QR3D = pyck::QuadratureRule<double, 3>;
-    py::class_<QR3D, pyck::Ptr<QR3D>>(m, "QuadratureRule3D")
+    py::class_<QR3D, pyck::Ptr<QR3D>>(m, "QuadratureRule3d")
         .def(py::init<const QR1D&>(), py::arg("rule"))
         .def(py::init<std::array<const QR1D*, 3>>(), py::arg("rules"))
         .def("points", &QR3D::points, py::return_value_policy::reference_internal)
@@ -261,11 +260,11 @@ PYBIND11_MODULE(_pyck, m) {
         .def(py::init<std::size_t>(), py::arg("num_pts"));
 
     using GL2D = pyck::GaussLegendre<double, 2>;
-    py::class_<GL2D, QR2D, pyck::Ptr<GL2D>>(m, "GaussLegendre2D")
+    py::class_<GL2D, QR2D, pyck::Ptr<GL2D>>(m, "GaussLegendre2d")
         .def(py::init<std::size_t>(), py::arg("num_pts"));
 
     using GL3D = pyck::GaussLegendre<double, 3>;
-    py::class_<GL3D, QR3D, pyck::Ptr<GL3D>>(m, "GaussLegendre3D")
+    py::class_<GL3D, QR3D, pyck::Ptr<GL3D>>(m, "GaussLegendre3d")
         .def(py::init<std::size_t>(), py::arg("num_pts"));
 
     // Legacy Tensor-product utilities (can be deprecated eventually)
@@ -296,7 +295,7 @@ PYBIND11_MODULE(_pyck, m) {
     // === Materials ==================================================================
 
     using Material1D = pyck::Material<double, 1>;
-    py::class_<Material1D, pyck::Ptr<Material1D>>(m, "Material1D")
+    py::class_<Material1D, pyck::Ptr<Material1D>>(m, "Material1d")
         .def("name", &Material1D::name)
         .def("youngs_modulus", &Material1D::youngs_modulus)
         .def("poisson_ratio", &Material1D::poisson_ratio)
@@ -313,7 +312,7 @@ PYBIND11_MODULE(_pyck, m) {
         .def("shear_coefficient", &SB1D::shear_coefficient);
 
     using Material2D = pyck::Material<double, 2>;
-    py::class_<Material2D, pyck::Ptr<Material2D>>(m, "Material2D")
+    py::class_<Material2D, pyck::Ptr<Material2D>>(m, "Material2d")
         .def("name", &Material2D::name)
         .def("youngs_modulus", &Material2D::youngs_modulus)
         .def("poisson_ratio", &Material2D::poisson_ratio)
@@ -331,7 +330,7 @@ PYBIND11_MODULE(_pyck, m) {
     // === Elements ===================================================================
 
     using Elem1D = pyck::Element<double, 1>;
-    py::class_<Elem1D, pyck::Ptr<Elem1D>>(m, "Element1D")
+    py::class_<Elem1D, pyck::Ptr<Elem1D>>(m, "Element1d")
         .def("num_node_dofs", &Elem1D::num_node_dofs);
 
     using EBB = pyck::BeamEulerBernoulli1p<double>;
@@ -352,7 +351,7 @@ PYBIND11_MODULE(_pyck, m) {
     // --- 2D Elements ---
 
     using Elem2D = pyck::Element<double, 2>;
-    py::class_<Elem2D, pyck::Ptr<Elem2D>>(m, "Element2D")
+    py::class_<Elem2D, pyck::Ptr<Elem2D>>(m, "Element2d")
         .def("num_node_dofs", &Elem2D::num_node_dofs);
 
     using KLP = pyck::PlateKirchhoffLove1p<double>;
@@ -376,12 +375,12 @@ PYBIND11_MODULE(_pyck, m) {
     py::class_<CondD, pyck::Ptr<CondD>>(m, "Condition");
 
     using LC1D = pyck::LoadCondition<double, 1>;
-    py::class_<LC1D, CondD, pyck::Ptr<LC1D>>(m, "LoadCondition1D")
+    py::class_<LC1D, CondD, pyck::Ptr<LC1D>>(m, "LoadCondition1d")
         .def(py::init<const Patch3D1D&, const Elem1D&, const QR1D&, const pyck::Vector<double>&>(),
              py::arg("patch"), py::arg("element"), py::arg("quadrature"), py::arg("load_values"));
 
     using LC2D = pyck::LoadCondition<double, 2>;
-    py::class_<LC2D, CondD, pyck::Ptr<LC2D>>(m, "LoadCondition2D")
+    py::class_<LC2D, CondD, pyck::Ptr<LC2D>>(m, "LoadCondition2d")
         .def(py::init<const Patch3D2D&, const Elem2D&, const QR2D&, const pyck::Vector<double>&>(),
              py::arg("patch"), py::arg("element"), py::arg("quadrature"), py::arg("load_values"));
 
@@ -414,12 +413,11 @@ PYBIND11_MODULE(_pyck, m) {
     // === Assembly ===================================================================
 
     using LEP1D = pyck::LinearElasticProblem<double, 1>;
-    py::class_<LEP1D>(m, "LinearElasticProblem1D")
+    py::class_<LEP1D>(m, "LinearElasticProblem1d")
         .def(py::init<const pyck::Ptr<Patch3D1D>&,
-                      const pyck::Ptr<Elem1D>&>(),
-             py::arg("patch"), py::arg("element"))
-        .def("set_quadrature", &LEP1D::set_quadrature,
-             py::arg("quadrature"))
+                      const pyck::Ptr<Elem1D>&,
+                      const pyck::Ptr<QR1D>&>(),
+             py::arg("patch"), py::arg("element"), py::arg("quadrature"))
         .def("add_condition", &LEP1D::add_condition,
              py::arg("condition"))
         .def("add_constraint", &LEP1D::add_constraint,
@@ -436,12 +434,11 @@ PYBIND11_MODULE(_pyck, m) {
         }, "Assemble global stiffness matrix and load vector. Returns (K, F).");
 
     using LEP2D = pyck::LinearElasticProblem<double, 2>;
-    py::class_<LEP2D>(m, "LinearElasticProblem2D")
+    py::class_<LEP2D>(m, "LinearElasticProblem2d")
         .def(py::init<const pyck::Ptr<Patch3D2D>&,
-                      const pyck::Ptr<Elem2D>&>(),
-             py::arg("patch"), py::arg("element"))
-        .def("set_quadrature", &LEP2D::set_quadrature,
-             py::arg("quadrature"))
+                      const pyck::Ptr<Elem2D>&,
+                      const pyck::Ptr<QR2D>&>(),
+             py::arg("patch"), py::arg("element"), py::arg("quadrature"))
         .def("add_condition", &LEP2D::add_condition,
              py::arg("condition"))
         .def("add_constraint", &LEP2D::add_constraint,
@@ -506,7 +503,7 @@ PYBIND11_MODULE(_pyck, m) {
          });
 
     using Patch3D1DF = pyck::Patch<float, 1>;
-    py::class_<Patch3D1DF, pyck::Ptr<Patch3D1DF>>(m, "Patch3D1D32")
+    py::class_<Patch3D1DF, pyck::Ptr<Patch3D1DF>>(m, "Patch3d1d32")
         .def("gdim", &Patch3D1DF::gdim)
         .def("tdim", &Patch3D1DF::tdim)
         .def("control_pts",

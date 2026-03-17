@@ -62,8 +62,7 @@ static Eigen::VectorXd solve_ss_plate(
     auto element = std::make_shared<PlateKirchhoffLove1p<double>>(material);
     auto gauss   = std::make_shared<GaussLegendre<double, 2>>(n_quad);
 
-    LinearElasticProblem<double, 2> problem(surface, element);
-    problem.set_quadrature(gauss);
+    LinearElasticProblem<double, 2> problem(surface, element, gauss);
 
     // Uniform load: all quadrature points get the same value q0
     auto intervals = surface->tensor_product().num_intervals();
@@ -202,8 +201,7 @@ TEST_CASE("KL Plate: SS Uniform Load — Strain Energy Convergence",
     auto elem_f = std::make_shared<PlateKirchhoffLove1p<double>>(mat_f);
     auto gauss_f = std::make_shared<GaussLegendre<double, 2>>(5);
 
-    LinearElasticProblem<double, 2> prob_f(surf_f, elem_f);
-    prob_f.set_quadrature(gauss_f);
+    LinearElasticProblem<double, 2> prob_f(surf_f, elem_f, gauss_f);
 
     auto intervals_f = surf_f->tensor_product().num_intervals();
     Index total_f = intervals_f[0] * intervals_f[1];
@@ -251,8 +249,7 @@ TEST_CASE("KL Plate: SS Uniform Load — Strain Energy Convergence",
     auto mat_c = std::make_shared<PlaneStress2d<double>>(E, nu, h);
     auto elem_c = std::make_shared<PlateKirchhoffLove1p<double>>(mat_c);
     auto gauss_c = std::make_shared<GaussLegendre<double, 2>>(4);
-    LinearElasticProblem<double, 2> prob_c(surf_c, elem_c);
-    prob_c.set_quadrature(gauss_c);
+    LinearElasticProblem<double, 2> prob_c(surf_c, elem_c, gauss_c);
 
     auto intervals_c = surf_c->tensor_product().num_intervals();
     Index total_c = intervals_c[0] * intervals_c[1];
@@ -329,8 +326,7 @@ TEST_CASE("KL Plate: Clamped All Edges — Centre Deflection",
     auto element = std::make_shared<PlateKirchhoffLove1p<double>>(mat);
     auto gauss   = std::make_shared<GaussLegendre<double, 2>>(nq);
 
-    LinearElasticProblem<double, 2> problem(surface, element);
-    problem.set_quadrature(gauss);
+    LinearElasticProblem<double, 2> problem(surface, element, gauss);
 
     auto intervals = surface->tensor_product().num_intervals();
     Index total_elements = intervals[0] * intervals[1];
@@ -432,8 +428,7 @@ TEST_CASE("KL Plate: Mixed BCs (SS/Clamped) — Symmetry Check",
         rectangle<double>(knots, knots, a, a));
     auto gauss   = std::make_shared<GaussLegendre<double, 2>>(p + 1);
 
-    LinearElasticProblem<double, 2> problem(surface, element);
-    problem.set_quadrature(gauss);
+    LinearElasticProblem<double, 2> problem(surface, element, gauss);
 
     auto intervals = surface->tensor_product().num_intervals();
     Index total = intervals[0] * intervals[1];

@@ -3,7 +3,7 @@
 from pyck.assembly.assembler import LinearElasticProblem, create_linear_elastic_problem
 from pyck.assembly.gauss import (
     GaussLegendre,
-    GaussLegendre2D,
+    GaussLegendre2d,
     create_gauss_legendre,
     create_gauss_legendre_2d,
 )
@@ -11,7 +11,7 @@ from pyck.assembly.gauss import (
 
 __all__ = [
     "GaussLegendre",
-    "GaussLegendre2D",
+    "GaussLegendre2d",
     "LinearElasticProblem",
     "create_gauss_legendre",
     "create_gauss_legendre_2d",

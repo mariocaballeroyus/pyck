@@ -101,8 +101,7 @@ static Eigen::VectorXd solve_ss_rm1p_plate(
     auto element  = std::make_shared<PlateReissnerMindlin1p<double>>(material);
     auto gauss    = std::make_shared<GaussLegendre<double, 2>>(n_quad);
 
-    LinearElasticProblem<double, 2> problem(surface, element);
-    problem.set_quadrature(gauss);
+    LinearElasticProblem<double, 2> problem(surface, element, gauss);
 
     // Count active elements
     Index num_spans = bsp->knot_vector().num_spans();
@@ -360,8 +359,7 @@ TEST_CASE("RM 1P Plate: strain energy convergence (thin plate)", "[RM1P]")
     auto element  = std::make_shared<PlateReissnerMindlin1p<double>>(material);
     auto gauss    = std::make_shared<GaussLegendre<double, 2>>(p + 2);
 
-    LinearElasticProblem<double, 2> problem(surf, element);
-    problem.set_quadrature(gauss);
+    LinearElasticProblem<double, 2> problem(surf, element, gauss);
 
     Index num_spans = bsp->knot_vector().num_spans();
     Index total_elements = num_spans * num_spans;
@@ -430,8 +428,7 @@ TEST_CASE("RM 1P Plate: shear-locking-free across slenderness ratios", "[RM1P]")
         auto element  = std::make_shared<PlateReissnerMindlin1p<double>>(material);
         auto gauss    = std::make_shared<GaussLegendre<double, 2>>(p + 2);
 
-        LinearElasticProblem<double, 2> problem(surf, element);
-        problem.set_quadrature(gauss);
+        LinearElasticProblem<double, 2> problem(surf, element, gauss);
 
         Index num_spans = bsp->knot_vector().num_spans();
         Index total = num_spans * num_spans;

@@ -38,15 +38,10 @@ public:
      * @param element The finite element formulation (e.g. EulerBernoulliBeam1P).
      */
     LinearElasticProblem(const Ptr<Patch<T, d>>& patch,
-                         const Ptr<Element<T, d>>& element)
-        : patch_(patch), element_(element), quadrature_(nullptr) {}
+                         const Ptr<Element<T, d>>& element,
+                         const Ptr<QuadratureRule<T, d>>& quadrature)
+        : patch_(patch), element_(element), quadrature_(quadrature) {}
 
-    /**
-     * @param quadrature A d-dimensional quadrature rule.
-     */
-    void set_quadrature(const Ptr<QuadratureRule<T, d>>& quadrature) {
-        quadrature_ = quadrature;
-    }
 
     /**
      * @brief Add a boundary condition (e.g. LoadCondition, DisplacementCondition, RotationCondition) to the system.

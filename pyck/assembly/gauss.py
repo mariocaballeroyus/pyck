@@ -1,193 +1,176 @@
-"""Gauss-Legendre quadrature rules."""
-
+"""Gauss-Legendre quadrature rules for different topological dimensions."""
+ 
 from __future__ import annotations
-
-from typing import Sequence
-
+ 
+from typing import Sequence, Union, overload
+ 
 import numpy as np
 import numpy.typing as npt
-
+ 
 import pyck._pyck as _pyck
-from pyck.assembly.quadrature import QuadratureRule
-
-
+ 
+ 
 class GaussLegendre:
-    """Gauss-Legendre quadrature on [-1, 1] (strictly one-dimensional).
-
-    Tensor-product methods are provided to extrapolate the 1D rule to
-    surface or volume geometries without changing the stored rule itself.
-
+    """Gauss-Legendre tensor-product quadrature rule.
+ 
+    This class provides a unified interface for 1D, 2D, and 3D Gauss-Legendre
+    quadrature rules. It wraps the underlying C++ implementations and ensures
+    consistent array shapes across dimensions.
+ 
     Parameters
     ----------
-    num_points : int
-        Number of integration points.  An *n*-point rule integrates
-        polynomials up to degree *2n − 1* exactly.
+    num_points : int or Sequence[int]
+        Number of integration points per direction. For 2D and 3D, if an
+        integer is provided, the same number of points is used in each
+        parametric direction (uniform rule). If a sequence is provided, its
+        length must match ``dim``.
+    dim : int, optional
+        Topological dimension (1, 2, or 3). If not provided, it is inferred
+        from ``num_points`` if it's a sequence, otherwise defaults to 1.
     """
-
-    _cpp_object: _pyck.GaussLegendre
-    _points_view: np.ndarray
-    _weights_view: np.ndarray
-
-    def __init__(self, num_points: int) -> None:
-        self._cpp_object = _pyck.GaussLegendre(int(num_points))
-        self._points_view = np.asarray(self._cpp_object.points())
-        self._weights_view = np.asarray(self._cpp_object.weights())
-
+ 
+    _cpp_object: Union[_pyck.GaussLegendre, _pyck.GaussLegendre2d, _pyck.GaussLegendre3d]
+    _dim: int
+ 
+    @overload
+    def __init__(self, num_points: int, dim: int = 1) -> None: ...
+ 
+    @overload
+    def __init__(self, num_points: Sequence[int], dim: int | None = None) -> None: ...
+ 
+    def __init__(
+        self, num_points: int | Sequence[int], dim: int | None = None
+    ) -> None:
+        if isinstance(num_points, Sequence):
+            if dim is not None and len(num_points) != dim:
+                raise ValueError(
+                    f"Length of num_points ({len(num_points)}) must match dim ({dim})"
+                )
+            dim = len(num_points)
+            if not all(n == num_points[0] for n in num_points):
+                raise NotImplementedError(
+                    "Non-uniform number of points per direction is not yet supported "
+                    "by the C++ backend for tensor-product rules."
+                )
+            num_points = num_points[0]
+ 
+        if dim is None:
+            dim = 1
+ 
+        if dim == 1:
+            self._cpp_object = _pyck.GaussLegendre(int(num_points))
+        elif dim == 2:
+            self._cpp_object = _pyck.GaussLegendre2d(int(num_points))
+        elif dim == 3:
+            self._cpp_object = _pyck.GaussLegendre3d(int(num_points))
+        else:
+            raise ValueError(f"Unsupported dimension: {dim}")
+ 
+        self._dim = dim
+ 
     @classmethod
-    def _from_cpp(cls, cpp_obj: _pyck.GaussLegendre) -> GaussLegendre:
-        """Wrap an existing C++ GaussLegendre object."""
+    def _from_cpp(
+        cls, cpp_obj: Union[_pyck.GaussLegendre, _pyck.GaussLegendre2d, _pyck.GaussLegendre3d]
+    ) -> GaussLegendre:
+        """Wrap an existing C++ Gauss-Legendre object.
+ 
+        Parameters
+        ----------
+        cpp_obj : C++ object
+            Underlying C++ quadrature rule from :module:`_pyck`.
+ 
+        Returns
+        -------
+        GaussLegendre
+            Python wrapper for the C++ rule.
+        """
         obj = object.__new__(cls)
         obj._cpp_object = cpp_obj
-        obj._points_view = np.asarray(obj._cpp_object.points())
-        obj._weights_view = np.asarray(obj._cpp_object.weights())
+        if isinstance(cpp_obj, _pyck.GaussLegendre):
+            obj._dim = 1
+        elif isinstance(cpp_obj, _pyck.GaussLegendre2d):
+            obj._dim = 2
+        else:
+            obj._dim = 3
         return obj
-
+ 
     @property
     def points(self) -> npt.NDArray[np.float64]:
-        """1D quadrature points on the reference element, shape `(Q,)`."""
-        return self._points_view
-
+        """Quadrature points on the reference element.
+ 
+        Returns
+        -------
+        ndarray, shape `(Q, dim)`
+            Array of quadrature points where `Q` is the total number of points.
+        """
+        pts = np.asarray(self._cpp_object.points())
+        if self._dim == 1 and pts.ndim == 1:
+            return pts[:, np.newaxis]
+        return pts
+ 
     @property
     def weights(self) -> npt.NDArray[np.float64]:
-        """1D quadrature weights, shape `(Q,)`."""
-        return self._weights_view
-
+        """Quadrature weights.
+ 
+        Returns
+        -------
+        ndarray, shape `(Q,)`
+            Array of quadrature weights.
+        """
+        wts = np.asarray(self._cpp_object.weights())
+        if wts.ndim > 1:
+            return wts.ravel()
+        return wts
+ 
     @property
     def num_points(self) -> int:
-        """Number of 1D quadrature points."""
+        """Total number of integration points."""
         return self._cpp_object.num_points()
-
-    # === 1D Domain Mapping ===========================================================
-
-    def map_to_domain(
-        self, lo: float, hi: float
-    ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
-        """Map the 1D reference points/weights from [-1, 1] to [lo, hi].
-
-        Parameters
-        ----------
-        lo : float
-            Lower bound of the target interval.
-        hi : float
-            Upper bound of the target interval.
-
-        Returns
-        -------
-        points : ndarray, shape `(Q,)`
-            Mapped quadrature points.
-        weights : ndarray, shape `(Q,)`
-            Mapped quadrature weights.
-        """
-        pts, wts = self._cpp_object.map_to_domain(lo, hi)
-        return np.asarray(pts), np.asarray(wts)
-
-    # === Tensor-Product Methods ======================================================
-
-    def tensor_product(
-        self,
-        *others: QuadratureRule,
-    ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
-        """Form the tensor product of this rule with zero or more additional 1D rules.
-
-        When called with no arguments, the result is identical to the 1D rule
-        itself (points reshaped to `(Q, 1)`).
-
-        Parameters
-        ----------
-        *others : QuadratureRule
-            Additional 1D quadrature rules (one per extra parametric direction).
-
-        Returns
-        -------
-        points : ndarray, shape `(Q_total, d)`
-            Tensor-product quadrature points.
-        weights : ndarray, shape `(Q_total,)`
-            Tensor-product quadrature weights.
-
-        Examples
-        --------
-        >>> gl = GaussLegendre(3)
-        >>> pts_2d, wts_2d = gl.tensor_product(gl)   # 3×3 = 9-point 2D rule
-        >>> pts_3d, wts_3d = gl.tensor_product(gl, gl)  # 27-point 3D rule
-        """
-        all_rules = [self] + list(others)
-        d = len(all_rules)
-
-        if d == 1:
-            pts, wts = _pyck.tensor_product_1d(self._cpp_object)
-        elif d == 2:
-            pts, wts = _pyck.tensor_product_2d(
-                all_rules[0]._cpp_object, all_rules[1]._cpp_object
-            )
-        elif d == 3:
-            pts, wts = _pyck.tensor_product_3d(
-                all_rules[0]._cpp_object,
-                all_rules[1]._cpp_object,
-                all_rules[2]._cpp_object,
-            )
-        else:
-            raise ValueError(f"Tensor product not supported for d={d}")
-
-        return np.asarray(pts), np.asarray(wts)
-
-    # === Dunder Methods ==============================================================
-
+ 
+    @property
+    def dim(self) -> int:
+        """Topological dimension of the quadrature rule."""
+        return self._dim
+ 
     def __len__(self) -> int:
-        """Number of 1D quadrature points."""
-        return self._cpp_object.num_points()
-
+        """Total number of quadrature points."""
+        return self.num_points
+ 
     def __repr__(self) -> str:
-        return f"GaussLegendre(num_points={self.num_points})"
-
-
-def create_gauss_legendre(num_points: int) -> GaussLegendre:
+        return f"GaussLegendre(num_points={self.num_points}, dim={self._dim})"
+ 
+ 
+def create_gauss_legendre(num_points: int, dim: int = 1) -> GaussLegendre:
     """Create a :class:`GaussLegendre` quadrature rule.
-
-    Parameters
-    ----------
-    num_points : int
-        Number of integration points.
-
-    Returns
-    -------
-    GaussLegendre
-    """
-    return GaussLegendre(num_points)
-
-
-class GaussLegendre2D:
-    """Gauss-Legendre tensor-product quadrature rule for 2D patches.
-
-    Parameters
-    ----------
-    num_points : int
-        Number of integration points **per direction**.  The total number
-        of quadrature points is ``num_points ** 2``.
-    """
-
-    _cpp_object: _pyck.GaussLegendre2D
-
-    def __init__(self, num_points: int) -> None:
-        self._cpp_object = _pyck.GaussLegendre2D(int(num_points))
-
-    @property
-    def num_points(self) -> int:
-        return self._cpp_object.num_points()
-
-    def __repr__(self) -> str:
-        return f"GaussLegendre2D(num_points={self.num_points})"
-
-
-def create_gauss_legendre_2d(num_points: int) -> GaussLegendre2D:
-    """Create a 2D tensor-product Gauss-Legendre quadrature rule.
-
+ 
     Parameters
     ----------
     num_points : int
         Number of integration points per direction.
-
+    dim : int, optional
+        Topological dimension (1, 2, or 3). Defaults to 1.
+ 
     Returns
     -------
-    GaussLegendre2D
+    GaussLegendre
     """
-    return GaussLegendre2D(num_points)
+    return GaussLegendre(num_points, dim=dim)
+ 
+ 
+def create_gauss_legendre_2d(num_points: int) -> GaussLegendre:
+    """Create a 2D tensor-product Gauss-Legendre quadrature rule.
+ 
+    Parameters
+    ----------
+    num_points : int
+        Number of integration points per direction.
+ 
+    Returns
+    -------
+    GaussLegendre
+    """
+    return GaussLegendre(num_points, dim=2)
+ 
+ 
+# Alias for backward compatibility
+GaussLegendre2d = GaussLegendre

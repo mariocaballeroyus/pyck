@@ -49,7 +49,7 @@ from pyck.constraints import (
 )
 from pyck.assembly import (
     GaussLegendre,
-    GaussLegendre2D,
+    GaussLegendre2d,
     LinearElasticProblem,
     create_gauss_legendre,
     create_gauss_legendre_2d,
@@ -106,7 +106,7 @@ __all__ = [
     "create_plate_displacement_constraint",
     "create_plate_clamped_constraint",
     "GaussLegendre",
-    "GaussLegendre2D",
+    "GaussLegendre2d",
     "LinearElasticProblem",
     "create_gauss_legendre",
     "create_gauss_legendre_2d",

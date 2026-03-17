@@ -55,8 +55,7 @@ static Eigen::VectorXd solve_ss_rm_plate(
     auto element  = std::make_shared<PlateReissnerMindlin3p<double>>(material);
     auto gauss    = std::make_shared<GaussLegendre<double, 2>>(n_quad);
 
-    LinearElasticProblem<double, 2> problem(surface, element);
-    problem.set_quadrature(gauss);
+    LinearElasticProblem<double, 2> problem(surface, element, gauss);
 
     // Count active (non-zero-volume) elements to size the load vector
     Index num_spans = bsp->knot_vector().num_spans();

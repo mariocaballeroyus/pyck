@@ -53,9 +53,7 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load", "[assembly][eul
     // Quartic basis requires 5 points for exact bending integral (order 2p-2 = 6, 4 pts gives degree 7)
     auto gauss_rule = std::make_shared<GaussLegendre<double, 1>>(5);
 
-    // 3. Problem construction
-    LinearElasticProblem<double, 1> problem(curve, beam_elem);
-    problem.set_quadrature(gauss_rule);
+    LinearElasticProblem<double, 1> problem(curve, beam_elem, gauss_rule);
 
     // 4. Conditions: Uniform Dist Load (1 element, 5 quad points = 5 total)
     Vector<double> load_values = Vector<double>::Constant(5, q);
@@ -146,9 +144,7 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load (Cubic Approximat
     // Cubic basis requires 4 points for exact bending integral (order 2p-2 = 4)
     auto gauss_rule = std::make_shared<GaussLegendre<double, 1>>(4);
 
-    // Problem construction
-    LinearElasticProblem<double, 1> problem(curve, element);
-    problem.set_quadrature(gauss_rule);
+    LinearElasticProblem<double, 1> problem(curve, element, gauss_rule);
 
     // Conditions: Uniform Dist Load (2 elements, 4 quad points each = 8 total)
     Vector<double> load_values = Vector<double>::Constant(8, q);
