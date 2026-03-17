@@ -69,13 +69,17 @@ public:
      *   - result[3]  = N_{;uu}     (second covariant derivative)
      *   - result[4]  = N_{;uv}     (mixed second covariant derivative)
      *   - result[5]  = N_{;vv}     (second covariant derivative)
+     *   - result[6]  = N_{;uuu}    (third covariant derivative)
+     *   - result[7]  = N_{;uuv}    (third covariant derivative)
+     *   - result[8]  = N_{;uvv}    (third covariant derivative)
+     *   - result[9]  = N_{;vvv}    (third covariant derivative)
      *
      * where the second covariant derivative includes the Christoffel correction:
      *   N_{;αβ} = N_{,αβ} − Γ^γ_{αβ} N_{,γ}
      *
      * @param points  Evaluation points in parametric coordinates (Q × 2).
      * @param span    Flat element index.
-     * @param order   Highest derivative order (clamped to [1, 2]).
+     * @param order   Highest derivative order (clamped to [1, 3]).
      * @return Pair of (derivative matrices, Jacobian vector of size Q).
      */
     std::pair<std::vector<Matrix<T>>, Vector<T>>

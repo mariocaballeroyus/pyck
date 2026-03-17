@@ -19,6 +19,7 @@
 #include "beam_timoshenko_2p.hpp"
 #include "plate_kirchhoff_love_1p.hpp"
 #include "plate_reissner_mindlin_3p.hpp"
+#include "plate_reissner_mindlin_1p.hpp"
 #include "linear_elastic_problem.hpp"
 #include "material.hpp"
 #include "slender_beam_1d.hpp"
@@ -376,6 +377,11 @@ PYBIND11_MODULE(_pyck, m) {
 
     using RMP = pyck::PlateReissnerMindlin3p<double>;
     py::class_<RMP, Elem2D, pyck::Ptr<RMP>>(m, "PlateReissnerMindlin3p")
+        .def(py::init<pyck::Ptr<pyck::PlaneStress2d<double>>>(),
+             py::arg("material"));
+
+    using RM1P = pyck::PlateReissnerMindlin1p<double>;
+    py::class_<RM1P, Elem2D, pyck::Ptr<RM1P>>(m, "PlateReissnerMindlin1p")
         .def(py::init<pyck::Ptr<pyck::PlaneStress2d<double>>>(),
              py::arg("material"));
 

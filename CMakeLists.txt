@@ -82,6 +82,7 @@ add_library(pyck_elements
     cpp/elements/beam_timoshenko_2p.cpp
     cpp/elements/plate_kirchhoff_love_1p.cpp
     cpp/elements/plate_reissner_mindlin_3p.cpp
+    cpp/elements/plate_reissner_mindlin_1p.cpp
 )
 target_include_directories(pyck_elements PUBLIC cpp/elements)
 target_link_libraries(pyck_elements PUBLIC pyck_geometry pyck_assembly pyck_materials)
@@ -133,6 +134,9 @@ target_link_libraries(test_kirchhoff_love_plate PRIVATE pyck_elements pyck_condi
 add_executable(test_reissner_mindlin tests/test_reissner_mindlin.cpp)
 target_link_libraries(test_reissner_mindlin PRIVATE pyck_elements pyck_conditions pyck_constraints pyck_assembly pyck_geometry pyck_basis pyck_materials catch)
 
+add_executable(test_reissner_mindlin_1p tests/test_reissner_mindlin_1p.cpp)
+target_link_libraries(test_reissner_mindlin_1p PRIVATE pyck_elements pyck_conditions pyck_constraints pyck_assembly pyck_geometry pyck_basis pyck_materials catch)
+
 enable_testing()
 add_test(NAME knot_vector_tests COMMAND test_knot_vector)
 add_test(NAME bspline_tests COMMAND test_bspline)
@@ -146,3 +150,4 @@ add_test(NAME constraints_tests COMMAND test_constraints)
 add_test(NAME surface_tests COMMAND test_surface)
 add_test(NAME kirchhoff_love_plate_tests COMMAND test_kirchhoff_love_plate)
 add_test(NAME reissner_mindlin_tests COMMAND test_reissner_mindlin)
+add_test(NAME reissner_mindlin_1p_tests COMMAND test_reissner_mindlin_1p)
