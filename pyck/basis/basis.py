@@ -1,44 +1,63 @@
+"""Abstract base class for one-dimensional basis function families.
+
+Defines the shared interface and implementation for B-splines and other
+polynomial bases, including knot vector access and derivative evaluation.
+"""
+
+from __future__ import annotations
+
 from abc import ABC, abstractmethod
-from typing import Any, Optional
+from functools import cached_property
 
 import numpy as np
-import numpy.typing as npt
+
+import pyck._pyck as _pyck
 
 from pyck.basis.knot_vector import KnotVector
 
 
 class Basis(ABC):
     """Abstract base class for one-dimensional basis function families."""
+    
+    _cpp_object: _pyck.Basis
+    _knot_vector: KnotVector
 
-    _cpp_object: Any
+    def __init__(self, kv: KnotVector) -> None:
+        self._knot_vector = kv
+
+    @classmethod
+    @abstractmethod
+    def _from_cpp(cls, cpp_obj: _pyck.Basis) -> Basis: 
+        """Wrap an existing C++ `Basis` object."""
 
     @property
-    @abstractmethod
-    def degree(self) -> int:
-        """Polynomial degree."""
-        ...
-
-    @property
-    @abstractmethod
-    def num_basis(self) -> int:
-        """Number of basis functions."""
-        ...
-
-    @property
-    @abstractmethod
     def knot_vector(self) -> KnotVector:
         """The :class:`KnotVector` associated with this basis."""
-        ...
+        return self._knot_vector
 
     @property
-    @abstractmethod
-    def knots(self) -> npt.NDArray[np.float64]:
-        """Zero-copy view of the raw knot values."""
-        ...
+    def knots(self) -> np.ndarray:
+        """Read-only access to the raw knot values."""
+        return self._knot_vector.knots
+
+    @cached_property
+    def degree(self) -> int:
+        """Polynomial degree of the basis functions."""
+        return self._cpp_object.degree()
+
+    @cached_property
+    def num_basis(self) -> int:
+        """Number of basis functions."""
+        return self._cpp_object.num_basis()
+
+    @cached_property
+    def num_intervals(self) -> int:
+        """Number of knot intervals."""
+        return self._cpp_object.num_intervals()
 
     def eval_all(
-        self, u: npt.ArrayLike, order: int = 0
-    ) -> npt.NDArray[np.float64] | list[npt.NDArray[np.float64]]:
+        self, u: np.ndarray, order: int = 0
+    ) -> list[np.ndarray]:
         """Evaluate all basis functions and their derivatives.
 
         Parameters
@@ -50,17 +69,14 @@ class Basis(ABC):
 
         Returns
         -------
-        matrix or list of matrices
-            If order=0, returns an (m, n) matrix.
-            If order > 0, returns a list of (order+1) (m, n) matrices.
+        list of ndarray
+            A list of (order+1) matrices, where results[k] contains the k-th
+            order derivatives (k=0, 1, ..., order). Each matrix has shape
+            (m, n) with m evaluation points and n basis functions.
+            When order=0, returns a single-element list.
         """
-        pts = np.atleast_1d(u).astype(np.float64)
-        deriv_list = self._cpp_object.eval_all(pts, int(order))
-        
-        results = [np.asarray(m) for m in deriv_list]
-        return results[0] if order == 0 else results
+        if order < 0:
+            raise ValueError(f"order must be non-negative, got {order}")
 
-    def __repr__(self) -> str:
-        """String representation of the basis."""
-        return f"Basis(degree={self.degree}, num_basis={self.num_basis})"
-        
+        pts = np.asarray(np.atleast_1d(u), dtype=np.float64)
+        return self._cpp_object.eval_all(pts, order)

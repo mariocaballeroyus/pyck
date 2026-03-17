@@ -33,6 +33,8 @@ PYBIND11_MODULE(_pyck, m) {
     py::class_<BasisD, pyck::Ptr<BasisD>>(m, "Basis")
         .def("degree", &BasisD::degree)
         .def("num_basis", &BasisD::num_basis)
+        .def("num_intervals", &BasisD::num_intervals)
+        .def("find_span", &BasisD::find_span, py::arg("u"))
         .def("eval", &BasisD::eval_on_span,
              py::arg("u"), py::arg("span"), py::arg("order") = 0)
         .def("eval_all", &BasisD::eval_all,
@@ -45,10 +47,6 @@ PYBIND11_MODULE(_pyck, m) {
              py::arg("knots"))
         .def_static("clamped_uniform", &pyck::clamped_uniform_knots<double>,
              py::arg("degree"), py::arg("num_basis"))
-        .def("size", &KnotVectorD::size)
-        .def("num_basis", &KnotVectorD::num_basis,
-             py::arg("degree"))
-        .def("num_spans", &KnotVectorD::num_spans)
         .def("span_bounds", &KnotVectorD::span_bounds,
              py::arg("span"))
         .def("find_span", &KnotVectorD::find_span,
@@ -58,23 +56,14 @@ PYBIND11_MODULE(_pyck, m) {
                  kv.size(),
                  kv.data().data(),
                  py::cast(&kv));
-         })
-        .def("__getitem__", [](const KnotVectorD& kv, std::size_t i) {
-             return kv[i];
-         })
-        .def("__len__", &KnotVectorD::size);
+         });
 
     using BSplineD = pyck::BSpline<double>;
     py::class_<BSplineD, BasisD, pyck::Ptr<BSplineD>>(m, "BSpline")
         .def(py::init<std::size_t, KnotVectorD>(),
              py::arg("degree"), py::arg("knot_vector"))
-        .def("knots", [](BSplineD& bs) {
-             const auto& v = bs.knots();
-             return py::array_t<double>(
-                 v.size(),
-                 v.data(),
-                 py::cast(&bs));
-         });
+        .def("knot_vector", &BSplineD::knot_vector,
+             py::return_value_policy::reference_internal);
 
     // === BoundaryPatch (1D parent) ================================================
 
@@ -87,7 +76,7 @@ PYBIND11_MODULE(_pyck, m) {
         .def("at_start", &BoundaryPatch1D::at_start);
 
     using Patch3D1D = pyck::Patch<double, 1>;
-    py::class_<Patch3D1D, pyck::Ptr<Patch3D1D>>(m, "Patch3D1D")
+    py::class_<Patch3D1D, pyck::Ptr<Patch3D1D>>(m, "Patch1d")
         .def("gdim", &Patch3D1D::gdim)
         .def("tdim", &Patch3D1D::tdim)
         .def("control_pts",
@@ -112,9 +101,9 @@ PYBIND11_MODULE(_pyck, m) {
 
     using CurvePatch3D = pyck::CurvePatch<double>;
     py::class_<CurvePatch3D, Patch3D1D, pyck::Ptr<CurvePatch3D>>(m, "CurvePatch")
-        .def(py::init([](pyck::Ptr<BSplineD> basis,
+        .def(py::init([](pyck::Ptr<BasisD> basis,
                          const pyck::ColMatrix<double, 3>& cp) {
-                 return std::make_shared<CurvePatch3D>(std::static_pointer_cast<BasisD>(basis), cp);
+                 return std::make_shared<CurvePatch3D>(basis, cp);
              }),
              py::arg("basis"),
              py::arg("control_points"))
@@ -131,10 +120,9 @@ PYBIND11_MODULE(_pyck, m) {
              py::arg("params"), py::arg("span"));
 
     // line_segment factory
-    m.def("line_segment", [](pyck::Ptr<BSplineD> basis, double length) {
+    m.def("line_segment", [](pyck::Ptr<BasisD> basis, double length) {
             return std::make_shared<CurvePatch3D>(
-                pyck::line_segment<double>(
-                    std::static_pointer_cast<const BasisD>(basis), length));
+                pyck::line_segment<double>(basis, length));
         },
         py::arg("basis"), py::arg("length"),
         "Create a straight line segment C(u) = (L*u, 0, 0) along the x-axis.");
@@ -150,7 +138,7 @@ PYBIND11_MODULE(_pyck, m) {
         .def("at_start", &BoundaryPatch2D::at_start);
 
     using Patch3D2D = pyck::Patch<double, 2>;
-    py::class_<Patch3D2D, pyck::Ptr<Patch3D2D>>(m, "Patch3D2D")
+    py::class_<Patch3D2D, pyck::Ptr<Patch3D2D>>(m, "Patch2d")
         .def("gdim", &Patch3D2D::gdim)
         .def("tdim", &Patch3D2D::tdim)
         .def("control_pts",
@@ -175,12 +163,12 @@ PYBIND11_MODULE(_pyck, m) {
 
     using SurfacePatch3D = pyck::SurfacePatch<double>;
     py::class_<SurfacePatch3D, Patch3D2D, pyck::Ptr<SurfacePatch3D>>(m, "SurfacePatch")
-        .def(py::init([](pyck::Ptr<BSplineD> basis_u,
-                         pyck::Ptr<BSplineD> basis_v,
+        .def(py::init([](pyck::Ptr<BasisD> basis_u,
+                         pyck::Ptr<BasisD> basis_v,
                          const pyck::ColMatrix<double, 3>& cp) {
                  return std::make_shared<SurfacePatch3D>(
-                     std::static_pointer_cast<BasisD>(basis_u),
-                     std::static_pointer_cast<BasisD>(basis_v),
+                     basis_u,
+                     basis_v,
                      cp);
              }),
              py::arg("basis_u"),
@@ -199,14 +187,11 @@ PYBIND11_MODULE(_pyck, m) {
              py::arg("params"), py::arg("span"));
 
     // rectangle factory
-    m.def("rectangle", [](pyck::Ptr<BSplineD> basis_u,
-                           pyck::Ptr<BSplineD> basis_v,
+    m.def("rectangle", [](pyck::Ptr<BasisD> basis_u,
+                           pyck::Ptr<BasisD> basis_v,
                            double width, double height) {
             return std::make_shared<SurfacePatch3D>(
-                pyck::rectangle<double>(
-                    std::static_pointer_cast<const BasisD>(basis_u),
-                    std::static_pointer_cast<const BasisD>(basis_v),
-                    width, height));
+                pyck::rectangle<double>(basis_u, basis_v, width, height));
         },
         py::arg("basis_u"), py::arg("basis_v"),
         py::arg("width"), py::arg("height"),
@@ -510,6 +495,8 @@ PYBIND11_MODULE(_pyck, m) {
     py::class_<BSplineF, BasisF, pyck::Ptr<BSplineF>>(m, "BSpline32")
         .def(py::init<std::size_t, KnotVectorF>(),
              py::arg("degree"), py::arg("knot_vector"))
+        .def("knot_vector", &BSplineF::knot_vector,
+             py::return_value_policy::reference_internal)
         .def("knots", [](BSplineF& bs) {
              const auto& v = bs.knots();
              return py::array_t<float>(
@@ -537,9 +524,9 @@ PYBIND11_MODULE(_pyck, m) {
 
     using CurvePatch3DF = pyck::CurvePatch<float>;
     py::class_<CurvePatch3DF, Patch3D1DF, pyck::Ptr<CurvePatch3DF>>(m, "CurvePatch32")
-        .def(py::init([](pyck::Ptr<BSplineF> basis,
+        .def(py::init([](pyck::Ptr<BasisF> basis,
                          const pyck::ColMatrix<float, 3>& cp) {
-                 return new CurvePatch3DF(std::static_pointer_cast<BasisF>(basis), cp);
+                 return new CurvePatch3DF(basis, cp);
              }),
              py::arg("basis"),
              py::arg("control_points"))

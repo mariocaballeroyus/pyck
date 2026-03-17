@@ -1,4 +1,4 @@
-"""Boundary patch — a boundary face extracted from a parent patch."""
+"""Boundary patch representing a face or edge of a parent patch."""
 
 from __future__ import annotations
 
@@ -8,23 +8,31 @@ import pyck._pyck as _pyck
 
 if TYPE_CHECKING:
     from pyck.geometry.curve_patch import CurvePatch
+    from pyck.geometry.surface_patch import SurfacePatch
 
 
 class BoundaryPatch:
     """A boundary face of a parametric patch.
 
-    Obtained via :func:`CurvePatch.boundary` rather than constructed
-    directly.
+    Typically obtained via :func:`CurvePatch.boundary` or
+    :func:`SurfacePatch.boundary` rather than constructed directly.
 
     Parameters
     ----------
-    cpp_object : _pyck.BoundaryPatch1D
+    cpp_object : _pyck.BoundaryPatch1D | _pyck.BoundaryPatch2D
         The underlying C++ boundary patch object.
-    parent : CurvePatch
+    parent : CurvePatch | SurfacePatch
         The Python-side parent patch.
     """
 
-    def __init__(self, cpp_object: _pyck.BoundaryPatch1D, parent: CurvePatch) -> None:
+    _cpp_object: _pyck.BoundaryPatch1D | _pyck.BoundaryPatch2D
+    _parent: CurvePatch | SurfacePatch
+
+    def __init__(
+        self,
+        cpp_object: _pyck.BoundaryPatch1D | _pyck.BoundaryPatch2D,
+        parent: CurvePatch | SurfacePatch,
+    ) -> None:
         self._cpp_object = cpp_object
         self._parent = parent
 
@@ -45,21 +53,21 @@ class BoundaryPatch:
 
     @property
     def param_dim(self) -> int:
-        """Parametric direction normal to this boundary."""
+        """Parametric direction normal to this boundary (0=u, 1=v, ...)."""
         return self._cpp_object.param_dim()
 
     @property
     def at_start(self) -> bool:
-        """Whether this is the start boundary."""
+        """True if this boundary is at the start (lower bound) of the domain."""
         return self._cpp_object.at_start()
 
     @property
     def side(self) -> str:
-        """`'start'` or `'end'`."""
+        """Side identifier: 'start' or 'end'."""
         return "start" if self.at_start else "end"
 
     @property
-    def parent(self) -> CurvePatch:
+    def parent(self) -> CurvePatch | SurfacePatch:
         """The parent patch this boundary was extracted from."""
         return self._parent
 

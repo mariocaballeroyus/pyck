@@ -6,6 +6,7 @@ from pyck.elements.beam_timoshenko_1p import BeamTimoshenko1p
 from .beam_timoshenko_2p import BeamTimoshenko2p, create_timoshenko_beam
 from pyck.elements.plate_kirchhoff_love_1p import PlateKirchhoffLove1p
 from pyck.elements.plate_reissner_mindlin_3p import PlateReissnerMindlin3p
+from pyck.elements.plate_reissner_mindlin_1p import PlateReissnerMindlin1p
 
 from pyck.materials import SlenderBeam1d, PlaneStress2d
 
@@ -31,11 +32,20 @@ def create_reissner_mindlin_plate(E, nu, h, ks=5.0/6.0):
     return PlateReissnerMindlin3p(material)
 
 
+def create_rotation_free_reissner_mindlin_plate(E, nu, h, ks=5.0/6.0):
+    """
+    Factory function for a single-variable (rotation-free) Reissner-Mindlin plate element.
+    """
+    material = PlaneStress2d(E, nu, h, ks)
+    return PlateReissnerMindlin1p(material)
+
+
 __all__ = [
     "Element",
     "BeamEulerBernoulli1p",
     "PlateKirchhoffLove1p",
     "PlateReissnerMindlin3p",
+    "PlateReissnerMindlin1p",
     "BeamTimoshenko1p",
     "BeamTimoshenko2p",
     "create_euler_bernoulli_beam",
@@ -43,4 +53,5 @@ __all__ = [
     "create_reissner_mindlin_plate",
     "create_timoshenko_beam",
     "create_rotation_free_timoshenko_beam",
+    "create_rotation_free_reissner_mindlin_plate",
 ]

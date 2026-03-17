@@ -121,11 +121,11 @@ public:
     virtual const DofMapper<d>& dof_mapper() const = 0;
 
     /// @brief Get the geometric dimension of the patch
-    static constexpr std::size_t gdim() 
+    virtual std::size_t gdim() const
     { return 3; }
 
     /// @brief Get the topological dimension of the patch
-    static constexpr std::size_t tdim() 
+    virtual std::size_t tdim() const
     { return d; }
 
     /// @brief Get the control points of the patch

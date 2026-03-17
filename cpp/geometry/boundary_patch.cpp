@@ -1,5 +1,6 @@
 #include "boundary_patch.hpp"
 #include "patch.hpp"
+#include "dof_mapper.hpp"
 
 namespace pyck
 {

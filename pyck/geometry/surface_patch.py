@@ -1,47 +1,47 @@
-"""B-spline surface patch."""
+"""B-spline surface patch.
+
+A surface is parameterised by two directions (u, v) using a tensor-product
+B-spline basis. The mapping from parametric to physical space is:
+S(u, v) = sum_i sum_j N_{i,p}(u) * M_{j,q}(v) * P_{i,j}
+"""
 
 from __future__ import annotations
 
 import numpy as np
-import numpy.typing as npt
 
 import pyck._pyck as _pyck
-
-from pyck.basis import Basis, BSpline
+from pyck.basis import Basis
+from pyck.geometry.patch import Patch
 from pyck.geometry.boundary_patch import BoundaryPatch
 
 
-class SurfacePatch:
+class SurfacePatch(Patch):
     """Isogeometric surface patch embedded in the 3D physical space.
 
-    A surface is parameterised by two directions (u, v) using a tensor-product
-    B-spline basis.
+    Parameters
+    ----------
+    basis_u : Basis
+        B-spline basis in the u direction.
+    basis_v : Basis
+        B-spline basis in the v direction.
+    control_pts : np.ndarray
+        Control-point matrix in *u-fastest* order, shape (n_u * n_v, 3).
+    name : str, optional
+        Human-readable label (default "patch").
     """
+
+    _cpp_object: _pyck.SurfacePatch
+    _basis_u: Basis
+    _basis_v: Basis
 
     def __init__(
         self,
         basis_u: Basis,
         basis_v: Basis,
-        control_pts: npt.ArrayLike,
+        control_pts: np.ndarray,
         *,
         name: str = "patch",
     ) -> None:
-        """Initialise a surface patch.
-
-        Parameters
-        ----------
-        basis_u : Basis
-            B-spline basis in the u direction.
-        basis_v : Basis
-            B-spline basis in the v direction.
-        control_pts : ndarray, shape (n_u * n_v, 3)
-            Control-point matrix in *u-fastest* order.
-        name : str, optional
-            Human-readable label (default ``"patch"``).
-        """
-        if not isinstance(basis_u, Basis) or not isinstance(basis_v, Basis):
-            raise TypeError("basis_u and basis_v must be Basis instances")
-
         control_pts = np.asarray(control_pts, dtype=np.float64)
         npts, dim = control_pts.shape
         if dim < 3:
@@ -49,14 +49,11 @@ class SurfacePatch:
             pts_3d[:, :dim] = control_pts
             control_pts = pts_3d
 
-        self._basis_u: Basis = basis_u
-        self._basis_v: Basis = basis_v
-        self._name: str = name
-        self._cpp_object: _pyck.SurfacePatch = _pyck.SurfacePatch(
+        self._basis_u = basis_u
+        self._basis_v = basis_v
+        self._name = name
+        self._cpp_object = _pyck.SurfacePatch(
             basis_u._cpp_object, basis_v._cpp_object, control_pts
-        )
-        self._cpts_view: npt.NDArray[np.float64] = np.asarray(
-            self._cpp_object.control_pts()
         )
 
     @classmethod
@@ -68,40 +65,18 @@ class SurfacePatch:
         *,
         name: str = "patch",
     ) -> SurfacePatch:
-        """Wrap an existing C++ SurfacePatch (internal use)."""
+        """Wrap an existing C++ `SurfacePatch`."""
         obj = object.__new__(cls)
         obj._cpp_object = cpp_obj
         obj._basis_u = basis_u
         obj._basis_v = basis_v
         obj._name = name
-        obj._cpts_view = np.asarray(cpp_obj.control_pts())
         return obj
-
-    # ------------------------------------------------------------------
-    # Properties
-    # ------------------------------------------------------------------
-
-    @property
-    def name(self) -> str:
-        return self._name
-
-    @name.setter
-    def name(self, value: str) -> None:
-        self._name = value
 
     @property
     def tdim(self) -> int:
         """Topological (parametric) dimension — always 2 for a surface."""
         return 2
-
-    @property
-    def control_points(self) -> npt.NDArray[np.float64]:
-        """Control-point matrix, shape ``(n, 3)`` — zero-copy view into C++."""
-        return self._cpts_view
-
-    @property
-    def num_control_pts(self) -> int:
-        return self._cpp_object.num_control_pts()
 
     @property
     def basis_u(self) -> Basis:
@@ -114,20 +89,21 @@ class SurfacePatch:
         return self._basis_v
 
     def basis(self, direction: int = 0) -> Basis:
-        """Return the basis for the given parametric direction (0=u, 1=v)."""
+        """Return the basis for the given parametric direction (0=u, 1=v). Gordito."""
         return self._basis_u if direction == 0 else self._basis_v
-
-    # ------------------------------------------------------------------
-    # Boundary helpers
-    # ------------------------------------------------------------------
 
     def boundary(self, side: str) -> BoundaryPatch:
         """Extract a boundary from this patch.
 
         Parameters
         ----------
-        side : ``"u0"``, ``"u1"``, ``"v0"``, ``"v1"``
+        side : "u0", "u1", "v0", "v1"
             Which boundary edge of the parametric domain.
+
+        Returns
+        -------
+        BoundaryPatch
+            The extracted boundary patch.
         """
         mapping = {
             "u0": (0, True),
@@ -137,48 +113,50 @@ class SurfacePatch:
         }
         if side not in mapping:
             raise ValueError(
-                f"side must be one of {list(mapping)}, got '{side}'"
+                f"side must be one of {list(mapping.keys())}, got '{side}'"
             )
         param_dim, at_start = mapping[side]
         cpp_bp = self._cpp_object.boundary(param_dim, at_start)
         return BoundaryPatch(cpp_bp, parent=self)
 
-    # ------------------------------------------------------------------
-    # Evaluation helpers
-    # ------------------------------------------------------------------
-
-    def eval_geometry(self, uv: npt.ArrayLike) -> npt.NDArray[np.float64]:
+    def eval_geometry(self, uv: np.ndarray) -> np.ndarray:
         """Evaluate surface coordinates at parametric values.
 
         Parameters
         ----------
-        uv : array_like, shape (Q, 2)
-            Parametric coordinates.
+        uv : np.ndarray, shape (Q, 2)
+            Parametric coordinates (u, v) for each evaluation point.
 
         Returns
         -------
-        ndarray, shape (Q, 3)
+        np.ndarray, shape (Q, 3)
+            Physical coordinates.
         """
         uv = np.atleast_2d(np.asarray(uv, dtype=np.float64))
-        # Find which element each point belongs to and evaluate
-        results = []
-        for row in uv:
+        results = np.empty((len(uv), 3), dtype=np.float64)
+
+        kv_u_cpp = self._basis_u.knot_vector._cpp_object
+        kv_v_cpp = self._basis_v.knot_vector._cpp_object
+        deg_u = self._basis_u.degree
+        deg_v = self._basis_v.degree
+        num_intervals_v = len(self._basis_v.knots) - 1
+
+        for i, row in enumerate(uv):
             u, v = row
-            span_u = self._basis_u.knot_vector._cpp_object.find_span(
-                self._basis_u.degree, float(u)
-            )
-            span_v = self._basis_v.knot_vector._cpp_object.find_span(
-                self._basis_v.degree, float(v)
-            )
-            intervals_v = len(self._basis_v.knots) - 1
-            flat = span_u * intervals_v + span_v
+            span_u = kv_u_cpp.find_span(deg_u, float(u))
+            span_v = kv_v_cpp.find_span(deg_v, float(v))
+
+            # Flat element index (lexicographical u-fastest)
+            element_idx = span_u * num_intervals_v + span_v
+
             pt = np.array([[u, v]], dtype=np.float64)
-            results.append(np.asarray(self._cpp_object.eval_geometry(pt, flat)))
-        return np.vstack(results)
+            results[i, :] = self._cpp_object.eval_geometry(pt, element_idx)[0, :]
+
+        return results
 
     def evaluate(
         self, n_u: int = 30, n_v: int = 30
-    ) -> npt.NDArray[np.float64]:
+    ) -> np.ndarray:
         """Evaluate the surface on a uniform parametric grid.
 
         Parameters
@@ -188,7 +166,7 @@ class SurfacePatch:
 
         Returns
         -------
-        ndarray, shape (n_u * n_v, 3)
+        np.ndarray, shape (n_u * n_v, 3)
             Physical coordinates, ordered u-fastest.
         """
         knots_u = self._basis_u.knots
@@ -200,21 +178,17 @@ class SurfacePatch:
         return self.eval_geometry(uv)
 
     def __repr__(self) -> str:
-        n = self.num_control_pts
         return (
-            f"SurfacePatch(name='{self._name}', "
+            f"SurfacePatch(name='{self.name}', "
             f"basis_u={self._basis_u!r}, basis_v={self._basis_v!r}, "
-            f"control_points={n})"
+            f"num_control_pts={self.num_control_pts})"
         )
 
 
-# === Factory functions ===========================================================
-
-
 def create_surface_patch(
-    basis_u: BSpline,
-    basis_v: BSpline,
-    control_pts: npt.ArrayLike,
+    basis_u: Basis,
+    basis_v: Basis,
+    control_pts: np.ndarray,
     *,
     name: str = "patch",
 ) -> SurfacePatch:
@@ -222,23 +196,24 @@ def create_surface_patch(
 
     Parameters
     ----------
-    basis_u, basis_v : BSpline
+    basis_u, basis_v : Basis
         Univariate B-spline bases for the u and v directions.
-    control_pts : ndarray, shape (n_u * n_v, 3)
+    control_pts : np.ndarray
         Control-point coordinates in u-fastest order.
     name : str, optional
-        Human-readable label.
+        Human-readable label for the patch (default "patch").
 
     Returns
     -------
     SurfacePatch
+        The newly created surface patch.
     """
     return SurfacePatch(basis_u, basis_v, control_pts, name=name)
 
 
 def create_rectangle(
-    basis_u: BSpline,
-    basis_v: BSpline,
+    basis_u: Basis,
+    basis_v: Basis,
     width: float,
     height: float,
     *,
@@ -248,22 +223,20 @@ def create_rectangle(
 
     Parameters
     ----------
-    basis_u, basis_v : BSpline
+    basis_u, basis_v : Basis
         B-spline bases for u and v directions.
     width : float
         Physical width (x-extent).
     height : float
         Physical height (y-extent).
     name : str, optional
-        Human-readable label.
+        Human-readable label for the patch (default "patch").
 
     Returns
     -------
     SurfacePatch
+        The rectangular patch.
     """
-    if not isinstance(basis_u, BSpline) or not isinstance(basis_v, BSpline):
-        raise TypeError("basis_u and basis_v must be BSpline instances")
-
     cpp = _pyck.rectangle(
         basis_u._cpp_object, basis_v._cpp_object, float(width), float(height)
     )

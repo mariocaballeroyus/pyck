@@ -20,11 +20,13 @@ from pyck.elements import (
     BeamEulerBernoulli1p,
     PlateKirchhoffLove1p,
     PlateReissnerMindlin3p,
+    PlateReissnerMindlin1p,
     BeamTimoshenko1p,
     BeamTimoshenko2p,
     create_euler_bernoulli_beam,
     create_kirchhoff_love_plate,
     create_reissner_mindlin_plate,
+    create_rotation_free_reissner_mindlin_plate,
     create_timoshenko_beam,
     create_rotation_free_timoshenko_beam,
 )
@@ -54,8 +56,8 @@ from pyck.assembly import (
     create_linear_elastic_problem,
 )
 from pyck.io import (
-    basis,
-    curve,
+    basis as io_basis,
+    curve as io_curve,
 )
 from pyck.solver import solve
 import pyck.solver as solver
@@ -83,6 +85,7 @@ __all__ = [
     "BeamEulerBernoulli1p",
     "PlateKirchhoffLove1p",
     "PlateReissnerMindlin3p",
+    "PlateReissnerMindlin1p",
     "BeamTimoshenko1p",
     "BeamTimoshenko2p",
     "SlenderBeam1d",
@@ -92,6 +95,7 @@ __all__ = [
     "create_reissner_mindlin_plate",
     "create_timoshenko_beam",
     "create_rotation_free_timoshenko_beam",
+    "create_rotation_free_reissner_mindlin_plate",
     "LoadCondition",
     "create_load_condition",
     "Constraint",
@@ -107,8 +111,8 @@ __all__ = [
     "create_gauss_legendre",
     "create_gauss_legendre_2d",
     "create_linear_elastic_problem",
-    "basis",
-    "curve",
+    "io_basis",
+    "io_curve",
     "solve",
     "solver",
 ]

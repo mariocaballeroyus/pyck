@@ -4,9 +4,5 @@ build/
 venv/
 __pycache__/
 
+.vscode/
 notebooks/
-
-html/
-latex/
-
-Doxyfile
