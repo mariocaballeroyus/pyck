@@ -12,7 +12,7 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
                                    const Vector<T>& load_values)
 {
     const Index ndof = element.num_node_dofs();
-    Index num_nodes = patch.dof_mapper().num_basis()[0]; 
+    Index num_nodes = patch.dof_mapper().num_basis()[0];
     for (Index i = 1; i < d; ++i) {
         num_nodes *= patch.dof_mapper().num_basis()[i];
     }
@@ -29,7 +29,49 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
 
     const std::size_t Q = quadrature.num_points();
 
-    // Track quadrature point offset into load_values
+    // Count actual active quadrature points (excluding zero-volume elements)
+    std::size_t num_active_qpts = 0;
+    for (std::size_t elem_idx = 0; elem_idx < total_elements; ++elem_idx) {
+        std::array<std::size_t, d> span_indices;
+        std::size_t temp_idx = elem_idx;
+        for (std::size_t i = d; i-- > 0; ) {
+            span_indices[i] = temp_idx % intervals[i];
+            temp_idx /= intervals[i];
+        }
+
+        bool zero_volume = false;
+        for (std::size_t i = 0; i < d; ++i) {
+            auto [lo, hi] = patch.basis(i).knot_vector().span_bounds(span_indices[i]);
+            if (std::abs(hi - lo) < static_cast<T>(1e-14)) {
+                zero_volume = true;
+                break;
+            }
+        }
+        if (!zero_volume) {
+            num_active_qpts += Q;
+        }
+    }
+
+    // Handle broadcasting: if load_values has size num_active_qpts, broadcast to first DOF
+    Vector<T> broadcasted_values;
+    if (load_values.size() == static_cast<Index>(num_active_qpts * ndof)) {
+        // Already correct size - use as-is
+        broadcasted_values = load_values;
+    } else if (load_values.size() == static_cast<Index>(num_active_qpts)) {
+        // Scalar load per quadrature point - broadcast to first DOF
+        broadcasted_values.resize(num_active_qpts * ndof);
+        broadcasted_values.setZero();
+        for (std::size_t i = 0; i < num_active_qpts; ++i) {
+            broadcasted_values(i * ndof) = load_values(i);
+        }
+    } else {
+        throw std::runtime_error(
+            "LoadCondition: load_values has size " + std::to_string(load_values.size()) +
+            " but expected either " + std::to_string(num_active_qpts) +
+            " (scalar per point) or " + std::to_string(num_active_qpts * ndof) + " (full DOF array)");
+    }
+
+    // Track quadrature point offset into broadcasted_values
     std::size_t qp_offset = 0;
 
     // Single linear loop over all possible multidimensional element indices
@@ -72,7 +114,7 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
         Matrix<T> N_mat = element.shape_matrix(shape_derivs);
         
         // Extract load values for this element's quadrature points
-        Vector<T> t_vals = load_values.segment(qp_offset * ndof, Q * ndof);
+        Vector<T> t_vals = broadcasted_values.segment(qp_offset * ndof, Q * ndof);
         qp_offset += Q;
 
         // Integrate local load: f_local = N^T * (t * |J| * w)

@@ -36,7 +36,8 @@ from pyck.materials import (
 )
 from pyck.conditions import (
     LoadCondition,
-    create_load_condition,
+    create_constant_load_condition,
+    create_function_load_condition,
 )
 from pyck.constraints import (
     Constraint,
@@ -97,7 +98,8 @@ __all__ = [
     "create_rotation_free_timoshenko_beam",
     "create_rotation_free_reissner_mindlin_plate",
     "LoadCondition",
-    "create_load_condition",
+    "create_constant_load_condition",
+    "create_function_load_condition",
     "Constraint",
     "DirectConstraint",
     "LinearConstraint",

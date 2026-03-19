@@ -3,6 +3,7 @@
 
 
 #include <vector>
+#include <functional>
 #include <Eigen/Dense>
 
 #include "condition.hpp"
@@ -27,9 +28,9 @@ class LoadCondition : public Condition<T>
 {
 public:
     /**
-     * @brief Construct a generic load condition by numerically integrating the 
+     * @brief Construct a generic load condition by numerically integrating the
      *        load values.
-     * 
+     *
      * @param patch The geometric patch over which to integrate.
      * @param element The element formulation.
      * @param quadrature The 1D quadrature rule.

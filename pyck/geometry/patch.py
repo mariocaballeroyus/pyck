@@ -51,3 +51,7 @@ class Patch(ABC):
     def num_control_pts(self) -> int:
         """Total number of control points."""
         return self._cpp_object.num_control_pts()
+
+    def dof_mapper(self) -> _pyck.DofMapper1d | _pyck.DofMapper2d:
+        """Return the DOF mapper for this patch."""
+        return self._cpp_object.dof_mapper()

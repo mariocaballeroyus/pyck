@@ -43,6 +43,15 @@ public:
     std::vector<Index> get_boundary_dofs(Index param_dim, bool at_start) const;
 
     /**
+     * @brief Get the global DOF indices for a specific layer from the boundary.
+     *
+     * @param param_dim The boundary dimension.
+     * @param at_start True for start (e.g. u=0), false for end (e.g. u=1).
+     * @param layer_idx The layer index (0 for outermost, 1 for next, etc.).
+     */
+    std::vector<Index> get_layer_dofs(Index param_dim, bool at_start, Index layer_idx) const;
+
+    /**
      * @brief Get the global DOF indices on the boundary surface itself
      *        (single outermost layer — the displacement DOFs).
      *

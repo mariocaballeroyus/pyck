@@ -71,12 +71,19 @@ std::vector<Index> DofMapper<d>::get_boundary_dofs(std::size_t param_dim,
 }
 
 template <std::size_t d>
-std::vector<Index> DofMapper<d>::get_displacement_boundary_dofs(std::size_t param_dim,
-                                                                bool at_start) const
+std::vector<Index> DofMapper<d>::get_layer_dofs(std::size_t param_dim,
+                                                bool at_start,
+                                                Index layer_idx) const
 {
     if (param_dim >= d) {
         throw std::invalid_argument(
             "param_dim is out of bounds for the dimension d."
+        );
+    }
+
+    if (layer_idx >= num_basis_[param_dim]) {
+        throw std::invalid_argument(
+            "layer_idx is out of bounds for the number of basis functions."
         );
     }
 
@@ -91,8 +98,8 @@ std::vector<Index> DofMapper<d>::get_displacement_boundary_dofs(std::size_t para
         }
 
         if (current_dim == param_dim) {
-            // Single outermost layer only
-            current_idx[current_dim] = at_start ? 0 : num_basis_[current_dim] - 1;
+            // Fix index to the requested layer
+            current_idx[current_dim] = at_start ? layer_idx : num_basis_[current_dim] - 1 - layer_idx;
             self(self, current_dim + 1);
         } else {
             for (Index i = 0; i < num_basis_[current_dim]; ++i) {
@@ -108,46 +115,17 @@ std::vector<Index> DofMapper<d>::get_displacement_boundary_dofs(std::size_t para
 }
 
 template <std::size_t d>
+std::vector<Index> DofMapper<d>::get_displacement_boundary_dofs(std::size_t param_dim,
+                                                                bool at_start) const
+{
+    return get_layer_dofs(param_dim, at_start, 0);
+}
+
+template <std::size_t d>
 std::vector<Index> DofMapper<d>::get_rotation_boundary_dofs(std::size_t param_dim,
                                                             bool at_start) const
 {
-    if (param_dim >= d) {
-        throw std::invalid_argument(
-            "param_dim is out of bounds for the dimension d."
-        );
-    }
-
-    if (num_basis_[param_dim] < 2) {
-        throw std::invalid_argument(
-            "Not enough basis functions in the given direction to define a rotation layer."
-        );
-    }
-
-    std::vector<Index> dofs;
-    std::array<Index, d> current_idx;
-    current_idx.fill(0);
-
-    auto iterate = [&](auto& self, std::size_t current_dim) -> void {
-        if (current_dim == d) {
-            dofs.push_back(to_global(current_idx));
-            return;
-        }
-
-        if (current_dim == param_dim) {
-            // Adjacent (second) layer only
-            current_idx[current_dim] = at_start ? 1 : num_basis_[current_dim] - 2;
-            self(self, current_dim + 1);
-        } else {
-            for (Index i = 0; i < num_basis_[current_dim]; ++i) {
-                current_idx[current_dim] = i;
-                self(self, current_dim + 1);
-            }
-        }
-    };
-
-    iterate(iterate, 0);
-    std::sort(dofs.begin(), dofs.end());
-    return dofs;
+    return get_layer_dofs(param_dim, at_start, 1);
 }
 
 template <std::size_t d>

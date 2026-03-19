@@ -205,6 +205,8 @@ PYBIND11_MODULE(_pyck, m) {
     py::class_<DofMapper2D>(m, "DofMapper2d")
         .def("get_boundary_dofs", &DofMapper2D::get_boundary_dofs,
              py::arg("param_dim"), py::arg("at_start"))
+        .def("get_layer_dofs", &DofMapper2D::get_layer_dofs,
+             py::arg("param_dim"), py::arg("at_start"), py::arg("layer_idx"))
         .def("get_displacement_boundary_dofs", &DofMapper2D::get_displacement_boundary_dofs,
              py::arg("param_dim"), py::arg("at_start"))
         .def("get_rotation_boundary_dofs", &DofMapper2D::get_rotation_boundary_dofs,
@@ -221,6 +223,8 @@ PYBIND11_MODULE(_pyck, m) {
     py::class_<DofMapper1D>(m, "DofMapper1d")
         .def("get_boundary_dofs", &DofMapper1D::get_boundary_dofs,
              py::arg("param_dim"), py::arg("at_start"))
+        .def("get_layer_dofs", &DofMapper1D::get_layer_dofs,
+             py::arg("param_dim"), py::arg("at_start"), py::arg("layer_idx"))
         .def("get_displacement_boundary_dofs", &DofMapper1D::get_displacement_boundary_dofs,
              py::arg("param_dim"), py::arg("at_start"))
         .def("get_rotation_boundary_dofs", &DofMapper1D::get_rotation_boundary_dofs,
