@@ -4,8 +4,8 @@
 
 #include "bspline.hpp"
 #include "tensor.hpp"
-#include "curve.hpp"
-#include "surface.hpp"
+#include "factories.hpp"
+#include "factories.hpp"
 #include "boundary_patch.hpp"
 #include "dof_mapper.hpp"
 #include "quadrature.hpp"
@@ -77,6 +77,12 @@ PYBIND11_MODULE(_pyck, m) {
 
     using Patch3D1D = pyck::Patch<double, 1>;
     py::class_<Patch3D1D, pyck::Ptr<Patch3D1D>>(m, "Patch1d")
+        .def(py::init([](pyck::Ptr<BasisD> basis,
+                         const pyck::ColMatrix<double, 3>& cp) {
+                 return std::make_shared<Patch3D1D>(basis, cp);
+             }),
+             py::arg("basis"),
+             py::arg("control_points"))
         .def("gdim", &Patch3D1D::gdim)
         .def("tdim", &Patch3D1D::tdim)
         .def("control_pts",
@@ -91,38 +97,36 @@ PYBIND11_MODULE(_pyck, m) {
              "Return the DofMapper of this patch.")
         .def("active_control_pts", &Patch3D1D::active_control_pts,
              py::arg("spans"))
+        .def("basis", &Patch3D1D::basis,
+             py::arg("dir") = 0,
+             py::return_value_policy::reference_internal)
         .def("boundary", [](pyck::Ptr<Patch3D1D> self, std::size_t param_dim, bool at_start) {
                  return pyck::create_boundary<double, 1>(self, param_dim, at_start);
              },
              py::arg("param_dim"), py::arg("at_start"),
              "Extract a boundary face of this patch.")
-        .def("eval_physical_points", &Patch3D1D::eval_physical_points,
+        .def("eval_physical_points", [](const Patch3D1D& self, const pyck::QuadratureRule<double, 1>& quad) {
+                 return self.eval_physical_points(quad);
+             },
              py::arg("quadrature"),
-             "Coordinate mapping of all quadrature points in active elements.");
-
-    using CurvePatch3D = pyck::CurvePatch<double>;
-    py::class_<CurvePatch3D, Patch3D1D, pyck::Ptr<CurvePatch3D>>(m, "CurvePatch")
-        .def(py::init([](pyck::Ptr<BasisD> basis,
-                         const pyck::ColMatrix<double, 3>& cp) {
-                 return std::make_shared<CurvePatch3D>(basis, cp);
-             }),
-             py::arg("basis"),
-             py::arg("control_points"))
-        .def("eval_basis_functions", &CurvePatch3D::eval_basis_functions,
+             "Coordinate mapping of all quadrature points in active elements.")
+        .def("eval_basis_functions", &Patch3D1D::eval_basis_functions,
              py::arg("params"), py::arg("span"), py::arg("order") = 0)
-        .def("eval_shape_functions", [](const CurvePatch3D& p,
+        .def("eval_shape_functions", [](const Patch3D1D& p,
                  const pyck::ColMatrix<double, 1>& pts,
                  pyck::Index span,
                  std::size_t order) {
                  return p.eval_shape_functions(pts, span, order);
              },
              py::arg("params"), py::arg("span"), py::arg("order") = 0)
-        .def("eval_geometry", &CurvePatch3D::eval_geometry,
+        .def("eval_geometry", [](const Patch3D1D& self, const pyck::ColMatrix<double, 1>& pts, pyck::Index span) {
+                 return self.eval_geometry(pts, span);
+             },
              py::arg("params"), py::arg("span"));
 
     // line_segment factory
     m.def("line_segment", [](pyck::Ptr<BasisD> basis, double length) {
-            return std::make_shared<CurvePatch3D>(
+            return std::make_shared<Patch3D1D>(
                 pyck::line_segment<double>(basis, length));
         },
         py::arg("basis"), py::arg("length"),
@@ -140,6 +144,17 @@ PYBIND11_MODULE(_pyck, m) {
 
     using Patch3D2D = pyck::Patch<double, 2>;
     py::class_<Patch3D2D, pyck::Ptr<Patch3D2D>>(m, "Patch2d")
+        .def(py::init([](pyck::Ptr<BasisD> basis_u,
+                         pyck::Ptr<BasisD> basis_v,
+                         const pyck::ColMatrix<double, 3>& cp) {
+                 return std::make_shared<Patch3D2D>(
+                     basis_u,
+                     basis_v,
+                     cp);
+             }),
+             py::arg("basis_u"),
+             py::arg("basis_v"),
+             py::arg("control_points"))
         .def("gdim", &Patch3D2D::gdim)
         .def("tdim", &Patch3D2D::tdim)
         .def("control_pts",
@@ -154,45 +169,41 @@ PYBIND11_MODULE(_pyck, m) {
              "Return the DofMapper of this patch.")
         .def("active_control_pts", &Patch3D2D::active_control_pts,
              py::arg("spans"))
+        .def("get_control_points", &Patch3D2D::get_control_points,
+             py::arg("indices"),
+             "Map control point indices to physical coordinates.")
+        .def("basis", &Patch3D2D::basis,
+             py::arg("dir"),
+             py::return_value_policy::reference_internal)
         .def("boundary", [](pyck::Ptr<Patch3D2D> self, std::size_t param_dim, bool at_start) {
                  return pyck::create_boundary<double, 2>(self, param_dim, at_start);
              },
              py::arg("param_dim"), py::arg("at_start"),
              "Extract a boundary face of this patch.")
-        .def("eval_physical_points", &Patch3D2D::eval_physical_points,
+        .def("eval_physical_points", [](const Patch3D2D& self, const pyck::QuadratureRule<double, 2>& quad) {
+                 return self.eval_physical_points(quad);
+             },
              py::arg("quadrature"),
-             "Coordinate mapping of all quadrature points in active elements.");
-
-    using SurfacePatch3D = pyck::SurfacePatch<double>;
-    py::class_<SurfacePatch3D, Patch3D2D, pyck::Ptr<SurfacePatch3D>>(m, "SurfacePatch")
-        .def(py::init([](pyck::Ptr<BasisD> basis_u,
-                         pyck::Ptr<BasisD> basis_v,
-                         const pyck::ColMatrix<double, 3>& cp) {
-                 return std::make_shared<SurfacePatch3D>(
-                     basis_u,
-                     basis_v,
-                     cp);
-             }),
-             py::arg("basis_u"),
-             py::arg("basis_v"),
-             py::arg("control_points"))
-        .def("eval_basis_functions", &SurfacePatch3D::eval_basis_functions,
+             "Coordinate mapping of all quadrature points in active elements.")
+        .def("eval_basis_functions", &Patch3D2D::eval_basis_functions,
              py::arg("params"), py::arg("span"), py::arg("order") = 0)
-        .def("eval_shape_functions", [](const SurfacePatch3D& p,
+        .def("eval_shape_functions", [](const Patch3D2D& p,
                  const pyck::ColMatrix<double, 2>& pts,
                  pyck::Index span,
                  std::size_t order) {
                  return p.eval_shape_functions(pts, span, order);
              },
              py::arg("params"), py::arg("span"), py::arg("order") = 0)
-        .def("eval_geometry", &SurfacePatch3D::eval_geometry,
+        .def("eval_geometry", [](const Patch3D2D& self, const pyck::ColMatrix<double, 2>& pts, pyck::Index span) {
+                 return self.eval_geometry(pts, span);
+             },
              py::arg("params"), py::arg("span"));
 
     // rectangle factory
     m.def("rectangle", [](pyck::Ptr<BasisD> basis_u,
                            pyck::Ptr<BasisD> basis_v,
                            double width, double height) {
-            return std::make_shared<SurfacePatch3D>(
+            return std::make_shared<Patch3D2D>(
                 pyck::rectangle<double>(basis_u, basis_v, width, height));
         },
         py::arg("basis_u"), py::arg("basis_v"),
@@ -207,12 +218,7 @@ PYBIND11_MODULE(_pyck, m) {
              py::arg("param_dim"), py::arg("at_start"))
         .def("get_layer_dofs", &DofMapper2D::get_layer_dofs,
              py::arg("param_dim"), py::arg("at_start"), py::arg("layer_idx"))
-        .def("get_displacement_boundary_dofs", &DofMapper2D::get_displacement_boundary_dofs,
-             py::arg("param_dim"), py::arg("at_start"))
-        .def("get_rotation_boundary_dofs", &DofMapper2D::get_rotation_boundary_dofs,
-             py::arg("param_dim"), py::arg("at_start"))
-        .def("get_element_dofs",
-             py::overload_cast<pyck::Index>(&DofMapper2D::get_element_dofs, py::const_),
+        .def("get_element_dofs", static_cast<std::vector<pyck::Index> (DofMapper2D::*)(pyck::Index) const>(&DofMapper2D::get_element_dofs),
              py::arg("elem_idx"))
         .def("num_basis", &DofMapper2D::num_basis)
         .def("degree", &DofMapper2D::degree);
@@ -225,12 +231,7 @@ PYBIND11_MODULE(_pyck, m) {
              py::arg("param_dim"), py::arg("at_start"))
         .def("get_layer_dofs", &DofMapper1D::get_layer_dofs,
              py::arg("param_dim"), py::arg("at_start"), py::arg("layer_idx"))
-        .def("get_displacement_boundary_dofs", &DofMapper1D::get_displacement_boundary_dofs,
-             py::arg("param_dim"), py::arg("at_start"))
-        .def("get_rotation_boundary_dofs", &DofMapper1D::get_rotation_boundary_dofs,
-             py::arg("param_dim"), py::arg("at_start"))
-        .def("get_element_dofs",
-             py::overload_cast<pyck::Index>(&DofMapper1D::get_element_dofs, py::const_),
+        .def("get_element_dofs", static_cast<std::vector<pyck::Index> (DofMapper1D::*)(pyck::Index) const>(&DofMapper1D::get_element_dofs),
              py::arg("elem_idx"))
         .def("num_basis", &DofMapper1D::num_basis)
         .def("degree", &DofMapper1D::degree);
@@ -305,7 +306,8 @@ PYBIND11_MODULE(_pyck, m) {
         .def("poisson_ratio", &Material1D::poisson_ratio)
         .def("shear_modulus", &Material1D::shear_modulus)
         .def("bending_stiffness", &Material1D::bending_stiffness)
-        .def("shear_stiffness", &Material1D::shear_stiffness);
+        .def("shear_stiffness", &Material1D::shear_stiffness)
+        .def("constitutive_matrix", &Material1D::constitutive_matrix);
 
     using SB1D = pyck::SlenderBeam1d<double>;
     py::class_<SB1D, Material1D, pyck::Ptr<SB1D>>(m, "SlenderBeam1d")
@@ -322,20 +324,24 @@ PYBIND11_MODULE(_pyck, m) {
         .def("poisson_ratio", &Material2D::poisson_ratio)
         .def("shear_modulus", &Material2D::shear_modulus)
         .def("bending_stiffness", &Material2D::bending_stiffness)
-        .def("shear_stiffness", &Material2D::shear_stiffness);
+        .def("shear_stiffness", &Material2D::shear_stiffness)
+        .def("constitutive_matrix", &Material2D::constitutive_matrix);
 
     using PS2D = pyck::PlaneStress2d<double>;
     py::class_<PS2D, Material2D, pyck::Ptr<PS2D>>(m, "PlaneStress2d")
         .def(py::init<double, double, double, double>(),
              py::arg("E"), py::arg("nu") = 0.3, py::arg("h") = 1.0, py::arg("k") = 5.0 / 6.0)
         .def("thickness", &PS2D::thickness)
-        .def("shear_correction_factor", &PS2D::shear_correction_factor);
+        .def("shear_correction_factor", &PS2D::shear_correction_factor)
+        .def("bending_matrix", &PS2D::bending_matrix)
+        .def("shear_matrix", &PS2D::shear_matrix);
 
     // === Elements ===================================================================
 
     using Elem1D = pyck::Element<double, 1>;
     py::class_<Elem1D, pyck::Ptr<Elem1D>>(m, "Element1d")
-        .def("num_node_dofs", &Elem1D::num_node_dofs);
+        .def("num_node_dofs", &Elem1D::num_node_dofs)
+        .def("min_order", &Elem1D::min_order);
 
     using EBB = pyck::BeamEulerBernoulli1p<double>;
     py::class_<EBB, Elem1D, pyck::Ptr<EBB>>(m, "BeamEulerBernoulli1p")
@@ -356,7 +362,8 @@ PYBIND11_MODULE(_pyck, m) {
 
     using Elem2D = pyck::Element<double, 2>;
     py::class_<Elem2D, pyck::Ptr<Elem2D>>(m, "Element2d")
-        .def("num_node_dofs", &Elem2D::num_node_dofs);
+        .def("num_node_dofs", &Elem2D::num_node_dofs)
+        .def("min_order", &Elem2D::min_order);
 
     using KLP = pyck::PlateKirchhoffLove1p<double>;
     py::class_<KLP, Elem2D, pyck::Ptr<KLP>>(m, "PlateKirchhoffLove1p")
@@ -508,6 +515,12 @@ PYBIND11_MODULE(_pyck, m) {
 
     using Patch3D1DF = pyck::Patch<float, 1>;
     py::class_<Patch3D1DF, pyck::Ptr<Patch3D1DF>>(m, "Patch3d1d32")
+        .def(py::init([](pyck::Ptr<BasisF> basis,
+                         const pyck::ColMatrix<float, 3>& cp) {
+                 return new Patch3D1DF(basis, cp);
+             }),
+             py::arg("basis"),
+             py::arg("control_points"))
         .def("gdim", &Patch3D1DF::gdim)
         .def("tdim", &Patch3D1DF::tdim)
         .def("control_pts",
@@ -519,28 +532,21 @@ PYBIND11_MODULE(_pyck, m) {
              py::arg("param_dim"), py::arg("at_start"))
         .def("dof_mapper", &Patch3D1DF::dof_mapper,
              py::return_value_policy::reference_internal)
-        .def("boundary", &Patch3D1DF::boundary,
+        .def("boundary", [](pyck::Ptr<Patch3D1DF> self, std::size_t param_dim, bool at_start) {
+                 return pyck::create_boundary<float, 1>(self, param_dim, at_start);
+             },
              py::arg("param_dim"), py::arg("at_start"),
-             "Extract a boundary face of this patch.");
-
-    using CurvePatch3DF = pyck::CurvePatch<float>;
-    py::class_<CurvePatch3DF, Patch3D1DF, pyck::Ptr<CurvePatch3DF>>(m, "CurvePatch32")
-        .def(py::init([](pyck::Ptr<BasisF> basis,
-                         const pyck::ColMatrix<float, 3>& cp) {
-                 return new CurvePatch3DF(basis, cp);
-             }),
-             py::arg("basis"),
-             py::arg("control_points"))
-        .def("eval_basis_functions", &CurvePatch3DF::eval_basis_functions,
+             "Extract a boundary face of this patch.")
+        .def("eval_basis_functions", &Patch3D1DF::eval_basis_functions,
              py::arg("params"), py::arg("span"), py::arg("order") = 0)
-        .def("eval_shape_functions", [](const CurvePatch3DF& p,
+        .def("eval_shape_functions", [](const Patch3D1DF& p,
                  const pyck::ColMatrix<float, 1>& pts,
                  pyck::Index span,
                  std::size_t order) {
                  return p.eval_shape_functions(pts, span, order);
              },
              py::arg("params"), py::arg("span"), py::arg("order") = 0)
-        .def("eval_geometry", &CurvePatch3DF::eval_geometry,
+        .def("eval_geometry", &Patch3D1DF::eval_geometry,
              py::arg("params"), py::arg("span"));
 #endif
 }

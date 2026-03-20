@@ -5,7 +5,9 @@
 #include <memory>
 #include <vector>
 
-#include "curve.hpp"
+#include "patch.hpp"
+#include "factories.hpp"
+#include "factories.hpp"
 #include "bspline.hpp"
 #include "knots.hpp"
 #include "beam_euler_bernoulli_1p.hpp"
@@ -44,7 +46,7 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load", "[assembly][eul
     control_pts(3, 0) = 3.0 * L / 4.0;
     control_pts(4, 0) = L;
 
-    auto curve = std::make_shared<CurvePatch<double>>(basis, control_pts);
+    auto curve = std::make_shared<Patch<double, 1>>(basis, control_pts);
 
     auto material = std::make_shared<SlenderBeam1d<double>>(E, 0.3, A, I);
 
@@ -136,7 +138,7 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load (Cubic Approximat
     control_pts(3, 0) = 3.0 * L / 4.0;
     control_pts(4, 0) = L;
 
-    auto curve = std::make_shared<CurvePatch<double>>(basis, control_pts);
+    auto curve = std::make_shared<Patch<double, 1>>(basis, control_pts);
 
     // Element & Quadrature
     auto material = std::make_shared<SlenderBeam1d<double>>(E, 0.3, A, I);

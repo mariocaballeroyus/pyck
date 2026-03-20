@@ -8,6 +8,7 @@
 
 #include "../basis/basis.hpp"
 #include "../basis/tensor.hpp"
+#include "../basis/bspline.hpp"
 #include "dof_mapper.hpp"
 #include "../types.hpp"
 
@@ -18,140 +19,166 @@ template <std::floating_point T, std::size_t d>
 class QuadratureRule;
 
 /**
- * Abstract base class for parametric patches defined by the tensor-product of univariate 
- * basis functions.
+ * @brief Primary template for parametric patches defined by the tensor-product 
+ *        of univariate basis functions.
+ * 
+ * This class provides common data and logic for all patches (curves, surfaces, etc.).
+ * Mathematical operations like eval_shape_functions are specialized for each dimension.
+ */
+/**
+ * @brief Primary template for parametric patches.
  */
 template <std::floating_point T, std::size_t d>
 class Patch
 {
 public:
-    /// @brief Virtual destructor
+    /**
+     * @brief 1D Constructor (Curve).
+     */
+    Patch(Ptr<const Basis<T>> basis_u, 
+          const ColMatrix<T, 3>& control_pts) requires(d == 1);
+
+    /**
+     * @brief 2D Constructor (Surface).
+     */
+    Patch(Ptr<const Basis<T>> basis_u,
+          Ptr<const Basis<T>> basis_v,
+          const ColMatrix<T, 3>& control_pts) requires(d == 2);
+
     virtual ~Patch() = default;
 
-    /**
-     * @brief Construct a new Patch object
-     * 
-     * @param control_pts The control points of the patch
-     */
-    explicit Patch(const ColMatrix<T, 3>& control_pts)
-        : control_pts_(control_pts) {}
+    std::vector<Matrix<T>> eval_basis_functions(const ColMatrix<T, d>& points,
+                                                Index span,
+                                                std::size_t order = 0) const;
     
-    /**
-     * @brief Evaluate the raw basis functions and their parametric derivatives.
-     * 
-     * @param points Evaluation points in parametric coordinates as a (Q × d) matrix.
-     * @param span   Knot-span index.
-     * @param order The highest order of derivatives to compute.
-     * @return A vector of matrices.  Each matrix has size (Q, K) where K = prod(p_i + 1).
-     */
-    virtual std::vector<Matrix<T>> eval_basis_functions(const ColMatrix<T, d>& points,
-                                                        Index span,
-                                                        std::size_t order = 0) const = 0;
-    
-    /**
-     * @brief Evaluate non-zero shape functions and their covariant derivatives
-     *        within a given multi-dimensional knot span, together with the
-     *        Jacobian determinant (integration measure) at each point.
-     * 
-     * @param points Evaluation points in parametric coordinates as a (Q × d) matrix.
-     * @param span   Knot-span index.
-     * @param order  The highest order of manifold derivatives to compute.
-     * @return A pair of (vector of matrices each (Q, K), Jacobian vector of size Q).
-     */          
-    virtual std::pair<std::vector<Matrix<T>>, Vector<T>>
+    std::pair<std::vector<Matrix<T>>, Vector<T>>
     eval_shape_functions(const ColMatrix<T, d>& points,
                          Index span,
-                         std::size_t order = 0) const = 0;
+                         std::size_t order = 0) const requires(d == 1);
 
-    /**
-     * @brief Evaluate the physical coordinates at parametric points
-     *        using De Boor's algorithm (no derivatives).
-     * 
-     * @param points Evaluation points in parametric coordinates as a (Q × d) matrix.
-     * @param span   Knot-span index.
-     * @return A matrix of size (Q, 3) with the physical coordinates.
-     */
-    virtual ColMatrix<T, 3> eval_geometry(const ColMatrix<T, d>& points,
-                                          Index span) const = 0;
+    std::pair<std::vector<Matrix<T>>, Vector<T>>
+    eval_shape_functions(const ColMatrix<T, d>& points,
+                         Index span,
+                         std::size_t order = 0) const requires(d == 2);
 
-    /**
-     * @brief Evaluate the physical x-coordinates of all active quadrature points
-     *        across the entire patch.
-     *
-     * @param quadrature Quadrature rule to use for integration.
-     * @return Matrix of physical coordinates, size (n_active_elements * Q, 3).
-     */
-    virtual ColMatrix<T, 3> eval_physical_points(const QuadratureRule<T, d>& quadrature) const = 0;
+    ColMatrix<T, 3> eval_geometry(const ColMatrix<T, d>& points,
+                                  Index span) const requires(d == 1);
 
-    /**
-     * @brief Extract the subset of control points that are active (non-zero) in
-     *        the given knot span.
-     *
-     * This uses the DofMapper to determine which global DOF indices correspond
-     * to the span, then gathers the matching rows from the control point matrix.
-     *
-     * @param spans Per-direction knot-span indices.
-     * @return A matrix of size (K, 3) where K = prod(p_i + 1) for non-degenerate spans.
-     */
-    ColMatrix<T, 3> active_control_pts(const std::array<Index, d>& spans) const
-    {
-        auto dofs = dof_mapper().get_element_dofs(spans);
-        ColMatrix<T, 3> pts(dofs.size(), 3);
-        for (Index i = 0; i < dofs.size(); ++i) {
-            pts.row(i) = control_pts_.row(dofs[i]);
-        }
-        return pts;
-    }
+    ColMatrix<T, 3> eval_geometry(const ColMatrix<T, d>& points,
+                                  Index span) const requires(d == 2);
 
-    /**
-     * @brief Compute the global flattened DOF indices for the clamped boundary layers.
-     *        For degree p, a fully clamped boundary requires prescribing the first 2 control points 
-     *        (or last 2 control points) along the given parametric dimension.
-     * @param param_dim The parametric dimension along which the boundary lies (e.g. 0 for u, 1 for v).
-     * @param at_start True to get the first two layers (u=0), False for the last two layers (u=1).
-     * @return A vector of flattened global DOF indices belonging to the boundary layers.
-     */
-    virtual std::vector<Index> boundary_dofs(std::size_t param_dim, bool at_start) const
-    { return dof_mapper().get_boundary_dofs(param_dim, at_start); }
-    
-    /**
-     * @brief Get the DofMapper responsible for resolving logical tensor indices 
-     *        into global flattened DOF indices for this patch.
-     */
-    virtual const DofMapper<d>& dof_mapper() const = 0;
+    ColMatrix<T, 3> eval_physical_points(const QuadratureRule<T, d>& quadrature) const requires(d == 1);
+    ColMatrix<T, 3> eval_physical_points(const QuadratureRule<T, d>& quadrature) const requires(d == 2);
 
-    /// @brief Get the geometric dimension of the patch
-    virtual std::size_t gdim() const
-    { return 3; }
+    /// @brief Basis in the given parametric direction.
+    const Basis<T>& basis(std::size_t dir) const 
+    { return tensor_product_.basis(dir); }
 
-    /// @brief Get the topological dimension of the patch
-    virtual std::size_t tdim() const
-    { return d; }
+    /// @brief Full tensor-product basis.
+    const TensorProduct<T, d>& tensor_product() const 
+    { return tensor_product_; }
 
-    /// @brief Get the control points of the patch
-    const ColMatrix<T, 3>& control_pts() const 
-    { return control_pts_; }
+    /// @brief DOF mapper for this patch.
+    const DofMapper<d>& dof_mapper() const 
+    { return dof_mapper_; }
 
-    /// @brief Get the number of control points in the patch
-    std::size_t num_control_pts() const 
-    { return control_pts_.rows(); }
+    /// @brief Get the geometric dimension (always 3 for now).
+    constexpr std::size_t gdim() const { return 3; }
 
-    /// @brief Get the control points of the patch (non-const version)
-    ColMatrix<T, 3>& control_pts() 
-    { return control_pts_; }
+    /// @brief Get the topological dimension.
+    constexpr std::size_t tdim() const { return d; }
 
-    /// @brief Get the basis functions for a given parametric direction
-    /// @param dir The parametric direction
-    virtual const Basis<T>& basis(std::size_t dir) const = 0;
+    /// @brief Get the control points matrix.
+    const ColMatrix<T, 3>& control_pts() const { return control_pts_; }
+    ColMatrix<T, 3>& control_pts() { return control_pts_; }
 
-    /// @brief Get the full tensor product basis
-    virtual const TensorProduct<T, d>& tensor_product() const = 0;
+    /// @brief Get the number of control points.
+    std::size_t num_control_pts() const { return control_pts_.rows(); }
+
+    ColMatrix<T, 3> active_control_pts(const std::array<Index, d>& spans) const;
+    ColMatrix<T, 3> get_control_points(const std::vector<Index>& indices) const;
+    std::vector<Index> boundary_dofs(std::size_t param_dim, bool at_start) const;
+    std::array<Index, d> decode_span(Index flat_idx) const;
 
 protected:
-    /// @brief Control points of the patch, stored as a matrix where each row is a control point
     ColMatrix<T, 3> control_pts_;
-
+    TensorProduct<T, d> tensor_product_;
+    DofMapper<d> dof_mapper_;
 };
+
+template <std::floating_point T, std::size_t d>
+std::vector<Matrix<T>> Patch<T, d>::eval_basis_functions(const ColMatrix<T, d>& points, Index span, std::size_t order) const
+{
+    auto spans = decode_span(span);
+    return tensor_product_.eval_on_span(points, spans, static_cast<Index>(order));
+}
+
+template <std::floating_point T, std::size_t d>
+ColMatrix<T, 3> Patch<T, d>::active_control_pts(const std::array<Index, d>& spans) const
+{
+    auto dofs = dof_mapper_.get_element_dofs(spans);
+    ColMatrix<T, 3> pts(dofs.size(), 3);
+    for (Index i = 0; i < dofs.size(); ++i) {
+        pts.row(i) = control_pts_.row(dofs[i]);
+    }
+    return pts;
+}
+
+template <std::floating_point T, std::size_t d>
+ColMatrix<T, 3> Patch<T, d>::get_control_points(const std::vector<Index>& indices) const
+{
+    ColMatrix<T, 3> pts(indices.size(), 3);
+    for (Index i = 0; i < indices.size(); ++i) {
+        pts.row(i) = control_pts_.row(indices[i]);
+    }
+    return pts;
+}
+
+template <std::floating_point T, std::size_t d>
+std::vector<Index> Patch<T, d>::boundary_dofs(std::size_t param_dim, bool at_start) const
+{
+    return dof_mapper_.get_boundary_dofs(param_dim, at_start);
+}
+
+template <std::floating_point T, std::size_t d>
+std::array<Index, d> Patch<T, d>::decode_span(Index flat_idx) const
+{
+    if constexpr (d == 1) {
+        return {flat_idx};
+    } else {
+        auto intervals = tensor_product_.num_intervals();
+        std::array<Index, d> spans;
+        Index temp = flat_idx;
+        for (int i = static_cast<int>(d) - 1; i >= 0; --i) {
+            spans[i] = temp % intervals[i];
+            temp /= intervals[i];
+        }
+        return spans;
+    }
+}
+
+/**
+ * @brief Helper to compute Greville abscissae for BSpline bases.
+ */
+template <std::floating_point T>
+std::vector<T> greville_abscissae(Ptr<const Basis<T>> bs)
+{
+    const Index n = bs->num_basis();
+    const Index p = bs->degree();
+    auto bspline = std::dynamic_pointer_cast<const BSpline<T>>(bs);
+    if (!bspline) {
+        throw std::runtime_error("Greville abscissae requires a BSpline basis.");
+    }
+    const auto& knots_vec = bspline->knots();
+    std::vector<T> xi(n);
+    for (Index i = 0; i < n; ++i) {
+        T sum = T(0);
+        for (Index j = 1; j <= p; ++j)
+            sum += knots_vec[i + j];
+        xi[i] = sum / static_cast<T>(p);
+    }
+    return xi;
+}
 
 } // namespace pyck
 

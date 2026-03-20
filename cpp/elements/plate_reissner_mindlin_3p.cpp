@@ -1,5 +1,5 @@
 #include "plate_reissner_mindlin_3p.hpp"
-#include "surface.hpp"
+#include "patch.hpp"
 
 namespace pyck
 {

@@ -10,10 +10,11 @@ namespace pyck
 
 /**
  * @brief Base class for material models.
+
  * @tparam T Scalar type.
- * @tparam Dim Dimension of the problem (e.g., 1 for 1D, 2 for 2D, 3 for 3D).
+ * @tparam d Dimension of the problem (e.g., 1 for 1D, 2 for 2D, 3 for 3D).
  */
-template <typename T, int Dim>
+template <typename T, int d>
 class Material
 {
 public:

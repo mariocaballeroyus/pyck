@@ -1,5 +1,7 @@
 #include "load_condition.hpp"
-#include "../basis/bspline.hpp"
+#include "../geometry/patch.hpp"
+#include "factories.hpp"
+#include "bspline.hpp"
 #include <stdexcept>
 
 namespace pyck
@@ -158,12 +160,10 @@ void LoadCondition<T, d>::apply(Matrix<T>& /*stiffness*/, Vector<T>& load) const
 
 template class LoadCondition<double, 1>;
 template class LoadCondition<double, 2>;
-template class LoadCondition<double, 3>;
 
 #ifdef PYCK_BUILD_SINGLE_PRECISION
 template class LoadCondition<float, 1>;
 template class LoadCondition<float, 2>;
-template class LoadCondition<float, 3>;
 #endif
 
 } // namespace pyck

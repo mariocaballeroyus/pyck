@@ -4,13 +4,14 @@
 #include <cmath>
 #include <string>
 
+#include "patch.hpp"
+#include "factories.hpp"
 #include "bspline.hpp"
 #include "knots.hpp"
-#include "curve.hpp"
 
 using namespace pyck;
 
-TEST_CASE("CurvePatch: Analytical Push-Forward Verification", "[geometry][curve]") {
+TEST_CASE("Patch<double, 1>: Analytical Push-Forward Verification", "[geometry][curve]") {
     std::vector<double> knots_vec = {0, 0, 0, 0, 1, 1, 1, 1};
     auto basis = std::make_shared<BSpline<double>>(3, KnotVector<double>(knots_vec));
 
@@ -20,7 +21,7 @@ TEST_CASE("CurvePatch: Analytical Push-Forward Verification", "[geometry][curve]
     control_pts.row(2) << 2.0, -1.0, 1.0;
     control_pts.row(3) << 3.0,  0.0, 0.0;
 
-    CurvePatch<double> curve(basis, control_pts);
+    Patch<double, 1> curve(basis, control_pts);
 
     std::vector<double> test_pts = {0.15, 0.5, 0.85};
 
@@ -77,7 +78,7 @@ TEST_CASE("CurvePatch: Analytical Push-Forward Verification", "[geometry][curve]
     }
 }
 
-TEST_CASE("CurvePatch: External AD Numerical Validation", "[geometry][curve]") {
+TEST_CASE("Patch<double, 1>: External AD Numerical Validation", "[geometry][curve]") {
     std::vector<double> knots_vec = {0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0};
     auto basis = std::make_shared<BSpline<double>>(3, KnotVector<double>(knots_vec));
 
@@ -87,7 +88,7 @@ TEST_CASE("CurvePatch: External AD Numerical Validation", "[geometry][curve]") {
     control_pts.row(2) << 2.0, -1.0, 1.0;
     control_pts.row(3) << 3.0,  0.0, 0.0;
 
-    CurvePatch<double> curve(basis, control_pts);
+    Patch<double, 1> curve(basis, control_pts);
 
     SECTION("Evaluation at u = 0.15") {
         Eigen::MatrixXd u(1, 1); u << 0.15;

@@ -5,9 +5,11 @@
 #include <string>
 #include <vector>
 
+#include "patch.hpp"
+#include "factories.hpp"
 #include "bspline.hpp"
 #include "knots.hpp"
-#include "surface.hpp"
+#include "quadrature.hpp"
 #include "gauss_legendre.hpp"
 
 using namespace pyck;
@@ -16,7 +18,7 @@ using namespace pyck;
 // Test 1: Flat surface — no Christoffel corrections
 // ===========================================================================
 
-TEST_CASE("SurfacePatch: Flat Rectangular Plate", "[geometry][surface]") {
+TEST_CASE("Patch<double, 2>: Flat Rectangular Plate", "[geometry][surface]") {
 
     // p=1 bilinear basis in both directions
     auto kv = KnotVector<double>({0, 0, 1, 1});
@@ -35,7 +37,7 @@ TEST_CASE("SurfacePatch: Flat Rectangular Plate", "[geometry][surface]") {
     cp.row(2) <<  0.0,   Ly, 0.0;   // (iu=0, iv=1)
     cp.row(3) <<   Lx,   Ly, 0.0;   // (iu=1, iv=1)
 
-    SurfacePatch<double> surf(basis_u, basis_v, cp);
+    Patch<double, 2> surf(basis_u, basis_v, cp);
 
     // Single non-zero element for clamped-uniform p=1, n=2
     // Knot spans: u has 3 spans (indices 0,1,2 → only 1 is non-zero)
@@ -124,7 +126,7 @@ TEST_CASE("SurfacePatch: Flat Rectangular Plate", "[geometry][surface]") {
 // Test 2: Twisted surface — non-trivial Christoffel symbols
 // ===========================================================================
 
-TEST_CASE("SurfacePatch: Twisted Bilinear Plate (z = u*v)", "[geometry][surface]") {
+TEST_CASE("Patch<double, 2>: Twisted Bilinear Plate (z = u*v)", "[geometry][surface]") {
 
     // p=1 bilinear: x(u,v) = (u, v, u*v)
     auto kv = KnotVector<double>({0, 0, 1, 1});
@@ -137,7 +139,7 @@ TEST_CASE("SurfacePatch: Twisted Bilinear Plate (z = u*v)", "[geometry][surface]
     cp.row(2) << 0.0, 1.0, 0.0;   // (0,1)
     cp.row(3) << 1.0, 1.0, 1.0;   // (1,1):  z = 1*1 = 1
 
-    SurfacePatch<double> surf(basis_u, basis_v, cp);
+    Patch<double, 2> surf(basis_u, basis_v, cp);
 
     // Non-zero element at span_u=1, span_v=1 → flat index 4
     Index elem_idx = 4;
@@ -222,7 +224,7 @@ TEST_CASE("SurfacePatch: Twisted Bilinear Plate (z = u*v)", "[geometry][surface]
 // Test 3: Rectangle factory + quadrature integration
 // ===========================================================================
 
-TEST_CASE("SurfacePatch: Rectangle Factory", "[geometry][surface]") {
+TEST_CASE("Patch<double, 2>: Rectangle Factory", "[geometry][surface]") {
 
     auto kv = clamped_uniform_knots<double>(2, 4);
     auto basis_u = std::make_shared<BSpline<double>>(2, kv);
@@ -279,7 +281,7 @@ TEST_CASE("SurfacePatch: Rectangle Factory", "[geometry][surface]") {
 // Test 4: eval_physical_points
 // ===========================================================================
 
-TEST_CASE("SurfacePatch: Physical Points Evaluation", "[geometry][surface]") {
+TEST_CASE("Patch<double, 2>: Physical Points Evaluation", "[geometry][surface]") {
 
     auto kv = KnotVector<double>({0, 0, 1, 1});
     auto basis_u = std::make_shared<BSpline<double>>(1, kv);
@@ -312,7 +314,7 @@ TEST_CASE("SurfacePatch: Physical Points Evaluation", "[geometry][surface]") {
 // Test 5: Higher-order basis with curved surface
 // ===========================================================================
 
-TEST_CASE("SurfacePatch: Quadratic Basis — Partition of Unity", "[geometry][surface]") {
+TEST_CASE("Patch<double, 2>: Quadratic Basis — Partition of Unity", "[geometry][surface]") {
 
     // p=2 quadratic basis in both directions, single element
     auto kv = KnotVector<double>({0, 0, 0, 1, 1, 1});
@@ -338,7 +340,7 @@ TEST_CASE("SurfacePatch: Quadratic Basis — Partition of Unity", "[geometry][su
     cp.row(7) << 0.5, 0.0, 2.0*R;
     cp.row(8) << 1.0, 0.0, 2.0*R;
 
-    SurfacePatch<double> surf(basis_u, basis_v, cp);
+    Patch<double, 2> surf(basis_u, basis_v, cp);
 
     // Non-zero element: for p=2 with knots {0,0,0,1,1,1}
     // num_spans = 5, and the non-zero span is at index 2 in each direction

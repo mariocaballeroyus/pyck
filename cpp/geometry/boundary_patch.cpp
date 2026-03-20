@@ -1,5 +1,7 @@
 #include "boundary_patch.hpp"
 #include "patch.hpp"
+#include "factories.hpp"
+#include "factories.hpp"
 #include "dof_mapper.hpp"
 
 namespace pyck
@@ -19,8 +21,8 @@ BoundaryPatch<T, d>::BoundaryPatch(const Ptr<Patch<T, d>>& parent,
 
     const auto& mapper = parent_->dof_mapper();
 
-    displacement_dofs_ = mapper.get_displacement_boundary_dofs(param_dim, at_start);
-    rotation_dofs_     = mapper.get_rotation_boundary_dofs(param_dim, at_start);
+    displacement_dofs_ = mapper.get_layer_dofs(param_dim, at_start, 0);
+    rotation_dofs_     = mapper.get_layer_dofs(param_dim, at_start, 1);
     boundary_dofs_     = mapper.get_boundary_dofs(param_dim, at_start);
 }
 
@@ -28,12 +30,10 @@ BoundaryPatch<T, d>::BoundaryPatch(const Ptr<Patch<T, d>>& parent,
 
 template class BoundaryPatch<double, 1>;
 template class BoundaryPatch<double, 2>;
-template class BoundaryPatch<double, 3>;
 
 #ifdef PYCK_BUILD_SINGLE_PRECISION
 template class BoundaryPatch<float, 1>;
 template class BoundaryPatch<float, 2>;
-template class BoundaryPatch<float, 3>;
 #endif
 
 } // namespace pyck

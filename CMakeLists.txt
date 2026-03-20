@@ -34,9 +34,10 @@ target_link_libraries(pyck_basis PUBLIC eigen)
 # Geometry library
 add_library(pyck_geometry
     cpp/geometry/dof_mapper.cpp
-    cpp/geometry/curve.cpp
-    cpp/geometry/surface.cpp
+    cpp/geometry/patch_1d.cpp
+    cpp/geometry/patch_2d.cpp
     cpp/geometry/boundary_patch.cpp
+    cpp/geometry/factories.cpp
 )
 target_include_directories(pyck_geometry PUBLIC cpp/geometry)
 target_link_libraries(pyck_geometry PUBLIC pyck_basis pyck_quadrature)

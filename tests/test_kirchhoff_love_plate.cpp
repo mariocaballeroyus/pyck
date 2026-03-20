@@ -6,7 +6,9 @@
 #include <vector>
 #include <numeric>
 
-#include "surface.hpp"
+#include "patch.hpp"
+#include "factories.hpp"
+#include "factories.hpp"
 #include "bspline.hpp"
 #include "knots.hpp"
 #include "plate_kirchhoff_love_1p.hpp"
@@ -55,7 +57,7 @@ static Eigen::VectorXd solve_ss_plate(
 {
     auto knots = std::make_shared<BSpline<double>>(
         degree, clamped_uniform_knots<double>(degree, num_basis_1d));
-    auto surface = std::make_shared<SurfacePatch<double>>(
+    auto surface = std::make_shared<Patch<double, 2>>(
         rectangle<double>(knots, knots, a, a));
 
     auto material = std::make_shared<PlaneStress2d<double>>(E, nu, h);
@@ -96,7 +98,7 @@ static Eigen::VectorXd solve_ss_plate(
     std::vector<Index> ss_dofs;
     for (int dim = 0; dim < 2; ++dim) {
         for (bool start : {true, false}) {
-            auto edge = surface->dof_mapper().get_displacement_boundary_dofs(dim, start);
+            auto edge = surface->dof_mapper().get_layer_dofs(dim, start, 0);
             ss_dofs.insert(ss_dofs.end(), edge.begin(), edge.end());
         }
     }
@@ -142,7 +144,7 @@ TEST_CASE("KL Plate: SS Uniform Load — Centre Deflection",
     // Evaluate at centre (u = v = 0.5)
     auto knots_obj = std::make_shared<BSpline<double>>(
         p, clamped_uniform_knots<double>(p, n));
-    auto surf = std::make_shared<SurfacePatch<double>>(
+    auto surf = std::make_shared<Patch<double, 2>>(
         rectangle<double>(knots_obj, knots_obj, a, a));
 
     ColMatrix<double, 2> pt(1, 2);
@@ -195,7 +197,7 @@ TEST_CASE("KL Plate: SS Uniform Load — Strain Energy Convergence",
     Index p_f = 4, n_f = 16;
     auto knots_f = std::make_shared<BSpline<double>>(
         p_f, clamped_uniform_knots<double>(p_f, n_f));
-    auto surf_f = std::make_shared<SurfacePatch<double>>(
+    auto surf_f = std::make_shared<Patch<double, 2>>(
         rectangle<double>(knots_f, knots_f, a, a));
     auto mat_f = std::make_shared<PlaneStress2d<double>>(E, nu, h);
     auto elem_f = std::make_shared<PlateKirchhoffLove1p<double>>(mat_f);
@@ -230,7 +232,7 @@ TEST_CASE("KL Plate: SS Uniform Load — Strain Energy Convergence",
     std::vector<Index> ss_dofs_f;
     for (int dim = 0; dim < 2; ++dim)
         for (bool start : {true, false}) {
-            auto edge = surf_f->dof_mapper().get_displacement_boundary_dofs(dim, start);
+            auto edge = surf_f->dof_mapper().get_layer_dofs(dim, start, 0);
             ss_dofs_f.insert(ss_dofs_f.end(), edge.begin(), edge.end());
         }
     std::sort(ss_dofs_f.begin(), ss_dofs_f.end());
@@ -244,7 +246,7 @@ TEST_CASE("KL Plate: SS Uniform Load — Strain Energy Convergence",
 
     auto knots_c = std::make_shared<BSpline<double>>(
         3, clamped_uniform_knots<double>(3, 6));
-    auto surf_c = std::make_shared<SurfacePatch<double>>(
+    auto surf_c = std::make_shared<Patch<double, 2>>(
         rectangle<double>(knots_c, knots_c, a, a));
     auto mat_c = std::make_shared<PlaneStress2d<double>>(E, nu, h);
     auto elem_c = std::make_shared<PlateKirchhoffLove1p<double>>(mat_c);
@@ -277,7 +279,7 @@ TEST_CASE("KL Plate: SS Uniform Load — Strain Energy Convergence",
     std::vector<Index> ss_dofs_c;
     for (int dim = 0; dim < 2; ++dim)
         for (bool start : {true, false}) {
-            auto edge = surf_c->dof_mapper().get_displacement_boundary_dofs(dim, start);
+            auto edge = surf_c->dof_mapper().get_layer_dofs(dim, start, 0);
             ss_dofs_c.insert(ss_dofs_c.end(), edge.begin(), edge.end());
         }
     std::sort(ss_dofs_c.begin(), ss_dofs_c.end());
@@ -320,7 +322,7 @@ TEST_CASE("KL Plate: Clamped All Edges — Centre Deflection",
 
     auto knots = std::make_shared<BSpline<double>>(
         p, clamped_uniform_knots<double>(p, n));
-    auto surface = std::make_shared<SurfacePatch<double>>(
+    auto surface = std::make_shared<Patch<double, 2>>(
         rectangle<double>(knots, knots, a, a));
     auto mat = std::make_shared<PlaneStress2d<double>>(E, nu, h);
     auto element = std::make_shared<PlateKirchhoffLove1p<double>>(mat);
@@ -424,7 +426,7 @@ TEST_CASE("KL Plate: Mixed BCs (SS/Clamped) — Symmetry Check",
 
     auto knots = std::make_shared<BSpline<double>>(
         p, clamped_uniform_knots<double>(p, n));
-    auto surface = std::make_shared<SurfacePatch<double>>(
+    auto surface = std::make_shared<Patch<double, 2>>(
         rectangle<double>(knots, knots, a, a));
     auto gauss   = std::make_shared<GaussLegendre<double, 2>>(p + 1);
 
@@ -461,7 +463,7 @@ TEST_CASE("KL Plate: Mixed BCs (SS/Clamped) — Symmetry Check",
     }
     // Simply supported at v=0 and v=1 (param_dim=1): displacement only
     for (bool start : {true, false}) {
-        auto edge = surface->dof_mapper().get_displacement_boundary_dofs(1, start);
+        auto edge = surface->dof_mapper().get_layer_dofs(1, start, 0);
         bc_dofs.insert(bc_dofs.end(), edge.begin(), edge.end());
     }
     std::sort(bc_dofs.begin(), bc_dofs.end());

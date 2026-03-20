@@ -1,7 +1,6 @@
 #ifndef PYCK_ELEMENT_HPP
 #define PYCK_ELEMENT_HPP
 
-
 #include <vector>
 #include <array>
 #include <Eigen/Dense>

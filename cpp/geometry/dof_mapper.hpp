@@ -52,24 +52,6 @@ public:
     std::vector<Index> get_layer_dofs(Index param_dim, bool at_start, Index layer_idx) const;
 
     /**
-     * @brief Get the global DOF indices on the boundary surface itself
-     *        (single outermost layer — the displacement DOFs).
-     *
-     * @param param_dim The boundary dimension.
-     * @param at_start True for u=0, false for u=1.
-     */
-    std::vector<Index> get_displacement_boundary_dofs(Index param_dim, bool at_start) const;
-
-    /**
-     * @brief Get the global DOF indices on the layer adjacent to the boundary
-     *        (the "rotation" DOFs used to enforce slope = 0).
-     *
-     * @param param_dim The boundary dimension.
-     * @param at_start True for u=0, false for u=1.
-     */
-    std::vector<Index> get_rotation_boundary_dofs(Index param_dim, bool at_start) const;
-
-    /**
      * @brief Get the active global DOF indices for a specific element.
      *
      * @param elem_idx Flat (lexicographic) element index.
@@ -103,6 +85,35 @@ public:
      * @brief Get the polynomial degree in each direction.
      */
     const std::array<Index, d>& degree() const { return degree_; }
+
+    /**
+     * @brief Get the number of parametric intervals (elements) for each dimension.
+     */
+    std::array<Index, d> num_intervals() const {
+        std::array<Index, d> res;
+        for (std::size_t i = 0; i < d; ++i) {
+            res[i] = (num_basis_[i] > degree_[i]) ? (num_basis_[i] - degree_[i]) : 0;
+        }
+        return res;
+    }
+
+    /**
+     * @brief Get the total number of DOF indices (product of num_basis).
+     */
+    std::size_t total_dofs() const {
+        std::size_t total = 1;
+        for (auto n : num_basis_) total *= n;
+        return total;
+    }
+
+    /**
+     * @brief Get the total number of elements.
+     */
+    std::size_t total_elements() const {
+        std::size_t total = 1;
+        for (auto n : num_intervals()) total *= n;
+        return total;
+    }
 
 private:
     /// @brief Number of basis functions in each direction

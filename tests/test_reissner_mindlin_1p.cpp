@@ -6,7 +6,9 @@
 #include <vector>
 #include <numeric>
 
-#include "surface.hpp"
+#include "patch.hpp"
+#include "factories.hpp"
+#include "factories.hpp"
 #include "bspline.hpp"
 #include "knots.hpp"
 #include "plate_reissner_mindlin_1p.hpp"
@@ -94,7 +96,7 @@ static Eigen::VectorXd solve_ss_rm1p_plate(
 {
     auto bsp = std::make_shared<BSpline<double>>(
         degree, clamped_uniform_knots<double>(degree, num_basis_1d));
-    auto surface = std::make_shared<SurfacePatch<double>>(
+    auto surface = std::make_shared<Patch<double, 2>>(
         rectangle<double>(bsp, bsp, a, a));
 
     auto material = std::make_shared<PlaneStress2d<double>>(E, nu, h, k);
@@ -143,7 +145,7 @@ static Eigen::VectorXd solve_ss_rm1p_plate(
     std::vector<Index> ss_dofs;
     for (int dim = 0; dim < 2; ++dim) {
         for (bool start : {true, false}) {
-            auto edge = surface->dof_mapper().get_displacement_boundary_dofs(dim, start);
+            auto edge = surface->dof_mapper().get_layer_dofs(dim, start, 0);
             ss_dofs.insert(ss_dofs.end(), edge.begin(), edge.end());
         }
     }
@@ -182,7 +184,7 @@ TEST_CASE("RM 1P Plate: stiffness matrix size and symmetry", "[RM1P]")
     Index n = 6;
     auto knots = std::make_shared<BSpline<double>>(
         p, clamped_uniform_knots<double>(p, n));
-    auto surface = std::make_shared<SurfacePatch<double>>(
+    auto surface = std::make_shared<Patch<double, 2>>(
         rectangle<double>(knots, knots, 1.0, 1.0));
 
     auto material = std::make_shared<PlaneStress2d<double>>(1.0e6, 0.3, 0.1);
@@ -232,7 +234,7 @@ TEST_CASE("RM 1P Plate: thin plate matches KL", "[RM1P]")
     // Evaluate total deflection at centre using effective shape functions
     auto bsp = std::make_shared<BSpline<double>>(
         p, clamped_uniform_knots<double>(p, n));
-    auto surf = std::make_shared<SurfacePatch<double>>(
+    auto surf = std::make_shared<Patch<double, 2>>(
         rectangle<double>(bsp, bsp, a, a));
 
     auto material = std::make_shared<PlaneStress2d<double>>(E, nu, h, k);
@@ -289,7 +291,7 @@ TEST_CASE("RM 1P Plate: thick plate — captures shear deformation", "[RM1P]")
     auto eval_w = [&](const Eigen::VectorXd& u_vec, double h_val) {
         auto bsp = std::make_shared<BSpline<double>>(
             p, clamped_uniform_knots<double>(p, n));
-        auto surf = std::make_shared<SurfacePatch<double>>(
+        auto surf = std::make_shared<Patch<double, 2>>(
             rectangle<double>(bsp, bsp, a, a));
         auto material = std::make_shared<PlaneStress2d<double>>(E, nu, h_val, k);
         PlateReissnerMindlin1p<double> element(material);
@@ -353,7 +355,7 @@ TEST_CASE("RM 1P Plate: strain energy convergence (thin plate)", "[RM1P]")
     // Rebuild to get K for energy computation
     auto bsp = std::make_shared<BSpline<double>>(
         p, clamped_uniform_knots<double>(p, n));
-    auto surf = std::make_shared<SurfacePatch<double>>(
+    auto surf = std::make_shared<Patch<double, 2>>(
         rectangle<double>(bsp, bsp, a, a));
     auto material = std::make_shared<PlaneStress2d<double>>(E, nu, h, k);
     auto element  = std::make_shared<PlateReissnerMindlin1p<double>>(material);
@@ -422,7 +424,7 @@ TEST_CASE("RM 1P Plate: shear-locking-free across slenderness ratios", "[RM1P]")
         // Rebuild K
         auto bsp = std::make_shared<BSpline<double>>(
             p, clamped_uniform_knots<double>(p, n));
-        auto surf = std::make_shared<SurfacePatch<double>>(
+        auto surf = std::make_shared<Patch<double, 2>>(
             rectangle<double>(bsp, bsp, a, a));
         auto material = std::make_shared<PlaneStress2d<double>>(E, nu, h_val, k);
         auto element  = std::make_shared<PlateReissnerMindlin1p<double>>(material);

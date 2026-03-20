@@ -1,6 +1,8 @@
 #include "linear_elastic_problem.hpp"
 #include "bspline.hpp"
 #include "direct_constraint.hpp"
+#include "patch.hpp"
+#include "factories.hpp"
 
 #include <stdexcept>
 
@@ -113,12 +115,10 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
 
 template class LinearElasticProblem<double, 1>;
 template class LinearElasticProblem<double, 2>;
-template class LinearElasticProblem<double, 3>;
 
 #ifdef PYCK_BUILD_SINGLE_PRECISION
 template class LinearElasticProblem<float, 1>;
 template class LinearElasticProblem<float, 2>;
-template class LinearElasticProblem<float, 3>;
 #endif
 
 } // namespace pyck

@@ -115,20 +115,6 @@ std::vector<Index> DofMapper<d>::get_layer_dofs(std::size_t param_dim,
 }
 
 template <std::size_t d>
-std::vector<Index> DofMapper<d>::get_displacement_boundary_dofs(std::size_t param_dim,
-                                                                bool at_start) const
-{
-    return get_layer_dofs(param_dim, at_start, 0);
-}
-
-template <std::size_t d>
-std::vector<Index> DofMapper<d>::get_rotation_boundary_dofs(std::size_t param_dim,
-                                                            bool at_start) const
-{
-    return get_layer_dofs(param_dim, at_start, 1);
-}
-
-template <std::size_t d>
 std::vector<Index> DofMapper<d>::get_element_dofs(Index elem_idx) const
 {
     // Compute the number of knot-span intervals per direction:
