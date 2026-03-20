@@ -138,11 +138,14 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
         }
     }
 
-    // Map to global DOFs (identity mapping for the scatter indices)
-    std::size_t K = element_load_.size();
-    global_dofs_.reserve(K);
-    for (std::size_t k = 0; k < K; ++k) {
-        global_dofs_.push_back(k);
+    // Map to global DOFs using the patch's global index mapping
+    auto cp_indices = patch.global_indices();
+    global_dofs_.clear();
+    global_dofs_.reserve(cp_indices.size() * ndof);
+    for (auto cp_idx : cp_indices) {
+        for (Index v = 0; v < ndof; ++v) {
+            global_dofs_.push_back(cp_idx * ndof + v);
+        }
     }
 }
 

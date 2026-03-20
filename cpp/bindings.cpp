@@ -65,16 +65,6 @@ PYBIND11_MODULE(_pyck, m) {
         .def("knot_vector", &BSplineD::knot_vector,
              py::return_value_policy::reference_internal);
 
-    // === BoundaryPatch (1D parent) ================================================
-
-    using BoundaryPatch1D = pyck::BoundaryPatch<double, 1>;
-    py::class_<BoundaryPatch1D, pyck::Ptr<BoundaryPatch1D>>(m, "BoundaryPatch1d")
-        .def("boundary_dofs", &BoundaryPatch1D::boundary_dofs)
-        .def("displacement_dofs", &BoundaryPatch1D::displacement_dofs)
-        .def("rotation_dofs", &BoundaryPatch1D::rotation_dofs)
-        .def("param_dim", &BoundaryPatch1D::param_dim)
-        .def("at_start", &BoundaryPatch1D::at_start);
-
     using Patch3D1D = pyck::Patch<double, 1>;
     py::class_<Patch3D1D, pyck::Ptr<Patch3D1D>>(m, "Patch1d")
         .def(py::init([](pyck::Ptr<BasisD> basis,
@@ -97,14 +87,12 @@ PYBIND11_MODULE(_pyck, m) {
              "Return the DofMapper of this patch.")
         .def("active_control_pts", &Patch3D1D::active_control_pts,
              py::arg("spans"))
+        .def("get_control_points", &Patch3D1D::get_control_points,
+             py::arg("indices"),
+             "Map control point indices to physical coordinates.")
         .def("basis", &Patch3D1D::basis,
              py::arg("dir") = 0,
              py::return_value_policy::reference_internal)
-        .def("boundary", [](pyck::Ptr<Patch3D1D> self, std::size_t param_dim, bool at_start) {
-                 return pyck::create_boundary<double, 1>(self, param_dim, at_start);
-             },
-             py::arg("param_dim"), py::arg("at_start"),
-             "Extract a boundary face of this patch.")
         .def("eval_physical_points", [](const Patch3D1D& self, const pyck::QuadratureRule<double, 1>& quad) {
                  return self.eval_physical_points(quad);
              },
@@ -119,6 +107,10 @@ PYBIND11_MODULE(_pyck, m) {
                  return p.eval_shape_functions(pts, span, order);
              },
              py::arg("params"), py::arg("span"), py::arg("order") = 0)
+        .def("eval_shape_functions_at_greville", [](const Patch3D1D& self, const std::vector<pyck::Index>& dofs, std::size_t order) {
+                 return self.eval_shape_functions_at_greville(dofs, order);
+             },
+             py::arg("dofs"), py::arg("order") = 0)
         .def("eval_geometry", [](const Patch3D1D& self, const pyck::ColMatrix<double, 1>& pts, pyck::Index span) {
                  return self.eval_geometry(pts, span);
              },
@@ -135,10 +127,8 @@ PYBIND11_MODULE(_pyck, m) {
     // === Surface Patch (2D) =========================================================
 
     using BoundaryPatch2D = pyck::BoundaryPatch<double, 2>;
-    py::class_<BoundaryPatch2D, pyck::Ptr<BoundaryPatch2D>>(m, "BoundaryPatch2d")
-        .def("boundary_dofs", &BoundaryPatch2D::boundary_dofs)
-        .def("displacement_dofs", &BoundaryPatch2D::displacement_dofs)
-        .def("rotation_dofs", &BoundaryPatch2D::rotation_dofs)
+    py::class_<BoundaryPatch2D, Patch3D1D, pyck::Ptr<BoundaryPatch2D>>(m, "BoundaryPatch2d")
+        .def("parent_dofs", &BoundaryPatch2D::parent_dofs)
         .def("param_dim", &BoundaryPatch2D::param_dim)
         .def("at_start", &BoundaryPatch2D::at_start);
 
@@ -194,6 +184,10 @@ PYBIND11_MODULE(_pyck, m) {
                  return p.eval_shape_functions(pts, span, order);
              },
              py::arg("params"), py::arg("span"), py::arg("order") = 0)
+        .def("eval_shape_functions_at_greville", [](const Patch3D2D& self, const std::vector<pyck::Index>& dofs, std::size_t order) {
+                 return self.eval_shape_functions_at_greville(dofs, order);
+             },
+             py::arg("dofs"), py::arg("order") = 0)
         .def("eval_geometry", [](const Patch3D2D& self, const pyck::ColMatrix<double, 2>& pts, pyck::Index span) {
                  return self.eval_geometry(pts, span);
              },
@@ -220,6 +214,7 @@ PYBIND11_MODULE(_pyck, m) {
              py::arg("param_dim"), py::arg("at_start"), py::arg("layer_idx"))
         .def("get_element_dofs", static_cast<std::vector<pyck::Index> (DofMapper2D::*)(pyck::Index) const>(&DofMapper2D::get_element_dofs),
              py::arg("elem_idx"))
+        .def("from_global", &DofMapper2D::from_global, py::arg("global_idx"))
         .def("num_basis", &DofMapper2D::num_basis)
         .def("degree", &DofMapper2D::degree);
 
@@ -233,6 +228,7 @@ PYBIND11_MODULE(_pyck, m) {
              py::arg("param_dim"), py::arg("at_start"), py::arg("layer_idx"))
         .def("get_element_dofs", static_cast<std::vector<pyck::Index> (DofMapper1D::*)(pyck::Index) const>(&DofMapper1D::get_element_dofs),
              py::arg("elem_idx"))
+        .def("from_global", &DofMapper1D::from_global, py::arg("global_idx"))
         .def("num_basis", &DofMapper1D::num_basis)
         .def("degree", &DofMapper1D::degree);
 

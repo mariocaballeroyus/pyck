@@ -22,7 +22,8 @@ template <std::floating_point T, std::size_t d> class Patch;
  * @tparam d  Parametric dimension of the **parent** patch.
  */
 template <std::floating_point T, std::size_t d>
-class BoundaryPatch
+requires (d > 1)
+class BoundaryPatch : public Patch<T, d - 1>
 {
 public:
 
@@ -38,14 +39,16 @@ public:
                   std::size_t param_dim,
                   bool at_start);
 
-    /// @brief All parent DOFs on the two boundary layers (displacement + rotation)
-    const std::vector<Index>& boundary_dofs() const { return boundary_dofs_; }
+    /// @brief All parent DOFs on the boundary
+    const std::vector<Index>& parent_dofs() const 
+    { return parent_dofs_; }
 
-    /// @brief Parent DOFs on the outermost layer (displacement DOFs)
-    const std::vector<Index>& displacement_dofs() const { return displacement_dofs_; }
-
-    /// @brief Parent DOFs on the adjacent layer (rotation / slope DOFs)
-    const std::vector<Index>& rotation_dofs() const { return rotation_dofs_; }
+    /**
+     * @brief Override global_indices to return the parent's DOF indices.
+     */
+    std::vector<Index> global_indices() const override {
+        return parent_dofs_;
+    }
 
     /// @brief Parametric direction normal to this boundary
     std::size_t param_dim() const { return param_dim_; }
@@ -67,14 +70,8 @@ private:
     /// @brief Whether this is the start (u=0) or end (u=1) boundary
     bool at_start_;
 
-    /// @brief Global DOF indices on the boundary layers (both displacement and rotation)
-    std::vector<Index> boundary_dofs_;
-
-    /// @brief Global DOF indices on the outermost boundary layer (displacement DOFs)
-    std::vector<Index> displacement_dofs_;
-
-    /// @brief Global DOF indices on the adjacent layer (rotation/slope DOFs)
-    std::vector<Index> rotation_dofs_;
+    /// @brief Global DOF indices of the parent patch on the boundary
+    std::vector<Index> parent_dofs_;
 };
 
 /**

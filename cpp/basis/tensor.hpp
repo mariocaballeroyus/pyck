@@ -73,6 +73,9 @@ public:
     /// @brief Get the 1D basis for a given parametric direction (runtime index)
     const Basis<T>& basis(Index dir) const;
 
+    /// @brief Get a shared pointer to the 1D basis for a given parametric direction
+    Ptr<const Basis<T>> basis_ptr(std::size_t dir) const { return bases_[dir]; }
+
 private:
 
     // === Member Variables ===========================================================

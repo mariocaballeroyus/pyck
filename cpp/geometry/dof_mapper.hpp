@@ -34,6 +34,14 @@ public:
     Index to_global(const std::array<Index, d>& logical_idx) const;
 
     /**
+     * @brief Map a flattened global DOF index back to logical tensor-product indices.
+     *
+     * @param global_idx Global DOF index.
+     * @return Array of d logical indices.
+     */
+    std::array<Index, d> from_global(Index global_idx) const;
+
+    /**
      * @brief Get the global DOF indices for the fully clamped boundary layers
      *        (both displacement and rotation layers).
      *

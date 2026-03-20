@@ -61,6 +61,14 @@ public:
                          Index span,
                          std::size_t order = 0) const requires(d == 2);
 
+    std::vector<Matrix<T>>
+    eval_shape_functions_at_greville(const std::vector<Index>& dofs,
+                                     std::size_t order = 0) const requires(d == 1);
+
+    std::vector<Matrix<T>>
+    eval_shape_functions_at_greville(const std::vector<Index>& dofs,
+                                     std::size_t order = 0) const requires(d == 2);
+
     ColMatrix<T, 3> eval_geometry(const ColMatrix<T, d>& points,
                                   Index span) const requires(d == 1);
 
@@ -73,6 +81,10 @@ public:
     /// @brief Basis in the given parametric direction.
     const Basis<T>& basis(std::size_t dir) const 
     { return tensor_product_.basis(dir); }
+
+    /// @brief Get a shared pointer to the 1D basis for a given parametric direction
+    Ptr<const Basis<T>> basis_ptr(std::size_t dir) const 
+    { return tensor_product_.basis_ptr(dir); }
 
     /// @brief Full tensor-product basis.
     const TensorProduct<T, d>& tensor_product() const 
@@ -100,10 +112,23 @@ public:
     std::vector<Index> boundary_dofs(std::size_t param_dim, bool at_start) const;
     std::array<Index, d> decode_span(Index flat_idx) const;
 
+    /**
+     * @brief Get the global indices for the control points in the system.
+     * 
+     * For a regular patch, these are just the local indices (0, 1, ..., N-1).
+     * For a boundary patch, these are the indices of the parent patch.
+     */
+    virtual std::vector<Index> global_indices() const {
+        std::vector<Index> indices(num_control_pts());
+        for (Index i = 0; i < indices.size(); ++i) indices[i] = i;
+        return indices;
+    }
+
 protected:
     ColMatrix<T, 3> control_pts_;
     TensorProduct<T, d> tensor_product_;
     DofMapper<d> dof_mapper_;
+    std::array<std::vector<T>, d> greville_;
 };
 
 template <std::floating_point T, std::size_t d>

@@ -27,6 +27,8 @@ Patch<T, d>::Patch(Ptr<const Basis<T>> basis_u, const ColMatrix<T, 3>& control_p
     if (actual_n != expected_n) {
         throw std::invalid_argument("Patch<T, 1>: Dimension mismatch.");
     }
+    
+    this->greville_[0] = greville_abscissae<T>(this->basis_ptr(0));
 }
 
 template <std::floating_point T, std::size_t d>
@@ -145,6 +147,50 @@ ColMatrix<T, 3> Patch<T, d>::eval_physical_points(const QuadratureRule<T, d>& qu
     }
     result.conservativeResize(out, Eigen::NoChange);
     return result;
+}
+
+template <std::floating_point T, std::size_t d>
+std::vector<Matrix<T>> 
+Patch<T, d>::eval_shape_functions_at_greville(const std::vector<Index>& dofs,
+                                              std::size_t order_in) const requires(d == 1)
+{
+    const Index num_target = dofs.size();
+    const Index order = std::max(Index(1), std::min(static_cast<Index>(order_in), Index(3)));
+    
+    std::vector<Matrix<T>> results(order + 1);
+    for (Index k = 0; k <= order; ++k) {
+        results[k].setZero(num_target, num_target);
+    }
+
+    const auto& greville = this->greville_[0];
+
+    for (std::size_t i = 0; i < num_target; ++i)
+    {
+        const Index global_i = dofs[i];
+        const auto logical_i = this->dof_mapper().from_global(global_i);
+        const T u = greville[logical_i[0]];
+        const Index span = this->basis(0).find_span(u);
+
+        ColMatrix<T, 1> pt; pt << u;
+        auto [shape_fns, jac] = this->eval_shape_functions(pt, span, order);
+
+        auto active_dofs = this->dof_mapper().get_element_dofs(span);
+
+        for (std::size_t j = 0; j < num_target; ++j)
+        {
+            const Index global_j = dofs[j];
+            auto it = std::find(active_dofs.begin(), active_dofs.end(), global_j);
+            if (it != active_dofs.end())
+            {
+                const Index local_j = std::distance(active_dofs.begin(), it);
+                for (std::size_t k = 0; k <= order; ++k) {
+                    results[k](i, j) = shape_fns[k](0, local_j);
+                }
+            }
+        }
+    }
+
+    return results;
 }
 
 template class Patch<double, 1>;

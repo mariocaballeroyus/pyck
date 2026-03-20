@@ -18,6 +18,19 @@ Index DofMapper<d>::to_global(const std::array<Index, d>& logical_idx) const
 }
 
 template <std::size_t d>
+std::array<Index, d> DofMapper<d>::from_global(Index global_idx) const
+{
+    std::array<Index, d> logical_idx;
+    Index temp = global_idx;
+    for (std::size_t i = 0; i < d; ++i)
+    {
+        logical_idx[i] = temp % num_basis_[i];
+        temp /= num_basis_[i];
+    }
+    return logical_idx;
+}
+
+template <std::size_t d>
 std::vector<Index> DofMapper<d>::get_boundary_dofs(std::size_t param_dim, 
                                                    bool at_start) const
 {    
