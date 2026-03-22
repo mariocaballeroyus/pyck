@@ -36,7 +36,7 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
     for (std::size_t elem_idx = 0; elem_idx < total_elements; ++elem_idx) {
         std::array<std::size_t, d> span_indices;
         std::size_t temp_idx = elem_idx;
-        for (std::size_t i = d; i-- > 0; ) {
+        for (std::size_t i = 0; i < d; ++i) {
             span_indices[i] = temp_idx % intervals[i];
             temp_idx /= intervals[i];
         }
@@ -82,7 +82,7 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
         // Decode linear index into multidimensional span_indices
         std::array<std::size_t, d> span_indices;
         std::size_t temp_idx = elem_idx;
-        for (std::size_t i = d; i-- > 0; )
+        for (std::size_t i = 0; i < d; ++i)
         {
             span_indices[i] = temp_idx % intervals[i];
             temp_idx /= intervals[i];

@@ -174,7 +174,7 @@ std::array<Index, d> Patch<T, d>::decode_span(Index flat_idx) const
         auto intervals = tensor_product_.num_intervals();
         std::array<Index, d> spans;
         Index temp = flat_idx;
-        for (int i = static_cast<int>(d) - 1; i >= 0; --i) {
+        for (std::size_t i = 0; i < d; ++i) {
             spans[i] = temp % intervals[i];
             temp /= intervals[i];
         }

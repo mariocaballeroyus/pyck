@@ -48,7 +48,7 @@ void PlateKirchhoffLove1p<T>::compute_local_stiffness(const std::vector<Matrix<T
                                                       Matrix<T>& stiffness) const
 {
     Matrix<T> B    = this->strain_displacement_matrix(shape_fns); // (3Q, K)
-    const auto& Db = material_->bending_matrix();
+    auto Db = material_->bending_matrix();
     
     const Index Q = q_weights.size(); // number of quadrature points
     const Index K = B.cols();         // number of dofs per element

@@ -171,7 +171,7 @@ Patch<T, d>::eval_shape_functions_at_greville(const std::vector<Index>& dofs,
         const T u = greville[logical_i[0]];
         const Index span = this->basis(0).find_span(u);
 
-        ColMatrix<T, 1> pt; pt << u;
+        ColMatrix<T, 1> pt(1, 1); pt << u;
         auto [shape_fns, jac] = this->eval_shape_functions(pt, span, order);
 
         auto active_dofs = this->dof_mapper().get_element_dofs(span);

@@ -337,7 +337,9 @@ PYBIND11_MODULE(_pyck, m) {
     using Elem1D = pyck::Element<double, 1>;
     py::class_<Elem1D, pyck::Ptr<Elem1D>>(m, "Element1d")
         .def("num_node_dofs", &Elem1D::num_node_dofs)
-        .def("min_order", &Elem1D::min_order);
+        .def("min_order", &Elem1D::min_order)
+        .def("shape_matrix", &Elem1D::shape_matrix, py::arg("shape_derivs"))
+        .def("strain_displacement_matrix", &Elem1D::strain_displacement_matrix, py::arg("shape_derivs"));
 
     using EBB = pyck::BeamEulerBernoulli1p<double>;
     py::class_<EBB, Elem1D, pyck::Ptr<EBB>>(m, "BeamEulerBernoulli1p")
@@ -359,7 +361,9 @@ PYBIND11_MODULE(_pyck, m) {
     using Elem2D = pyck::Element<double, 2>;
     py::class_<Elem2D, pyck::Ptr<Elem2D>>(m, "Element2d")
         .def("num_node_dofs", &Elem2D::num_node_dofs)
-        .def("min_order", &Elem2D::min_order);
+        .def("min_order", &Elem2D::min_order)
+        .def("shape_matrix", &Elem2D::shape_matrix, py::arg("shape_derivs"))
+        .def("strain_displacement_matrix", &Elem2D::strain_displacement_matrix, py::arg("shape_derivs"));
 
     using KLP = pyck::PlateKirchhoffLove1p<double>;
     py::class_<KLP, Elem2D, pyck::Ptr<KLP>>(m, "PlateKirchhoffLove1p")
@@ -437,7 +441,7 @@ PYBIND11_MODULE(_pyck, m) {
             pyck::Matrix<double> K;
             pyck::Vector<double> F;
             p.assemble(K, F);
-            return py::make_tuple(std::move(K), std::move(F));
+            return py::make_tuple(K, F);
         }, "Assemble global stiffness matrix and load vector. Returns (K, F).");
 
     using LEP2D = pyck::LinearElasticProblem<double, 2>;
@@ -458,7 +462,7 @@ PYBIND11_MODULE(_pyck, m) {
             pyck::Matrix<double> K;
             pyck::Vector<double> F;
             p.assemble(K, F);
-            return py::make_tuple(std::move(K), std::move(F));
+            return py::make_tuple(K, F);
         }, "Assemble global stiffness matrix and load vector. Returns (K, F).");
 
 #ifdef PYCK_BUILD_SINGLE_PRECISION

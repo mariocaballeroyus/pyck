@@ -50,7 +50,7 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
         // Decode linear index into multidimensional span_indices
         std::array<std::size_t, d> span_indices;
         std::size_t temp_idx = elem_idx;
-        for (std::size_t i = d; i-- > 0; ) // Lexicographical decoding
+        for (std::size_t i = 0; i < d; ++i) // Lexicographical decoding
         {
             span_indices[i] = temp_idx % intervals[i];
             temp_idx /= intervals[i];

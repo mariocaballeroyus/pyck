@@ -64,7 +64,7 @@ std::pair<ColMatrix<T, d>, Vector<T>> QuadratureRule<T, d>::tensor_product(
     {
         std::size_t temp = i;
         T w = static_cast<T>(1);
-        for (std::size_t j = d; j-- > 0; )
+        for (std::size_t j = 0; j < d; ++j) 
         {
             std::size_t qj = rules[j]->num_points();
             std::size_t idx = temp % qj;

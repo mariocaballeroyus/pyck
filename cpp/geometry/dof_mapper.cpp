@@ -149,7 +149,7 @@ std::vector<Index> DofMapper<d>::get_element_dofs(Index elem_idx) const
     // using row-major (last index fastest) convention matching the assembler
     std::array<Index, d> span_indices;
     Index temp = elem_idx;
-    for (std::size_t i = d; i-- > 0; ) {
+    for (std::size_t i = 0; i < d; ++i) {
         span_indices[i] = temp % intervals[i];
         temp /= intervals[i];
     }
