@@ -107,10 +107,6 @@ PYBIND11_MODULE(_pyck, m) {
                  return p.eval_shape_functions(pts, span, order);
              },
              py::arg("params"), py::arg("span"), py::arg("order") = 0)
-        .def("eval_shape_functions_at_greville", [](const Patch3D1D& self, const std::vector<pyck::Index>& dofs, std::size_t order) {
-                 return self.eval_shape_functions_at_greville(dofs, order);
-             },
-             py::arg("dofs"), py::arg("order") = 0)
         .def("eval_geometry", [](const Patch3D1D& self, const pyck::ColMatrix<double, 1>& pts, pyck::Index span) {
                  return self.eval_geometry(pts, span);
              },
@@ -184,10 +180,6 @@ PYBIND11_MODULE(_pyck, m) {
                  return p.eval_shape_functions(pts, span, order);
              },
              py::arg("params"), py::arg("span"), py::arg("order") = 0)
-        .def("eval_shape_functions_at_greville", [](const Patch3D2D& self, const std::vector<pyck::Index>& dofs, std::size_t order) {
-                 return self.eval_shape_functions_at_greville(dofs, order);
-             },
-             py::arg("dofs"), py::arg("order") = 0)
         .def("eval_geometry", [](const Patch3D2D& self, const pyck::ColMatrix<double, 2>& pts, pyck::Index span) {
                  return self.eval_geometry(pts, span);
              },

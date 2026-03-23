@@ -61,14 +61,6 @@ public:
                          Index span,
                          std::size_t order = 0) const requires(d == 2);
 
-    std::vector<Matrix<T>>
-    eval_shape_functions_at_greville(const std::vector<Index>& dofs,
-                                     std::size_t order = 0) const requires(d == 1);
-
-    std::vector<Matrix<T>>
-    eval_shape_functions_at_greville(const std::vector<Index>& dofs,
-                                     std::size_t order = 0) const requires(d == 2);
-
     ColMatrix<T, 3> eval_geometry(const ColMatrix<T, d>& points,
                                   Index span) const requires(d == 1);
 
@@ -128,7 +120,6 @@ protected:
     ColMatrix<T, 3> control_pts_;
     TensorProduct<T, d> tensor_product_;
     DofMapper<d> dof_mapper_;
-    std::array<std::vector<T>, d> greville_;
 };
 
 template <std::floating_point T, std::size_t d>
@@ -180,29 +171,6 @@ std::array<Index, d> Patch<T, d>::decode_span(Index flat_idx) const
         }
         return spans;
     }
-}
-
-/**
- * @brief Helper to compute Greville abscissae for BSpline bases.
- */
-template <std::floating_point T>
-std::vector<T> greville_abscissae(Ptr<const Basis<T>> bs)
-{
-    const Index n = bs->num_basis();
-    const Index p = bs->degree();
-    auto bspline = std::dynamic_pointer_cast<const BSpline<T>>(bs);
-    if (!bspline) {
-        throw std::runtime_error("Greville abscissae requires a BSpline basis.");
-    }
-    const auto& knots_vec = bspline->knots();
-    std::vector<T> xi(n);
-    for (Index i = 0; i < n; ++i) {
-        T sum = T(0);
-        for (Index j = 1; j <= p; ++j)
-            sum += knots_vec[i + j];
-        xi[i] = sum / static_cast<T>(p);
-    }
-    return xi;
 }
 
 } // namespace pyck

@@ -25,9 +25,6 @@ Patch<T, d>::Patch(Ptr<const Basis<T>> basis_u, Ptr<const Basis<T>> basis_v, con
     if (actual_n != expected_n) {
         throw std::invalid_argument("Patch<T, 2>: Dimension mismatch.");
     }
-
-    this->greville_[0] = greville_abscissae<T>(this->basis_ptr(0));
-    this->greville_[1] = greville_abscissae<T>(this->basis_ptr(1));
 }
 
 template <std::floating_point T, std::size_t d>
@@ -370,59 +367,6 @@ ColMatrix<T, 3> Patch<T, d>::eval_physical_points(const QuadratureRule<T, d>& qu
 
     result.conservativeResize(out, Eigen::NoChange);
     return result;
-}
-
-template <std::floating_point T, std::size_t d>
-std::vector<Matrix<T>> 
-Patch<T, d>::eval_shape_functions_at_greville(const std::vector<Index>& dofs,
-                                              std::size_t order_in) const requires(d == 2)
-{
-    const Index num_target = dofs.size();
-    const Index order = std::max(Index(1), std::min(static_cast<Index>(order_in), Index(3)));
-    
-    const std::size_t num_result_mats = (order == 1) ? 3 : ((order == 2) ? 6 : 10);
-    
-    std::vector<Matrix<T>> results(num_result_mats);
-    for (std::size_t k = 0; k < num_result_mats; ++k) {
-        results[k].setZero(num_target, num_target);
-    }
-
-    const auto& greville_u = this->greville_[0];
-    const auto& greville_v = this->greville_[1];
-    const Index num_intervals_v = this->basis(1).num_intervals();
-
-    for (std::size_t i = 0; i < num_target; ++i)
-    {
-        const Index global_i = dofs[i];
-        const auto logical_i = this->dof_mapper().from_global(global_i);
-        const T u = greville_u[logical_i[0]];
-        const T v = greville_v[logical_i[1]];
-        
-        const Index span_u = this->basis(0).find_span(u);
-        const Index span_v = this->basis(1).find_span(v);
-        const Index num_intervals_u = this->basis(0).num_intervals();
-        const Index elem_idx = span_u + span_v * num_intervals_u;
-
-        ColMatrix<T, 2> pt(1, 2); pt << u, v;
-        auto [shape_fns, jac] = this->eval_shape_functions(pt, elem_idx, order);
-
-        auto active_dofs = this->dof_mapper().get_element_dofs(elem_idx);
-
-        for (std::size_t j = 0; j < num_target; ++j)
-        {
-            const Index global_j = dofs[j];
-            auto it = std::find(active_dofs.begin(), active_dofs.end(), global_j);
-            if (it != active_dofs.end())
-            {
-                const Index local_j = std::distance(active_dofs.begin(), it);
-                for (std::size_t k = 0; k < num_result_mats; ++k) {
-                    results[k](i, j) = shape_fns[k](0, local_j);
-                }
-            }
-        }
-    }
-
-    return results;
 }
 
 template class Patch<double, 2>;

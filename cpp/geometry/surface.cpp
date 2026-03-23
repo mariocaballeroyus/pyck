@@ -10,6 +10,29 @@
 namespace pyck
 {
 
+/**
+ * @brief Helper to compute Greville abscissae for BSpline bases.
+ */
+template <std::floating_point T>
+std::vector<T> greville_abscissae(Ptr<const Basis<T>> bs)
+{
+    const Index n = bs->num_basis();
+    const Index p = bs->degree();
+    auto bspline = std::dynamic_pointer_cast<const BSpline<T>>(bs);
+    if (!bspline) {
+        throw std::runtime_error("Greville abscissae requires a BSpline basis.");
+    }
+    const auto& knots_vec = bspline->knots();
+    std::vector<T> xi(n);
+    for (Index i = 0; i < n; ++i) {
+        T sum = T(0);
+        for (Index j = 1; j <= p; ++j)
+            sum += knots_vec[i + j];
+        xi[i] = sum / static_cast<T>(p);
+    }
+    return xi;
+}
+
 template <std::floating_point T>
 Patch<T, 2>::Patch(Ptr<const Basis<T>> basis_u,
                    Ptr<const Basis<T>> basis_v,
