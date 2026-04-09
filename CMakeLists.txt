@@ -38,6 +38,7 @@ add_library(pyck_geometry
     cpp/geometry/patch_2d.cpp
     cpp/geometry/boundary_patch.cpp
     cpp/geometry/factories.cpp
+    cpp/geometry/evaluation.cpp
 )
 target_include_directories(pyck_geometry PUBLIC cpp/geometry)
 target_link_libraries(pyck_geometry PUBLIC pyck_basis pyck_quadrature)
@@ -72,6 +73,7 @@ target_link_libraries(pyck_assembly PUBLIC eigen pyck_elements pyck_conditions p
 # Conditions library
 add_library(pyck_conditions
     cpp/conditions/load_condition.cpp
+    cpp/conditions/penalty_condition.cpp
 )
 target_include_directories(pyck_conditions PUBLIC cpp/conditions)
 target_link_libraries(pyck_conditions PUBLIC pyck_geometry pyck_assembly)
@@ -98,57 +100,40 @@ target_link_libraries(_pyck PRIVATE pyck_basis pyck_geometry pyck_elements pyck_
 set_target_properties(_pyck PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/pyck")
 install(TARGETS _pyck DESTINATION pyck)
 
-# Test executables
-add_executable(test_knot_vector tests/test_knot_vector.cpp)
-target_link_libraries(test_knot_vector PRIVATE pyck_basis catch)
-
-add_executable(test_bspline tests/test_bspline.cpp)
-target_link_libraries(test_bspline PRIVATE pyck_basis catch)
-
-add_executable(test_tensor_product tests/test_tensor_product.cpp)
-target_link_libraries(test_tensor_product PRIVATE pyck_basis catch)
-
-add_executable(test_curve tests/test_curve.cpp)
-target_link_libraries(test_curve PRIVATE pyck_geometry catch)
-
-add_executable(test_dof_mapper tests/test_dof_mapper.cpp)
-target_link_libraries(test_dof_mapper PRIVATE pyck_geometry catch)
-
-add_executable(test_load_condition tests/test_load_condition.cpp)
-target_link_libraries(test_load_condition PRIVATE pyck_conditions pyck_assembly pyck_basis pyck_materials catch)
-
-add_executable(test_quadrature tests/test_quadrature.cpp)
-target_link_libraries(test_quadrature PRIVATE pyck_quadrature catch)
-
-add_executable(test_euler_bernoulli tests/test_euler_bernoulli.cpp)
-target_link_libraries(test_euler_bernoulli PRIVATE pyck_elements pyck_conditions pyck_constraints pyck_assembly pyck_geometry pyck_basis pyck_materials catch)
-
-add_executable(test_constraints tests/test_constraints.cpp)
-target_link_libraries(test_constraints PRIVATE pyck_constraints pyck_assembly catch)
-
-add_executable(test_surface tests/test_surface.cpp)
-target_link_libraries(test_surface PRIVATE pyck_geometry catch)
-
-add_executable(test_kirchhoff_love_plate tests/test_kirchhoff_love_plate.cpp)
-target_link_libraries(test_kirchhoff_love_plate PRIVATE pyck_elements pyck_conditions pyck_constraints pyck_assembly pyck_geometry pyck_basis pyck_materials catch)
-
-add_executable(test_reissner_mindlin tests/test_reissner_mindlin.cpp)
-target_link_libraries(test_reissner_mindlin PRIVATE pyck_elements pyck_conditions pyck_constraints pyck_assembly pyck_geometry pyck_basis pyck_materials catch)
-
-add_executable(test_reissner_mindlin_1p tests/test_reissner_mindlin_1p.cpp)
-target_link_libraries(test_reissner_mindlin_1p PRIVATE pyck_elements pyck_conditions pyck_constraints pyck_assembly pyck_geometry pyck_basis pyck_materials catch)
+# Test executable (unified runner)
+add_executable(pyck_tests 
+    tests/test_main.cpp
+    tests/basis/test_knot_vector.cpp
+    tests/basis/test_bspline.cpp
+    tests/basis/test_tensor_product.cpp
+    tests/geometry/test_curve.cpp
+    tests/geometry/test_surface.cpp
+    tests/geometry/test_dof_mapper.cpp
+    tests/quadrature/test_quadrature.cpp
+    tests/elements/test_euler_bernoulli.cpp
+    tests/elements/test_kirchhoff_love_1p.cpp
+    tests/elements/test_reissner_mindlin.cpp
+    tests/elements/test_reissner_mindlin_1p.cpp
+    tests/assembly/test_constraints.cpp
+    tests/assembly/test_load_condition.cpp
+    tests/assembly/test_materials.cpp
+)
+target_link_libraries(pyck_tests PRIVATE 
+    pyck_basis 
+    pyck_geometry 
+    pyck_elements 
+    pyck_conditions 
+    pyck_constraints 
+    pyck_assembly 
+    pyck_materials 
+    pyck_quadrature 
+    catch
+)
 
 enable_testing()
-add_test(NAME knot_vector_tests COMMAND test_knot_vector)
-add_test(NAME bspline_tests COMMAND test_bspline)
-add_test(NAME tensor_product_tests COMMAND test_tensor_product)
-add_test(NAME curve_tests COMMAND test_curve)
-add_test(NAME quadrature_tests COMMAND test_quadrature)
-add_test(NAME dof_mapper_tests COMMAND test_dof_mapper)
-add_test(NAME load_condition_tests COMMAND test_load_condition)
-add_test(NAME euler_bernoulli_tests COMMAND test_euler_bernoulli)
-add_test(NAME constraints_tests COMMAND test_constraints)
-add_test(NAME surface_tests COMMAND test_surface)
-add_test(NAME kirchhoff_love_plate_tests COMMAND test_kirchhoff_love_plate)
-add_test(NAME reissner_mindlin_tests COMMAND test_reissner_mindlin)
-add_test(NAME reissner_mindlin_1p_tests COMMAND test_reissner_mindlin_1p)
+add_test(NAME basis_tests COMMAND pyck_tests [basis])
+add_test(NAME geometry_tests COMMAND pyck_tests [geometry])
+add_test(NAME quadrature_tests COMMAND pyck_tests [quadrature])
+add_test(NAME assembly_tests COMMAND pyck_tests [assembly])
+add_test(NAME element_tests COMMAND pyck_tests [elements])
+add_test(NAME material_tests COMMAND pyck_tests [materials])

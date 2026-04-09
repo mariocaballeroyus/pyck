@@ -1,4 +1,3 @@
-#define CATCH_CONFIG_MAIN
 #include "catch.hpp"
 
 #include <cmath>
@@ -14,7 +13,7 @@
 #include "beam_euler_bernoulli_1p.hpp"
 #include "load_condition.hpp"
 
-#include "../cpp/materials/slender_beam_1d.hpp"
+#include "slender_beam_1d.hpp"
 
 using namespace pyck;
 

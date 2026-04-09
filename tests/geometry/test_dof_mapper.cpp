@@ -1,4 +1,3 @@
-#define CATCH_CONFIG_MAIN
 #include "catch.hpp"
 
 #include "dof_mapper.hpp"
@@ -14,17 +13,21 @@ TEST_CASE("DofMapper 1D functionality", "[geometry][dof_mapper]") {
     }
 
     SECTION("Boundary DOFs at Start (u=0)") {
-        auto bnd_dofs = mapper.get_boundary_dofs(0, true);
-        REQUIRE(bnd_dofs.size() == 2);
-        REQUIRE(bnd_dofs[0] == 0);
-        REQUIRE(bnd_dofs[1] == 1);
+        auto layer0 = mapper.get_layer_dofs(0, true, 0);
+        auto layer1 = mapper.get_layer_dofs(0, true, 1);
+        REQUIRE(layer0.size() == 1);
+        REQUIRE(layer1.size() == 1);
+        REQUIRE(layer0[0] == 0);
+        REQUIRE(layer1[0] == 1);
     }
 
     SECTION("Boundary DOFs at End (u=1)") {
-        auto bnd_dofs = mapper.get_boundary_dofs(0, false);
-        REQUIRE(bnd_dofs.size() == 2);
-        REQUIRE(bnd_dofs[0] == 3);
-        REQUIRE(bnd_dofs[1] == 4);
+        auto layer0 = mapper.get_layer_dofs(0, false, 0);
+        auto layer1 = mapper.get_layer_dofs(0, false, 1);
+        REQUIRE(layer0.size() == 1);
+        REQUIRE(layer1.size() == 1);
+        REQUIRE(layer0[0] == 4);
+        REQUIRE(layer1[0] == 3);
     }
 }
 
@@ -42,60 +45,60 @@ TEST_CASE("DofMapper 2D functionality", "[geometry][dof_mapper]") {
     }
 
     SECTION("Boundary DOFs at Start u=0") {
-        auto bnd_dofs = mapper.get_boundary_dofs(0, true);
-        // There should be 2 layers along the u-boundary, for all 4 v-indices: 2 * 4 = 8
-        REQUIRE(bnd_dofs.size() == 8);
-        // j=0 -> i=0, i=1 -> IDs: 0, 1
-        // j=1 -> i=0, i=1 -> IDs: 5, 6
-        // j=2 -> i=0, i=1 -> IDs: 10, 11
-        // j=3 -> i=0, i=1 -> IDs: 15, 16
-        REQUIRE(bnd_dofs[0] == 0);
-        REQUIRE(bnd_dofs[1] == 1);
-        REQUIRE(bnd_dofs[2] == 5);
-        REQUIRE(bnd_dofs[3] == 6);
-        REQUIRE(bnd_dofs[4] == 10);
-        REQUIRE(bnd_dofs[5] == 11);
-        REQUIRE(bnd_dofs[6] == 15);
-        REQUIRE(bnd_dofs[7] == 16);
+        auto layer0 = mapper.get_layer_dofs(0, true, 0);
+        auto layer1 = mapper.get_layer_dofs(0, true, 1);
+        REQUIRE(layer0.size() == 4);
+        REQUIRE(layer1.size() == 4);
+        
+        // layer 0: (0,0)=0, (0,1)=5, (0,2)=10, (0,3)=15
+        REQUIRE(layer0[0] == 0);
+        REQUIRE(layer0[1] == 5);
+        REQUIRE(layer0[2] == 10);
+        REQUIRE(layer0[3] == 15);
+
+        // layer 1: (1,0)=1, (1,1)=6, (1,2)=11, (1,3)=16
+        REQUIRE(layer1[0] == 1);
+        REQUIRE(layer1[1] == 6);
+        REQUIRE(layer1[2] == 11);
+        REQUIRE(layer1[3] == 16);
     }
 
     SECTION("Boundary DOFs at End u=1") {
-        auto bnd_dofs = mapper.get_boundary_dofs(0, false);
-        // Last 2 layers: i=3, i=4 for all j
-        REQUIRE(bnd_dofs.size() == 8);
-        // j=0 -> i=3, i=4 -> IDs: 3, 4
-        // j=1 -> i=3, i=4 -> IDs: 8, 9
-        // j=2 -> i=3, i=4 -> IDs: 13, 14
-        // j=3 -> i=3, i=4 -> IDs: 18, 19
-        REQUIRE(bnd_dofs[0] == 3);
-        REQUIRE(bnd_dofs[1] == 4);
-        REQUIRE(bnd_dofs[4] == 13);
-        REQUIRE(bnd_dofs[5] == 14);
-        REQUIRE(bnd_dofs[7] == 19);
+        auto layer0 = mapper.get_layer_dofs(0, false, 0);
+        auto layer1 = mapper.get_layer_dofs(0, false, 1);
+        REQUIRE(layer0.size() == 4);
+        REQUIRE(layer1.size() == 4);
+        
+        // layer 0: i=4, j=0..3 -> IDs: 4, 9, 14, 19
+        REQUIRE(layer0[0] == 4);
+        REQUIRE(layer0[1] == 9);
+        REQUIRE(layer0[2] == 14);
+        REQUIRE(layer0[3] == 19);
+
+        // layer 1: i=3, j=0..3 -> IDs: 3, 8, 13, 18
+        REQUIRE(layer1[0] == 3);
+        REQUIRE(layer1[1] == 8);
+        REQUIRE(layer1[2] == 13);
+        REQUIRE(layer1[3] == 18);
     }
 
     SECTION("Boundary DOFs at Start v=0") {
-        auto bnd_dofs = mapper.get_boundary_dofs(1, true);
-        // 2 layers along v-boundary (j=0, j=1), for all 5 u-indices: 5 * 2 = 10
-        REQUIRE(bnd_dofs.size() == 10);
-        // i=0..4, j=0, 1
-        // Order of traversal is i in outer dim, j in param dim
-        // Actually traversal goes i=0..4 and j=0,1 inside the recursion logic:
-        // iterate does current_dim=0 (5 loops) -> current_dim=1 (2 loops).
-        // Since j is param_dim=1, for each i: it does j=0, j=1
-        // i=0: {0,0}=0, {0,1}=5
-        // i=1: {1,0}=1, {1,1}=6
-        // ...
-        REQUIRE(bnd_dofs[0] == 0);
-        REQUIRE(bnd_dofs[1] == 1);
-        REQUIRE(bnd_dofs[5] == 5);
-        REQUIRE(bnd_dofs[9] == 9);
+        auto layer0 = mapper.get_layer_dofs(1, true, 0);
+        auto layer1 = mapper.get_layer_dofs(1, true, 1);
+        REQUIRE(layer0.size() == 5);
+        REQUIRE(layer1.size() == 5);
+        
+        // layer 0: j=0, i=0..4 -> IDs: 0, 1, 2, 3, 4
+        for (int i=0; i<5; ++i) REQUIRE(layer0[i] == i);
+        // layer 1: j=1, i=0..4 -> IDs: 5, 6, 7, 8, 9
+        for (int i=0; i<5; ++i) REQUIRE(layer1[i] == 5+i);
     }
 }
 
 TEST_CASE("DofMapper bounds checking", "[geometry][dof_mapper]") {
     DofMapper<2> mapper({3, 3}, {2, 2});
-    REQUIRE_THROWS_AS(mapper.get_boundary_dofs(2, true), std::invalid_argument);
+    REQUIRE_THROWS_AS(mapper.get_layer_dofs(2, true, 0), std::invalid_argument);
+    REQUIRE_THROWS_AS(mapper.get_layer_dofs(0, true, 3), std::invalid_argument);
 }
 
 TEST_CASE("DofMapper 1D get_element_dofs", "[geometry][dof_mapper]") {

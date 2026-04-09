@@ -1,4 +1,3 @@
-#define CATCH_CONFIG_MAIN
 #include "catch.hpp"
 
 #include <cmath>
@@ -6,7 +5,6 @@
 #include <vector>
 
 #include "patch.hpp"
-#include "factories.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
 #include "knots.hpp"
@@ -16,8 +14,8 @@
 #include "linear_elastic_problem.hpp"
 #include "load_condition.hpp"
 #include "direct_constraint.hpp"
-#include "../cpp/materials/slender_beam_1d.hpp"
-#include "../cpp/materials/plane_stress_2d.hpp"
+#include "slender_beam_1d.hpp"
+#include "plane_stress_2d.hpp"
 #include <Eigen/Dense>
 
 using namespace pyck;

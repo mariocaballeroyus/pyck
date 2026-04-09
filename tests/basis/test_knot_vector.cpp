@@ -1,4 +1,3 @@
-#define CATCH_CONFIG_MAIN
 #include "catch.hpp"
 
 #include "knots.hpp"
@@ -64,4 +63,25 @@ TEST_CASE("KnotVector: unique spans", "[basis][knots]") {
     }
 
     REQUIRE(num_elements == n - p);
+}
+
+/**
+ * Greville abscissae formula test.
+ * Formula: xi_i = 1/p * sum(u_{i+1:i+p+1}) for i = 0, ..., n-1
+ */
+TEST_CASE("KnotVector: Greville abscissae", "[basis][knots]") {
+    std::size_t p = 2;
+    std::size_t n = 4;
+    auto kv = clamped_uniform_knots<double>(p, n); // [0,0,0, 0.5, 1,1,1]
+    
+    // Expected: [0, (0+0.5)/2, (0.5+1)/2, 1]
+    std::vector<double> expected = {0.0, 0.25, 0.75, 1.0};
+    
+    for (std::size_t i = 0; i < n; ++i) {
+        double sum = 0.0;
+        for (std::size_t j = 1; j <= p; ++j) {
+            sum += kv[i + j];
+        }
+        REQUIRE(sum / p == Approx(expected[i]));
+    }
 }

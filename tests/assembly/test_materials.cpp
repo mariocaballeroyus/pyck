@@ -1,7 +1,6 @@
-#define CATCH_CONFIG_MAIN
 #include "catch.hpp"
-#include "materials/slender_beam_1d.hpp"
-#include "materials/plane_stress_2d.hpp"
+#include "slender_beam_1d.hpp"
+#include "plane_stress_2d.hpp"
 
 using namespace pyck;
 
