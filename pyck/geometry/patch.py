@@ -55,3 +55,45 @@ class Patch(ABC):
     def dof_mapper(self) -> _pyck.DofMapper1d | _pyck.DofMapper2d:
         """Return the DOF mapper for this patch."""
         return self._cpp_object.dof_mapper()
+
+    def layer_dofs(self, param_dim: int, at_start: bool, layer_idx: int = 0) -> list[int]:
+        """Return the DOF indices for a given boundary layer."""
+        return self._cpp_object.layer_dofs(param_dim, at_start, layer_idx)
+
+    @abstractmethod
+    def basis(self, direction: int) -> typing.Any:
+        """Return the basis in the given direction."""
+
+    @abstractmethod
+    def eval_shape_functions(
+        self, params: np.ndarray, span: int, order: int = 0
+    ) -> tuple[list[np.ndarray], np.ndarray]:
+        """Evaluate shape functions and their derivatives on a given span.
+        
+        Returns
+        -------
+        tuple[list[np.ndarray], np.ndarray]
+            (Shape function derivatives, Jacobian determinants)
+        """
+
+    @property
+    def greville_points(self) -> np.ndarray:
+        """Get the Greville points of the patch in the parametric domain."""
+        return self._cpp_object.greville_points()
+
+    def greville_span(self, dof_index: int) -> int:
+        """Get the element span containing the Greville point for a global DOF index."""
+        return self._cpp_object.greville_span(int(dof_index))
+
+    def eval_shape_functions_at_greville(
+        self, dof_index: int, order: int = 0
+    ) -> tuple[list[np.ndarray], np.ndarray]:
+        """Evaluate shape functions and their derivatives at the Greville point corresponding to a global DOF index.
+        
+        Returns
+        -------
+        tuple[list[np.ndarray], np.ndarray]
+            (Shape function derivatives, Jacobian determinants)
+        """
+        sf, jac = self._cpp_object.eval_shape_functions_at_greville(int(dof_index), int(order))
+        return list(sf), np.asarray(jac)

@@ -7,7 +7,7 @@ from typing import Sequence
 import pyck._pyck as _pyck
 
 from pyck.basis.basis import Basis
-from pyck.basis.knot_vector import KnotVector
+from pyck.basis.knot_vector import KnotVector, create_clamped_uniform_knots
 
 
 class BSpline(Basis):
@@ -59,3 +59,21 @@ def create_bspline(degree: int, knots: KnotVector | Sequence[float]) -> BSpline:
     if not isinstance(knots, KnotVector):
         knots = KnotVector(knots)
     return BSpline(degree, knots)
+
+
+def create_clamped_uniform(degree: int, num_basis: int) -> BSpline:
+    """Create a clamped, uniformly-spaced B-spline basis.
+
+    Parameters
+    ----------
+    degree : int
+        Polynomial degree.
+    num_basis : int
+        Number of basis functions.
+
+    Returns
+    -------
+    A :class:`BSpline` instance.
+    """
+    kv = create_clamped_uniform_knots(degree, num_basis)
+    return BSpline(degree, kv)

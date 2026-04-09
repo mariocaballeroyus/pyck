@@ -55,6 +55,10 @@ class Basis(ABC):
         """Number of knot intervals."""
         return self._cpp_object.num_intervals()
 
+    def find_span(self, u: float) -> int:
+        """Find the index of the knot span containing *u*."""
+        return self._cpp_object.find_span(float(u))
+
     def eval_all(
         self, u: np.ndarray, order: int = 0
     ) -> list[np.ndarray]:

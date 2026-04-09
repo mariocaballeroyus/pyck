@@ -48,9 +48,13 @@ class KnotVector:
         """Number of knot intervals."""
         return len(self.knots) - 1
 
-    def num_basis(self, degree: int) -> int:
-        """Number of basis functions for a given polynomial degree."""
-        return len(self.knots) - degree - 1
+    def find_span(self, degree: int, u: float) -> int:
+        """Find the index of the knot span containing *u* for a given degree."""
+        return self._cpp_object.find_span(int(degree), float(u))
+
+    def span_bounds(self, span: int) -> tuple[float, float]:
+        """Return the lower and upper parameter values of knot span *span*."""
+        return self._cpp_object.span_bounds(int(span))
 
     def __len__(self) -> int:
         return len(self.knots)
@@ -80,7 +84,7 @@ def create_knot_vector(knots: Sequence[float]) -> KnotVector:
     return KnotVector(knots)
 
 
-def create_clamped_uniform(degree: int, num_basis: int) -> KnotVector:
+def create_clamped_uniform_knots(degree: int, num_basis: int) -> KnotVector:
     """Create a clamped, uniformly-spaced knot vector.
 
     Parameters

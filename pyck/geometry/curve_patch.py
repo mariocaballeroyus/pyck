@@ -115,6 +115,14 @@ class CurvePatch(Patch):
 
         return coords
 
+
+    def eval_shape_functions(
+        self, params: np.ndarray, span: int, order: int = 0
+    ) -> tuple[list[np.ndarray], np.ndarray]:
+        """Evaluate shape functions and their derivatives on a given span."""
+        params = np.atleast_2d(np.asarray(params, dtype=np.float64))
+        return self._cpp_object.eval_shape_functions(params, span, order)
+
     def evaluate(self, n_points: int = 200) -> np.ndarray:
         """Evaluate the curve at uniformly spaced parametric points.
 

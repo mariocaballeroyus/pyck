@@ -3,12 +3,15 @@ import collections.abc
 import numpy
 import numpy.typing
 import typing
-__all__: list[str] = ['BSpline', 'Basis', 'BeamEulerBernoulli1p', 'BeamTimoshenko1p', 'BeamTimoshenko2p', 'BoundaryPatch1d', 'BoundaryPatch2d', 'Condition', 'Constraint', 'CurvePatch', 'DirectConstraint', 'DofMapper1d', 'DofMapper2d', 'Element1d', 'Element2d', 'GaussLegendre', 'GaussLegendre2d', 'GaussLegendre3d', 'KnotVector', 'LinearConstraint', 'LinearElasticProblem1d', 'LinearElasticProblem2d', 'LoadCondition1d', 'LoadCondition2d', 'Material1d', 'Material2d', 'Patch1d', 'Patch2d', 'PlaneStress2d', 'PlateKirchhoffLove1p', 'PlateReissnerMindlin1p', 'PlateReissnerMindlin3p', 'QuadratureRule1d', 'QuadratureRule2d', 'QuadratureRule3d', 'SlenderBeam1d', 'SurfacePatch', 'line_segment', 'rectangle', 'tensor_product', 'tensor_product_1d', 'tensor_product_2d']
+
+__all__: list[str] = ['BSpline', 'Basis', 'BeamEulerBernoulli1p', 'BeamTimoshenko1p', 'BeamTimoshenko2p', 'BoundaryPatch1d', 'BoundaryPatch2d', 'Condition', 'Constraint', 'CurvePatch', 'DirectConstraint', 'DofMapper1d', 'DofMapper2d', 'Element1d', 'Element2d', 'GaussLegendre', 'GaussLegendre2d', 'GaussLegendre3d', 'KnotVector', 'LinearConstraint', 'LinearElasticProblem1d', 'LinearElasticProblem2d', 'LoadCondition1d', 'LoadCondition2d', 'Material1d', 'Material2d', 'Patch1d', 'Patch2d', 'PlaneStress2d', 'PlateKirchhoffLove1p', 'PlateReissnerMindlin1p', 'PlateReissnerMindlin3p', 'QuadratureRule1d', 'QuadratureRule2d', 'QuadratureRule3d', 'SlenderBeam1d', 'SurfacePatch', 'line_segment', 'rectangle', 'tensor_product', 'tensor_product_1d', 'tensor_product_2d', 'eval_shape_at', 'eval_geometry_at']
+
 class BSpline(Basis):
     def __init__(self, degree: typing.SupportsInt | typing.SupportsIndex, knot_vector: KnotVector) -> None:
         ...
     def knot_vector(self) -> KnotVector:
         ...
+
 class Basis:
     def degree(self) -> int:
         ...
@@ -24,41 +27,37 @@ class Basis:
         ...
     def num_intervals(self) -> int:
         ...
+
 class BeamEulerBernoulli1p(Element1d):
     def __init__(self, material: SlenderBeam1d) -> None:
         ...
+
 class BeamTimoshenko1p(Element1d):
     def __init__(self, material: SlenderBeam1d) -> None:
         ...
+
 class BeamTimoshenko2p(Element1d):
     def __init__(self, material: SlenderBeam1d) -> None:
         ...
-class BoundaryPatch1d:
+
+class BoundaryPatch1d(Patch1d):
     def at_start(self) -> bool:
-        ...
-    def boundary_dofs(self) -> list[int]:
-        ...
-    def displacement_dofs(self) -> list[int]:
         ...
     def param_dim(self) -> int:
         ...
-    def rotation_dofs(self) -> list[int]:
-        ...
-class BoundaryPatch2d:
+
+class BoundaryPatch2d(Patch2d):
     def at_start(self) -> bool:
-        ...
-    def boundary_dofs(self) -> list[int]:
-        ...
-    def displacement_dofs(self) -> list[int]:
         ...
     def param_dim(self) -> int:
         ...
-    def rotation_dofs(self) -> list[int]:
-        ...
+
 class Condition:
     pass
+
 class Constraint:
     pass
+
 class CurvePatch(Patch1d):
     def __init__(self, basis: Basis, control_points: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 3]"]) -> None:
         ...
@@ -68,6 +67,7 @@ class CurvePatch(Patch1d):
         ...
     def eval_shape_functions(self, params: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 1]"], span: typing.SupportsInt | typing.SupportsIndex, order: typing.SupportsInt | typing.SupportsIndex = 0) -> tuple[list[typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]"]], typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]]:
         ...
+
 class DirectConstraint(Constraint):
     @typing.overload
     def __init__(self, dofs: collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex], values: collections.abc.Sequence[typing.SupportsFloat | typing.SupportsIndex]) -> None:
@@ -81,47 +81,47 @@ class DirectConstraint(Constraint):
         ...
     def values(self) -> list[float]:
         ...
+
 class DofMapper1d:
     def degree(self) -> typing.Annotated[list[int], "FixedSize(1)"]:
         ...
-    def get_boundary_dofs(self, param_dim: typing.SupportsInt | typing.SupportsIndex, at_start: bool) -> list[int]:
-        ...
-    def get_displacement_boundary_dofs(self, param_dim: typing.SupportsInt | typing.SupportsIndex, at_start: bool) -> list[int]:
+    def get_layer_dofs(self, param_dim: typing.SupportsInt | typing.SupportsIndex, at_start: bool, layer_idx: typing.SupportsInt | typing.SupportsIndex) -> list[int]:
         ...
     def get_element_dofs(self, elem_idx: typing.SupportsInt | typing.SupportsIndex) -> list[int]:
-        ...
-    def get_rotation_boundary_dofs(self, param_dim: typing.SupportsInt | typing.SupportsIndex, at_start: bool) -> list[int]:
         ...
     def num_basis(self) -> typing.Annotated[list[int], "FixedSize(1)"]:
         ...
+
 class DofMapper2d:
     def degree(self) -> typing.Annotated[list[int], "FixedSize(2)"]:
         ...
-    def get_boundary_dofs(self, param_dim: typing.SupportsInt | typing.SupportsIndex, at_start: bool) -> list[int]:
-        ...
-    def get_displacement_boundary_dofs(self, param_dim: typing.SupportsInt | typing.SupportsIndex, at_start: bool) -> list[int]:
+    def get_layer_dofs(self, param_dim: typing.SupportsInt | typing.SupportsIndex, at_start: bool, layer_idx: typing.SupportsInt | typing.SupportsIndex) -> list[int]:
         ...
     def get_element_dofs(self, elem_idx: typing.SupportsInt | typing.SupportsIndex) -> list[int]:
         ...
-    def get_rotation_boundary_dofs(self, param_dim: typing.SupportsInt | typing.SupportsIndex, at_start: bool) -> list[int]:
-        ...
     def num_basis(self) -> typing.Annotated[list[int], "FixedSize(2)"]:
         ...
+
 class Element1d:
     def num_node_dofs(self) -> int:
         ...
+
 class Element2d:
     def num_node_dofs(self) -> int:
         ...
+
 class GaussLegendre(QuadratureRule1d):
     def __init__(self, num_pts: typing.SupportsInt | typing.SupportsIndex) -> None:
         ...
+
 class GaussLegendre2d(QuadratureRule2d):
     def __init__(self, num_pts: typing.SupportsInt | typing.SupportsIndex) -> None:
         ...
+
 class GaussLegendre3d(QuadratureRule3d):
     def __init__(self, num_pts: typing.SupportsInt | typing.SupportsIndex) -> None:
         ...
+
 class KnotVector:
     @staticmethod
     def clamped_uniform(degree: typing.SupportsInt | typing.SupportsIndex, num_basis: typing.SupportsInt | typing.SupportsIndex) -> KnotVector:
@@ -134,6 +134,7 @@ class KnotVector:
         ...
     def span_bounds(self, span: typing.SupportsInt | typing.SupportsIndex) -> tuple[float, float]:
         ...
+
 class LinearConstraint(Constraint):
     def __init__(self, slaves: collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex], masters: typing.Annotated[numpy.typing.ArrayLike, numpy.uint64, "[m, n]"], weights: collections.abc.Sequence[typing.SupportsFloat | typing.SupportsIndex], constant: typing.SupportsFloat | typing.SupportsIndex = 0.0) -> None:
         ...
@@ -147,6 +148,7 @@ class LinearConstraint(Constraint):
         ...
     def weights(self) -> list[float]:
         ...
+
 class LinearElasticProblem1d:
     def __init__(self, patch: Patch1d, element: Element1d, quadrature: QuadratureRule1d) -> None:
         ...
@@ -164,6 +166,7 @@ class LinearElasticProblem1d:
         """
         Assemble global stiffness matrix and load vector. Returns (K, F).
         """
+
 class LinearElasticProblem2d:
     def __init__(self, patch: Patch2d, element: Element2d, quadrature: QuadratureRule2d) -> None:
         ...
@@ -181,12 +184,15 @@ class LinearElasticProblem2d:
         """
         Assemble global stiffness matrix and load vector. Returns (K, F).
         """
+
 class LoadCondition1d(Condition):
     def __init__(self, patch: Patch1d, element: Element1d, quadrature: QuadratureRule1d, load_values: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 1]"]) -> None:
         ...
+
 class LoadCondition2d(Condition):
     def __init__(self, patch: Patch2d, element: Element2d, quadrature: QuadratureRule2d, load_values: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 1]"]) -> None:
         ...
+
 class Material1d:
     def bending_stiffness(self) -> float:
         ...
@@ -200,6 +206,7 @@ class Material1d:
         ...
     def youngs_modulus(self) -> float:
         ...
+
 class Material2d:
     def bending_stiffness(self) -> float:
         ...
@@ -213,6 +220,7 @@ class Material2d:
         ...
     def youngs_modulus(self) -> float:
         ...
+
 class Patch1d:
     @staticmethod
     def eval_physical_points(*args, **kwargs) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 3]"]:
@@ -225,11 +233,11 @@ class Patch1d:
         """
         Extract a boundary face of this patch.
         """
-    def boundary_dofs(self, param_dim: typing.SupportsInt | typing.SupportsIndex, at_start: bool) -> list[int]:
+    def layer_dofs(self, param_dim: typing.SupportsInt | typing.SupportsIndex, at_start: bool, layer_idx: int = 0) -> list[int]:
         ...
     def control_pts(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 3]"]:
         ...
-    def dof_mapper(self) -> ...:
+    def dof_mapper(self) -> DofMapper1d:
         """
         Return the DofMapper of this patch.
         """
@@ -239,6 +247,7 @@ class Patch1d:
         ...
     def tdim(self) -> int:
         ...
+
 class Patch2d:
     @staticmethod
     def eval_physical_points(*args, **kwargs) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 3]"]:
@@ -251,11 +260,11 @@ class Patch2d:
         """
         Extract a boundary face of this patch.
         """
-    def boundary_dofs(self, param_dim: typing.SupportsInt | typing.SupportsIndex, at_start: bool) -> list[int]:
+    def layer_dofs(self, param_dim: typing.SupportsInt | typing.SupportsIndex, at_start: bool, layer_idx: int = 0) -> list[int]:
         ...
     def control_pts(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 3]"]:
         ...
-    def dof_mapper(self) -> ...:
+    def dof_mapper(self) -> DofMapper2d:
         """
         Return the DofMapper of this patch.
         """
@@ -265,6 +274,7 @@ class Patch2d:
         ...
     def tdim(self) -> int:
         ...
+
 class PlaneStress2d(Material2d):
     def __init__(self, E: typing.SupportsFloat | typing.SupportsIndex, nu: typing.SupportsFloat | typing.SupportsIndex = 0.3, h: typing.SupportsFloat | typing.SupportsIndex = 1.0, k: typing.SupportsFloat | typing.SupportsIndex = 0.8333333333333334) -> None:
         ...
@@ -272,15 +282,19 @@ class PlaneStress2d(Material2d):
         ...
     def thickness(self) -> float:
         ...
+
 class PlateKirchhoffLove1p(Element2d):
     def __init__(self, material: PlaneStress2d) -> None:
         ...
+
 class PlateReissnerMindlin1p(Element2d):
     def __init__(self, material: PlaneStress2d) -> None:
         ...
+
 class PlateReissnerMindlin3p(Element2d):
     def __init__(self, material: PlaneStress2d) -> None:
         ...
+
 class QuadratureRule1d:
     def num_points(self) -> int:
         ...
@@ -288,6 +302,7 @@ class QuadratureRule1d:
         ...
     def weights(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]:
         ...
+
 class QuadratureRule2d:
     @typing.overload
     def __init__(self, rule: QuadratureRule1d) -> None:
@@ -301,6 +316,7 @@ class QuadratureRule2d:
         ...
     def weights(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]:
         ...
+
 class QuadratureRule3d:
     @typing.overload
     def __init__(self, rule: QuadratureRule1d) -> None:
@@ -314,6 +330,7 @@ class QuadratureRule3d:
         ...
     def weights(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]:
         ...
+
 class SlenderBeam1d(Material1d):
     def __init__(self, E: typing.SupportsFloat | typing.SupportsIndex, nu: typing.SupportsFloat | typing.SupportsIndex, A: typing.SupportsFloat | typing.SupportsIndex, I: typing.SupportsFloat | typing.SupportsIndex, k: typing.SupportsFloat | typing.SupportsIndex = 0.8333333333333334) -> None:
         ...
@@ -323,6 +340,7 @@ class SlenderBeam1d(Material1d):
         ...
     def shear_coefficient(self) -> float:
         ...
+
 class SurfacePatch(Patch2d):
     def __init__(self, basis_u: Basis, basis_v: Basis, control_points: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 3]"]) -> None:
         ...
@@ -332,29 +350,41 @@ class SurfacePatch(Patch2d):
         ...
     def eval_shape_functions(self, params: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 2]"], span: typing.SupportsInt | typing.SupportsIndex, order: typing.SupportsInt | typing.SupportsIndex = 0) -> tuple[list[typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]"]], typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]]:
         ...
+
 def line_segment(basis: Basis, length: typing.SupportsFloat | typing.SupportsIndex) -> CurvePatch:
     """
     Create a straight line segment C(u) = (L*u, 0, 0) along the x-axis.
     """
+
 def rectangle(basis_u: Basis, basis_v: Basis, width: typing.SupportsFloat | typing.SupportsIndex, height: typing.SupportsFloat | typing.SupportsIndex) -> SurfacePatch:
     """
     Create a flat rectangular surface patch in the xy-plane.
     """
+
 @typing.overload
 def tensor_product(rules: typing.Annotated[collections.abc.Sequence[QuadratureRule1d], "FixedSize(2)"]) -> tuple[typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 2]"], typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]]:
     """
     Form the tensor product of 2 one-dimensional quadrature rules.
     """
+
 @typing.overload
 def tensor_product(rules: typing.Annotated[collections.abc.Sequence[QuadratureRule1d], "FixedSize(3)"]) -> tuple[typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 3]"], typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]]:
     """
     Form the tensor product of 3 one-dimensional quadrature rules.
     """
+
 def tensor_product_1d(rule: QuadratureRule1d) -> tuple[typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"], typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]]:
     """
     Return (points, weights) for a 1D tensor product (identity).
     """
+
 def tensor_product_2d(rule_u: QuadratureRule1d, rule_v: QuadratureRule1d) -> tuple[typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 2]"], typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]]:
     """
     Form the 2D tensor product of two 1D quadrature rules.
     """
+
+def eval_shape_at(patch: Patch1d | Patch2d, params: numpy.typing.NDArray[numpy.float64], order: int = 0) -> list[numpy.typing.NDArray[numpy.float64]]:
+    ...
+
+def eval_geometry_at(patch: Patch1d | Patch2d, params: numpy.typing.NDArray[numpy.float64]) -> numpy.typing.NDArray[numpy.float64]:
+    ...

@@ -2,15 +2,16 @@
  
 from __future__ import annotations
  
-from typing import Sequence, Union, overload
+from typing import Any, Sequence, overload
  
 import numpy as np
 import numpy.typing as npt
  
 import pyck._pyck as _pyck
- 
- 
-class GaussLegendre:
+from pyck.assembly.quadrature import QuadratureRule
+
+
+class GaussLegendre(QuadratureRule):
     """Gauss-Legendre tensor-product quadrature rule.
  
     This class provides a unified interface for 1D, 2D, and 3D Gauss-Legendre
@@ -29,7 +30,7 @@ class GaussLegendre:
         from ``num_points`` if it's a sequence, otherwise defaults to 1.
     """
  
-    _cpp_object: Union[_pyck.GaussLegendre, _pyck.GaussLegendre2d, _pyck.GaussLegendre3d]
+    _cpp_object: _pyck.GaussLegendre | _pyck.GaussLegendre2d | _pyck.GaussLegendre3d
     _dim: int
  
     @overload
@@ -70,7 +71,7 @@ class GaussLegendre:
  
     @classmethod
     def _from_cpp(
-        cls, cpp_obj: Union[_pyck.GaussLegendre, _pyck.GaussLegendre2d, _pyck.GaussLegendre3d]
+        cls, cpp_obj: _pyck.GaussLegendre | _pyck.GaussLegendre2d | _pyck.GaussLegendre3d
     ) -> GaussLegendre:
         """Wrap an existing C++ Gauss-Legendre object.
  
@@ -170,7 +171,30 @@ def create_gauss_legendre_2d(num_points: int) -> GaussLegendre:
     GaussLegendre
     """
     return GaussLegendre(num_points, dim=2)
+
+
+def create_gauss_from_patch(patch: Any) -> GaussLegendre:
+    """Create a Gauss-Legendre quadrature rule suitable for a patch.
  
+    The number of integration points per direction is set to degree + 1,
+    which is sufficient to integrate the mass matrix of the patch exactly.
  
+    Parameters
+    ----------
+    patch : Patch
+        The patch to create the quadrature rule for.
+ 
+    Returns
+    -------
+    GaussLegendre
+    """
+    # Find max degree across all parametric directions
+    max_degree = 0
+    for i in range(patch.tdim):
+        max_degree = max(max_degree, patch.basis(i).degree)
+    
+    return GaussLegendre(max_degree + 1, dim=patch.tdim)
+
+
 # Alias for backward compatibility
 GaussLegendre2d = GaussLegendre

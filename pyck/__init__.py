@@ -6,6 +6,7 @@ from pyck.basis import (
     KnotVector,
     create_bspline,
     create_clamped_uniform,
+    create_clamped_uniform_knots,
     create_knot_vector,
 )
 from pyck.geometry import (
@@ -15,6 +16,8 @@ from pyck.geometry import (
     SurfacePatch,
     create_surface_patch,
     create_rectangle,
+    eval_shape_at,
+    eval_geometry_at,
 )
 from pyck.elements import (
     BeamEulerBernoulli1p,
@@ -38,6 +41,9 @@ from pyck.conditions import (
     LoadCondition,
     create_constant_load_condition,
     create_function_load_condition,
+    PenaltyCondition,
+    create_displacement_penalty,
+    create_curvature_penalty,
 )
 from pyck.constraints import (
     Constraint,
@@ -51,9 +57,11 @@ from pyck.constraints import (
 from pyck.assembly import (
     GaussLegendre,
     GaussLegendre2d,
+    QuadratureRule,
     LinearElasticProblem,
     create_gauss_legendre,
     create_gauss_legendre_2d,
+    create_gauss_from_patch,
     create_linear_elastic_problem,
 )
 from pyck.io import (
@@ -76,6 +84,7 @@ __all__ = [
     "KnotVector",
     "create_bspline",
     "create_clamped_uniform",
+    "create_clamped_uniform_knots",
     "create_knot_vector",
     "CurvePatch",
     "create_curve_patch",
@@ -100,6 +109,9 @@ __all__ = [
     "LoadCondition",
     "create_constant_load_condition",
     "create_function_load_condition",
+    "PenaltyCondition",
+    "create_displacement_penalty",
+    "create_curvature_penalty",
     "Constraint",
     "DirectConstraint",
     "LinearConstraint",
@@ -109,9 +121,11 @@ __all__ = [
     "create_plate_clamped_constraint",
     "GaussLegendre",
     "GaussLegendre2d",
+    "QuadratureRule",
     "LinearElasticProblem",
     "create_gauss_legendre",
     "create_gauss_legendre_2d",
+    "create_gauss_from_patch",
     "create_linear_elastic_problem",
     "io_basis",
     "io_curve",
