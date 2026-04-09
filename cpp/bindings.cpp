@@ -5,7 +5,7 @@
 #include "bspline.hpp"
 #include "tensor.hpp"
 #include "factories.hpp"
-#include "factories.hpp"
+#include "evaluation.hpp"
 #include "boundary_patch.hpp"
 #include "dof_mapper.hpp"
 #include "quadrature.hpp"
@@ -14,6 +14,7 @@
 #include "beam_euler_bernoulli_1p.hpp"
 #include "condition.hpp"
 #include "load_condition.hpp"
+#include "penalty_condition.hpp"
 #include "linear_constraint.hpp"
 #include "beam_timoshenko_1p.hpp"
 #include "beam_timoshenko_2p.hpp"
@@ -80,8 +81,8 @@ PYBIND11_MODULE(_pyck, m) {
                  &Patch3D1D::control_pts),
              py::return_value_policy::reference_internal)
         .def("num_control_pts", &Patch3D1D::num_control_pts)
-        .def("boundary_dofs", &Patch3D1D::boundary_dofs,
-             py::arg("param_dim"), py::arg("at_start"))
+        .def("layer_dofs", &Patch3D1D::layer_dofs,
+             py::arg("param_dim"), py::arg("at_start"), py::arg("layer_idx") = 0)
         .def("dof_mapper", &Patch3D1D::dof_mapper,
              py::return_value_policy::reference_internal,
              "Return the DofMapper of this patch.")
@@ -93,6 +94,16 @@ PYBIND11_MODULE(_pyck, m) {
         .def("basis", &Patch3D1D::basis,
              py::arg("dir") = 0,
              py::return_value_policy::reference_internal)
+        .def("greville_points", &Patch3D1D::greville_points,
+             py::return_value_policy::reference_internal,
+             "Get the Greville points of the patch in the parametric domain.")
+        .def("eval_shape_functions_at_greville", [](const Patch3D1D& p, pyck::Index dof_index, std::size_t order) {
+                 return p.eval_shape_functions_at_greville(dof_index, order);
+             },
+             py::arg("dof_index"), py::arg("order") = 0,
+             "Evaluate shape functions and their derivatives at the Greville point corresponding to a global DOF index.")
+        .def("greville_span", &Patch3D1D::greville_span, py::arg("dof_index"), 
+             "Get the element span containing the Greville point for a global DOF index.")
         .def("eval_physical_points", [](const Patch3D1D& self, const pyck::QuadratureRule<double, 1>& quad) {
                  return self.eval_physical_points(quad);
              },
@@ -148,8 +159,8 @@ PYBIND11_MODULE(_pyck, m) {
                  &Patch3D2D::control_pts),
              py::return_value_policy::reference_internal)
         .def("num_control_pts", &Patch3D2D::num_control_pts)
-        .def("boundary_dofs", &Patch3D2D::boundary_dofs,
-             py::arg("param_dim"), py::arg("at_start"))
+        .def("layer_dofs", &Patch3D2D::layer_dofs,
+             py::arg("param_dim"), py::arg("at_start"), py::arg("layer_idx") = 0)
         .def("dof_mapper", &Patch3D2D::dof_mapper,
              py::return_value_policy::reference_internal,
              "Return the DofMapper of this patch.")
@@ -161,6 +172,16 @@ PYBIND11_MODULE(_pyck, m) {
         .def("basis", &Patch3D2D::basis,
              py::arg("dir"),
              py::return_value_policy::reference_internal)
+        .def("greville_points", &Patch3D2D::greville_points,
+             py::return_value_policy::reference_internal,
+             "Get the Greville points of the patch in the parametric domain.")
+        .def("eval_shape_functions_at_greville", [](const Patch3D2D& p, pyck::Index dof_index, std::size_t order) {
+                 return p.eval_shape_functions_at_greville(dof_index, order);
+             },
+             py::arg("dof_index"), py::arg("order") = 0,
+             "Evaluate shape functions and their derivatives at the Greville point corresponding to a global DOF index.")
+        .def("greville_span", &Patch3D2D::greville_span, py::arg("dof_index"), 
+             "Get the element span containing the Greville point for a global DOF index.")
         .def("boundary", [](pyck::Ptr<Patch3D2D> self, std::size_t param_dim, bool at_start) {
                  return pyck::create_boundary<double, 2>(self, param_dim, at_start);
              },
@@ -200,8 +221,6 @@ PYBIND11_MODULE(_pyck, m) {
 
     using DofMapper2D = pyck::DofMapper<2>;
     py::class_<DofMapper2D>(m, "DofMapper2d")
-        .def("get_boundary_dofs", &DofMapper2D::get_boundary_dofs,
-             py::arg("param_dim"), py::arg("at_start"))
         .def("get_layer_dofs", &DofMapper2D::get_layer_dofs,
              py::arg("param_dim"), py::arg("at_start"), py::arg("layer_idx"))
         .def("get_element_dofs", static_cast<std::vector<pyck::Index> (DofMapper2D::*)(pyck::Index) const>(&DofMapper2D::get_element_dofs),
@@ -214,8 +233,6 @@ PYBIND11_MODULE(_pyck, m) {
 
     using DofMapper1D = pyck::DofMapper<1>;
     py::class_<DofMapper1D>(m, "DofMapper1d")
-        .def("get_boundary_dofs", &DofMapper1D::get_boundary_dofs,
-             py::arg("param_dim"), py::arg("at_start"))
         .def("get_layer_dofs", &DofMapper1D::get_layer_dofs,
              py::arg("param_dim"), py::arg("at_start"), py::arg("layer_idx"))
         .def("get_element_dofs", static_cast<std::vector<pyck::Index> (DofMapper1D::*)(pyck::Index) const>(&DofMapper1D::get_element_dofs),
@@ -387,6 +404,23 @@ PYBIND11_MODULE(_pyck, m) {
         .def(py::init<const Patch3D2D&, const Elem2D&, const QR2D&, const pyck::Vector<double>&>(),
              py::arg("patch"), py::arg("element"), py::arg("quadrature"), py::arg("load_values"));
 
+    // Penalty Type enum
+    py::enum_<pyck::PenaltyType>(m, "PenaltyType")
+        .value("Displacement", pyck::PenaltyType::Displacement)
+        .value("Derivative", pyck::PenaltyType::Derivative)
+        .export_values();
+
+    // Penalty Conditions (only 2D - 1D boundaries don't use BoundaryPatch)
+    using BoundaryPatch2D = pyck::BoundaryPatch<double, 2>;
+
+    using PC2D = pyck::PenaltyCondition<double, 2>;
+    py::class_<PC2D, CondD, pyck::Ptr<PC2D>>(m, "PenaltyCondition2d")
+        .def(py::init<const BoundaryPatch2D&, const Elem2D&, const QR1D&,
+                      pyck::PenaltyType, double, std::size_t, double>(),
+             py::arg("boundary"), py::arg("element"), py::arg("quadrature"),
+             py::arg("penalty_type"), py::arg("penalty_parameter"),
+             py::arg("derivative_order") = 0, py::arg("prescribed_value") = 0.0);
+
     // === Constraints ================================================================
 
     using ConstD = pyck::Constraint<double>;
@@ -520,8 +554,8 @@ PYBIND11_MODULE(_pyck, m) {
                  &Patch3D1DF::control_pts),
              py::return_value_policy::reference_internal)
         .def("num_control_pts", &Patch3D1DF::num_control_pts)
-        .def("boundary_dofs", &Patch3D1DF::boundary_dofs,
-             py::arg("param_dim"), py::arg("at_start"))
+        .def("layer_dofs", &Patch3D1DF::layer_dofs,
+             py::arg("param_dim"), py::arg("at_start"), py::arg("layer_idx") = 0)
         .def("dof_mapper", &Patch3D1DF::dof_mapper,
              py::return_value_policy::reference_internal)
         .def("boundary", [](pyck::Ptr<Patch3D1DF> self, std::size_t param_dim, bool at_start) {
@@ -541,4 +575,17 @@ PYBIND11_MODULE(_pyck, m) {
         .def("eval_geometry", &Patch3D1DF::eval_geometry,
              py::arg("params"), py::arg("span"));
 #endif
+    m.def("eval_shape_at", &pyck::eval_shape_at<double, 1>,
+          py::arg("patch"), py::arg("params"), py::arg("order") = 0,
+          "Evaluate shape functions at given parametric points (auto span finding).");
+    m.def("eval_shape_at", &pyck::eval_shape_at<double, 2>,
+          py::arg("patch"), py::arg("params"), py::arg("order") = 0,
+          "Evaluate shape functions at given parametric points (auto span finding).");
+    
+    m.def("eval_geometry_at", &pyck::eval_geometry_at<double, 1>,
+          py::arg("patch"), py::arg("params"),
+          "Evaluate physical coordinates at given parametric points.");
+    m.def("eval_geometry_at", &pyck::eval_geometry_at<double, 2>,
+          py::arg("patch"), py::arg("params"),
+          "Evaluate physical coordinates at given parametric points.");
 }

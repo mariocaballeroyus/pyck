@@ -57,6 +57,11 @@ public:
      */
     std::vector<Matrix<T>> eval_all(const Vector<T>& points,
                                     Index order = 0) const override;
+
+    /**
+     * @brief Compute the Greville abscissae for the B-spline basis.
+     */
+    Vector<T> greville_abscissae() const override;
 };
 
 } // namespace pyck

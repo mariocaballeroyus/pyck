@@ -86,6 +86,13 @@ public:
     Index find_span(T param) const
     { return knots_.find_span(degree_, param); }
 
+    /**
+     * @brief Compute the Greville abscissae for this basis.
+     * 
+     * @return A vector of parameter values corresponding to the Greville points.
+     */
+    virtual Vector<T> greville_abscissae() const = 0;
+
     /// @brief Get the knot vector object
     const KnotVector<T>& knot_vector() const 
     { return knots_; }

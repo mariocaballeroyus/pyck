@@ -253,6 +253,24 @@ std::vector<Matrix<T>> BSpline<T>::eval_all(const Vector<T>& points,
     return results;
 }
 
+template <std::floating_point T>
+Vector<T> BSpline<T>::greville_abscissae() const
+{
+    const Index n = this->num_basis();
+    const Index p = this->degree_;
+    const auto& knots_data = this->knots_.data();
+    
+    Vector<T> greville(n);
+    for (Index i = 0; i < n; ++i) {
+        T sum = 0;
+        for (Index j = 1; j <= p; ++j) {
+            sum += knots_data[i + j];
+        }
+        greville[i] = p > 0 ? sum / static_cast<T>(p) : knots_data[i];
+    }
+    return greville;
+}
+
 // === Template Instantiations ========================================================
 
 template class BSpline<double>;

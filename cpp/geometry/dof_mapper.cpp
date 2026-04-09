@@ -31,59 +31,6 @@ std::array<Index, d> DofMapper<d>::from_global(Index global_idx) const
 }
 
 template <std::size_t d>
-std::vector<Index> DofMapper<d>::get_boundary_dofs(std::size_t param_dim, 
-                                                   bool at_start) const
-{    
-    if (param_dim >= d) {
-        throw std::invalid_argument(
-            "param_dim is out of bounds for the dimension d."
-        );
-    }
-
-    std::vector<Index> dofs;
-    std::array<Index, d> current_idx;
-    current_idx.fill(0);
-    
-    // Only iterate over exactly the indices we need
-    auto iterate = [&](auto& self, std::size_t current_dim) -> void {
-        if (current_dim == d) {
-            dofs.push_back(to_global(current_idx));
-            return;
-        }
-
-        if (current_dim == param_dim) 
-        {
-            // Only loop over the two clamped boundary layers!
-            if (at_start) {
-                current_idx[current_dim] = 0;
-                self(self, current_dim + 1);
-                current_idx[current_dim] = 1;
-                self(self, current_dim + 1);
-            } else {
-                current_idx[current_dim] = num_basis_[current_dim] - 2;
-                self(self, current_dim + 1);
-                current_idx[current_dim] = num_basis_[current_dim] - 1;
-                self(self, current_dim + 1);
-            }
-        } 
-        else 
-        {
-            // Full sweep for orthogonal dimensions
-            for (Index i = 0; i < num_basis_[current_dim]; ++i) {
-                current_idx[current_dim] = i;
-                self(self, current_dim + 1);
-            }
-        }
-    };
-
-    iterate(iterate, 0);
-    
-    std::sort(dofs.begin(), dofs.end());
-    
-    return dofs;
-}
-
-template <std::size_t d>
 std::vector<Index> DofMapper<d>::get_layer_dofs(std::size_t param_dim,
                                                 bool at_start,
                                                 Index layer_idx) const

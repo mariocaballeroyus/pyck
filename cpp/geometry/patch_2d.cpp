@@ -25,6 +25,36 @@ Patch<T, d>::Patch(Ptr<const Basis<T>> basis_u, Ptr<const Basis<T>> basis_v, con
     if (actual_n != expected_n) {
         throw std::invalid_argument("Patch<T, 2>: Dimension mismatch.");
     }
+
+    // Initialize Greville points and spans
+    Vector<T> gu = this->tensor_product_.basis(0).greville_abscissae();
+    Vector<T> gv = this->tensor_product_.basis(1).greville_abscissae();
+    Index nu = gu.size();
+    Index nv = gv.size();
+    
+    greville_points_.resize(nu * nv, 2);
+    greville_spans_.resize(nu * nv);
+    
+    auto intervals = this->tensor_product_.num_intervals();
+    for (Index i = 0; i < nu; ++i) {
+        Index su = this->tensor_product_.basis(0).find_span(gu[i]);
+        for (Index j = 0; j < nv; ++j) {
+            Index flat = i * nv + j;
+            greville_points_(flat, 0) = gu[i];
+            greville_points_(flat, 1) = gv[j];
+            Index sv = this->tensor_product_.basis(1).find_span(gv[j]);
+            greville_spans_[flat] = su * intervals[1] + sv;
+        }
+    }
+}
+
+template <std::floating_point T, std::size_t d>
+std::pair<std::vector<Matrix<T>>, Vector<T>> 
+Patch<T, d>::eval_shape_functions_at_greville(Index dof_index, std::size_t order_in) const 
+{
+    ColMatrix<T, d> pt = greville_points_.row(dof_index);
+    Index span = greville_spans_[dof_index];
+    return eval_shape_functions(pt, span, order_in);
 }
 
 template <std::floating_point T, std::size_t d>
@@ -321,6 +351,7 @@ Patch<T, d>::eval_shape_functions(const ColMatrix<T, d>& points, Index span, std
 
     return {std::move(result), std::move(jacobian)};
 }
+
 
 template <std::floating_point T, std::size_t d>
 ColMatrix<T, 3> Patch<T, d>::eval_geometry(const ColMatrix<T, d>& points, Index span) const requires(d == 2)

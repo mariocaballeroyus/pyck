@@ -51,11 +51,10 @@ public:
                                                 Index span,
                                                 std::size_t order = 0) const;
     
-    std::pair<std::vector<Matrix<T>>, Vector<T>>
+                                                std::pair<std::vector<Matrix<T>>, Vector<T>>
     eval_shape_functions(const ColMatrix<T, d>& points,
                          Index span,
                          std::size_t order = 0) const requires(d == 1);
-
     std::pair<std::vector<Matrix<T>>, Vector<T>>
     eval_shape_functions(const ColMatrix<T, d>& points,
                          Index span,
@@ -69,6 +68,23 @@ public:
 
     ColMatrix<T, 3> eval_physical_points(const QuadratureRule<T, d>& quadrature) const requires(d == 1);
     ColMatrix<T, 3> eval_physical_points(const QuadratureRule<T, d>& quadrature) const requires(d == 2);
+
+    /// @brief Get the Greville points of the patch in the parametric domain.
+    const ColMatrix<T, d>& greville_points() const { return greville_points_; }
+
+    /// @brief Get the element span containing the Greville point for a global DOF index.
+    Index greville_span(Index dof_index) const { return greville_spans_[dof_index]; }
+
+    /**
+     * @brief Evaluate shape functions and their derivatives at the Greville point 
+     *        corresponding to a global DOF index.
+     * 
+     * @param dof_index Global DOF index (0 to num_control_pts - 1).
+     * @param order Highest order of derivatives to compute.
+     * @return Evaluation results (shape function matrices and area element).
+     */
+    std::pair<std::vector<Matrix<T>>, Vector<T>>
+    eval_shape_functions_at_greville(Index dof_index, std::size_t order = 0) const;
 
     /// @brief Basis in the given parametric direction.
     const Basis<T>& basis(std::size_t dir) const 
@@ -101,7 +117,7 @@ public:
 
     ColMatrix<T, 3> active_control_pts(const std::array<Index, d>& spans) const;
     ColMatrix<T, 3> get_control_points(const std::vector<Index>& indices) const;
-    std::vector<Index> boundary_dofs(std::size_t param_dim, bool at_start) const;
+    std::vector<Index> layer_dofs(std::size_t param_dim, bool at_start, Index layer_idx = 0) const;
     std::array<Index, d> decode_span(Index flat_idx) const;
 
     /**
@@ -120,6 +136,8 @@ protected:
     ColMatrix<T, 3> control_pts_;
     TensorProduct<T, d> tensor_product_;
     DofMapper<d> dof_mapper_;
+    ColMatrix<T, d> greville_points_;
+    std::vector<Index> greville_spans_;
 };
 
 template <std::floating_point T, std::size_t d>
@@ -151,9 +169,9 @@ ColMatrix<T, 3> Patch<T, d>::get_control_points(const std::vector<Index>& indice
 }
 
 template <std::floating_point T, std::size_t d>
-std::vector<Index> Patch<T, d>::boundary_dofs(std::size_t param_dim, bool at_start) const
+std::vector<Index> Patch<T, d>::layer_dofs(std::size_t param_dim, bool at_start, Index layer_idx) const
 {
-    return dof_mapper_.get_boundary_dofs(param_dim, at_start);
+    return dof_mapper_.get_layer_dofs(param_dim, at_start, layer_idx);
 }
 
 template <std::floating_point T, std::size_t d>

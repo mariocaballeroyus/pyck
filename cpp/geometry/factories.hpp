@@ -41,9 +41,19 @@ Patch<T, 1> line_segment(Ptr<const Basis<T>> basis, T length);
  */
 template <std::floating_point T>
 Patch<T, 2> rectangle(Ptr<const Basis<T>> basis_u,
-                          Ptr<const Basis<T>> basis_v,
-                          T width,
-                          T height);
+                           Ptr<const Basis<T>> basis_v,
+                           T width,
+                           T height);
+
+/**
+ * @brief Create a flat square surface patch in the xy-plane.
+ *
+ * @param basis  Basis in both u and v directions.
+ * @param side   Physical side length (both x and y).
+ * @return A Patch<T, 2> representing the square surface.
+ */
+template <std::floating_point T>
+Patch<T, 2> square(Ptr<const Basis<T>> basis, T side);
 
 } // namespace pyck
 
