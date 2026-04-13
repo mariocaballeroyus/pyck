@@ -13,12 +13,14 @@ BeamTimoshenko1p<T>::BeamTimoshenko1p(Ptr<SlenderBeam1d<T>> material)
 }
 
 template <std::floating_point T>
-Matrix<T> BeamTimoshenko1p<T>::shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const
+Matrix<T> BeamTimoshenko1p<T>::transverse_shape_matrix(
+    const std::vector<Matrix<T>>& shape_derivs) const
 {
     const auto& N = shape_derivs;
     T ratio = material_->bending_stiffness() / material_->shear_stiffness();
-    
-    // Ni = [ Ni - (Kb/Ks) * Ni,xx ]
+
+    // Effective shape function for total deflection: Ñ_i = N_i - (Kb/Ks) N_i,xx
+    // This accounts for w = w_b - (Kb/Ks) w_b,xx in the load-vector integral.
     return N[idx::val] - ratio * N[idx::d11];
 }
 

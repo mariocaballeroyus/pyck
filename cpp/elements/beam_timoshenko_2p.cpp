@@ -13,21 +13,19 @@ BeamTimoshenko2p<T>::BeamTimoshenko2p(Ptr<SlenderBeam1d<T>> material)
 }
 
 template <std::floating_point T>
-Matrix<T> BeamTimoshenko2p<T>::shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const
+Matrix<T> BeamTimoshenko2p<T>::transverse_shape_matrix(
+    const std::vector<Matrix<T>>& shape_derivs) const
 {
-    const Index Q = shape_derivs[idx::val].rows();
-    const Index n = shape_derivs[idx::val].cols();
+    // Transverse displacement w uses the standard isoparametric basis (Q × n).
+    return shape_derivs[idx::val];
+}
 
-    // Ni = [ Ni  0
-    //        0   Ni ]
-    Matrix<T> N = Matrix<T>::Zero(2 * Q, 2 * n);
-    for (Index q = 0; q < Q; ++q) {
-        for (Index i = 0; i < n; ++i) {
-            N(2*q,     2*i    ) = shape_derivs[idx::val](q, i);
-            N(2*q + 1, 2*i + 1) = shape_derivs[idx::val](q, i);
-        }
-    }
-    return N;
+template <std::floating_point T>
+Matrix<T> BeamTimoshenko2p<T>::rotation_shape_matrix(
+    const std::vector<Matrix<T>>& shape_derivs) const
+{
+    // The rotation DOF θ shares the same isoparametric basis as w.
+    return shape_derivs[idx::val];
 }
 
 template <std::floating_point T>

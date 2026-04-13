@@ -247,7 +247,7 @@ TEST_CASE("RM 1P Plate: thin plate matches KL", "[RM1P]")
     Index flat   = span_u * num_sp + span_v;
 
     auto [sf, jac] = surf->eval_shape_functions(pt, flat, element.min_order());
-    auto N_eff = element.shape_matrix(sf);  // effective shape function
+    auto N_eff = element.transverse_shape_matrix(sf);  // effective shape function
     auto active = surf->dof_mapper().get_element_dofs(flat);
 
     Vector<double> u_active(active.size());
@@ -303,7 +303,7 @@ TEST_CASE("RM 1P Plate: thick plate — captures shear deformation", "[RM1P]")
         Index flat   = span_u * num_sp + span_v;
 
         auto [sf, jac] = surf->eval_shape_functions(pt, flat, element.min_order());
-        auto N_eff = element.shape_matrix(sf);
+        auto N_eff = element.transverse_shape_matrix(sf);
         auto active = surf->dof_mapper().get_element_dofs(flat);
 
         Vector<double> u_active(active.size());

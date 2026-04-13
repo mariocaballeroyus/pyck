@@ -112,29 +112,27 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
         std::size_t req_order = element.min_order();
         auto [shape_derivs, jacobian] = patch.eval_shape_functions(mapped_pts, elem_idx, req_order);
         
-        // Use generalized formulation shape matrix N
-        Matrix<T> N_mat = element.shape_matrix(shape_derivs);
-        
-        // Extract load values for this element's quadrature points
-        Vector<T> t_vals = broadcasted_values.segment(qp_offset * ndof, Q * ndof);
-        qp_offset += Q;
+        // N_w is the transverse displacement interpolation matrix (Q × n).
+        // The distributed load q is conjugate to w only; rotation DOFs carry
+        // no distributed force in the standard plate/beam formulations.
+        Matrix<T> N_w = element.transverse_shape_matrix(shape_derivs);
 
-        // Integrate local load: f_local = N^T * (t * |J| * w)
-        Vector<T> W_J_T(Q * ndof);
+        // Scalar integration weights: q(ξ_k) · |J(ξ_k)| · w_k
+        // DOF 0 of broadcasted_values holds the transverse load at each QP.
+        Vector<T> W_J_T(Q);
         for (std::size_t k = 0; k < Q; ++k) {
             T scale = mapped_weights(k) * jacobian(k);
-            for (std::size_t v = 0; v < ndof; ++v) {
-                W_J_T(k * ndof + v) = t_vals(k * ndof + v) * scale;
-            }
+            W_J_T(k) = broadcasted_values((qp_offset + k) * ndof) * scale;
         }
-        Vector<T> local_load = N_mat.transpose() * W_J_T;
+        qp_offset += Q;
 
-        // Scatter into global load vector
+        // f_w = N_w^T · (q · |J| · w)  — one entry per element node
+        Vector<T> local_load_w = N_w.transpose() * W_J_T;
+
+        // Scatter to the transverse-displacement DOF (DOF 0) of each node
         auto elem_nodes = patch.dof_mapper().get_element_dofs(elem_idx);
         for (std::size_t k = 0; k < elem_nodes.size(); ++k) {
-            for (std::size_t v = 0; v < ndof; ++v) {
-                element_load_(elem_nodes[k] * ndof + v) += local_load(k * ndof + v);
-            }
+            element_load_(elem_nodes[k] * ndof + 0) += local_load_w(k);
         }
     }
 

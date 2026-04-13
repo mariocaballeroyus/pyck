@@ -44,7 +44,11 @@ public:
                                  const Vector<T>& q_weights,
                                  Matrix<T>& stiffness) const override;
 
-    Matrix<T> shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
+    /// @brief Effective transverse displacement shape functions Ñ_w (Q × n).
+    ///
+    /// Accounts for the Laplacian correction w = w_b - (K_b/K_s) Δw_b, so
+    /// this is: Ñ_i = N_i - (K_b/K_s)(N_i,xx + N_i,yy).
+    Matrix<T> transverse_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
 
     Matrix<T> strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
 

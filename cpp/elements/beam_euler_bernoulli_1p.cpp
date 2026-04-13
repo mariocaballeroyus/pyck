@@ -13,9 +13,9 @@ BeamEulerBernoulli1p<T>::BeamEulerBernoulli1p(Ptr<SlenderBeam1d<T>> material)
 }
 
 template <std::floating_point T>
-Matrix<T> BeamEulerBernoulli1p<T>::shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const
+Matrix<T> BeamEulerBernoulli1p<T>::transverse_shape_matrix(
+    const std::vector<Matrix<T>>& shape_derivs) const
 {
-    // Ni = [ Ni ]
     return shape_derivs[idx::val];
 }
 

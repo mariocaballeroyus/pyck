@@ -13,10 +13,9 @@ PlateKirchhoffLove1p<T>::PlateKirchhoffLove1p(Ptr<PlaneStress2d<T>> material)
 }
 
 template <std::floating_point T>
-Matrix<T> PlateKirchhoffLove1p<T>::shape_matrix(
+Matrix<T> PlateKirchhoffLove1p<T>::transverse_shape_matrix(
     const std::vector<Matrix<T>>& shape_derivs) const
 {
-    // Ni = [ Ni ]
     return shape_derivs[idx::val];
 }
 

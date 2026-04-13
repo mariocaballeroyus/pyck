@@ -26,9 +26,11 @@ public:
                                          const Vector<T>& q_weights,
                                          Matrix<T>& stiffness) const = 0;
 
-    /// @brief Compute the generalized shape function matrix N.
-    /// @param shape_derivs Pre-evaluated shape functions and their derivatives.
-    virtual Matrix<T> shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const = 0;
+    /// @brief Transverse displacement shape matrix N_w (Q × n).
+    ///
+    /// Maps nodal transverse-displacement DOFs to interpolated values at the
+    /// quadrature points.  Used in the load-vector integral ∫ N_w^T q dΩ.
+    virtual Matrix<T> transverse_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const = 0;
 
     /// @brief Compute the generalized strain-displacement matrix B.
     /// @param shape_derivs Pre-evaluated shape functions and their derivatives.
@@ -54,14 +56,17 @@ public:
                                          const Vector<T>& q_weights,
                                          Matrix<T>& stiffness) const = 0;
 
-    
-    virtual Matrix<T> shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const = 0;
+    /// @brief Transverse displacement shape matrix N_w (Q × n).
+    ///
+    /// Maps nodal transverse-displacement DOFs to interpolated values at the
+    /// quadrature points.  Used in the load-vector integral ∫ N_w^T q dΩ.
+    virtual Matrix<T> transverse_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const = 0;
 
     virtual Matrix<T> strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const = 0;
-    
+
     /// @brief Number of DOFs per node
     virtual std::size_t num_node_dofs() const = 0;
-    
+
     /// @brief Minimum required derivative order for shape function evaluation
     virtual std::size_t min_order() const { return 0; }
 
@@ -82,12 +87,16 @@ public:
                                          const Vector<T>& q_weights,
                                          Matrix<T>& stiffness) const = 0;
 
-    virtual Matrix<T> shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const = 0;
+    /// @brief Transverse displacement shape matrix N_w (Q × n).
+    ///
+    /// Maps nodal transverse-displacement DOFs to interpolated values at the
+    /// quadrature points.  Used in the load-vector integral ∫ N_w^T q dΩ.
+    virtual Matrix<T> transverse_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const = 0;
 
     virtual Matrix<T> strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const = 0;
-    
+
     virtual std::size_t num_node_dofs() const = 0;
-    
+
     virtual std::size_t min_order() const { return 0; }
 
 protected:

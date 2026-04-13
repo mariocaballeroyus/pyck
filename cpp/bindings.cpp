@@ -14,7 +14,6 @@
 #include "beam_euler_bernoulli_1p.hpp"
 #include "condition.hpp"
 #include "load_condition.hpp"
-#include "penalty_condition.hpp"
 #include "linear_constraint.hpp"
 #include "beam_timoshenko_1p.hpp"
 #include "beam_timoshenko_2p.hpp"
@@ -347,7 +346,7 @@ PYBIND11_MODULE(_pyck, m) {
     py::class_<Elem1D, pyck::Ptr<Elem1D>>(m, "Element1d")
         .def("num_node_dofs", &Elem1D::num_node_dofs)
         .def("min_order", &Elem1D::min_order)
-        .def("shape_matrix", &Elem1D::shape_matrix, py::arg("shape_derivs"))
+        .def("transverse_shape_matrix", &Elem1D::transverse_shape_matrix, py::arg("shape_derivs"))
         .def("strain_displacement_matrix", &Elem1D::strain_displacement_matrix, py::arg("shape_derivs"));
 
     using EBB = pyck::BeamEulerBernoulli1p<double>;
@@ -363,7 +362,8 @@ PYBIND11_MODULE(_pyck, m) {
     using TBB2p = pyck::BeamTimoshenko2p<double>;
     py::class_<TBB2p, Elem1D, pyck::Ptr<TBB2p>>(m, "BeamTimoshenko2p")
         .def(py::init<pyck::Ptr<pyck::SlenderBeam1d<double>>>(),
-             py::arg("material"));
+             py::arg("material"))
+        .def("rotation_shape_matrix", &TBB2p::rotation_shape_matrix, py::arg("shape_derivs"));
 
     // --- 2D Elements ---
 
@@ -371,7 +371,7 @@ PYBIND11_MODULE(_pyck, m) {
     py::class_<Elem2D, pyck::Ptr<Elem2D>>(m, "Element2d")
         .def("num_node_dofs", &Elem2D::num_node_dofs)
         .def("min_order", &Elem2D::min_order)
-        .def("shape_matrix", &Elem2D::shape_matrix, py::arg("shape_derivs"))
+        .def("transverse_shape_matrix", &Elem2D::transverse_shape_matrix, py::arg("shape_derivs"))
         .def("strain_displacement_matrix", &Elem2D::strain_displacement_matrix, py::arg("shape_derivs"));
 
     using KLP = pyck::PlateKirchhoffLove1p<double>;
@@ -382,7 +382,8 @@ PYBIND11_MODULE(_pyck, m) {
     using RMP = pyck::PlateReissnerMindlin3p<double>;
     py::class_<RMP, Elem2D, pyck::Ptr<RMP>>(m, "PlateReissnerMindlin3p")
         .def(py::init<pyck::Ptr<pyck::PlaneStress2d<double>>>(),
-             py::arg("material"));
+             py::arg("material"))
+        .def("rotation_shape_matrix", &RMP::rotation_shape_matrix, py::arg("shape_derivs"));
 
     using RM1P = pyck::PlateReissnerMindlin1p<double>;
     py::class_<RM1P, Elem2D, pyck::Ptr<RM1P>>(m, "PlateReissnerMindlin1p")
@@ -403,23 +404,6 @@ PYBIND11_MODULE(_pyck, m) {
     py::class_<LC2D, CondD, pyck::Ptr<LC2D>>(m, "LoadCondition2d")
         .def(py::init<const Patch3D2D&, const Elem2D&, const QR2D&, const pyck::Vector<double>&>(),
              py::arg("patch"), py::arg("element"), py::arg("quadrature"), py::arg("load_values"));
-
-    // Penalty Type enum
-    py::enum_<pyck::PenaltyType>(m, "PenaltyType")
-        .value("Displacement", pyck::PenaltyType::Displacement)
-        .value("Derivative", pyck::PenaltyType::Derivative)
-        .export_values();
-
-    // Penalty Conditions (only 2D - 1D boundaries don't use BoundaryPatch)
-    using BoundaryPatch2D = pyck::BoundaryPatch<double, 2>;
-
-    using PC2D = pyck::PenaltyCondition<double, 2>;
-    py::class_<PC2D, CondD, pyck::Ptr<PC2D>>(m, "PenaltyCondition2d")
-        .def(py::init<const BoundaryPatch2D&, const Elem2D&, const QR1D&,
-                      pyck::PenaltyType, double, std::size_t, double>(),
-             py::arg("boundary"), py::arg("element"), py::arg("quadrature"),
-             py::arg("penalty_type"), py::arg("penalty_parameter"),
-             py::arg("derivative_order") = 0, py::arg("prescribed_value") = 0.0);
 
     // === Constraints ================================================================
 
