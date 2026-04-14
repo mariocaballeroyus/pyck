@@ -36,20 +36,21 @@ public:
                                  const Vector<T>& q_weights,
                                  Matrix<T>& stiffness) const override;
 
-    /// @brief Transverse displacement shape functions N_w (Q × n).
-    Matrix<T> transverse_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
+    /// @brief Transverse-displacement shape matrix N_w (Q × n).
+    Matrix<T> displacement_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
 
-    /// @brief Rotation shape functions N_θ (Q × n).
-    ///
-    /// Both in-plane rotation DOFs (θ_x, θ_y) share the same isoparametric
-    /// basis as the transverse displacement, so this returns shape_derivs[val].
-    Matrix<T> rotation_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const;
+    /// @brief Rotation shape matrix (2Q × n): rows `2q`, `2q+1` are both the
+    /// isoparametric basis (same for N_θx and N_θy).  θ_x and θ_y live on
+    /// their own DOF slots (1, 2) — see `rotation_dof_indices`.
+    Matrix<T> rotation_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
 
     Matrix<T> strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
 
     std::size_t num_node_dofs() const override { return 3; }
 
     std::size_t min_order() const override { return 1; }
+
+    std::array<std::size_t, 2> rotation_dof_indices() const override { return {1, 2}; }
 
 private:
     Ptr<PlaneStress2d<T>> material_;

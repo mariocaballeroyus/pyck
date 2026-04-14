@@ -14,19 +14,39 @@ PlateReissnerMindlin3p<T>::PlateReissnerMindlin3p(Ptr<PlaneStress2d<T>> material
 }
 
 template <std::floating_point T>
-Matrix<T> PlateReissnerMindlin3p<T>::transverse_shape_matrix(
+Matrix<T> PlateReissnerMindlin3p<T>::displacement_shape_matrix(
     const std::vector<Matrix<T>>& shape_derivs) const
 {
-    // Transverse displacement w uses the standard isoparametric basis (Q × n).
-    return shape_derivs[idx::val];
+    const auto& N = shape_derivs;
+    const Index Q = N[idx::val].rows();
+    const Index n = N[idx::val].cols();
+    Matrix<T> Nw = Matrix<T>::Zero(Q, 3 * n);
+
+    // Ni_w = [ Ni 0 0 ]
+    for (Index i = 0; i < n; ++i) {
+        Nw.col(3*i) = N[idx::val].col(i);
+    }
+    return Nw;
 }
 
 template <std::floating_point T>
 Matrix<T> PlateReissnerMindlin3p<T>::rotation_shape_matrix(
     const std::vector<Matrix<T>>& shape_derivs) const
 {
-    // Both rotation DOFs (θ_x, θ_y) share the same isoparametric basis as w.
-    return shape_derivs[idx::val];
+    const auto& N = shape_derivs;
+    const Index Q = N[idx::val].rows();
+    const Index n = N[idx::val].cols();
+    Matrix<T> Nphi = Matrix<T>::Zero(2 * Q, 3 * n);
+
+    // Ni_phi = [ 0 Ni 0  
+    //            0 0  Ni ]
+    for (Index q = 0; q < Q; ++q) {
+        for (Index i = 0; i < n; ++i) {
+            Nphi(2*q,     3*i + 1) = N[idx::val](q, i);
+            Nphi(2*q + 1, 3*i + 2) = N[idx::val](q, i);
+        }
+    }
+    return Nphi;
 }
 
 template <std::floating_point T>

@@ -54,7 +54,10 @@ public:
     ///
     /// Accounts for the Laplacian correction w = w_b - (K_b/K_s) w_b,xx, so
     /// this is: Ñ_i = N_i - (K_b/K_s) N_i,xx.
-    Matrix<T> transverse_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
+    Matrix<T> displacement_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
+
+    /// @brief Rotation shape matrix N_θ = -N,x (θ = -dw_b/dx).
+    Matrix<T> rotation_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
 
     Matrix<T> strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
 

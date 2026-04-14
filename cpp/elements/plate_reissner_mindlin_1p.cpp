@@ -13,15 +13,32 @@ PlateReissnerMindlin1p<T>::PlateReissnerMindlin1p(Ptr<PlaneStress2d<T>> material
 }
 
 template <std::floating_point T>
-Matrix<T> PlateReissnerMindlin1p<T>::transverse_shape_matrix(
+Matrix<T> PlateReissnerMindlin1p<T>::displacement_shape_matrix(
     const std::vector<Matrix<T>>& shape_derivs) const
 {
     const auto& N = shape_derivs;
     T ratio = material_->bending_stiffness() / material_->shear_stiffness();
 
-    // Effective shape function for total deflection: Ñ_i = N_i - (Kb/Ks)(N_i,xx + N_i,yy)
-    // This accounts for w = w_b - (Kb/Ks) Δw_b in the load-vector integral.
+    // Ni_w = [ Ni - (Kb/Ks) * (Ni,xx + Ni,yy) ]
     return N[idx::val] - ratio * (N[idx::d11] + N[idx::d22]);
+}
+
+template <std::floating_point T>
+Matrix<T> PlateReissnerMindlin1p<T>::rotation_shape_matrix(
+    const std::vector<Matrix<T>>& shape_derivs) const
+{
+    const auto& N = shape_derivs;
+    const Index Q = N[idx::d1].rows();
+    const Index n = N[idx::d1].cols();
+    Matrix<T> Nphi(2 * Q, n);
+
+    // Ni_phi = [ -Ni,x 
+    //            -Ni,y ]
+    for (Index q = 0; q < Q; ++q) {
+        Nphi.row(2*q    ) = -N[idx::d1].row(q);
+        Nphi.row(2*q + 1) = -N[idx::d2].row(q);
+    }
+    return Nphi;
 }
 
 template <std::floating_point T>

@@ -48,13 +48,22 @@ public:
     ///
     /// Accounts for the Laplacian correction w = w_b - (K_b/K_s) Δw_b, so
     /// this is: Ñ_i = N_i - (K_b/K_s)(N_i,xx + N_i,yy).
-    Matrix<T> transverse_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
+    Matrix<T> displacement_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
+
+    /// @brief Rotation shape matrix (2Q × n): row `2q` = −N,x, row `2q+1` = −N,y.
+    ///
+    /// RM-1p ansatz gives θ = -∇w_b (the shear-correction term in
+    /// w = w_b - ratio·Δw_b cancels against -γ in θ = γ - ∇w).
+    /// Both components act on the sole w_b DOF.
+    Matrix<T> rotation_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
 
     Matrix<T> strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
 
     std::size_t num_node_dofs() const override { return 1; }
 
     std::size_t min_order() const override { return 3; }
+
+    std::array<std::size_t, 2> rotation_dof_indices() const override { return {0, 0}; }
 
 private:
     Ptr<PlaneStress2d<T>> material_;

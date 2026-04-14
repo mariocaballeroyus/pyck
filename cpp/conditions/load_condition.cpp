@@ -112,13 +112,12 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
         std::size_t req_order = element.min_order();
         auto [shape_derivs, jacobian] = patch.eval_shape_functions(mapped_pts, elem_idx, req_order);
         
-        // N_w is the transverse displacement interpolation matrix (Q × n).
-        // The distributed load q is conjugate to w only; rotation DOFs carry
-        // no distributed force in the standard plate/beam formulations.
-        Matrix<T> N_w = element.transverse_shape_matrix(shape_derivs);
+        // N_w is the transverse-displacement shape matrix (Q × K_elem) with
+        // nonzero columns only at each node's w-slot.  Because the distributed
+        // load q is conjugate to w only, N_w^T · (q·|J|·w) already scatters
+        // the load into the correct slots with zeros elsewhere.
+        Matrix<T> N_w = element.displacement_shape_matrix(shape_derivs);
 
-        // Scalar integration weights: q(ξ_k) · |J(ξ_k)| · w_k
-        // DOF 0 of broadcasted_values holds the transverse load at each QP.
         Vector<T> W_J_T(Q);
         for (std::size_t k = 0; k < Q; ++k) {
             T scale = mapped_weights(k) * jacobian(k);
@@ -126,13 +125,15 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
         }
         qp_offset += Q;
 
-        // f_w = N_w^T · (q · |J| · w)  — one entry per element node
-        Vector<T> local_load_w = N_w.transpose() * W_J_T;
+        // f_local = N_w^T · (q · |J| · w)  — size K_elem
+        Vector<T> local_load = N_w.transpose() * W_J_T;
 
-        // Scatter to the transverse-displacement DOF (DOF 0) of each node
+        // Scatter into the element's global DOFs (node-major layout).
         auto elem_nodes = patch.dof_mapper().get_element_dofs(elem_idx);
         for (std::size_t k = 0; k < elem_nodes.size(); ++k) {
-            element_load_(elem_nodes[k] * ndof + 0) += local_load_w(k);
+            for (Index v = 0; v < ndof; ++v) {
+                element_load_(elem_nodes[k] * ndof + v) += local_load(k * ndof + v);
+            }
         }
     }
 

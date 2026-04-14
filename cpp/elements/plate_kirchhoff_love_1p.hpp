@@ -39,13 +39,20 @@ public:
                                  const Vector<T>& q_weights,
                                  Matrix<T>& stiffness) const override;
 
-    Matrix<T> transverse_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
+    Matrix<T> displacement_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
+
+    /// @brief Rotation shape matrix (2Q × n): row `2q` = −N,x, row `2q+1` = −N,y
+    /// since θ = −∇w.  Both components act on the sole w DOF
+    /// (see `rotation_dof_indices`).
+    Matrix<T> rotation_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
 
     Matrix<T> strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
 
     std::size_t num_node_dofs() const override { return 1; }
 
     std::size_t min_order() const override { return 2; }
+
+    std::array<std::size_t, 2> rotation_dof_indices() const override { return {0, 0}; }
 
 private:
     /// @brief Material and thickness

@@ -48,20 +48,22 @@ public:
                                  const Vector<T>& q_weights,
                                  Matrix<T>& stiffness) const override;
 
-    /// @brief Transverse displacement shape functions N_w (Q × n).
-    Matrix<T> transverse_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
+    /// @brief Transverse-displacement shape matrix N_w (Q × n).
+    Matrix<T> displacement_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
 
-    /// @brief Rotation shape functions N_θ (Q × n).
+    /// @brief Rotation shape matrix N_θ (Q × n).
     ///
-    /// The rotation DOF θ shares the same isoparametric basis as w, so this
-    /// returns shape_derivs[val].
-    Matrix<T> rotation_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const;
+    /// The rotation DOF θ shares the same isoparametric basis as w; it lives
+    /// on DOF slot 1 (see `rotation_dof_index`).
+    Matrix<T> rotation_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
 
     Matrix<T> strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
 
     std::size_t num_node_dofs() const override { return 2; }
 
     std::size_t min_order() const override { return 1; }
+
+    std::size_t rotation_dof_index() const override { return 1; }
 
 private:
     /// @brief Material and cross section geometry

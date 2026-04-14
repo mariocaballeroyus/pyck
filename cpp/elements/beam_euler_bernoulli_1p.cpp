@@ -13,10 +13,18 @@ BeamEulerBernoulli1p<T>::BeamEulerBernoulli1p(Ptr<SlenderBeam1d<T>> material)
 }
 
 template <std::floating_point T>
-Matrix<T> BeamEulerBernoulli1p<T>::transverse_shape_matrix(
+Matrix<T> BeamEulerBernoulli1p<T>::displacement_shape_matrix(
     const std::vector<Matrix<T>>& shape_derivs) const
 {
     return shape_derivs[idx::val];
+}
+
+template <std::floating_point T>
+Matrix<T> BeamEulerBernoulli1p<T>::rotation_shape_matrix(
+    const std::vector<Matrix<T>>& shape_derivs) const
+{
+    // EB kinematics: θ = -dw/dx.
+    return -shape_derivs[idx::d1];
 }
 
 template <std::floating_point T>
