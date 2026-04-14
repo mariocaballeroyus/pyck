@@ -346,6 +346,13 @@ Patch<T, d>::eval_shape_functions(const ColMatrix<T, d>& points, Index span, std
                 - dG1_22_2 * N_u.row(q) - dG2_22_2 * N_v.row(q)
                 - G1_22 * N_uv.row(q) - G2_22 * N_vv.row(q)
                 - T(2) * G1_22 * N_cov_uv - T(2) * G2_22 * N_cov_vv; // N_{;vvv}
+
+            const T h1 = std::sqrt(g11);
+            const T h2 = std::sqrt(g22);
+            result[6].row(q) /= h1 * g11;
+            result[7].row(q) /= g11 * h2;
+            result[8].row(q) /= h1 * g22;
+            result[9].row(q) /= g22 * h2;
         }
     }
 
