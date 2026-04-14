@@ -43,7 +43,8 @@ from pyck.conditions import (
     create_function_load_condition,
     PenaltyCondition,
     create_displacement_penalty,
-    create_curvature_penalty,
+    create_simply_supported_penalty,
+    create_clamped_penalty,
 )
 from pyck.constraints import (
     Constraint,
@@ -111,7 +112,8 @@ __all__ = [
     "create_function_load_condition",
     "PenaltyCondition",
     "create_displacement_penalty",
-    "create_curvature_penalty",
+    "create_simply_supported_penalty",
+    "create_clamped_penalty",
     "Constraint",
     "DirectConstraint",
     "LinearConstraint",

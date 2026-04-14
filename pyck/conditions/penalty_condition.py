@@ -5,64 +5,47 @@ from typing import TYPE_CHECKING
 import pyck._pyck as _pyck
 
 if TYPE_CHECKING:
-    from pyck.geometry.patch import Patch
     from pyck.geometry.boundary_patch import BoundaryPatch
     from pyck.elements.element import Element
     from pyck.assembly.quadrature import QuadratureRule
 
 
 class PenaltyCondition:
-    """Penalty-based boundary condition.
+    """Penalty method for weakly enforcing Dirichlet boundary conditions.
 
-    Weakly enforces boundary conditions using a penalty method by adding
-    penalty terms to the stiffness matrix and load vector:
+    Adds penalty contributions to the global stiffness matrix and load vector:
 
-        K_penalty = ∫_Γ α * B^T * B dΓ
-        F_penalty = ∫_Γ α * B^T * prescribed_value dΓ
+        K_pen += α_w  ∫_Γ N_w^T  N_w  dΓ
+        K_pen += α_φn ∫_Γ N_φn^T N_φn dΓ   (RM-3p only)
+        K_pen += α_φs ∫_Γ N_φs^T N_φs dΓ   (RM-3p only)
 
-    where B is either the shape functions (displacement penalty) or their
-    derivatives (derivative penalty).
+        f_pen += α_w  ∫_Γ N_w^T  w̄    dΓ
+        f_pen += α_φn ∫_Γ N_φn^T φ̄_n  dΓ   (RM-3p only)
+        f_pen += α_φs ∫_Γ N_φs^T φ̄_s  dΓ   (RM-3p only)
+
+    For single-DOF elements (KL-1p, RM-1p) only the displacement penalty is
+    assembled; the rotation terms are silently ignored.
 
     Parameters
     ----------
     boundary : BoundaryPatch
-        The boundary patch where the penalty is applied.
+        1-D boundary extracted from a 2-D surface patch.
     element : Element
-        The element formulation (provides shape functions).
+        2-D element formulation (determines the DOF layout).
     quadrature : QuadratureRule
-        Quadrature rule for boundary integration.
-    penalty_type : PenaltyType
-        Type of penalty (Displacement or Derivative).
-    penalty_parameter : float
-        Penalty parameter α (large positive value, e.g., 1e10-1e12).
-        Larger values enforce the constraint more strongly but may
-        worsen conditioning.
-    derivative_order : int, optional
-        Order of derivative to penalize (0=value, 1=gradient, 2=curvature).
-        Default is 0.
-    prescribed_value : float, optional
-        Prescribed value to enforce. Default is 0.0.
-
-    Examples
-    --------
-    >>> # Penalty for displacement w = 0 on boundary
-    >>> boundary = surface.boundary(0, True)
-    >>> quad = create_gauss_from_patch(boundary)
-    >>> penalty = PenaltyCondition(
-    ...     boundary, element, quad,
-    ...     _pyck.PenaltyType.Displacement,
-    ...     penalty_parameter=1e12
-    ... )
-    >>> problem.add_condition(penalty)
-
-    >>> # Penalty for curvature ∂²w/∂n² = 0 on boundary
-    >>> penalty = PenaltyCondition(
-    ...     boundary, element, quad,
-    ...     _pyck.PenaltyType.Derivative,
-    ...     penalty_parameter=1e10,
-    ...     derivative_order=2
-    ... )
-    >>> problem.add_condition(penalty)
+        1-D Gauss–Legendre rule for the boundary integral.
+    alpha_w : float
+        Penalty factor for the transverse displacement constraint.
+    w_bar : float, optional
+        Prescribed displacement value (default 0.0).
+    alpha_phi_n : float, optional
+        Penalty factor for the normal rotation (RM-3p only, default 0.0).
+    phi_n_bar : float, optional
+        Prescribed normal rotation (default 0.0).
+    alpha_phi_s : float, optional
+        Penalty factor for the tangential rotation (RM-3p only, default 0.0).
+    phi_s_bar : float, optional
+        Prescribed tangential rotation (default 0.0).
     """
 
     def __init__(
@@ -70,43 +53,37 @@ class PenaltyCondition:
         boundary: "BoundaryPatch",
         element: "Element",
         quadrature: "QuadratureRule",
-        penalty_type: _pyck.PenaltyType,
-        penalty_parameter: float,
-        derivative_order: int = 0,
-        prescribed_value: float = 0.0,
+        alpha_w: float,
+        w_bar: float = 0.0,
+        alpha_phi_n: float = 0.0,
+        phi_n_bar: float = 0.0,
+        alpha_phi_s: float = 0.0,
+        phi_s_bar: float = 0.0,
     ):
-        # Determine the dimension from the boundary patch
         boundary_cpp = boundary._cpp_object
         element_cpp = element._cpp_object
         quadrature_cpp = quadrature._cpp_object
 
-        # Create the C++ penalty condition (only 2D supported currently)
-        if isinstance(boundary_cpp, _pyck.BoundaryPatch2d):
-            self._cpp_object = _pyck.PenaltyCondition2d(
-                boundary_cpp,
-                element_cpp,
-                quadrature_cpp,
-                penalty_type,
-                penalty_parameter,
-                derivative_order,
-                prescribed_value,
-            )
-        else:
+        if not isinstance(boundary_cpp, _pyck.BoundaryPatch2d):
             raise TypeError(
-                f"Unsupported boundary patch type: {type(boundary_cpp)}. "
-                f"Only 2D surfaces are currently supported for penalty conditions."
+                f"PenaltyCondition requires a 2-D boundary patch, "
+                f"got {type(boundary_cpp).__name__}."
             )
 
-    def bind(self, quadrature: "QuadratureRule", element: "Element") -> None:
-        """Bind the condition to a quadrature rule and element.
-
-        For PenaltyCondition, this is a no-op since the penalty terms are
-        computed during construction.
-        """
-        pass
+        self._cpp_object = _pyck.PenaltyCondition2d(
+            boundary_cpp,
+            element_cpp,
+            quadrature_cpp,
+            float(alpha_w),
+            float(w_bar),
+            float(alpha_phi_n),
+            float(phi_n_bar),
+            float(alpha_phi_s),
+            float(phi_s_bar),
+        )
 
     def __repr__(self) -> str:
-        return f"PenaltyCondition({self._cpp_object})"
+        return f"PenaltyCondition()"
 
 
 def create_displacement_penalty(
@@ -114,80 +91,102 @@ def create_displacement_penalty(
     element: "Element",
     quadrature: "QuadratureRule",
     alpha: float = 1e12,
+    w_bar: float = 0.0,
 ) -> PenaltyCondition:
-    """Create a penalty condition for displacement constraint (w = 0).
+    """Create a displacement penalty condition  (w = w̄).
 
     Parameters
     ----------
     boundary : BoundaryPatch
-        The boundary where the penalty is applied.
+        1-D boundary extracted from a 2-D surface patch.
     element : Element
-        The element formulation.
+        2-D element formulation.
     quadrature : QuadratureRule
-        Quadrature rule for boundary integration.
-    alpha : float, optional
-        Penalty parameter (default: 1e12).
+        1-D quadrature rule for the boundary integral.
+    alpha : float
+        Penalty factor (default 1e12).
+    w_bar : float
+        Prescribed displacement (default 0.0).
 
     Returns
     -------
     PenaltyCondition
-        Penalty condition enforcing displacement = 0.
-
-    Examples
-    --------
-    >>> boundary = surface.boundary(0, True)
-    >>> quad = create_gauss_from_patch(boundary)
-    >>> penalty = create_displacement_penalty(boundary, element, quad)
-    >>> problem.add_condition(penalty)
     """
-    return PenaltyCondition(
-        boundary,
-        element,
-        quadrature,
-        _pyck.PenaltyType.Displacement,
-        alpha,
-        derivative_order=0,
-        prescribed_value=0.0,
-    )
+    return PenaltyCondition(boundary, element, quadrature, alpha_w=alpha, w_bar=w_bar)
 
 
-def create_curvature_penalty(
+def create_simply_supported_penalty(
     boundary: "BoundaryPatch",
     element: "Element",
     quadrature: "QuadratureRule",
-    alpha: float = 1e10,
+    alpha: float = 1e12,
 ) -> PenaltyCondition:
-    """Create a penalty condition for curvature constraint (∂²w/∂n² = 0).
+    """Create a simply-supported penalty condition (w = 0, θ_s = 0).
+
+    Enforces the standard simply-supported Kirchhoff–Love / Reissner–Mindlin
+    boundary conditions: zero transverse displacement and zero tangential
+    rotation.  For single-DOF elements (KL-1p, RM-1p) only the displacement
+    penalty is assembled.
 
     Parameters
     ----------
     boundary : BoundaryPatch
-        The boundary where the penalty is applied.
+        1-D boundary extracted from a 2-D surface patch.
     element : Element
-        The element formulation.
+        2-D element formulation.
     quadrature : QuadratureRule
-        Quadrature rule for boundary integration.
-    alpha : float, optional
-        Penalty parameter (default: 1e10).
+        1-D quadrature rule for the boundary integral.
+    alpha : float
+        Penalty factor for both displacement and rotation (default 1e12).
 
     Returns
     -------
     PenaltyCondition
-        Penalty condition enforcing curvature = 0.
-
-    Examples
-    --------
-    >>> boundary = surface.boundary(0, True)
-    >>> quad = create_gauss_from_patch(boundary)
-    >>> penalty = create_curvature_penalty(boundary, element, quad)
-    >>> problem.add_condition(penalty)
     """
     return PenaltyCondition(
         boundary,
         element,
         quadrature,
-        _pyck.PenaltyType.Derivative,
-        alpha,
-        derivative_order=2,
-        prescribed_value=0.0,
+        alpha_w=alpha,
+        w_bar=0.0,
+        alpha_phi_n=0.0,
+        phi_n_bar=0.0,
+        alpha_phi_s=alpha,
+        phi_s_bar=0.0,
+    )
+
+
+def create_clamped_penalty(
+    boundary: "BoundaryPatch",
+    element: "Element",
+    quadrature: "QuadratureRule",
+    alpha: float = 1e12,
+) -> PenaltyCondition:
+    """Create a clamped penalty condition (w = 0, θ_n = 0, θ_s = 0).
+
+    Parameters
+    ----------
+    boundary : BoundaryPatch
+        1-D boundary extracted from a 2-D surface patch.
+    element : Element
+        2-D element formulation.
+    quadrature : QuadratureRule
+        1-D quadrature rule for the boundary integral.
+    alpha : float
+        Penalty factor for displacement and all rotations (default 1e12).
+
+    Returns
+    -------
+    PenaltyCondition
+    """
+    return PenaltyCondition(
+        boundary,
+        element,
+        quadrature,
+        alpha_w=alpha,
+        w_bar=0.0,
+        alpha_phi_n=alpha,
+        phi_n_bar=0.0,
+        alpha_phi_s=alpha,
+        phi_s_bar=0.0,
     )

@@ -9,15 +9,18 @@ from pyck.conditions.load_condition import (
 from pyck.conditions.penalty_condition import (
     PenaltyCondition,
     create_displacement_penalty,
-    create_curvature_penalty,
+    create_simply_supported_penalty,
+    create_clamped_penalty,
 )
 
 
 __all__ = [
+    "Condition",
     "LoadCondition",
     "create_constant_load_condition",
     "create_function_load_condition",
     "PenaltyCondition",
     "create_displacement_penalty",
-    "create_curvature_penalty",
+    "create_simply_supported_penalty",
+    "create_clamped_penalty",
 ]
