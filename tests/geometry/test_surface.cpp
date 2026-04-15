@@ -76,7 +76,7 @@ TEST_CASE("Patch<double, 2>: Flat Rectangular Plate", "[geometry][surface]") {
         CHECK(jac(0) == Approx(Lx * Ly).margin(1e-12));
     }
 
-    SECTION("No Christoffel corrections — N_{;ab} == N_{,ab}") {
+    SECTION("No Christoffel corrections — N_{;ab} == N_{,ab} / sqrt(g_aa * g_bb)") {
         Eigen::MatrixXd pts(1, 2);
         pts << 0.4, 0.6;
 
@@ -86,19 +86,19 @@ TEST_CASE("Patch<double, 2>: Flat Rectangular Plate", "[geometry][surface]") {
         // Stride for flat index
         const int S = 3;  // order+1
 
-        // result[3] == N_{,uu}  (index (2,0) in tensor product = 2*S + 0 = 6)
-        for (int a = 0; a < 4; ++a) {
-            CHECK(result[3](0, a) == Approx(basis_derivs[6](0, a)).margin(1e-14));
-        }
+        // For a flat rectangle: g11 = Lx^2, g22 = Ly^2.
+        // eval_shape_functions returns metric-normalised covariant derivatives:
+        //   result[3] = N_{;uu} / g11        = N_{,uu} / Lx^2  (Christoffels vanish)
+        //   result[4] = N_{;uv} / sqrt(g11*g22) = N_{,uv} / (Lx*Ly)
+        //   result[5] = N_{;vv} / g22        = N_{,vv} / Ly^2
+        const double g11 = Lx * Lx;
+        const double g22 = Ly * Ly;
+        const double sg  = Lx * Ly;  // sqrt(g11 * g22)
 
-        // result[4] == N_{,uv}  (index (1,1) in tensor product = 1*S + 1 = 4)
         for (int a = 0; a < 4; ++a) {
-            CHECK(result[4](0, a) == Approx(basis_derivs[4](0, a)).margin(1e-14));
-        }
-
-        // result[5] == N_{,vv}  (index (0,2) in tensor product = 0*S + 2 = 2)
-        for (int a = 0; a < 4; ++a) {
-            CHECK(result[5](0, a) == Approx(basis_derivs[2](0, a)).margin(1e-14));
+            CHECK(result[3](0, a) == Approx(basis_derivs[2 * S + 0](0, a) / g11).margin(1e-14));
+            CHECK(result[4](0, a) == Approx(basis_derivs[1 * S + 1](0, a) / sg ).margin(1e-14));
+            CHECK(result[5](0, a) == Approx(basis_derivs[0 * S + 2](0, a) / g22).margin(1e-14));
         }
     }
 
@@ -181,12 +181,14 @@ TEST_CASE("Patch<double, 2>: Twisted Bilinear Plate (z = u*v)", "[geometry][surf
             for (int a = 0; a < 4; ++a)
                 CHECK(result[0](0, a) == Approx(N[a]).margin(1e-14));
 
-            // --- First parametric derivatives ---
+            // --- First derivatives (metric-normalised: N_{,u}/sqrt(g11), N_{,v}/sqrt(g22)) ---
             double Nu[4] = {-(1.0-v), -v, (1.0-v), v};
             double Nv[4] = {-(1.0-u), (1.0-u), -u, u};
+            double sq_g11 = std::sqrt(g11);
+            double sq_g22 = std::sqrt(g22);
             for (int a = 0; a < 4; ++a) {
-                CHECK(result[1](0, a) == Approx(Nu[a]).margin(1e-14));
-                CHECK(result[2](0, a) == Approx(Nv[a]).margin(1e-14));
+                CHECK(result[1](0, a) == Approx(Nu[a] / sq_g11).margin(1e-14));
+                CHECK(result[2](0, a) == Approx(Nv[a] / sq_g22).margin(1e-14));
             }
 
             // --- Analytical Christoffel symbols ---
@@ -208,11 +210,12 @@ TEST_CASE("Patch<double, 2>: Twisted Bilinear Plate (z = u*v)", "[geometry][surf
                 CHECK(result[5](0, a) == Approx(Nvv[a]).margin(1e-14));
             }
 
-            // --- N_{;uv} = N_{,uv} − Γ^1_{12} N_{,u} − Γ^2_{12} N_{,v} ---
+            // --- N_{;uv} / sqrt(g11*g22) = (N_{,uv} − Γ^1_{12} N_{,u} − Γ^2_{12} N_{,v}) / sqrt(g11*g22) ---
             double Nuv_param[4] = {1.0, -1.0, -1.0, 1.0};
+            double sq_g1g2 = std::sqrt(g11 * g22);
             for (int a = 0; a < 4; ++a) {
-                double expected = Nuv_param[a] - G1_12 * Nu[a] - G2_12 * Nv[a];
-                CHECK(result[4](0, a) == Approx(expected).margin(1e-12));
+                double cov = Nuv_param[a] - G1_12 * Nu[a] - G2_12 * Nv[a];
+                CHECK(result[4](0, a) == Approx(cov / sq_g1g2).margin(1e-12));
             }
         }
     }

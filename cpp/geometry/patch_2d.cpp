@@ -105,6 +105,9 @@ Patch<T, d>::eval_shape_functions(const ColMatrix<T, d>& points, Index span, std
         }
     }
 
+    // Raw second covariant derivatives
+    Matrix<T> raw_cov_uu, raw_cov_uv, raw_cov_vv;
+
     if (order >= 2)
     {
         // Second geometry derivatives  a_{α,β} = ∂²x/∂ξ^α∂ξ^β   (Q × 3)
@@ -121,6 +124,10 @@ Patch<T, d>::eval_shape_functions(const ColMatrix<T, d>& points, Index span, std
         result[3] = Matrix<T>(Q, K);  // result[3] = N_{;uu}
         result[4] = Matrix<T>(Q, K);  // result[4] = N_{;uv}
         result[5] = Matrix<T>(Q, K);  // result[5] = N_{;vv}
+
+        raw_cov_uu.resize(Q, K);
+        raw_cov_uv.resize(Q, K);
+        raw_cov_vv.resize(Q, K);
 
         for (Index q = 0; q < Q; ++q)
         {
@@ -154,12 +161,16 @@ Patch<T, d>::eval_shape_functions(const ColMatrix<T, d>& points, Index span, std
             const T G1_22 = gi11 * C_221 + gi12 * C_222;
             const T G2_22 = gi12 * C_221 + gi22 * C_222;
 
-            // Second covariant derivatives:
+            // Second covariant derivatives
             //   N_{;αβ} = N_{,αβ} − Γ^γ_{αβ} N_{,γ}
-            // result[3] = N_{;uu},  result[4] = N_{;uv},  result[5] = N_{;vv}
-            result[3].row(q) = (N_uu.row(q) - G1_11 * N_u.row(q) - G2_11 * N_v.row(q)) / g11;
-            result[4].row(q) = (N_uv.row(q) - G1_12 * N_u.row(q) - G2_12 * N_v.row(q)) / std::sqrt(g11 * g22);
-            result[5].row(q) = (N_vv.row(q) - G1_22 * N_u.row(q) - G2_22 * N_v.row(q)) / g22;
+            raw_cov_uu.row(q) = N_uu.row(q) - G1_11 * N_u.row(q) - G2_11 * N_v.row(q);
+            raw_cov_uv.row(q) = N_uv.row(q) - G1_12 * N_u.row(q) - G2_12 * N_v.row(q);
+            raw_cov_vv.row(q) = N_vv.row(q) - G1_22 * N_u.row(q) - G2_22 * N_v.row(q);
+
+            // Metric-normalized second covariant derivatives
+            result[3].row(q) = raw_cov_uu.row(q) / g11;
+            result[4].row(q) = raw_cov_uv.row(q) / std::sqrt(g11 * g22);
+            result[5].row(q) = raw_cov_vv.row(q) / g22;
         }
     }
 
@@ -316,12 +327,9 @@ Patch<T, d>::eval_shape_functions(const ColMatrix<T, d>& points, Index span, std
             //            − Γ^δ_{αγ} N_{;δβ}
             //            − Γ^δ_{βγ} N_{;αδ}
             
-            // Pre-compute the 2nd covariant derivatives used below
-            // N_{;uu} = result[3], N_{;uv} = result[4], N_{;vv} = result[5]
-            // (already computed in the order-2 block)
-            auto N_cov_uu = result[3].row(q);
-            auto N_cov_uv = result[4].row(q);
-            auto N_cov_vv = result[5].row(q);
+            auto N_cov_uu = raw_cov_uu.row(q);
+            auto N_cov_uv = raw_cov_uv.row(q);
+            auto N_cov_vv = raw_cov_vv.row(q);
 
             // Third covariant derivatives:
             //   N_{;αβδ} = N_{,αβδ} - Γ^γ_{αβ,δ} N_{,γ} - Γ^γ_{αβ} N_{,γδ} 

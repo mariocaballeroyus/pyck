@@ -113,7 +113,7 @@ TEST_CASE("Kirchhoff-Love 1P Plate: Navier Bi-Sinusoidal Load",
             Index span_u = knots_u->knot_vector().find_span(p, pu);
             Index span_v = knots_v->knot_vector().find_span(p, pv);
             auto intervals = surface->tensor_product().num_intervals();
-            Index flat = span_u * intervals[1] + span_v;
+            Index flat = span_u + span_v * intervals[0];
 
             auto [sf, jac] = surface->eval_shape_functions(pt, flat, 0);
             auto active = surface->dof_mapper().get_element_dofs(flat);
