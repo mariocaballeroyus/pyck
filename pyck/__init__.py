@@ -41,6 +41,10 @@ from pyck.conditions import (
     LoadCondition,
     create_constant_load_condition,
     create_function_load_condition,
+    LagrangeMultiplierCondition,
+    create_displacement_lagrange,
+    create_simply_supported_lagrange,
+    create_clamped_lagrange,
     PenaltyCondition,
     create_displacement_penalty,
     create_simply_supported_penalty,
@@ -68,6 +72,7 @@ from pyck.assembly import (
 from pyck.io import (
     basis as io_basis,
     curve as io_curve,
+    export_field_vtk,
 )
 from pyck.solver import solve
 import pyck.solver as solver
@@ -110,6 +115,10 @@ __all__ = [
     "LoadCondition",
     "create_constant_load_condition",
     "create_function_load_condition",
+    "LagrangeMultiplierCondition",
+    "create_displacement_lagrange",
+    "create_simply_supported_lagrange",
+    "create_clamped_lagrange",
     "PenaltyCondition",
     "create_displacement_penalty",
     "create_simply_supported_penalty",
@@ -131,6 +140,7 @@ __all__ = [
     "create_linear_elastic_problem",
     "io_basis",
     "io_curve",
+    "export_field_vtk",
     "solve",
     "solver",
 ]

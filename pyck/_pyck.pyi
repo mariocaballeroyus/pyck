@@ -4,7 +4,7 @@ import numpy
 import numpy.typing
 import typing
 
-__all__: list[str] = ['BSpline', 'Basis', 'BeamEulerBernoulli1p', 'BeamTimoshenko1p', 'BeamTimoshenko2p', 'BoundaryPatch1d', 'BoundaryPatch2d', 'Condition', 'Constraint', 'CurvePatch', 'DirectConstraint', 'DofMapper1d', 'DofMapper2d', 'Element1d', 'Element2d', 'GaussLegendre', 'GaussLegendre2d', 'GaussLegendre3d', 'KnotVector', 'LinearConstraint', 'LinearElasticProblem1d', 'LinearElasticProblem2d', 'LoadCondition1d', 'LoadCondition2d', 'Material1d', 'Material2d', 'Patch1d', 'Patch2d', 'PenaltyCondition2d', 'PlaneStress2d', 'PlateKirchhoffLove1p', 'PlateReissnerMindlin1p', 'PlateReissnerMindlin3p', 'QuadratureRule1d', 'QuadratureRule2d', 'QuadratureRule3d', 'SlenderBeam1d', 'SurfacePatch', 'line_segment', 'rectangle', 'tensor_product', 'tensor_product_1d', 'tensor_product_2d', 'eval_shape_at', 'eval_geometry_at']
+__all__: list[str] = ['BSpline', 'Basis', 'BeamEulerBernoulli1p', 'BeamTimoshenko1p', 'BeamTimoshenko2p', 'BoundaryPatch1d', 'BoundaryPatch2d', 'Condition', 'Constraint', 'CurvePatch', 'DirectConstraint', 'DofMapper1d', 'DofMapper2d', 'Element1d', 'Element2d', 'GaussLegendre', 'GaussLegendre2d', 'GaussLegendre3d', 'KnotVector', 'LagrangeMultiplierCondition2d', 'LinearConstraint', 'LinearElasticProblem1d', 'LinearElasticProblem2d', 'LoadCondition1d', 'LoadCondition2d', 'Material1d', 'Material2d', 'Patch1d', 'Patch2d', 'PenaltyCondition2d', 'PlaneStress2d', 'PlateKirchhoffLove1p', 'PlateReissnerMindlin1p', 'PlateReissnerMindlin3p', 'QuadratureRule1d', 'QuadratureRule2d', 'QuadratureRule3d', 'SlenderBeam1d', 'SurfacePatch', 'line_segment', 'rectangle', 'tensor_product', 'tensor_product_1d', 'tensor_product_2d', 'eval_shape_at', 'eval_geometry_at']
 
 class BSpline(Basis):
     def __init__(self, degree: typing.SupportsInt | typing.SupportsIndex, knot_vector: KnotVector) -> None:
@@ -228,6 +228,21 @@ class PenaltyCondition2d(Condition):
         alpha_phi_n: typing.SupportsFloat | typing.SupportsIndex = 0.0,
         phi_n_bar: typing.SupportsFloat | typing.SupportsIndex = 0.0,
         alpha_phi_s: typing.SupportsFloat | typing.SupportsIndex = 0.0,
+        phi_s_bar: typing.SupportsFloat | typing.SupportsIndex = 0.0,
+    ) -> None:
+        ...
+
+class LagrangeMultiplierCondition2d(Condition):
+    def __init__(
+        self,
+        boundary: BoundaryPatch2d,
+        element: Element2d,
+        quadrature: QuadratureRule1d,
+        enforce_w: bool = True,
+        w_bar: typing.SupportsFloat | typing.SupportsIndex = 0.0,
+        enforce_phi_n: bool = False,
+        phi_n_bar: typing.SupportsFloat | typing.SupportsIndex = 0.0,
+        enforce_phi_s: bool = False,
         phi_s_bar: typing.SupportsFloat | typing.SupportsIndex = 0.0,
     ) -> None:
         ...

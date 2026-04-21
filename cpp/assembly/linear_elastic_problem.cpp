@@ -27,9 +27,16 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
         global_dofs *= num_basis_array[i];
     }
 
+    std::size_t multiplier_dofs = 0;
+    for (const auto& cond : conditions_) {
+        cond->set_multiplier_offset(global_dofs + multiplier_dofs);
+        multiplier_dofs += cond->num_multipliers();
+    }
+    const std::size_t total_dofs = global_dofs + multiplier_dofs;
+
     // Initialize global matrices to zero
-    K.setZero(global_dofs, global_dofs);
-    F.setZero(global_dofs);
+    K.setZero(total_dofs, total_dofs);
+    F.setZero(total_dofs);
 
     // Determine the number of intervals (elements) per dimension
     std::array<std::size_t, d> intervals;

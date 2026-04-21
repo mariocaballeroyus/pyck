@@ -14,6 +14,7 @@
 #include "beam_euler_bernoulli_1p.hpp"
 #include "condition.hpp"
 #include "load_condition.hpp"
+#include "lagrange_multiplier_condition.hpp"
 #include "penalty_condition.hpp"
 #include "linear_constraint.hpp"
 #include "beam_timoshenko_1p.hpp"
@@ -418,6 +419,15 @@ PYBIND11_MODULE(_pyck, m) {
              py::arg("alpha_w"), py::arg("w_bar"),
              py::arg("alpha_phi_n") = 0.0, py::arg("phi_n_bar") = 0.0,
              py::arg("alpha_phi_s") = 0.0, py::arg("phi_s_bar") = 0.0);
+
+    using LMCond2D = pyck::LagrangeMultiplierCondition<double>;
+    py::class_<LMCond2D, CondD, pyck::Ptr<LMCond2D>>(m, "LagrangeMultiplierCondition2d")
+        .def(py::init<const BoundaryPatch2D&, const Elem2D&, const QR1D&,
+                      bool, double, bool, double, bool, double>(),
+             py::arg("boundary"), py::arg("element"), py::arg("quadrature"),
+             py::arg("enforce_w") = true, py::arg("w_bar") = 0.0,
+             py::arg("enforce_phi_n") = false, py::arg("phi_n_bar") = 0.0,
+             py::arg("enforce_phi_s") = false, py::arg("phi_s_bar") = 0.0);
 
     // === Constraints ================================================================
 
