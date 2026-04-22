@@ -3,13 +3,14 @@
 from __future__ import annotations
  
 from typing import TYPE_CHECKING, Sequence, Union, cast, Any
- 
+
 import numpy as np
 import numpy.typing as npt
- 
+
 import pyck._pyck as _pyck
+from pyck.conditions.condition import BindableCondition
 from pyck.constraints.direct_constraint import DirectConstraint
- 
+
 if TYPE_CHECKING:
     from pyck.assembly.quadrature import QuadratureRule
     from pyck.conditions.condition import Condition
@@ -106,12 +107,21 @@ class LinearElasticProblem:
             Name of the target patch. If None, applied to all patches.
         """
         for name in self._resolve_patch_names(patch):
-            # Check for lazy-binding by inspecting _cpp_object attribute if it exists
-            cpp_obj = getattr(condition, "_cpp_object", None)
+            cpp_obj = condition._cpp_object
             if cpp_obj is None:
+                if not isinstance(condition, BindableCondition):
+                    raise TypeError(
+                        f"Condition of type {type(condition).__name__} "
+                        f"does not provide a bound C++ object or a bind() method."
+                    )
                 condition.bind(self._quadrature, self._element)
-                cpp_obj = getattr(condition, "_cpp_object")
- 
+                cpp_obj = condition._cpp_object
+                if cpp_obj is None:
+                    raise TypeError(
+                        f"Condition of type {type(condition).__name__} "
+                        f"did not produce a C++ object after bind()."
+                    )
+
             self._conditions[name].append(condition)
             self._cpp_objects[name].add_condition(cast(Any, cpp_obj))
  

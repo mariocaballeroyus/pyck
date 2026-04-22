@@ -48,6 +48,8 @@ class PenaltyCondition:
         Prescribed tangential rotation (default 0.0).
     """
 
+    _cpp_object: _pyck.PenaltyCondition2d
+
     def __init__(
         self,
         boundary: "BoundaryPatch",

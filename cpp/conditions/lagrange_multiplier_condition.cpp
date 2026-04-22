@@ -32,15 +32,16 @@ LagrangeMultiplierCondition<T>::LagrangeMultiplierCondition(
         );
     }
 
-    const bool one_field_plate = (element.num_node_dofs() == 1);
-    const bool need_derivative_basis = one_field_plate && enforce_phi_s;
+    const auto rotation_dofs = element.rotation_dof_indices();
+    const bool derived_rotation_plate = (rotation_dofs[0] == rotation_dofs[1]);
+    const bool need_derivative_basis = derived_rotation_plate && enforce_phi_s;
     if (need_derivative_basis) {
         auto boundary_bspline =
             std::dynamic_pointer_cast<const BSpline<T>>(boundary.basis_ptr(0));
         if (!boundary_bspline) {
             throw std::invalid_argument(
                 "LagrangeMultiplierCondition: tangential-rotation multipliers for "
-                "single-DOF plates require a BSpline boundary basis."
+                "plates with derived rotations require a BSpline boundary basis."
             );
         }
 
@@ -87,8 +88,8 @@ LagrangeMultiplierCondition<T>::LagrangeMultiplierCondition(
             ComponentKind::tangential_rotation,
             phi_s_bar,
             0,
-            one_field_plate ? derivative_basis_count_ : boundary_basis_count_,
-            one_field_plate,
+            derived_rotation_plate ? derivative_basis_count_ : boundary_basis_count_,
+            derived_rotation_plate,
         });
     }
 

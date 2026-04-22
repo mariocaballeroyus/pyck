@@ -36,6 +36,8 @@ class LagrangeMultiplierCondition:
         Prescribed tangential rotation. If ``None``, it is not enforced.
     """
 
+    _cpp_object: _pyck.LagrangeMultiplierCondition2d
+
     def __init__(
         self,
         boundary: "BoundaryPatch",

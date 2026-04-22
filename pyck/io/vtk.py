@@ -4,7 +4,7 @@ Each Bezier element (knot span) is sampled on a tensor-product parametric
 grid and emitted as a block of linear ``VTK_QUAD`` cells. The export is
 formulation-agnostic: it relies on each element's
 ``displacement_shape_matrix`` / ``rotation_shape_matrix``, so the same
-function works for KL-1p, RM-3p, RM-1p, etc.
+function works for KL-1p, RM-3p, RM-displ-3p, RM-1p, etc.
 """
 
 from __future__ import annotations
@@ -40,7 +40,8 @@ def export_field_vtk(
         Output filename (``.vtk`` recommended).
     surf : SurfacePatch
         The geometry patch the solution lives on.
-    element : plate element (e.g. PlateKirchhoffLove1p, PlateReissnerMindlin3p,
+    element : plate element (e.g. PlateKirchhoffLove1p,
+        PlateReissnerMindlin3p, PlateReissnerMindlinDispl3p,
         PlateReissnerMindlin1p)
         Used only via its ``_cpp_object.displacement_shape_matrix`` and
         ``rotation_shape_matrix`` methods.
@@ -152,9 +153,13 @@ def _canonical(name: str) -> str:
 
 
 def _needs_higher_order_for_phi(element) -> bool:
-    """RM-1p and KL-1p derive rotations from gradients of w; RM-3p does not."""
+    """Formulations with derived rotations need shape derivatives for phi."""
     cls = type(element).__name__
-    return cls in ("PlateKirchhoffLove1p", "PlateReissnerMindlin1p")
+    return cls in (
+        "PlateKirchhoffLove1p",
+        "PlateReissnerMindlin1p",
+        "PlateReissnerMindlinDispl3p",
+    )
 
 
 def _quad_connectivity(s: int) -> npt.NDArray[np.int64]:

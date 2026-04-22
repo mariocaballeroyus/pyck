@@ -62,7 +62,7 @@ class PlateReissnerMindlin1p:
 
 
 class PlateReissnerMindlin3p:
-    """Reissner-Mindlin plate element.
+    """Standard Reissner-Mindlin plate element.
 
     Uses the transverse displacement w, and the rotations phi_x and phi_y 
     as the primary variables. Accounts for both bending and shear 
@@ -93,6 +93,38 @@ class PlateReissnerMindlin3p:
         return f"PlateReissnerMindlin3p(material={self._material}, k_s={self._k_s})"
 
 
+class PlateReissnerMindlinDispl3p:
+    """Split-displacement Reissner-Mindlin plate element.
+
+    Uses one bending displacement field ``w_b`` and two shear displacement
+    fields ``w_s1`` and ``w_s2``. The recovered physical fields are
+
+        w = w_b + w_s1 + w_s2
+        phi_x = -w_b,x - w_s2,x
+        phi_y = -w_b,y - w_s1,y
+        gamma = [w_s1,x, w_s2,y]
+        kappa = L phi
+
+    Parameters
+    ----------
+    material : PlaneStress2d
+        Plate material model.
+    """
+
+    def __init__(self, material: PlaneStress2d) -> None:
+        self._material = material
+        self._cpp_object = _pyck.PlateReissnerMindlinDispl3p(
+            self._material._cpp_object
+        )
+
+    @property
+    def material(self) -> PlaneStress2d:
+        return self._material
+
+    def __repr__(self) -> str:
+        return f"PlateReissnerMindlinDispl3p(material={self._material})"
+
+
 def create_kirchhoff_love_plate(
     material: PlaneStress2d
 ) -> PlateKirchhoffLove1p:
@@ -105,3 +137,10 @@ def create_reissner_mindlin_plate(
 ) -> PlateReissnerMindlin3p:
     """Create a :class:`PlateReissnerMindlin3p` element."""
     return PlateReissnerMindlin3p(material, k_s)
+
+
+def create_reissner_mindlin_displ_plate(
+    material: PlaneStress2d,
+) -> PlateReissnerMindlinDispl3p:
+    """Create a :class:`PlateReissnerMindlinDispl3p` element."""
+    return PlateReissnerMindlinDispl3p(material)
