@@ -13,9 +13,11 @@ from pyck.elements.plates import (
     PlateReissnerMindlin1p,
     PlateReissnerMindlin3p,
     PlateReissnerMindlinDispl3p,
+    PlateReissnerMindlinDispl2p,
     create_kirchhoff_love_plate,
     create_reissner_mindlin_plate,
     create_reissner_mindlin_displ_plate,
+    create_reissner_mindlin_displ_2p_plate,
 )
 
 from pyck.materials import SlenderBeam1d, PlaneStress2d
@@ -46,6 +48,7 @@ __all__ = [
     "PlateReissnerMindlin1p",
     "PlateReissnerMindlin3p",
     "PlateReissnerMindlinDispl3p",
+    "PlateReissnerMindlinDispl2p",
     # Factory functions
     "create_euler_bernoulli_beam",
     "create_timoshenko_beam",
@@ -53,5 +56,6 @@ __all__ = [
     "create_kirchhoff_love_plate",
     "create_reissner_mindlin_plate",
     "create_reissner_mindlin_displ_plate",
+    "create_reissner_mindlin_displ_2p_plate",
     "create_rotation_free_reissner_mindlin_plate",
 ]

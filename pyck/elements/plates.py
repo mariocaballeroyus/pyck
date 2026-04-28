@@ -125,6 +125,41 @@ class PlateReissnerMindlinDispl3p:
         return f"PlateReissnerMindlinDispl3p(material={self._material})"
 
 
+class PlateReissnerMindlinDispl2p:
+    """Two-parameter rotation-free Reissner-Mindlin plate element.
+
+    Uses a bending displacement field ``w_b`` and a Helmholtz scalar
+    potential ``psi`` for the curl part of the rotation field. The
+    recovered physical fields are
+
+        w     = w_b - (Kb / Ks) * Laplacian(w_b)
+        phi_x = -w_b,x + psi,y
+        phi_y = -w_b,y - psi,x
+        gamma = -(Kb/Ks) grad(Laplacian(w_b)) + curl(psi)
+        kappa = L phi
+
+    Requires at least C^2 continuity (cubic B-splines or higher).
+
+    Parameters
+    ----------
+    material : PlaneStress2d
+        Plate material model.
+    """
+
+    def __init__(self, material: PlaneStress2d) -> None:
+        self._material = material
+        self._cpp_object = _pyck.PlateReissnerMindlinDispl2p(
+            self._material._cpp_object
+        )
+
+    @property
+    def material(self) -> PlaneStress2d:
+        return self._material
+
+    def __repr__(self) -> str:
+        return f"PlateReissnerMindlinDispl2p(material={self._material})"
+
+
 def create_kirchhoff_love_plate(
     material: PlaneStress2d
 ) -> PlateKirchhoffLove1p:
@@ -144,3 +179,10 @@ def create_reissner_mindlin_displ_plate(
 ) -> PlateReissnerMindlinDispl3p:
     """Create a :class:`PlateReissnerMindlinDispl3p` element."""
     return PlateReissnerMindlinDispl3p(material)
+
+
+def create_reissner_mindlin_displ_2p_plate(
+    material: PlaneStress2d,
+) -> PlateReissnerMindlinDispl2p:
+    """Create a :class:`PlateReissnerMindlinDispl2p` element."""
+    return PlateReissnerMindlinDispl2p(material)
