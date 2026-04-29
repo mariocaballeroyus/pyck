@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from functools import cached_property
 from typing import TYPE_CHECKING
 
 import pyck._pyck as _pyck
 
 if TYPE_CHECKING:
-    from pyck.geometry.curve_patch import CurvePatch
-    from pyck.geometry.surface_patch import SurfacePatch
+    from pyck.assembly.quadrature import QuadratureRule
+    from pyck.geometry.curve import CurvePatch
+    from pyck.geometry.surface import SurfacePatch
 
 
 class BoundaryPatch:
@@ -70,6 +72,30 @@ class BoundaryPatch:
     def parent(self) -> CurvePatch | SurfacePatch:
         """The parent patch this boundary was extracted from."""
         return self._parent
+
+    @cached_property
+    def quadrature(self) -> QuadratureRule:
+        """Default Gauss-Legendre rule for integrating along this boundary.
+
+        For a 2-D surface boundary this returns a 1-D rule with
+        ``deg_tangent + 1`` points, where the tangent direction is the
+        parametric direction *not* normal to the boundary. Used as the
+        fallback rule by :class:`PenaltyCondition`,
+        :class:`LagrangeMultiplierCondition`, and their factories when no
+        explicit quadrature is provided.
+        """
+        from pyck.assembly.gauss import GaussLegendre
+
+        parent_tdim = self._parent.tdim
+        if parent_tdim != 2:
+            raise NotImplementedError(
+                f"BoundaryPatch.quadrature is only defined for boundaries "
+                f"of 2-D patches (got parent tdim={parent_tdim}). Pass an "
+                f"explicit quadrature rule instead."
+            )
+        tangent_dim = 1 - self.param_dim
+        deg = self._parent.basis(tangent_dim).degree
+        return GaussLegendre(deg + 1, dim=1)
 
     def __repr__(self) -> str:
         return (

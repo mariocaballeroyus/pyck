@@ -1,11 +1,11 @@
-from pyck import assembly, basis, conditions, constraints, elements, geometry, io
+from pyck import assembly, basis, conditions, constraints, elements, geometry, io, materials
+from pyck import materials as material
 
 from pyck.basis import (
     Basis,
     BSpline,
     KnotVector,
     create_bspline,
-    create_clamped_uniform,
     create_clamped_uniform_knots,
     create_knot_vector,
 )
@@ -40,11 +40,14 @@ from pyck.elements import (
 from pyck.materials import (
     SlenderBeam1d,
     PlaneStress2d,
+    create_plane_stress,
+    create_plane_stress_2d,
+    create_slender_beam,
+    create_slender_beam_1d,
 )
 from pyck.conditions import (
     LoadCondition,
     create_constant_load_condition,
-    create_function_load_condition,
     LagrangeMultiplierCondition,
     create_displacement_lagrange,
     create_simply_supported_lagrange,
@@ -89,11 +92,12 @@ __all__ = [
     "elements",
     "geometry",
     "io",
+    "materials",
+    "material",
     "Basis",
     "BSpline",
     "KnotVector",
     "create_bspline",
-    "create_clamped_uniform",
     "create_clamped_uniform_knots",
     "create_knot_vector",
     "CurvePatch",
@@ -112,6 +116,10 @@ __all__ = [
     "BeamTimoshenko2p",
     "SlenderBeam1d",
     "PlaneStress2d",
+    "create_plane_stress",
+    "create_plane_stress_2d",
+    "create_slender_beam",
+    "create_slender_beam_1d",
     "create_euler_bernoulli_beam",
     "create_kirchhoff_love_plate",
     "create_reissner_mindlin_plate",
@@ -122,7 +130,6 @@ __all__ = [
     "create_rotation_free_reissner_mindlin_plate",
     "LoadCondition",
     "create_constant_load_condition",
-    "create_function_load_condition",
     "LagrangeMultiplierCondition",
     "create_displacement_lagrange",
     "create_simply_supported_lagrange",

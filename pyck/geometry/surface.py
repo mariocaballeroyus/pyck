@@ -10,7 +10,8 @@ from __future__ import annotations
 import numpy as np
 
 import pyck._pyck as _pyck
-from pyck.basis import Basis
+from pyck.basis import Basis, BSpline
+from pyck.basis.knot_vector import create_clamped_uniform_knots
 from pyck.geometry.patch import Patch
 from pyck.geometry.boundary_patch import BoundaryPatch
 
@@ -58,12 +59,9 @@ class SurfacePatch(Patch):
 
     @classmethod
     def _from_cpp(
-        cls,
-        cpp_obj: _pyck.SurfacePatch,
-        basis_u: Basis,
-        basis_v: Basis,
-        *,
-        name: str = "patch",
+        cls, cpp_obj: _pyck.SurfacePatch,
+        basis_u: Basis, basis_v: Basis,
+        *, name: str = "patch",
     ) -> SurfacePatch:
         """Wrap an existing C++ `SurfacePatch`."""
         obj = object.__new__(cls)
@@ -193,11 +191,7 @@ class SurfacePatch(Patch):
 
 
 def create_surface_patch(
-    basis_u: Basis,
-    basis_v: Basis,
-    control_pts: np.ndarray,
-    *,
-    name: str = "patch",
+    basis_u: Basis, basis_v: Basis, control_pts: np.ndarray, *, name: str = "patch"
 ) -> SurfacePatch:
     """Create a surface patch from two bases and control points.
 
@@ -219,32 +213,35 @@ def create_surface_patch(
 
 
 def create_rectangle(
-    basis_u: Basis,
-    basis_v: Basis,
-    width: float,
-    height: float,
-    *,
-    name: str = "patch",
+    nu: int, nv: int, deg: int,
+    l: float, w: float
 ) -> SurfacePatch:
-    """Create a flat rectangular surface patch in the xy-plane.
+    """Create a rectangular surface patch from basis counts and degree.
 
     Parameters
     ----------
-    basis_u, basis_v : Basis
-        B-spline bases for u and v directions.
-    width : float
-        Physical width (x-extent).
-    height : float
-        Physical height (y-extent).
-    name : str, optional
-        Human-readable label for the patch (default "patch").
+    nu, nv : int
+        Number of basis functions in the u and v directions.
+    deg : int
+        Common polynomial degree in both parametric directions.
+    l, w : float
+        Rectangle length and width in physical space.
 
     Returns
     -------
     SurfacePatch
-        The rectangular patch.
+        A planar rectangular patch spanning `[0, l] x [0, w]` in physical space
+        and `[0, 1] x [0, 1]` in parametric space.
     """
-    cpp = _pyck.rectangle(
-        basis_u._cpp_object, basis_v._cpp_object, float(width), float(height)
+    knots_u = create_clamped_uniform_knots(deg, nu)
+    knots_v = create_clamped_uniform_knots(deg, nv)
+
+    basis_u = BSpline(deg, knots_u)
+    basis_v = BSpline(deg, knots_v)
+
+    cpp_patch = _pyck.rectangle(
+        basis_u._cpp_object, basis_v._cpp_object, l, w
     )
-    return SurfacePatch._from_cpp(cpp, basis_u, basis_v, name=name)
+    return SurfacePatch._from_cpp(cpp_patch, basis_u, basis_v)
+    
+    

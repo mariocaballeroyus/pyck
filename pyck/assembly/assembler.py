@@ -37,21 +37,23 @@ class LinearElasticProblem:
         self,
         patches: Sequence[Patch],
         element: Element,
-        quadrature: QuadratureRule,
+        quadrature: QuadratureRule | None = None,
     ) -> None:
         if len(patches) != 1:
             raise NotImplementedError(
                 f"LinearElasticProblem currently supports exactly 1 patch, "
                 f"got {len(patches)}."
             )
- 
+
         self._patches: dict[str, Patch] = {}
         for p in patches:
             if p.name in self._patches:
                 raise ValueError(f"Duplicate patch name: '{p.name}'")
             self._patches[p.name] = p
- 
+
         self._element = element
+        if quadrature is None:
+            quadrature = patches[0].quadrature
         self._quadrature = quadrature
         self._conditions: dict[str, list[Condition]] = {
             name: [] for name in self._patches
@@ -75,9 +77,28 @@ class LinearElasticProblem:
                 raise ValueError(f"Unsupported topological dimension: {patch.tdim}")
  
     @property
+    def element(self) -> Element:
+        """Return the element formulation."""
+        return self._element
+
+    @property
+    def patches(self) -> tuple[Patch, ...]:
+        """Return the geometry patches in construction order."""
+        return tuple(self._patches.values())
+
+    @property
     def patch_names(self) -> list[str]:
         """Return the names of all patches in the problem."""
         return list(self._patches.keys())
+
+    @property
+    def num_physical_dofs(self) -> int:
+        """Return the number of non-auxiliary solution DOFs."""
+        num_node_dofs = int(self._element._cpp_object.num_node_dofs())
+        return sum(
+            patch.num_control_pts * num_node_dofs
+            for patch in self._patches.values()
+        )
  
     def _resolve_patch_names(self, patch: str | None = None) -> list[str]:
         """Return the list of patch names targeted by *patch*."""
@@ -172,19 +193,19 @@ class LinearElasticProblem:
 def create_linear_elastic_problem(
     patches: Sequence[Patch],
     element: Element,
-    quadrature: QuadratureRule,
+    quadrature: QuadratureRule | None = None,
 ) -> LinearElasticProblem:
     """Create a :class:`LinearElasticProblem` assembler.
- 
+
     Parameters
     ----------
     patches : Sequence[Patch]
         Geometry on which the problem is defined.
     element : Element
         Finite element formulation.
-    quadrature : QuadratureRule
-        Quadrature rule for assembly.
- 
+    quadrature : QuadratureRule, optional
+        Quadrature rule for assembly. Defaults to ``patches[0].quadrature``.
+
     Returns
     -------
     LinearElasticProblem

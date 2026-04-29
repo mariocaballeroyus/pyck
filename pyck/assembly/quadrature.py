@@ -13,6 +13,8 @@ class QuadratureRule(ABC):
     A :class:`QuadratureRule` stores reference points and weights on [-1, 1]^d.
     """
 
+    _cpp_object: object
+
     @property
     @abstractmethod
     def points(self) -> npt.NDArray[np.float64]:

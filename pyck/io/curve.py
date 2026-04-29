@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from matplotlib.axes import Axes
 from mpl_toolkits.mplot3d import Axes3D
 
-from pyck.geometry.curve_patch import CurvePatch
+from pyck.geometry.curve import CurvePatch
 
 
 def evaluate_curve(

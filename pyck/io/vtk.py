@@ -4,7 +4,9 @@ Each Bezier element (knot span) is sampled on a tensor-product parametric
 grid and emitted as a block of linear ``VTK_QUAD`` cells. The export is
 formulation-agnostic: it relies on each element's
 ``displacement_shape_matrix`` / ``rotation_shape_matrix``, so the same
-function works for KL-1p, RM-3p, RM-displ-3p, RM-1p, etc.
+function works for KL-1p, RM-3p, RM-displ-3p, RM-1p, etc.  The
+RM-displ-2p formulation additionally exposes its primary ``w_b`` and
+``psi`` fields and their recovered contributions.
 """
 
 from __future__ import annotations
@@ -16,7 +18,7 @@ import numpy as np
 import numpy.typing as npt
 
 from pyck.geometry.evaluation import eval_geometry_at, eval_shape_at
-from pyck.geometry.surface_patch import SurfacePatch
+from pyck.geometry.surface import SurfacePatch
 
 
 _VTK_QUAD = 9
@@ -53,7 +55,11 @@ def export_field_vtk(
         linear quad cells per element.
     fields : iterable of str, optional
         Which fields to write. Recognised names: ``"displacement"`` (alias
-        ``"w"``) and ``"rotation"`` (alias ``"phi"``). Default
+        ``"w"``), ``"rotation"`` (alias ``"phi"``), ``"kappa"``,
+        ``"gamma"``, and for RM-displ-2p also ``"wb"``, ``"psi"``,
+        ``"shear_displacement"``, ``"curl_psi"`` as the scalar magnitude
+        ``|curl(psi)|``, and ``"curl_psi_vector"``. Pass ``"all"`` to
+        write every field supported by the element. Default
         ``("displacement",)``.
     title : str, optional
         Header line written to the VTK file (default ``"pyck export"``).
@@ -63,12 +69,29 @@ def export_field_vtk(
     Path
         The path that was written.
     """
-    requested = {_canonical(name) for name in fields}
-    unknown = requested - {"w", "phi"}
+    requested = _expand_fields({_canonical(name) for name in fields}, element)
+    supported = {
+        "w",
+        "phi",
+        "kappa",
+        "gamma",
+        "wb",
+        "ws",
+        "psi",
+        "curl_psi",
+        "curl_psi_vector",
+    }
+    unknown = requested - supported
     if unknown:
         raise ValueError(
             f"Unknown field name(s): {sorted(unknown)}. "
-            f"Supported: 'displacement'/'w', 'rotation'/'phi'."
+            f"Supported: 'all', 'displacement'/'w', 'rotation'/'phi', "
+            f"'kappa', 'gamma', 'wb', 'shear_displacement', 'psi', 'curl_psi'."
+        )
+    if requested & {"wb", "ws", "psi", "curl_psi", "curl_psi_vector"} and not _is_rm_displ_2p(element):
+        raise ValueError(
+            "Fields 'wb', 'shear_displacement', 'psi', 'curl_psi', and "
+            "'curl_psi_vector' are only available for PlateReissnerMindlinDispl2p."
         )
 
     s = int(samples_per_span)
@@ -90,8 +113,9 @@ def export_field_vtk(
 
     pts_blocks: list[npt.NDArray[np.float64]] = []
     quads_blocks: list[npt.NDArray[np.int64]] = []
-    w_blocks: list[npt.NDArray[np.float64]] = []
-    phi_blocks: list[npt.NDArray[np.float64]] = []
+    field_blocks: dict[str, list[npt.NDArray[np.float64]]] = {
+        name: [] for name in requested
+    }
 
     solution = np.ascontiguousarray(solution, dtype=np.float64).ravel()
     point_offset = 0
@@ -106,7 +130,9 @@ def export_field_vtk(
             params = np.column_stack([u_pts, v_pts])
 
             coords = eval_geometry_at(surf, params)
-            shape = eval_shape_at(surf, params, order=2 if "w" in requested else 0)
+            shape = eval_shape_at(
+                surf, params, order=_shape_order_for_fields(element, requested)
+            )
 
             pts_blocks.append(coords)
             quads_blocks.append(block_quads + point_offset)
@@ -114,29 +140,70 @@ def export_field_vtk(
 
             if "w" in requested:
                 Nw = element._cpp_object.displacement_shape_matrix(shape)
-                w_blocks.append(np.asarray(Nw @ solution).ravel())
+                field_blocks["w"].append(np.asarray(Nw @ solution).ravel())
 
             if "phi" in requested:
-                # rotation_shape_matrix needs first derivatives for KL/RM-1p
-                # and third derivatives are unused for displacement output, so
-                # request order=3 once if we need rotation alongside w.
-                shape_phi = (
-                    eval_shape_at(surf, params, order=3)
-                    if _needs_higher_order_for_phi(element)
-                    else shape
-                )
-                Nphi = element._cpp_object.rotation_shape_matrix(shape_phi)
+                Nphi = element._cpp_object.rotation_shape_matrix(shape)
                 phi_flat = np.asarray(Nphi @ solution).ravel()
-                phi_blocks.append(phi_flat.reshape(-1, 2))
+                field_blocks["phi"].append(phi_flat.reshape(-1, 2))
+
+            if requested & {"kappa", "gamma"}:
+                B = element._cpp_object.strain_displacement_matrix(shape)
+                strain = np.asarray(B @ solution).reshape(-1, 5)
+                if "kappa" in requested:
+                    field_blocks["kappa"].append(strain[:, :3])
+                if "gamma" in requested:
+                    field_blocks["gamma"].append(strain[:, 3:5])
+
+            if requested & {"wb", "ws", "psi", "curl_psi", "curl_psi_vector"}:
+                wb_coeff = solution[0::2]
+                psi_coeff = solution[1::2]
+                wb = np.asarray(shape[0] @ wb_coeff).ravel()
+                psi = np.asarray(shape[0] @ psi_coeff).ravel()
+
+                if "wb" in requested:
+                    field_blocks["wb"].append(wb)
+                if "psi" in requested:
+                    field_blocks["psi"].append(psi)
+                if "ws" in requested:
+                    if "w" in requested:
+                        w = field_blocks["w"][-1]
+                    else:
+                        Nw = element._cpp_object.displacement_shape_matrix(shape)
+                        w = np.asarray(Nw @ solution).ravel()
+                    field_blocks["ws"].append(w - wb)
+                if requested & {"curl_psi", "curl_psi_vector"}:
+                    psi_x = np.asarray(shape[1] @ psi_coeff).ravel()
+                    psi_y = np.asarray(shape[2] @ psi_coeff).ravel()
+                    curl_psi = np.column_stack([psi_y, -psi_x])
+                    if "curl_psi" in requested:
+                        field_blocks["curl_psi"].append(
+                            np.linalg.norm(curl_psi, axis=1)
+                        )
+                    if "curl_psi_vector" in requested:
+                        field_blocks["curl_psi_vector"].append(curl_psi)
 
     points = np.vstack(pts_blocks)
     quads = np.vstack(quads_blocks)
 
     point_data: dict[str, npt.NDArray[np.float64]] = {}
-    if "w" in requested:
-        point_data["w"] = np.concatenate(w_blocks)
-    if "phi" in requested:
-        point_data["rotation"] = np.vstack(phi_blocks)
+    names = {
+        "w": "w",
+        "phi": "rotation",
+        "kappa": "kappa",
+        "gamma": "gamma",
+        "wb": "wb",
+        "ws": "shear_displacement",
+        "psi": "psi",
+        "curl_psi": "curl_psi",
+        "curl_psi_vector": "curl_psi_vector",
+    }
+    for key in sorted(requested, key=_field_sort_key):
+        blocks = field_blocks[key]
+        if not blocks:
+            continue
+        arr = np.concatenate(blocks) if blocks[0].ndim == 1 else np.vstack(blocks)
+        point_data[names[key]] = arr
 
     out = Path(path)
     _write_legacy_vtk(out, title, points, quads, point_data)
@@ -145,11 +212,42 @@ def export_field_vtk(
 
 def _canonical(name: str) -> str:
     n = name.strip().lower()
+    if n == "all":
+        return "all"
     if n in ("w", "displacement", "deflection"):
         return "w"
     if n in ("phi", "rotation", "rotations", "theta"):
         return "phi"
+    if n in ("kappa", "bending_strain", "bending-strain"):
+        return "kappa"
+    if n in ("gamma", "shear_strain", "shear-strain"):
+        return "gamma"
+    if n in ("wb", "w_b", "bending_displacement", "bending-displacement"):
+        return "wb"
+    if n in ("ws", "w_s", "shear_displacement", "shear-displacement"):
+        return "ws"
+    if n in ("psi", "potential"):
+        return "psi"
+    if n in ("curl_psi", "curl-psi", "curl_psi_magnitude", "curl-psi-magnitude"):
+        return "curl_psi"
+    if n in ("curl_psi_vector", "curl-psi-vector"):
+        return "curl_psi_vector"
     return n
+
+
+def _expand_fields(requested: set[str], element) -> set[str]:
+    if "all" not in requested:
+        return requested
+    requested = set(requested)
+    requested.remove("all")
+    requested.update({"w", "phi", "kappa", "gamma"})
+    if _is_rm_displ_2p(element):
+        requested.update({"wb", "ws", "psi", "curl_psi", "curl_psi_vector"})
+    return requested
+
+
+def _is_rm_displ_2p(element) -> bool:
+    return type(element).__name__ == "PlateReissnerMindlinDispl2p"
 
 
 def _needs_higher_order_for_phi(element) -> bool:
@@ -160,6 +258,33 @@ def _needs_higher_order_for_phi(element) -> bool:
         "PlateReissnerMindlin1p",
         "PlateReissnerMindlinDispl3p",
     )
+
+
+def _shape_order_for_fields(element, requested: set[str]) -> int:
+    if _is_rm_displ_2p(element):
+        return 3
+    if requested & {"kappa", "gamma"}:
+        return 3
+    if "phi" in requested and _needs_higher_order_for_phi(element):
+        return 3
+    if "w" in requested:
+        return 2
+    return 0
+
+
+def _field_sort_key(name: str) -> int:
+    order = [
+        "w",
+        "wb",
+        "ws",
+        "psi",
+        "curl_psi",
+        "curl_psi_vector",
+        "phi",
+        "kappa",
+        "gamma",
+    ]
+    return order.index(name) if name in order else len(order)
 
 
 def _quad_connectivity(s: int) -> npt.NDArray[np.int64]:

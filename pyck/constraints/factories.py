@@ -17,8 +17,8 @@ from pyck.elements.beams import BeamEulerBernoulli1p, BeamTimoshenko1p, BeamTimo
 
 if TYPE_CHECKING:
     from pyck.elements.element import Element
-    from pyck.geometry.curve_patch import CurvePatch
-    from pyck.geometry.surface_patch import SurfacePatch
+    from pyck.geometry.curve import CurvePatch
+    from pyck.geometry.surface import SurfacePatch
 
 
 def _resolve_side(at: str) -> str:

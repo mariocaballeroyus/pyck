@@ -14,6 +14,10 @@ import numpy as np
 
 import pyck._pyck as _pyck
 
+if typing.TYPE_CHECKING:
+    from pyck.assembly.quadrature import QuadratureRule
+    from pyck.geometry.boundary_patch import BoundaryPatch
+
 
 class Patch(ABC):
     """Abstract base class for tensor-product parametric patches."""
@@ -61,8 +65,33 @@ class Patch(ABC):
         return self._cpp_object.layer_dofs(param_dim, at_start, layer_idx)
 
     @abstractmethod
+    def boundary(self, side: str) -> BoundaryPatch:
+        """Extract a boundary patch from this patch."""
+
+    @abstractmethod
     def basis(self, direction: int) -> typing.Any:
         """Return the basis in the given direction."""
+
+    @cached_property
+    def quadrature(self) -> QuadratureRule:
+        """Default tensor-product Gauss-Legendre rule for this patch.
+
+        Number of points per direction is ``max_degree + 1`` (sufficient to
+        integrate the mass matrix exactly). Used as the fallback rule by
+        :class:`LinearElasticProblem` and the condition factories when no
+        explicit quadrature is provided.
+        """
+        from pyck.assembly.gauss import GaussLegendre
+
+        # `basis` is a method on SurfacePatch and a property on CurvePatch;
+        # handle both transparently.
+        basis_attr = getattr(type(self), "basis", None)
+        is_property = isinstance(basis_attr, property)
+        max_deg = 0
+        for i in range(self.tdim):
+            b = self.basis if is_property else self.basis(i)
+            max_deg = max(max_deg, b.degree)
+        return GaussLegendre(max_deg + 1, dim=self.tdim)
 
     @abstractmethod
     def eval_shape_functions(

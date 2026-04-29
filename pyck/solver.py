@@ -9,28 +9,78 @@ least-squares solve to recover a consistent solution.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any, overload
+
 import numpy as np
 import numpy.typing as npt
 
+if TYPE_CHECKING:
+    from pyck.assembly.assembler import LinearElasticProblem
 
+
+@overload
 def solve(
     K: npt.NDArray[np.float64],
     f: npt.NDArray[np.float64],
+    *,
+    physical_dofs: int | None = None,
 ) -> npt.NDArray[np.float64]:
-    """Solve the linear system K d = f.
+    ...
 
-    BCs are expected to be already enforced in K and f (the element
-    handles this).
+
+@overload
+def solve(
+    K: "LinearElasticProblem",
+    f: None = None,
+    *,
+    physical_dofs: int | None = None,
+) -> npt.NDArray[np.float64]:
+    ...
+
+
+def solve(
+    K: npt.NDArray[np.float64] | "LinearElasticProblem",
+    f: npt.NDArray[np.float64] | None = None,
+    *,
+    physical_dofs: int | None = None,
+) -> npt.NDArray[np.float64]:
+    """Solve a linear system or a linear-elastic problem.
+
+    When passed a :class:`LinearElasticProblem`, this function assembles the
+    system and returns only the physical DOFs, excluding appended auxiliary
+    unknowns such as Lagrange multipliers.
 
     Args:
-        K: Stiffness matrix `(n, n)` with BCs applied.
-        f: Load vector `(n,)` with BCs applied.
+        K: Stiffness matrix `(n, n)` with BCs applied, or a
+            `LinearElasticProblem`.
+        f: Load vector `(n,)` with BCs applied. Omit when solving a problem.
+        physical_dofs: Optional number of leading physical DOFs to return.
+            This is inferred automatically when `K` is a problem.
 
     Returns:
-        Solution vector `(n,)`.
+        Solution vector.
     """
+    if _looks_like_problem(K):
+        if f is not None:
+            raise TypeError("f must be omitted when solving a LinearElasticProblem")
+        problem = K
+        K, f = problem.assemble()
+        physical_dofs = problem.num_physical_dofs
+    elif f is None:
+        raise TypeError("solve() missing required load vector 'f'")
+
     try:
-        return np.linalg.solve(K, f)
+        solution = np.linalg.solve(K, f)
     except np.linalg.LinAlgError:
-        sol, *_ = np.linalg.lstsq(K, f, rcond=None)
-        return sol
+        solution, *_ = np.linalg.lstsq(K, f, rcond=None)
+
+    solution = np.asarray(solution, dtype=np.float64).ravel()
+    if physical_dofs is not None:
+        return solution[: int(physical_dofs)]
+    return solution
+
+
+def _looks_like_problem(value: Any) -> bool:
+    return callable(getattr(value, "assemble", None)) and hasattr(
+        value, "num_physical_dofs"
+    )

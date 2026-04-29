@@ -4,7 +4,7 @@ from pyck.conditions.condition import BindableCondition, Condition
 from pyck.conditions.load_condition import (
     LoadCondition,
     create_constant_load_condition,
-    create_function_load_condition,
+    create_load_condition,
 )
 from pyck.conditions.lagrange_multiplier_condition import (
     LagrangeMultiplierCondition,
@@ -25,7 +25,7 @@ __all__ = [
     "BindableCondition",
     "LoadCondition",
     "create_constant_load_condition",
-    "create_function_load_condition",
+    "create_load_condition",
     "LagrangeMultiplierCondition",
     "create_displacement_lagrange",
     "create_simply_supported_lagrange",
