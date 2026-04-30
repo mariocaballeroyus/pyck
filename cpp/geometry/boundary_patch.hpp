@@ -59,6 +59,15 @@ public:
     /// @brief Reference to the parent patch
     const Ptr<Patch<T, d>>& parent() const { return parent_; }
 
+    /// @brief First non-degenerate span in the parent along the fixed direction
+    Index span_fixed() const { return span_fixed_; }
+
+    /// @brief Parameter value at which to evaluate the parent along the fixed direction
+    T u_eval_fixed() const { return u_eval_fixed_; }
+
+    /// @brief Sign of the outward normal (+1 or -1) consistent with parametric orientation
+    T sign_n() const { return sign_n_; }
+
     /// @brief Compute outward unit normal at quadrature points.
     /// For d=2 (1D boundary): normal = tangent × parent_surface_normal
     /// For d=3 (2D boundary): normal = tangent0 × tangent1
@@ -80,6 +89,10 @@ private:
 
     /// @brief Global DOF indices of the parent patch on the boundary
     std::vector<Index> parent_dofs_;
+
+    Index span_fixed_;
+    T u_eval_fixed_;
+    T sign_n_;
 };
 
 /**

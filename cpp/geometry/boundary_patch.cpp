@@ -13,7 +13,9 @@ BoundaryPatch<T, d>::BoundaryPatch(const Ptr<Patch<T, d>>& parent,
                                    bool at_start)
     : Patch<T, d - 1>(parent->basis_ptr(1 - param_dim),
                     parent->get_control_points(parent->dof_mapper().get_layer_dofs(param_dim, at_start, 0))),
-      parent_(parent), param_dim_(param_dim), at_start_(at_start)
+      parent_(parent), param_dim_(param_dim), at_start_(at_start),
+      span_fixed_(0), u_eval_fixed_(T(0)),
+      sign_n_(((param_dim == 1) == at_start) ? T(1) : T(-1))
 {
     if (param_dim >= d) {
         throw std::invalid_argument(
@@ -22,6 +24,19 @@ BoundaryPatch<T, d>::BoundaryPatch(const Ptr<Patch<T, d>>& parent,
     }
 
     parent_dofs_ = parent->dof_mapper().get_layer_dofs(param_dim, at_start, 0);
+
+    auto& kv_fixed = parent->basis(param_dim).knot_vector();
+    if (at_start) {
+        for (Index s = 0; s < kv_fixed.num_spans(); ++s) {
+            auto [lo, hi] = kv_fixed.span_bounds(s);
+            if (std::abs(hi - lo) > T(1e-14)) { span_fixed_ = s; u_eval_fixed_ = lo; break; }
+        }
+    } else {
+        for (Index s = kv_fixed.num_spans(); s-- > 0;) {
+            auto [lo, hi] = kv_fixed.span_bounds(s);
+            if (std::abs(hi - lo) > T(1e-14)) { span_fixed_ = s; u_eval_fixed_ = hi; break; }
+        }
+    }
 }
 
 // === eval_normal ====================================================================
