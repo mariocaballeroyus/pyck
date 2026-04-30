@@ -12,6 +12,7 @@
 #include "dof_mapper.hpp"
 #include "element.hpp"
 #include "quadrature.hpp"
+#include "../assembly/dof_layout.hpp"
 #include "../types.hpp"
 
 namespace pyck
@@ -30,6 +31,10 @@ namespace pyck
  * transverse displacement w, normal rotation θ_n, or tangential rotation θ_s.
  * The multiplier field is discretized with the 1D boundary basis associated
  * with the supplied BoundaryPatch.
+ *
+ * Each enforced field declares its own DOF block on the global `DofLayout`
+ * with a `DofType::LagrangeMultiplier` tag. (All fields use the same tag;
+ * field identification relies on block ordering or external context.)
  *
  * @tparam T Scalar floating-point type (double or float).
  */
@@ -58,15 +63,34 @@ public:
                                 bool enforce_phi_n = false, T phi_n_bar = T(0),
                                 bool enforce_phi_s = false, T phi_s_bar = T(0));
 
-    std::size_t num_multipliers() const override { return num_multipliers_; }
+    /**
+     * @brief Report the number of Lagrange multiplier DOFs required.
+     */
+    std::size_t num_dofs() const override;
+
+    /**
+     * @brief Allocate multiplier DOF blocks in the layout.
+     *
+     * Called by the assembler during the DOF allocation phase. Stores the
+     * allocated block IDs for use in apply().
+     *
+     * @param layout       Layout to allocate blocks against.
+     * @param primal_block Handle to the primal block.
+     */
+    void allocate_dofs(DofLayout& layout, DofLayout::BlockId primal_block);
 
     /**
      * @brief Scatter the coupling blocks and prescribed trace RHS.
      *
-     * @param stiffness Global augmented stiffness matrix (modified in-place).
-     * @param load      Global augmented load vector (modified in-place).
+     * @param stiffness    Global augmented stiffness matrix (modified in-place).
+     * @param load         Global augmented load vector (modified in-place).
+     * @param layout       Equation-numbering authority for the assembly.
+     * @param primal_block Handle to the primal DOF block.
      */
-    void apply(Matrix<T>& stiffness, Vector<T>& load) const override;
+    void apply(Matrix<T>& stiffness,
+               Vector<T>& load,
+               const DofLayout& layout,
+               DofLayout::BlockId primal_block) const override;
 
 private:
 
@@ -78,24 +102,37 @@ private:
 
     struct Component {
         ComponentKind kind;
+        DofType dof_type;
         T prescribed_value;
-        Index block_offset;
         Index dof_count;
         bool use_derivative_basis;
+        DofLayout::BlockId block_id = 0;  // set by declare_dofs
     };
 
+    /**
+     * @brief Per-span local contribution.
+     *
+     * `C` and `G` are stacked component-wise: rows for component[0] first,
+     * then rows for component[1], etc. `elem_node_cps` is the list of
+     * parent-patch CP indices for this span; the global primal DOF for
+     * `(elem_node_cps[k], slot)` is resolved at apply time via
+     * `layout.primal_dof(primal_block_, elem_node_cps[k], slot)`.
+     * `basis_ids_per_component[c]` lists the block-local lambda IDs for
+     * component `c` on this span; the global lambda DOF is
+     * `layout.aux_dof(components_[c].block_id, basis_ids_per_component[c][i])`.
+     */
     struct LocalContribution {
         Matrix<T> C;
         Vector<T> G;
-        std::vector<Index> primal_dofs;
-        std::vector<Index> lambda_dofs;
+        std::vector<Index> elem_node_cps;
+        std::vector<std::vector<Index>> basis_ids_per_component;
     };
 
     std::vector<Component> components_;
     std::vector<LocalContribution> contributions_;
     Index boundary_basis_count_ = 0;
     Index derivative_basis_count_ = 0;
-    Index num_multipliers_ = 0;
+    Index node_dofs_ = 0;
     Ptr<const Basis<T>> derivative_basis_;
     std::optional<DofMapper<1>> derivative_dof_mapper_;
 };

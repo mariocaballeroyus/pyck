@@ -24,6 +24,7 @@
 #include "plate_reissner_mindlin_displ_3p.hpp"
 #include "plate_reissner_mindlin_displ_2p.hpp"
 #include "plate_reissner_mindlin_1p.hpp"
+#include "dof_layout.hpp"
 #include "linear_elastic_problem.hpp"
 #include "material.hpp"
 #include "slender_beam_1d.hpp"

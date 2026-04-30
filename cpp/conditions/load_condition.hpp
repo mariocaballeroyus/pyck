@@ -43,15 +43,23 @@ public:
 
     /**
      * @brief Apply the integrated load to the global load vector.
-     * 
-     * @param stiffness Stiffness matrix
-     * @param load      Load vector
+     *
+     * @param stiffness    Stiffness matrix
+     * @param load         Load vector
+     * @param layout       Equation-numbering authority.
+     * @param primal_block Primal DOF block handle.
      */
-    void apply(Matrix<T>& stiffness, Vector<T>& load) const override;
+    void apply(Matrix<T>& stiffness,
+               Vector<T>& load,
+               const DofLayout& layout,
+               DofLayout::BlockId primal_block) const override;
 
 private:
-    /// @brief Global DOF indices associated with the load condition.
-    std::vector<Index> global_dofs_;
+    /// @brief Patch control-point indices contributing to the load.
+    std::vector<Index> cp_indices_;
+
+    /// @brief Element DOFs per control point.
+    Index node_dofs_ = 0;
 
     /// @brief Load vector evaluated at the element level.
     Vector<T> element_load_;

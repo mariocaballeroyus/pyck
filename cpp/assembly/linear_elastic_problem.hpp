@@ -11,6 +11,7 @@
 #include "condition.hpp"
 #include "direct_constraint.hpp"
 #include "constraint.hpp"
+#include "dof_layout.hpp"
 #include "quadrature.hpp"
 #include "../types.hpp"
 
@@ -96,6 +97,8 @@ private:
     std::vector<Ptr<Constraint<T>>> constraints_;
 
     std::vector<Ptr<DirectConstraint<T>>> direct_constraints_;
+
+    mutable DofLayout layout_;
 
 };
 

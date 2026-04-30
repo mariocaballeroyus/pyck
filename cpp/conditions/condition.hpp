@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <vector>
 
+#include "../assembly/dof_layout.hpp"
 #include "../types.hpp"
 
 namespace pyck
@@ -20,39 +21,55 @@ public:
     virtual ~Condition() = default;
 
     /**
-     * @brief Apply the condition to the stiffness matrix and load vector
+     * @brief Report how many DOFs this condition requires.
      *
-     * @param stiffness Stiffness matrix
-     * @param load Load vector
-     */
-    virtual void apply(Matrix<T>& stiffness, Vector<T>& load) const = 0;
-
-    /**
-     * @brief Number of additional Lagrange-multiplier DOFs the condition
-     *        appends to the global system. Default 0 (penalty / load).
-     */
-    virtual std::size_t num_multipliers() const { return 0; }
-
-    /**
-     * @brief Set the global offset where this condition's multiplier rows
-     *        start. The assembler calls this once before sizing K/F so that
-     *        `apply()` can scatter into the correct rows/columns of the
-     *        augmented system.
-     */
-    void set_multiplier_offset(std::size_t offset) { multiplier_offset_ = offset; }
-
-    /// @brief Global offset of this condition's multiplier block.
-    std::size_t multiplier_offset() const { return multiplier_offset_; }
-
-    /**
-     * @brief Set the degrees of freedom where the condition is applied
+     * The assembler queries this before sizing the global system, allocates
+     * the DOFs, and provides the block IDs to apply().
      *
-     * @param dofs Degrees of freedom where the condition is applied
+     * Default: 0 (no auxiliary DOFs).
+     */
+    virtual std::size_t num_dofs() const { return 0; }
+
+    /**
+     * @brief Allocate DOF blocks in the layout (if needed).
+     *
+     * Called by the assembler during the DOF allocation phase. Conditions
+     * that require auxiliary DOFs override this to allocate their blocks.
+     *
+     * @param layout       Layout to allocate blocks against.
+     * @param primal_block Handle to the primal DOF block.
+     *
+     * Default: no-op.
+     */
+    virtual void allocate_dofs(DofLayout& layout, DofLayout::BlockId primal_block) { }
+
+    /**
+     * @brief Apply the condition to the stiffness matrix and load vector.
+     *
+     * Called after K/F have been sized. The condition receives the primal block
+     * ID so it can scatter DOFs appropriately.
+     *
+     * @param stiffness    Stiffness matrix
+     * @param load         Load vector
+     * @param layout       Equation-numbering authority for the assembly.
+     * @param primal_block Handle to the primal DOF block.
+     */
+    virtual void apply(Matrix<T>& stiffness,
+                       Vector<T>& load,
+                       const DofLayout& layout,
+                       DofLayout::BlockId primal_block) const = 0;
+
+    /**
+     * @brief Set the degrees of freedom where the condition is applied.
+     *
+     * Used by load-style conditions to record their target rows.
      */
     void set_dofs(std::vector<Index> dofs)
     { dofs_ = std::move(dofs); }
 
-    /// @brief Get the degrees of freedom where the condition is applied
+    /**
+     * @brief Get the degrees of freedom where the condition is applied.
+     */
     const std::vector<Index>& dofs() const
     { return dofs_; }
 
@@ -60,9 +77,6 @@ protected:
 
     /// @brief Degrees of freedom where the condition is applied
     std::vector<Index> dofs_;
-
-    /// @brief Global offset of the multiplier block (set by the assembler).
-    std::size_t multiplier_offset_ = 0;
 
 };
 

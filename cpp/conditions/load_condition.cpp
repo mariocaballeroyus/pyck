@@ -137,24 +137,27 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
         }
     }
 
-    // Map to global DOFs using the patch's global index mapping
-    auto cp_indices = patch.global_indices();
-    global_dofs_.clear();
-    global_dofs_.reserve(cp_indices.size() * ndof);
-    for (auto cp_idx : cp_indices) {
-        for (Index v = 0; v < ndof; ++v) {
-            global_dofs_.push_back(cp_idx * ndof + v);
-        }
-    }
+    // Stash CP indices and per-node DOF count; absolute global IDs are
+    // resolved at declare_dofs / apply time via the layout.
+    cp_indices_ = patch.global_indices();
+    node_dofs_ = ndof;
 }
 
 template <std::floating_point T, std::size_t d>
-void LoadCondition<T, d>::apply(Matrix<T>& /*stiffness*/, Vector<T>& load) const
+void LoadCondition<T, d>::apply(Matrix<T>& /*stiffness*/,
+                                Vector<T>& load,
+                                const DofLayout& layout,
+                                DofLayout::BlockId primal_block) const
 {
     // The load condition is a RHS-only contribution.
-    for (std::size_t k = 0; k < global_dofs_.size(); ++k) {
-        Index dof = global_dofs_[k];
-        load(dof) += element_load_(k);
+    const Index ndof = node_dofs_;
+    const Index base_offset = layout.block_base(primal_block);
+    const Index stride = layout.block_stride(primal_block);
+    for (std::size_t k = 0; k < cp_indices_.size(); ++k) {
+        const Index base = base_offset + cp_indices_[k] * stride;
+        for (Index v = 0; v < ndof; ++v) {
+            load(base + v) += element_load_(k * ndof + v);
+        }
     }
 }
 

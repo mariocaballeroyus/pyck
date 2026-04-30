@@ -70,10 +70,15 @@ public:
     /**
      * @brief Scatter the penalty stiffness and load into the global system.
      *
-     * @param stiffness Global stiffness matrix (modified in-place).
-     * @param load      Global load vector (modified in-place).
+     * @param stiffness    Global stiffness matrix (modified in-place).
+     * @param load         Global load vector (modified in-place).
+     * @param layout       Equation-numbering authority.
+     * @param primal_block Primal DOF block handle.
      */
-    void apply(Matrix<T>& stiffness, Vector<T>& load) const override;
+    void apply(Matrix<T>& stiffness,
+               Vector<T>& load,
+               const DofLayout& layout,
+               DofLayout::BlockId primal_block) const override;
 
 private:
 
@@ -84,13 +89,18 @@ private:
     /// a single boundary span include all CPs active in the parent 2D
     /// element — not just those on the boundary row.  Contributions are
     /// therefore stored per-span rather than in a flat boundary-DOF block.
+    /// `cps` lists the parent-patch CP indices for the span; absolute
+    /// global DOFs are resolved at apply time via the layout.
     struct LocalContribution {
         Matrix<T> K;
         Vector<T> F;
-        std::vector<Index> dofs;
+        std::vector<Index> cps;
     };
 
     std::vector<LocalContribution> contributions_;
+
+    /// @brief Element DOFs per control point.
+    Index node_dofs_ = 0;
 };
 
 } // namespace pyck

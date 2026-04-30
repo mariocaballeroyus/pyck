@@ -18,21 +18,26 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
         );
     }
 
-    // Determine the total number of global DOFs
+    // Get patch and element info
     const auto& mapper = patch_->dof_mapper();
-    std::size_t ndof = element_->num_node_dofs();
-    std::size_t global_dofs = ndof;
+    const std::size_t ndof = element_->num_node_dofs();
     const auto& num_basis_array = mapper.num_basis();
+
+    // Get number of control points
+    std::size_t num_cps = 1;
     for (std::size_t i = 0; i < d; ++i) {
-        global_dofs *= num_basis_array[i];
+        num_cps *= num_basis_array[i];
     }
 
-    std::size_t multiplier_dofs = 0;
+    // Allocate primal block
+    layout_.clear();
+    const DofLayout::BlockId primal_block = layout_.allocate(DofType::Primal, num_cps * ndof, ndof);
+
+    // Conditions allocate their auxiliary DOFs; the layout assigns global IDs.
     for (const auto& cond : conditions_) {
-        cond->set_multiplier_offset(global_dofs + multiplier_dofs);
-        multiplier_dofs += cond->num_multipliers();
+        cond->allocate_dofs(layout_, primal_block);
     }
-    const std::size_t total_dofs = global_dofs + multiplier_dofs;
+    const std::size_t total_dofs = layout_.num_dofs();
 
     // Initialize global matrices to zero
     K.setZero(total_dofs, total_dofs);
@@ -89,23 +94,20 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
         // Gather element contributions (span-local stiffness)
         element_->compute_local_stiffness(shape_fns, jac, mapped_weights, Ke);
 
-        // Scatter local stiffness into global matrix
+        // Scatter local stiffness into global matrix via the layout.
         auto elem_nodes = mapper.get_element_dofs(elem_idx);
-        for (std::size_t i = 0; i < elem_nodes.size(); ++i) {
-            for (std::size_t j = 0; j < elem_nodes.size(); ++j) {
-                for (std::size_t di = 0; di < ndof; ++di) {
-                    for (std::size_t dj = 0; dj < ndof; ++dj) {
-                        K(elem_nodes[i] * ndof + di, elem_nodes[j] * ndof + dj) += Ke(i * ndof + di, j * ndof + dj);
-                    }
-                }
+        auto elem_dofs = layout_.scatter_primal(primal_block, elem_nodes);
+        const std::size_t Ne = elem_dofs.size();
+        for (std::size_t i = 0; i < Ne; ++i) {
+            for (std::size_t j = 0; j < Ne; ++j) {
+                K(elem_dofs[i], elem_dofs[j]) += Ke(i, j);
             }
         }
     }
 
     // Apply boundary / load conditions
     for (const auto& cond : conditions_) {
-        // Evaluate the condition on K and F.
-        cond->apply(K, F);
+        cond->apply(K, F, layout_, primal_block);
     }
 
     // Apply exact constraints (Master-Slave FIRST, Dirichlet LAST)

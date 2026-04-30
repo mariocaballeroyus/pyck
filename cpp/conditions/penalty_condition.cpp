@@ -22,6 +22,7 @@ PenaltyCondition<T>::PenaltyCondition(
     const std::size_t p_dim    = boundary.param_dim();
     const bool        at_start = boundary.at_start();
     const Index       ndof     = element.num_node_dofs();
+    node_dofs_ = ndof;
     const std::size_t req_order = element.min_order();
 
     // ------------------------------------------------------------------
@@ -167,31 +168,29 @@ PenaltyCondition<T>::PenaltyCondition(
                + alpha_phi_s * phi_s_bar * Ns_row.transpose());
         }
 
-        // Expand element DOFs into the full DOF layout and stash.
-        std::vector<Index> local_global;
-        local_global.reserve(K_elem);
-        for (auto cp : elem_dofs) {
-            for (Index v = 0; v < ndof; ++v) {
-                local_global.push_back(cp * ndof + v);
-            }
-        }
-
+        // Stash the parent-patch CP indices; absolute global DOFs are
+        // resolved at apply time via the layout.
+        std::vector<Index> cps(elem_dofs.begin(), elem_dofs.end());
         contributions_.push_back({std::move(K_local),
                                   std::move(F_local),
-                                  std::move(local_global)});
+                                  std::move(cps)});
     }
 }
 
 template <std::floating_point T>
-void PenaltyCondition<T>::apply(Matrix<T>& stiffness, Vector<T>& load) const
+void PenaltyCondition<T>::apply(Matrix<T>& stiffness,
+                                Vector<T>& load,
+                                const DofLayout& layout,
+                                DofLayout::BlockId primal_block) const
 {
     for (const auto& c : contributions_) {
-        const Index n = static_cast<Index>(c.dofs.size());
+        auto dofs = layout.scatter_primal(primal_block, c.cps);
+        const Index n = static_cast<Index>(dofs.size());
         for (Index i = 0; i < n; ++i) {
-            const Index gi = c.dofs[i];
+            const Index gi = dofs[i];
             load(gi) += c.F(i);
             for (Index j = 0; j < n; ++j) {
-                stiffness(gi, c.dofs[j]) += c.K(i, j);
+                stiffness(gi, dofs[j]) += c.K(i, j);
             }
         }
     }

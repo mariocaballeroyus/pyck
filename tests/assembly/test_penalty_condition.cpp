@@ -17,6 +17,7 @@
 #include "load_condition.hpp"
 #include "direct_constraint.hpp"
 #include "penalty_condition.hpp"
+#include "dof_layout.hpp"
 #include "plane_stress_2d.hpp"
 #include "plate_kirchhoff_love_1p.hpp"
 #include "plate_reissner_mindlin_3p.hpp"
@@ -124,13 +125,20 @@ TEST_CASE("PenaltyCondition structural properties", "[conditions][penalty]")
     // Total DOFs = n_nodes_2d * ndof_per_node = (n*n) * 3
     const Index N_dof_rm3 = surface->num_control_pts() * 3;
 
+    auto setup_layout_rm3 = [&]() {
+        DofLayout layout;
+        auto primal = layout.allocate(pyck::DofType::Primal, surface->num_control_pts() * 3, 3);
+        return std::make_pair(std::move(layout), primal);
+    };
+
     SECTION("Stiffness is symmetric for w-only penalty")
     {
         PenaltyCondition<double> pen(*bdy, *elem_rm3, g1,
                                      1e6, 0.0);
+        auto [layout, primal] = setup_layout_rm3();
         Matrix<double> K = Matrix<double>::Zero(N_dof_rm3, N_dof_rm3);
         Vector<double> F = Vector<double>::Zero(N_dof_rm3);
-        pen.apply(K, F);
+        pen.apply(K, F, layout, primal);
         REQUIRE((K - K.transpose()).norm() < 1e-12 * K.norm());
     }
 
@@ -140,9 +148,10 @@ TEST_CASE("PenaltyCondition structural properties", "[conditions][penalty]")
                                      1e6, 0.0,
                                      1e6, 0.0,
                                      1e6, 0.0);
+        auto [layout, primal] = setup_layout_rm3();
         Matrix<double> K = Matrix<double>::Zero(N_dof_rm3, N_dof_rm3);
         Vector<double> F = Vector<double>::Zero(N_dof_rm3);
-        pen.apply(K, F);
+        pen.apply(K, F, layout, primal);
         REQUIRE((K - K.transpose()).norm() < 1e-12 * K.norm());
     }
 
@@ -152,10 +161,11 @@ TEST_CASE("PenaltyCondition structural properties", "[conditions][penalty]")
                                      0.0, 5.0,
                                      0.0, 3.0,
                                      0.0, 1.0);
+        auto [layout, primal] = setup_layout_rm3();
         Index N_dof = surface->num_control_pts() * 3;
         Matrix<double> K = Matrix<double>::Zero(N_dof, N_dof);
         Vector<double> F = Vector<double>::Zero(N_dof);
-        pen.apply(K, F);
+        pen.apply(K, F, layout, primal);
         REQUIRE(K.norm() == Approx(0.0).margin(1e-15));
         REQUIRE(F.norm() == Approx(0.0).margin(1e-15));
     }
@@ -166,10 +176,13 @@ TEST_CASE("PenaltyCondition structural properties", "[conditions][penalty]")
         auto bdy_kl  = create_boundary<double, 2>(surface, 1, true);  // bottom edge
         PenaltyCondition<double> pen(*bdy_kl, *elem_kl, g1, 1e6, 0.0);
 
+        DofLayout layout;
+        auto primal = layout.allocate(pyck::DofType::Primal, surface->num_control_pts() * 1, 1);
+
         Index N_dof = surface->num_control_pts();
         Matrix<double> K = Matrix<double>::Zero(N_dof, N_dof);
         Vector<double> F = Vector<double>::Zero(N_dof);
-        pen.apply(K, F);
+        pen.apply(K, F, layout, primal);
 
         REQUIRE((K - K.transpose()).norm() < 1e-12 * K.norm());
         // All eigenvalues >= 0 (PSD)
@@ -615,9 +628,11 @@ TEST_CASE("PenaltyCondition normal direction: axis-aligned rectangle",
                                     0.0, 0.0,
                                     alpha, 0.0,
                                     alpha, 0.0);
+    DofLayout layout_r;
+    auto primal_r = layout_r.allocate(pyck::DofType::Primal, surface->num_control_pts() * ndof, ndof);
     Matrix<double> K_r = Matrix<double>::Zero(N, N);
     Vector<double> F_r = Vector<double>::Zero(N);
-    pen_r.apply(K_r, F_r);
+    pen_r.apply(K_r, F_r, layout_r, primal_r);
 
     // For each boundary node: K[θx, θy] = 0 (cross-term)
     // and K[θx, θx] ≈ K[θy, θy] (same mass integral, same alpha)
@@ -638,9 +653,11 @@ TEST_CASE("PenaltyCondition normal direction: axis-aligned rectangle",
                                     0.0, 0.0,
                                     alpha, 0.0,
                                     alpha, 0.0);
+    DofLayout layout_b;
+    auto primal_b = layout_b.allocate(pyck::DofType::Primal, surface->num_control_pts() * ndof, ndof);
     Matrix<double> K_b = Matrix<double>::Zero(N, N);
     Vector<double> F_b = Vector<double>::Zero(N);
-    pen_b.apply(K_b, F_b);
+    pen_b.apply(K_b, F_b, layout_b, primal_b);
 
     auto bot_nodes = surface->dof_mapper().get_layer_dofs(1, true, 0);
     for (auto node : bot_nodes) {

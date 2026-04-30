@@ -39,7 +39,7 @@ def test_navier_plate_bisinusoidal_load_rm3p():
         x, y = phys_pts[:, 0], phys_pts[:, 1]
         return f0 * np.sin(np.pi * x / L) * np.sin(np.pi * y / W)
 
-    load_cond = ck.create_function_load_condition(surface, load_func, gauss)
+    load_cond = ck.conditions.create_load_condition(surface, load_func, gauss)
 
     element = ck.PlateReissnerMindlin3p(material)
     problem = ck.LinearElasticProblem([surface], element, gauss)

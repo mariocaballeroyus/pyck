@@ -16,7 +16,6 @@ def test_lagrange_multiplier_condition_augments_system():
     problem.add_condition(
         ck.LagrangeMultiplierCondition(
             boundary,
-            element,
             gauss1d,
             w_bar=0.0,
             phi_n_bar=0.0,

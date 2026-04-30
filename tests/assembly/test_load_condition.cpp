@@ -12,6 +12,7 @@
 #include "gauss_legendre.hpp"
 #include "beam_euler_bernoulli_1p.hpp"
 #include "load_condition.hpp"
+#include "dof_layout.hpp"
 
 #include "slender_beam_1d.hpp"
 
@@ -44,12 +45,15 @@ TEST_CASE("LoadCondition 1D", "[conditions][load_condition]") {
         Vector<double> load_values = Vector<double>::Constant(4, 10.0);
         
         LoadCondition<double, 1> load_cond(curve, element, gauss_rule, load_values);
-        
+
+        DofLayout layout;
+        auto primal = layout.allocate(pyck::DofType::Primal, num_pts * element.num_node_dofs(), element.num_node_dofs());
+
         Vector<double> F(num_pts);
         F.setZero();
         Matrix<double> K(num_pts, num_pts); // dummy
-        
-        load_cond.apply(K, F);
+
+        load_cond.apply(K, F, layout, primal);
         
         // Total load should be \int_0^2 10 dx = 20.
         // Distributed among 3 nodes based on shape functions.

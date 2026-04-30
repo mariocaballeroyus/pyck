@@ -68,8 +68,8 @@ LagrangeMultiplierCondition<T>::LagrangeMultiplierCondition(
     if (enforce_w) {
         components_.push_back({
             ComponentKind::displacement,
+            DofType::LagrangeMultiplier,
             w_bar,
-            0,
             boundary_basis_count_,
             false,
         });
@@ -77,8 +77,8 @@ LagrangeMultiplierCondition<T>::LagrangeMultiplierCondition(
     if (enforce_phi_n) {
         components_.push_back({
             ComponentKind::normal_rotation,
+            DofType::LagrangeMultiplier,
             phi_n_bar,
-            0,
             boundary_basis_count_,
             false,
         });
@@ -86,24 +86,18 @@ LagrangeMultiplierCondition<T>::LagrangeMultiplierCondition(
     if (enforce_phi_s) {
         components_.push_back({
             ComponentKind::tangential_rotation,
+            DofType::LagrangeMultiplier,
             phi_s_bar,
-            0,
             derived_rotation_plate ? derivative_basis_count_ : boundary_basis_count_,
             derived_rotation_plate,
         });
     }
 
-    Index next_offset = 0;
-    for (auto& component : components_) {
-        component.block_offset = next_offset;
-        next_offset += component.dof_count;
-    }
-    num_multipliers_ = next_offset;
-
     const auto& parent = *boundary.parent();
     const std::size_t p_dim = boundary.param_dim();
     const bool at_start = boundary.at_start();
     const Index ndof = static_cast<Index>(element.num_node_dofs());
+    node_dofs_ = ndof;
     const std::size_t req_order = element.min_order();
 
     auto& kv_fixed = parent.basis(p_dim).knot_vector();
@@ -264,51 +258,79 @@ LagrangeMultiplierCondition<T>::LagrangeMultiplierCondition(
             }
         }
 
-        std::vector<Index> primal_global;
-        primal_global.reserve(K_elem);
-        for (auto cp : elem_dofs) {
-            for (Index v = 0; v < ndof; ++v) {
-                primal_global.push_back(cp * ndof + v);
-            }
-        }
+        std::vector<Index> elem_node_cps(elem_dofs.begin(), elem_dofs.end());
 
-        std::vector<Index> lambda_local;
-        lambda_local.reserve(static_cast<std::size_t>(local_row_count));
+        std::vector<std::vector<Index>> basis_ids_per_component;
+        basis_ids_per_component.reserve(components_.size());
         for (const auto& component : components_) {
             const auto& basis_ids = component.use_derivative_basis
                 ? derivative_basis_ids
                 : trace_basis_ids;
-            for (auto basis_id : basis_ids) {
-                lambda_local.push_back(component.block_offset + basis_id);
-            }
+            basis_ids_per_component.emplace_back(basis_ids.begin(), basis_ids.end());
         }
 
         contributions_.push_back({
             std::move(C_local),
             std::move(G_local),
-            std::move(primal_global),
-            std::move(lambda_local),
+            std::move(elem_node_cps),
+            std::move(basis_ids_per_component),
         });
     }
 }
 
 template <std::floating_point T>
-void LagrangeMultiplierCondition<T>::apply(Matrix<T>& stiffness, Vector<T>& load) const
+std::size_t LagrangeMultiplierCondition<T>::num_dofs() const
 {
+    std::size_t total = 0;
+    for (const auto& component : components_) {
+        total += component.dof_count;
+    }
+    return total;
+}
+
+template <std::floating_point T>
+void LagrangeMultiplierCondition<T>::allocate_dofs(
+    DofLayout& layout, DofLayout::BlockId primal_block)
+{
+    (void)primal_block;
+    for (auto& component : components_) {
+        component.block_id = layout.allocate(
+            component.dof_type, component.dof_count, 1);
+    }
+}
+
+template <std::floating_point T>
+void LagrangeMultiplierCondition<T>::apply(
+    Matrix<T>& stiffness, Vector<T>& load, const DofLayout& layout,
+    DofLayout::BlockId primal_block) const
+{
+    const Index ndof = node_dofs_;
+
     for (const auto& c : contributions_) {
-        const Index n_lambda = static_cast<Index>(c.lambda_dofs.size());
-        const Index n_primal = static_cast<Index>(c.primal_dofs.size());
+        const Index n_cps = static_cast<Index>(c.elem_node_cps.size());
+        const Index n_primal = n_cps * ndof;
 
-        for (Index i = 0; i < n_lambda; ++i) {
-            const Index lambda_i = static_cast<Index>(this->multiplier_offset() + c.lambda_dofs[i]);
-            load(lambda_i) += c.G(i);
+        auto primal_dofs = layout.scatter_primal(primal_block, c.elem_node_cps);
 
-            for (Index j = 0; j < n_primal; ++j) {
-                const Index primal_j = c.primal_dofs[j];
-                const T cij = c.C(i, j);
-                stiffness(lambda_i, primal_j) += cij;
-                stiffness(primal_j, lambda_i) += cij;
+        Index row_offset = 0;
+        for (Index ci = 0; ci < static_cast<Index>(components_.size()); ++ci) {
+            const auto& component = components_[ci];
+            const auto& basis_ids = c.basis_ids_per_component[ci];
+            const Index n_lambda = static_cast<Index>(basis_ids.size());
+            const Index component_base = layout.block_base(component.block_id);
+
+            for (Index i = 0; i < n_lambda; ++i) {
+                const Index lambda_i = component_base + basis_ids[i];
+                load(lambda_i) += c.G(row_offset + i);
+
+                for (Index j = 0; j < n_primal; ++j) {
+                    const Index primal_j = primal_dofs[j];
+                    const T cij = c.C(row_offset + i, j);
+                    stiffness(lambda_i, primal_j) += cij;
+                    stiffness(primal_j, lambda_i) += cij;
+                }
             }
+            row_offset += n_lambda;
         }
     }
 }
