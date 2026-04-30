@@ -86,6 +86,14 @@ public:
     std::pair<std::vector<Matrix<T>>, Vector<T>>
     eval_shape_functions_at_greville(Index dof_index, std::size_t order = 0) const;
 
+    std::array<ColMatrix<T, 3>, d> eval_tangent(
+        const std::vector<Matrix<T>>& N,
+        const ColMatrix<T, 3>& act_pts) const requires(d == 1);
+
+    std::array<ColMatrix<T, 3>, d> eval_tangent(
+        const std::vector<Matrix<T>>& N,
+        const ColMatrix<T, 3>& act_pts) const requires(d == 2);
+
     /// @brief Basis in the given parametric direction.
     const Basis<T>& basis(std::size_t dir) const 
     { return tensor_product_.basis(dir); }

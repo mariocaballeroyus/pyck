@@ -414,6 +414,14 @@ PYBIND11_MODULE(_pyck, m) {
     using CondD = pyck::Condition<double>;
     py::class_<CondD, pyck::Ptr<CondD>>(m, "Condition");
 
+    py::enum_<pyck::Field>(m, "Field")
+        .value("UX", pyck::Field::UX)
+        .value("UY", pyck::Field::UY)
+        .value("UZ", pyck::Field::UZ)
+        .value("W", pyck::Field::W)
+        .value("ROT_N", pyck::Field::ROT_N)
+        .value("ROT_S", pyck::Field::ROT_S);
+
     using LC1D = pyck::LoadCondition<double, 1>;
     py::class_<LC1D, CondD, pyck::Ptr<LC1D>>(m, "LoadCondition1d")
         .def(py::init<const Patch3D1D&, const Elem1D&, const QR1D&, const pyck::Vector<double>&>(),
@@ -424,23 +432,19 @@ PYBIND11_MODULE(_pyck, m) {
         .def(py::init<const Patch3D2D&, const Elem2D&, const QR2D&, const pyck::Vector<double>&>(),
              py::arg("patch"), py::arg("element"), py::arg("quadrature"), py::arg("load_values"));
 
-    using PenCond2D = pyck::PenaltyCondition<double>;
+    using PenCond2D = pyck::PenaltyCondition<double, 2>;
     py::class_<PenCond2D, CondD, pyck::Ptr<PenCond2D>>(m, "PenaltyCondition2d")
         .def(py::init<const BoundaryPatch2D&, const Elem2D&, const QR1D&,
-                      double, double, double, double, double, double>(),
+                      pyck::Field, double, double>(),
              py::arg("boundary"), py::arg("element"), py::arg("quadrature"),
-             py::arg("alpha_w"), py::arg("w_bar"),
-             py::arg("alpha_phi_n") = 0.0, py::arg("phi_n_bar") = 0.0,
-             py::arg("alpha_phi_s") = 0.0, py::arg("phi_s_bar") = 0.0);
+             py::arg("field"), py::arg("penalty"), py::arg("value") = 0.0);
 
-    using LMCond2D = pyck::LagrangeMultiplierCondition<double>;
+    using LMCond2D = pyck::LagrangeMultiplierCondition<double, 2>;
     py::class_<LMCond2D, CondD, pyck::Ptr<LMCond2D>>(m, "LagrangeMultiplierCondition2d")
         .def(py::init<const BoundaryPatch2D&, const Elem2D&, const QR1D&,
-                      bool, double, bool, double, bool, double>(),
+                      pyck::Field, double>(),
              py::arg("boundary"), py::arg("element"), py::arg("quadrature"),
-             py::arg("enforce_w") = true, py::arg("w_bar") = 0.0,
-             py::arg("enforce_phi_n") = false, py::arg("phi_n_bar") = 0.0,
-             py::arg("enforce_phi_s") = false, py::arg("phi_s_bar") = 0.0);
+             py::arg("field"), py::arg("value") = 0.0);
 
     // === Constraints ================================================================
 

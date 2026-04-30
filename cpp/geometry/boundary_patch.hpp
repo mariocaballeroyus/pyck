@@ -59,6 +59,14 @@ public:
     /// @brief Reference to the parent patch
     const Ptr<Patch<T, d>>& parent() const { return parent_; }
 
+    /// @brief Compute outward unit normal at quadrature points.
+    /// For d=2 (1D boundary): normal = tangent × parent_surface_normal
+    /// For d=3 (2D boundary): normal = tangent0 × tangent1
+    ColMatrix<T, 3> eval_normal(
+        const std::array<ColMatrix<T, 3>, d - 1>& tangents,
+        T sign_n,
+        const std::array<Eigen::Matrix<T, 3, 1>, d>& parent_tangents) const;
+
 private:
 
     /// @brief Pointer to the parent patch (non-owning, for DOF mapping and geometry access)

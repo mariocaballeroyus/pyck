@@ -415,6 +415,18 @@ ColMatrix<T, 3> Patch<T, d>::eval_physical_points(const QuadratureRule<T, d>& qu
     return result;
 }
 
+template <std::floating_point T, std::size_t d>
+std::array<ColMatrix<T, 3>, d> Patch<T, d>::eval_tangent(
+    const std::vector<Matrix<T>>& N,
+    const ColMatrix<T, 3>& act_pts) const requires(d == 2)
+{
+    std::array<ColMatrix<T, 3>, 2> tangents;
+    if (N.size() < 3) throw std::runtime_error("eval_tangent: N must contain at least 3 entries (values and derivatives)");
+    tangents[0] = N[1] * act_pts;  // ∂x/∂ξ⁰
+    tangents[1] = N[2] * act_pts;  // ∂x/∂ξ¹
+    return tangents;
+}
+
 template class Patch<double, 2>;
 
 #ifdef PYCK_BUILD_SINGLE_PRECISION
