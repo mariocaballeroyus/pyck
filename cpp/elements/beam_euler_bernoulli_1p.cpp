@@ -28,33 +28,21 @@ Matrix<T> BeamEulerBernoulli1p<T>::rotation_shape_matrix(
 }
 
 template <std::floating_point T>
-Matrix<T> BeamEulerBernoulli1p<T>::strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const
+Matrix<T> BeamEulerBernoulli1p<T>::bending_strain_matrix(
+    const std::vector<Matrix<T>>& shape_derivs) const
 {
-    // Bi = [ -Ni,xx ]
+    // Bb_i = -Ni,xx (kappa = -w,xx)
     return -shape_derivs[idx::d11];
 }
 
 template <std::floating_point T>
-void BeamEulerBernoulli1p<T>::compute_local_stiffness(const std::vector<Matrix<T>>& shape_fns,
-                                                     const Vector<T>& jacobian,
-                                                     const Vector<T>& q_weights,
-                                                     Matrix<T>& stiffness) const
+Matrix<T> BeamEulerBernoulli1p<T>::shear_strain_matrix(
+    const std::vector<Matrix<T>>& shape_derivs) const
 {
-    Matrix<T> B   = this->strain_displacement_matrix(shape_fns); // (Q, n)
-    T Kb          = material_->bending_stiffness();              // Kb = EI
-    
-    const Index Q = q_weights.size(); // number of quadrature points
-    const Index K = B.cols();         // number of dofs per element
-
-    // dV = wq * Jq
-    Vector<T> dV  = q_weights.cwiseProduct(jacobian); // (Q,)
-
-    // Ke = sum_q{ Bb^T * Kb * Bb * dV }
-    stiffness.setZero(K, K);
-    for (Index q = 0; q < Q; ++q) {
-        auto Bb = B.row(q);
-        stiffness.noalias() += dV[q] * (Kb * Bb.transpose() * Bb);
-    }
+    // Euler-Bernoulli has no transverse shear strain.
+    const Index Q = shape_derivs[idx::val].rows();
+    const Index n = shape_derivs[idx::val].cols();
+    return Matrix<T>::Zero(Q, n);
 }
 
 // === Template Instantiations ========================================================

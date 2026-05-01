@@ -29,8 +29,8 @@ Matrix<T> PlateKirchhoffLove1p<T>::rotation_shape_matrix(
     const Index n = N[idx::d1].cols();
     Matrix<T> Nphi(2 * Q, n);
 
-    // Ni_phi = [ -Ni,x 
-    //             -Ni,y ]
+    // Ni_phi = [ -Ni,x
+    //            -Ni,y ]
     for (Index q = 0; q < Q; ++q) {
         Nphi.row(2*q    ) = -N[idx::d1].row(q);
         Nphi.row(2*q + 1) = -N[idx::d2].row(q);
@@ -39,47 +39,54 @@ Matrix<T> PlateKirchhoffLove1p<T>::rotation_shape_matrix(
 }
 
 template <std::floating_point T>
-Matrix<T> PlateKirchhoffLove1p<T>::strain_displacement_matrix(
+Matrix<T> PlateKirchhoffLove1p<T>::bending_strain_matrix(
     const std::vector<Matrix<T>>& shape_derivs) const
 {
-    const auto& N  = shape_derivs;
-    const Index Q = N[0].rows(); // number of quadrature points
-    const Index n = N[0].cols(); // number of nodes per element
+    const auto& N = shape_derivs;
+    const Index Q = N[idx::val].rows();
+    const Index n = N[idx::val].cols();
 
-    // Bi = [ -Ni,xx
-    //        -Ni,yy
-    //        -2*Ni,xy ]
-    Matrix<T> B(3 * Q, n);
+    // Bb_i = [ -Ni,xx     ]   kappa_x
+    //        [ -Ni,yy     ]   kappa_y
+    //        [ -2 Ni,xy   ]   2 kappa_xy
+    Matrix<T> Bb(3 * Q, n);
     for (Index q = 0; q < Q; ++q) {
-        // Bending part (kappa_x, kappa_y, kappa_xy)
-        B.row(3*q    ) = -N[idx::d11].row(q);
-        B.row(3*q + 1) = -N[idx::d22].row(q);
-        B.row(3*q + 2) = -T(2) * N[idx::d12].row(q);
+        Bb.row(3*q    ) = -N[idx::d11].row(q);
+        Bb.row(3*q + 1) = -N[idx::d22].row(q);
+        Bb.row(3*q + 2) = -T(2) * N[idx::d12].row(q);
     }
-    return B;
+    return Bb;
 }
 
 template <std::floating_point T>
-void PlateKirchhoffLove1p<T>::compute_local_stiffness(const std::vector<Matrix<T>>& shape_fns,
-                                                      const Vector<T>& jacobian,
-                                                      const Vector<T>& q_weights,
-                                                      Matrix<T>& stiffness) const
+Matrix<T> PlateKirchhoffLove1p<T>::shear_strain_matrix(
+    const std::vector<Matrix<T>>& shape_derivs) const
 {
-    Matrix<T> B    = this->strain_displacement_matrix(shape_fns); // (3Q, K)
-    auto Db = material_->bending_matrix();
-    
-    const Index Q = q_weights.size(); // number of quadrature points
-    const Index K = B.cols();         // number of dofs per element
+    // Kirchhoff-Love has no transverse shear strain.
+    const Index Q = shape_derivs[idx::val].rows();
+    const Index n = shape_derivs[idx::val].cols();
+    return Matrix<T>::Zero(2 * Q, n);
+}
 
-    // dV = wq * Jq
-    Vector<T> dV  = q_weights.cwiseProduct(jacobian); // (Q,)
+template <std::floating_point T>
+Matrix<T> PlateKirchhoffLove1p<T>::transverse_shear_matrix(
+    const std::vector<Matrix<T>>& shape_derivs) const
+{
+    // KL has no shear strain; recover q via equilibrium q = -div(m):
+    //   q_x = -(m_x,x + m_xy,y) = -D (Ni,xxx + (2-nu) Ni,xyy)
+    //   q_y = -(m_xy,x + m_y,y) = -D ((2-nu) Ni,xxy + Ni,yyy)
+    const auto& N = shape_derivs;
+    const Index Q = N[idx::d1].rows();
+    const Index n = N[idx::d1].cols();
+    const T D = material_->bending_stiffness();
+    const T nu = material_->poisson_ratio();
 
-    // Ke = sum_q{ Bb^T * Db * Bb * dV }
-    stiffness.setZero(K, K);
+    Matrix<T> Nq(2 * Q, n);
     for (Index q = 0; q < Q; ++q) {
-        auto Bb = B.middleRows(3 * q, 3);
-        stiffness.noalias() += dV[q] * (Bb.transpose() * Db * Bb);
+        Nq.row(2*q    ) = -D * (N[idx::d111].row(q) + (T(2) - nu) * N[idx::d122].row(q));
+        Nq.row(2*q + 1) = -D * ((T(2) - nu) * N[idx::d112].row(q) + N[idx::d222].row(q));
     }
+    return Nq;
 }
 
 // === Template Instantiations ========================================================

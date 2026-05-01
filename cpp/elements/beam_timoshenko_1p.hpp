@@ -30,25 +30,13 @@ protected:
     using idx = typename Element<T, 1>::idx;
 
 public:
-    /**
-     * @brief Construct a single-variable Timoshenko beam element.
-     *
-     * @param material Pointer to the slender beam material model.
-     */
     BeamTimoshenko1p(Ptr<SlenderBeam1d<T>> material);
 
-    /**
-     * @brief Compute the local stiffness matrix for the element.
-     * @param patch The patch of the element.
-     * @param q_points Quadrature points.
-     * @param q_weights Quadrature weights.
-     * @param span Knot-span index.
-     * @param stiffness The local stiffness matrix to be computed.
-     */
-    void compute_local_stiffness(const std::vector<Matrix<T>>& shape_fns,
-                                 const Vector<T>& jacobian,
-                                 const Vector<T>& q_weights,
-                                 Matrix<T>& stiffness) const override;
+    Matrix<T> bending_strain_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
+    Matrix<T> shear_strain_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
+
+    T bending_stiffness() const override { return material_->bending_stiffness(); }
+    T shear_stiffness() const override { return material_->shear_stiffness(); }
 
     /// @brief Effective transverse displacement shape functions Ñ_w (Q × n).
     ///
@@ -59,15 +47,11 @@ public:
     /// @brief Rotation shape matrix N_θ = -N,x (θ = -dw_b/dx).
     Matrix<T> rotation_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
 
-    Matrix<T> strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
-
     std::size_t num_node_dofs() const override { return 1; }
 
     std::size_t min_order() const override { return 3; }
 
 private:
-
-    /// @brief Material and cross section geometry
     Ptr<SlenderBeam1d<T>> material_;
 
 };

@@ -29,10 +29,6 @@ namespace pyck
  *            -w_b,yy - w_s1,yy,
  *            -2 w_b,xy - w_s1,xy - w_s2,xy]^T
  *
- * This preserves the displacement-only nature of the formulation while
- * keeping the split transverse fields kinematically consistent with both
- * gamma = grad(w) + phi and kappa = L phi.
- *
  * @tparam T Scalar type.
  */
 template <std::floating_point T>
@@ -51,29 +47,8 @@ public:
         }
     }
 
-    void compute_local_stiffness(const std::vector<Matrix<T>>& shape_fns,
-                                 const Vector<T>& jacobian,
-                                 const Vector<T>& q_weights,
-                                 Matrix<T>& stiffness) const override
-    {
-        Matrix<T> B = this->strain_displacement_matrix(shape_fns);
-        const auto Db = material_->bending_matrix();
-        const auto Ds = material_->shear_matrix();
-
-        const Index Q = q_weights.size();
-        const Index K = B.cols();
-        const Vector<T> dV = q_weights.cwiseProduct(jacobian);
-
-        stiffness.setZero(K, K);
-        for (Index q = 0; q < Q; ++q) {
-            const auto Bb = B.middleRows(5 * q, 3);
-            const auto Bs = B.middleRows(5 * q + 3, 2);
-            stiffness.noalias() += dV[q] * (
-                Bb.transpose() * Db * Bb
-                + Bs.transpose() * Ds * Bs
-            );
-        }
-    }
+    Matrix<T> bending_constitutive_matrix() const override { return material_->bending_matrix(); }
+    Matrix<T> shear_constitutive_matrix() const override { return material_->shear_matrix(); }
 
     Matrix<T> displacement_shape_matrix(
         const std::vector<Matrix<T>>& shape_derivs) const override
@@ -101,40 +76,54 @@ public:
 
         for (Index q = 0; q < Q; ++q) {
             for (Index i = 0; i < n; ++i) {
-                Nphi(2 * q,     3 * i) = -N[idx::d1](q, i);
+                Nphi(2 * q,     3 * i)     = -N[idx::d1](q, i);
                 Nphi(2 * q,     3 * i + 2) = -N[idx::d1](q, i);
-                Nphi(2 * q + 1, 3 * i) = -N[idx::d2](q, i);
+                Nphi(2 * q + 1, 3 * i)     = -N[idx::d2](q, i);
                 Nphi(2 * q + 1, 3 * i + 1) = -N[idx::d2](q, i);
             }
         }
         return Nphi;
     }
 
-    Matrix<T> strain_displacement_matrix(
+    Matrix<T> bending_strain_matrix(
         const std::vector<Matrix<T>>& shape_derivs) const override
     {
         const auto& N = shape_derivs;
         const Index Q = N[idx::val].rows();
         const Index n = N[idx::val].cols();
-        Matrix<T> B = Matrix<T>::Zero(5 * Q, 3 * n);
+        Matrix<T> Bb = Matrix<T>::Zero(3 * Q, 3 * n);
 
         for (Index q = 0; q < Q; ++q) {
             for (Index i = 0; i < n; ++i) {
-                B(5 * q,     3 * i) = -N[idx::d11](q, i);
-                B(5 * q,     3 * i + 2) = -N[idx::d11](q, i);
+                Bb(3 * q,     3 * i)     = -N[idx::d11](q, i);
+                Bb(3 * q,     3 * i + 2) = -N[idx::d11](q, i);
 
-                B(5 * q + 1, 3 * i) = -N[idx::d22](q, i);
-                B(5 * q + 1, 3 * i + 1) = -N[idx::d22](q, i);
+                Bb(3 * q + 1, 3 * i)     = -N[idx::d22](q, i);
+                Bb(3 * q + 1, 3 * i + 1) = -N[idx::d22](q, i);
 
-                B(5 * q + 2, 3 * i) = -T(2) * N[idx::d12](q, i);
-                B(5 * q + 2, 3 * i + 1) = -N[idx::d12](q, i);
-                B(5 * q + 2, 3 * i + 2) = -N[idx::d12](q, i);
-
-                B(5 * q + 3, 3 * i + 1) = N[idx::d1](q, i);
-                B(5 * q + 4, 3 * i + 2) = N[idx::d2](q, i);
+                Bb(3 * q + 2, 3 * i)     = -T(2) * N[idx::d12](q, i);
+                Bb(3 * q + 2, 3 * i + 1) = -N[idx::d12](q, i);
+                Bb(3 * q + 2, 3 * i + 2) = -N[idx::d12](q, i);
             }
         }
-        return B;
+        return Bb;
+    }
+
+    Matrix<T> shear_strain_matrix(
+        const std::vector<Matrix<T>>& shape_derivs) const override
+    {
+        const auto& N = shape_derivs;
+        const Index Q = N[idx::val].rows();
+        const Index n = N[idx::val].cols();
+        Matrix<T> Bs = Matrix<T>::Zero(2 * Q, 3 * n);
+
+        for (Index q = 0; q < Q; ++q) {
+            for (Index i = 0; i < n; ++i) {
+                Bs(2 * q,     3 * i + 1) = N[idx::d1](q, i);
+                Bs(2 * q + 1, 3 * i + 2) = N[idx::d2](q, i);
+            }
+        }
+        return Bs;
     }
 
     std::size_t num_node_dofs() const override { return 3; }

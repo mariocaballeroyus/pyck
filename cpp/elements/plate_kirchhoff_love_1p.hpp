@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "element.hpp"
-#include "plane_stress_2d.hpp"
+#include "../materials/plane_stress_2d.hpp"
 #include "../types.hpp"
 
 namespace pyck
@@ -19,7 +19,7 @@ namespace pyck
  * DOF per node (1):
  *   - w: Transverse displacement
  *
- * Sign convention: kappa = grad(grad(w))
+ * Sign convention: kappa = -grad(grad(w))
  *
  * @tparam T Scalar type.
  */
@@ -34,19 +34,21 @@ public:
     /// @param material Pointer to the plane stress material model.
     PlateKirchhoffLove1p(Ptr<PlaneStress2d<T>> material);
 
-    void compute_local_stiffness(const std::vector<Matrix<T>>& shape_fns,
-                                 const Vector<T>& jacobian,
-                                 const Vector<T>& q_weights,
-                                 Matrix<T>& stiffness) const override;
+    Matrix<T> bending_strain_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
+
+    /// @brief No transverse shear strain in Kirchhoff-Love: returns a zero matrix.
+    Matrix<T> shear_strain_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
+
+    Matrix<T> bending_constitutive_matrix() const override { return material_->bending_matrix(); }
 
     Matrix<T> displacement_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
 
-    /// @brief Rotation shape matrix (2Q × n): row `2q` = −N,x, row `2q+1` = −N,y
-    /// since θ = −∇w.  Both components act on the sole w DOF
-    /// (see `rotation_dof_indices`).
     Matrix<T> rotation_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
 
-    Matrix<T> strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
+    /// @brief Equilibrium-based recovery of the transverse shear force from
+    /// q = -div(m). For Kirchhoff-Love no shear strain block exists, so the
+    /// base-class default is overridden.
+    Matrix<T> transverse_shear_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
 
     std::size_t num_node_dofs() const override { return 1; }
 
@@ -55,7 +57,6 @@ public:
     std::array<std::size_t, 2> rotation_dof_indices() const override { return {0, 0}; }
 
 private:
-    /// @brief Material and thickness
     Ptr<PlaneStress2d<T>> material_;
 };
 

@@ -43,50 +43,40 @@ Matrix<T> BeamTimoshenko2p<T>::rotation_shape_matrix(
 }
 
 template <std::floating_point T>
-Matrix<T> BeamTimoshenko2p<T>::strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const
+Matrix<T> BeamTimoshenko2p<T>::bending_strain_matrix(
+    const std::vector<Matrix<T>>& shape_derivs) const
 {
-    const Index Q = shape_derivs[idx::val].rows(); // number of quadrature points
-    const Index n = shape_derivs[idx::val].cols(); // number of dofs per element
+    const auto& N = shape_derivs;
+    const Index Q = N[idx::val].rows();
+    const Index n = N[idx::val].cols();
 
-    // Bi = [ 0      N1,x
-    //        N1,x   N1 ]
-    Matrix<T> B = Matrix<T>::Zero(2 * Q, 2 * n);
+    // Bb_i = [ 0   Ni,x ]   (kappa = theta,x with theta on slot 1)
+    Matrix<T> Bb = Matrix<T>::Zero(Q, 2 * n);
     for (Index q = 0; q < Q; ++q) {
         for (Index i = 0; i < n; ++i) {
-            // Bending part (kappa_x = theta,x)
-            B(2*q,     2*i + 1) =  shape_derivs[idx::d1](q, i);
-            // Shear part (gamma_xz = w,x + theta)
-            B(2*q + 1, 2*i    ) =  shape_derivs[idx::d1](q, i);
-            B(2*q + 1, 2*i + 1) =  shape_derivs[idx::val](q, i);
+            Bb(q, 2*i + 1) = N[idx::d1](q, i);
         }
     }
-    return B;
+    return Bb;
 }
 
 template <std::floating_point T>
-void BeamTimoshenko2p<T>::compute_local_stiffness(const std::vector<Matrix<T>>& shape_fns,
-                                                  const Vector<T>& jacobian,
-                                                  const Vector<T>& q_weights,
-                                                  Matrix<T>& stiffness) const
+Matrix<T> BeamTimoshenko2p<T>::shear_strain_matrix(
+    const std::vector<Matrix<T>>& shape_derivs) const
 {
-    Matrix<T> B   = this->strain_displacement_matrix(shape_fns); // (2Q, 2n)
-    T Kb          = material_->bending_stiffness();              // Kb = EI
-    T Ks          = material_->shear_stiffness();                // Ks = kGA
+    const auto& N = shape_derivs;
+    const Index Q = N[idx::val].rows();
+    const Index n = N[idx::val].cols();
 
-    const Index Q = q_weights.size(); // number of quadrature points
-    const Index K = B.cols();         // number of dofs per element
-
-    // dV = wq * Jq
-    Vector<T> dV = q_weights.cwiseProduct(jacobian); // (Q,)
-
-    // Ke = sum_q{ Bb^T * Kb * Bb * dV  +  Bs^T * Ks * Bs * dV }
-    stiffness.setZero(K, K);
+    // Bs_i = [ Ni,x  Ni ]   (gamma = w,x + theta)
+    Matrix<T> Bs = Matrix<T>::Zero(Q, 2 * n);
     for (Index q = 0; q < Q; ++q) {
-        auto Bb = B.row(2 * q);
-        auto Bs = B.row(2 * q + 1);
-        stiffness.noalias() += dV[q] * (Kb * Bb.transpose() * Bb
-                                      + Ks * Bs.transpose() * Bs);
+        for (Index i = 0; i < n; ++i) {
+            Bs(q, 2*i    ) = N[idx::d1](q, i);
+            Bs(q, 2*i + 1) = N[idx::val](q, i);
+        }
     }
+    return Bs;
 }
 
 // === Template Instantiations ========================================================

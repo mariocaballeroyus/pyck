@@ -50,29 +50,8 @@ public:
         }
     }
 
-    void compute_local_stiffness(const std::vector<Matrix<T>>& shape_fns,
-                                 const Vector<T>& jacobian,
-                                 const Vector<T>& q_weights,
-                                 Matrix<T>& stiffness) const override
-    {
-        Matrix<T> B = this->strain_displacement_matrix(shape_fns);
-        const auto Db = material_->bending_matrix();
-        const auto Ds = material_->shear_matrix();
-
-        const Index Q = q_weights.size();
-        const Index K = B.cols();
-        const Vector<T> dV = q_weights.cwiseProduct(jacobian);
-
-        stiffness.setZero(K, K);
-        for (Index q = 0; q < Q; ++q) {
-            const auto Bb = B.middleRows(5 * q, 3);
-            const auto Bs = B.middleRows(5 * q + 3, 2);
-            stiffness.noalias() += dV[q] * (
-                Bb.transpose() * Db * Bb
-                + Bs.transpose() * Ds * Bs
-            );
-        }
-    }
+    Matrix<T> bending_constitutive_matrix() const override { return material_->bending_matrix(); }
+    Matrix<T> shear_constitutive_matrix() const override { return material_->shear_matrix(); }
 
     Matrix<T> displacement_shape_matrix(
         const std::vector<Matrix<T>>& shape_derivs) const override
@@ -113,7 +92,34 @@ public:
         return Nphi;
     }
 
-    Matrix<T> strain_displacement_matrix(
+    Matrix<T> bending_strain_matrix(
+        const std::vector<Matrix<T>>& shape_derivs) const override
+    {
+        const auto& N = shape_derivs;
+        const Index Q = N[idx::val].rows();
+        const Index n = N[idx::val].cols();
+
+        // Bb_i (3 x 2): kappa = L phi
+        //   row 0 (kappa_x):    [ -N_i,xx              N_i,xy             ]
+        //   row 1 (kappa_y):    [ -N_i,yy             -N_i,xy             ]
+        //   row 2 (2 kappa_xy): [ -2 N_i,xy            N_i,yy - N_i,xx    ]
+        Matrix<T> Bb = Matrix<T>::Zero(3 * Q, 2 * n);
+        for (Index q = 0; q < Q; ++q) {
+            for (Index i = 0; i < n; ++i) {
+                Bb(3 * q,     2 * i)     = -N[idx::d11](q, i);
+                Bb(3 * q,     2 * i + 1) =  N[idx::d12](q, i);
+
+                Bb(3 * q + 1, 2 * i)     = -N[idx::d22](q, i);
+                Bb(3 * q + 1, 2 * i + 1) = -N[idx::d12](q, i);
+
+                Bb(3 * q + 2, 2 * i)     = -T(2) * N[idx::d12](q, i);
+                Bb(3 * q + 2, 2 * i + 1) =  N[idx::d22](q, i) - N[idx::d11](q, i);
+            }
+        }
+        return Bb;
+    }
+
+    Matrix<T> shear_strain_matrix(
         const std::vector<Matrix<T>>& shape_derivs) const override
     {
         const auto& N = shape_derivs;
@@ -122,37 +128,22 @@ public:
         const T ratio = material_->bending_stiffness()
                       / material_->shear_stiffness();
 
-        // Bb_i (3 x 2): bending strains kappa = L phi
-        //   row 0 (kappa_x):    [ -N_i,xx              N_i,xy             ]
-        //   row 1 (kappa_y):    [ -N_i,yy             -N_i,xy             ]
-        //   row 2 (2 kappa_xy): [ -2 N_i,xy            N_i,yy - N_i,xx    ]
-        // Bs_i (2 x 2): shear strains gamma = -(Kb/Ks) grad(Lap w_b) + curl psi
+        // Bs_i (2 x 2): gamma = -(Kb/Ks) grad(Lap w_b) + curl psi
         //   row 0 (gamma_x): [ -(Kb/Ks)(N_i,xxx + N_i,xyy)   N_i,y ]
         //   row 1 (gamma_y): [ -(Kb/Ks)(N_i,xxy + N_i,yyy)  -N_i,x ]
-        Matrix<T> B = Matrix<T>::Zero(5 * Q, 2 * n);
+        Matrix<T> Bs = Matrix<T>::Zero(2 * Q, 2 * n);
         for (Index q = 0; q < Q; ++q) {
             for (Index i = 0; i < n; ++i) {
-                // Bending block
-                B(5 * q,     2 * i)     = -N[idx::d11](q, i);
-                B(5 * q,     2 * i + 1) =  N[idx::d12](q, i);
+                Bs(2 * q,     2 * i)     = -ratio * (N[idx::d111](q, i)
+                                                   + N[idx::d122](q, i));
+                Bs(2 * q,     2 * i + 1) =  N[idx::d2](q, i);
 
-                B(5 * q + 1, 2 * i)     = -N[idx::d22](q, i);
-                B(5 * q + 1, 2 * i + 1) = -N[idx::d12](q, i);
-
-                B(5 * q + 2, 2 * i)     = -T(2) * N[idx::d12](q, i);
-                B(5 * q + 2, 2 * i + 1) =  N[idx::d22](q, i) - N[idx::d11](q, i);
-
-                // Shear block
-                B(5 * q + 3, 2 * i)     = -ratio * (N[idx::d111](q, i)
-                                                  + N[idx::d122](q, i));
-                B(5 * q + 3, 2 * i + 1) =  N[idx::d2](q, i);
-
-                B(5 * q + 4, 2 * i)     = -ratio * (N[idx::d112](q, i)
-                                                  + N[idx::d222](q, i));
-                B(5 * q + 4, 2 * i + 1) = -N[idx::d1](q, i);
+                Bs(2 * q + 1, 2 * i)     = -ratio * (N[idx::d112](q, i)
+                                                   + N[idx::d222](q, i));
+                Bs(2 * q + 1, 2 * i + 1) = -N[idx::d1](q, i);
             }
         }
-        return B;
+        return Bs;
     }
 
     std::size_t num_node_dofs() const override { return 2; }

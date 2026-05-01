@@ -32,32 +32,19 @@ class PlateReissnerMindlin1p : public Element<T, 2>
 
 public:
 
-    /**
-     * @brief Construct a Reissner-Mindlin plate element with the given material.
-     * 
-     * @param material  Material model providing bending and shear stiffnesses.
-     */
     PlateReissnerMindlin1p(Ptr<PlaneStress2d<T>> material);
 
-    void compute_local_stiffness(const std::vector<Matrix<T>>& shape_fns,
-                                 const Vector<T>& jacobian,
-                                 const Vector<T>& q_weights,
-                                 Matrix<T>& stiffness) const override;
+    Matrix<T> bending_strain_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
+    Matrix<T> shear_strain_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
 
-    /// @brief Effective transverse displacement shape functions Ñ_w (Q × n).
-    ///
-    /// Accounts for the Laplacian correction w = w_b - (K_b/K_s) Δw_b, so
-    /// this is: Ñ_i = N_i - (K_b/K_s)(N_i,xx + N_i,yy).
+    Matrix<T> bending_constitutive_matrix() const override { return material_->bending_matrix(); }
+    Matrix<T> shear_constitutive_matrix() const override { return material_->shear_matrix(); }
+
+    /** @brief Effective transverse-displacement shape matrix N_w_tilde (Q x n), including the Laplacian shear correction. */
     Matrix<T> displacement_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
 
-    /// @brief Rotation shape matrix (2Q × n): row `2q` = −N,x, row `2q+1` = −N,y.
-    ///
-    /// RM-1p ansatz gives θ = -∇w_b (the shear-correction term in
-    /// w = w_b - ratio·Δw_b cancels against -γ in θ = γ - ∇w).
-    /// Both components act on the sole w_b DOF.
+    /** @brief Rotation shape matrix N_varphi (2Q x n). */
     Matrix<T> rotation_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
-
-    Matrix<T> strain_displacement_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
 
     std::size_t num_node_dofs() const override { return 1; }
 
