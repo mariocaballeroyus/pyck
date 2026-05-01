@@ -1,4 +1,4 @@
-#include "penalty_condition.hpp"
+#include "nitsche_condition.hpp"
 
 #include "patch_boundary.hpp"
 #include "patch.hpp"
@@ -11,30 +11,45 @@ namespace pyck
 
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-PenaltyCondition<T, d>::PenaltyCondition(
+NitscheCondition<T, d>::NitscheCondition(
     const PatchBoundary<T, d>& boundary,
     const Element<T, d>& element,
-    const QuadratureRule<T, d - 1>& quadrature)
+    const QuadratureRule<T, d - 1>& quadrature,
+    T thickness)
     : boundary_(boundary),
       element_(element),
-      quadrature_(quadrature)
-{}
+      quadrature_(quadrature),
+      thickness_(thickness)
+{
+    if (thickness_ <= T(0)) {
+        throw std::invalid_argument("NitscheCondition: thickness must be positive.");
+    }
+}
 
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-PenaltyCondition<T, d>& PenaltyCondition<T, d>::add(
-    Ptr<const BoundaryField<T>> field, T penalty, T value)
+NitscheCondition<T, d>& NitscheCondition<T, d>::add(
+    Ptr<const BoundaryField<T>> displacement_field,
+    Ptr<const BoundaryField<T>> traction_field,
+    T penalty,
+    T value)
 {
-    if (!field) {
-        throw std::invalid_argument("PenaltyCondition::add: field must not be null.");
+    if (!displacement_field) {
+        throw std::invalid_argument(
+            "NitscheCondition::add: displacement_field must not be null.");
     }
-    terms_.push_back({std::move(field), penalty, value});
+    if (!traction_field) {
+        throw std::invalid_argument(
+            "NitscheCondition::add: traction_field must not be null.");
+    }
+    terms_.push_back({std::move(displacement_field),
+                      std::move(traction_field), penalty, value});
     return *this;
 }
 
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-void PenaltyCondition<T, d>::apply(Matrix<T>& stiffness,
+void NitscheCondition<T, d>::apply(Matrix<T>& stiffness,
                                    Vector<T>& load,
                                    const DofLayout& layout,
                                    DofLayout::BlockId primal_block) const
@@ -46,7 +61,10 @@ void PenaltyCondition<T, d>::apply(Matrix<T>& stiffness,
     const auto& quadrature = quadrature_;
     const auto& parent = *boundary.parent();
     const Index ndof = static_cast<Index>(element.num_node_dofs());
-    const std::size_t req_order = element.min_order();
+    // Traction fields can need higher derivatives than the element's stiffness:
+    // KL's transverse-shear recovery uses 3rd derivatives, and bending-moment
+    // projections need 2nd. Request whichever is larger.
+    const std::size_t req_order = std::max<std::size_t>(element.min_order(), 3);
 
     const Index num_spans = boundary.basis(0).knot_vector().num_spans();
     for (Index span = 0; span < num_spans; ++span)
@@ -55,7 +73,7 @@ void PenaltyCondition<T, d>::apply(Matrix<T>& stiffness,
         auto [lo, hi] = boundary.basis(0).knot_vector().span_bounds(span);
         if (std::abs(hi - lo) < T(1e-14)) continue;
 
-        // Per-span scaffolding: shared across all fields.
+        // Per-span scaffolding: shared across all terms.
         auto [mapped_pts, mapped_weights] = quadrature.map_to_domain(lo, hi);
         const Index Q = static_cast<Index>(mapped_pts.rows());
 
@@ -74,20 +92,41 @@ void PenaltyCondition<T, d>::apply(Matrix<T>& stiffness,
         Matrix<T> K_local = Matrix<T>::Zero(K_elem, K_elem);
         Vector<T> F_local = Vector<T>::Zero(K_elem);
 
-        // Accumulate every field's contribution into the same local matrices.
+        // Accumulate every term's contribution into the same local matrices.
         for (const auto& term : terms_)
         {
-            Matrix<T> C = term.field->evaluate(
+            Matrix<T> N = term.displacement_field->evaluate(
                 element, boundary, span, boundary_derivs,
                 flat_parent, parent_derivs);
+            Matrix<T> Qmat = term.traction_field->evaluate(
+                element, boundary, span, boundary_derivs,
+                flat_parent, parent_derivs);
+
+            const T penalty_h = term.penalty / thickness_;
 
             for (Index q = 0; q < Q; ++q)
             {
                 const T dGamma = boundary_jac(q) * mapped_weights(q);
-                K_local.noalias() += dGamma * term.penalty
-                                   * C.row(q).transpose() * C.row(q);
-                F_local.noalias() += dGamma * term.penalty * term.value
-                                   * C.row(q).transpose();
+
+                // Term 1: -N^T · Q (consistency)
+                K_local.noalias() -= dGamma
+                    * N.row(q).transpose() * Qmat.row(q);
+
+                // Term 2: -Q^T · N (symmetry, stiffness part)
+                K_local.noalias() -= dGamma
+                    * Qmat.row(q).transpose() * N.row(q);
+
+                // Term 2: Q^T · ū (symmetry, load part)
+                F_local.noalias() -= dGamma * term.value
+                    * Qmat.row(q).transpose();
+
+                // Term 3: +(β/h)·N^T · N (penalty, stiffness part)
+                K_local.noalias() += dGamma * penalty_h
+                    * N.row(q).transpose() * N.row(q);
+
+                // Term 3: +(β/h)·N^T · ū (penalty, load part)
+                F_local.noalias() += dGamma * penalty_h * term.value
+                    * N.row(q).transpose();
             }
         }
 
@@ -106,10 +145,10 @@ void PenaltyCondition<T, d>::apply(Matrix<T>& stiffness,
     }
 }
 
-template class PenaltyCondition<double, 2>;
+template class NitscheCondition<double, 2>;
 
 #ifdef PYCK_BUILD_SINGLE_PRECISION
-template class PenaltyCondition<float, 2>;
+template class NitscheCondition<float, 2>;
 #endif
 
 } // namespace pyck

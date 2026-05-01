@@ -75,6 +75,7 @@ add_library(pyck_conditions
     cpp/conditions/load_condition.cpp
     cpp/conditions/penalty_condition.cpp
     cpp/conditions/lagrange_multiplier_condition.cpp
+    cpp/conditions/nitsche_condition.cpp
 )
 target_include_directories(pyck_conditions PUBLIC cpp/conditions)
 target_link_libraries(pyck_conditions PUBLIC pyck_geometry pyck_assembly)

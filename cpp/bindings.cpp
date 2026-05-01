@@ -6,15 +6,17 @@
 #include "tensor.hpp"
 #include "factories.hpp"
 #include "evaluation.hpp"
-#include "boundary_patch.hpp"
+#include "patch_boundary.hpp"
 #include "dof_mapper.hpp"
 #include "quadrature.hpp"
 #include "gauss_legendre.hpp"
 #include "element.hpp"
 #include "beam_euler_bernoulli_1p.hpp"
+#include "boundary_field.hpp"
 #include "condition.hpp"
 #include "load_condition.hpp"
 #include "lagrange_multiplier_condition.hpp"
+#include "nitsche_condition.hpp"
 #include "penalty_condition.hpp"
 #include "linear_constraint.hpp"
 #include "beam_timoshenko_1p.hpp"
@@ -137,11 +139,11 @@ PYBIND11_MODULE(_pyck, m) {
 
     // === Surface Patch (2D) =========================================================
 
-    using BoundaryPatch2D = pyck::BoundaryPatch<double, 2>;
-    py::class_<BoundaryPatch2D, Patch3D1D, pyck::Ptr<BoundaryPatch2D>>(m, "BoundaryPatch2d")
-        .def("parent_dofs", &BoundaryPatch2D::parent_dofs)
-        .def("param_dim", &BoundaryPatch2D::param_dim)
-        .def("at_start", &BoundaryPatch2D::at_start);
+    using PatchBoundary2D = pyck::PatchBoundary<double, 2>;
+    py::class_<PatchBoundary2D, Patch3D1D, pyck::Ptr<PatchBoundary2D>>(m, "PatchBoundary2d")
+        .def("parent_dofs", &PatchBoundary2D::parent_dofs)
+        .def("param_dim", &PatchBoundary2D::param_dim)
+        .def("at_start", &PatchBoundary2D::at_start);
 
     using Patch3D2D = pyck::Patch<double, 2>;
     py::class_<Patch3D2D, pyck::Ptr<Patch3D2D>>(m, "Patch2d")
@@ -187,7 +189,7 @@ PYBIND11_MODULE(_pyck, m) {
         .def("greville_span", &Patch3D2D::greville_span, py::arg("dof_index"), 
              "Get the element span containing the Greville point for a global DOF index.")
         .def("boundary", [](pyck::Ptr<Patch3D2D> self, std::size_t param_dim, bool at_start) {
-                 return pyck::create_boundary<double, 2>(self, param_dim, at_start);
+                 return pyck::create_patch_boundary<double, 2>(self, param_dim, at_start);
              },
              py::arg("param_dim"), py::arg("at_start"),
              "Extract a boundary face of this patch.")
@@ -414,13 +416,32 @@ PYBIND11_MODULE(_pyck, m) {
     using CondD = pyck::Condition<double>;
     py::class_<CondD, pyck::Ptr<CondD>>(m, "Condition");
 
-    py::enum_<pyck::Field>(m, "Field")
-        .value("UX", pyck::Field::UX)
-        .value("UY", pyck::Field::UY)
-        .value("UZ", pyck::Field::UZ)
-        .value("W", pyck::Field::W)
-        .value("ROT_N", pyck::Field::ROT_N)
-        .value("ROT_S", pyck::Field::ROT_S);
+    using BoundaryFieldD = pyck::BoundaryField<double>;
+    py::class_<BoundaryFieldD, pyck::Ptr<BoundaryFieldD>>(m, "BoundaryField");
+
+    py::class_<pyck::TransverseDisplacement<double>, BoundaryFieldD,
+               pyck::Ptr<pyck::TransverseDisplacement<double>>>(m, "TransverseDisplacement")
+        .def(py::init<>());
+
+    py::class_<pyck::NormalRotation<double>, BoundaryFieldD,
+               pyck::Ptr<pyck::NormalRotation<double>>>(m, "NormalRotation")
+        .def(py::init<>());
+
+    py::class_<pyck::TangentialRotation<double>, BoundaryFieldD,
+               pyck::Ptr<pyck::TangentialRotation<double>>>(m, "TangentialRotation")
+        .def(py::init<>());
+
+    py::class_<pyck::NormalTransverseShear<double>, BoundaryFieldD,
+               pyck::Ptr<pyck::NormalTransverseShear<double>>>(m, "NormalTransverseShear")
+        .def(py::init<>());
+
+    py::class_<pyck::NormalBendingMoment<double>, BoundaryFieldD,
+               pyck::Ptr<pyck::NormalBendingMoment<double>>>(m, "NormalBendingMoment")
+        .def(py::init<>());
+
+    py::class_<pyck::TwistingMoment<double>, BoundaryFieldD,
+               pyck::Ptr<pyck::TwistingMoment<double>>>(m, "TwistingMoment")
+        .def(py::init<>());
 
     using LC1D = pyck::LoadCondition<double, 1>;
     py::class_<LC1D, CondD, pyck::Ptr<LC1D>>(m, "LoadCondition1d")
@@ -434,17 +455,48 @@ PYBIND11_MODULE(_pyck, m) {
 
     using PenCond2D = pyck::PenaltyCondition<double, 2>;
     py::class_<PenCond2D, CondD, pyck::Ptr<PenCond2D>>(m, "PenaltyCondition2d")
-        .def(py::init<const BoundaryPatch2D&, const Elem2D&, const QR1D&,
-                      pyck::Field, double, double>(),
-             py::arg("boundary"), py::arg("element"), py::arg("quadrature"),
-             py::arg("field"), py::arg("penalty"), py::arg("value") = 0.0);
+        .def(py::init<const PatchBoundary2D&, const Elem2D&, const QR1D&>(),
+             py::arg("boundary"), py::arg("element"), py::arg("quadrature"))
+        .def("add",
+             [](PenCond2D& self,
+                pyck::Ptr<const BoundaryFieldD> field,
+                double penalty,
+                double value) -> PenCond2D& {
+                 return self.add(std::move(field), penalty, value);
+             },
+             py::arg("field"), py::arg("penalty"), py::arg("value") = 0.0,
+             py::return_value_policy::reference);
 
     using LMCond2D = pyck::LagrangeMultiplierCondition<double, 2>;
     py::class_<LMCond2D, CondD, pyck::Ptr<LMCond2D>>(m, "LagrangeMultiplierCondition2d")
-        .def(py::init<const BoundaryPatch2D&, const Elem2D&, const QR1D&,
-                      pyck::Field, double>(),
+        .def(py::init<const PatchBoundary2D&, const Elem2D&, const QR1D&>(),
+             py::arg("boundary"), py::arg("element"), py::arg("quadrature"))
+        .def("add",
+             [](LMCond2D& self,
+                pyck::Ptr<const BoundaryFieldD> field,
+                double value) -> LMCond2D& {
+                 return self.add(std::move(field), value);
+             },
+             py::arg("field"), py::arg("value") = 0.0,
+             py::return_value_policy::reference);
+
+    using NitCond2D = pyck::NitscheCondition<double, 2>;
+    py::class_<NitCond2D, CondD, pyck::Ptr<NitCond2D>>(m, "NitscheCondition2d")
+        .def(py::init<const PatchBoundary2D&, const Elem2D&, const QR1D&, double>(),
              py::arg("boundary"), py::arg("element"), py::arg("quadrature"),
-             py::arg("field"), py::arg("value") = 0.0);
+             py::arg("thickness"))
+        .def("add",
+             [](NitCond2D& self,
+                pyck::Ptr<const BoundaryFieldD> displacement_field,
+                pyck::Ptr<const BoundaryFieldD> traction_field,
+                double penalty,
+                double value) -> NitCond2D& {
+                 return self.add(std::move(displacement_field),
+                                 std::move(traction_field), penalty, value);
+             },
+             py::arg("displacement_field"), py::arg("traction_field"),
+             py::arg("penalty"), py::arg("value") = 0.0,
+             py::return_value_policy::reference);
 
     // === Constraints ================================================================
 
@@ -584,7 +636,7 @@ PYBIND11_MODULE(_pyck, m) {
         .def("dof_mapper", &Patch3D1DF::dof_mapper,
              py::return_value_policy::reference_internal)
         .def("boundary", [](pyck::Ptr<Patch3D1DF> self, std::size_t param_dim, bool at_start) {
-                 return pyck::create_boundary<float, 1>(self, param_dim, at_start);
+                 return pyck::create_patch_boundary<float, 1>(self, param_dim, at_start);
              },
              py::arg("param_dim"), py::arg("at_start"),
              "Extract a boundary face of this patch.")
