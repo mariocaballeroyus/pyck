@@ -4,11 +4,13 @@ from pyck import materials as material
 from pyck.basis import (
     Basis,
     BSpline,
+    NURBS,
     KnotVector,
     create_bspline,
     create_clamped_uniform,
     create_clamped_uniform_knots,
     create_knot_vector,
+    create_nurbs,
 )
 from pyck.geometry import (
     CurvePatch,
@@ -108,11 +110,13 @@ __all__ = [
     "material",
     "Basis",
     "BSpline",
+    "NURBS",
     "KnotVector",
     "create_bspline",
     "create_clamped_uniform",
     "create_clamped_uniform_knots",
     "create_knot_vector",
+    "create_nurbs",
     "CurvePatch",
     "create_curve_patch",
     "create_line_segment",

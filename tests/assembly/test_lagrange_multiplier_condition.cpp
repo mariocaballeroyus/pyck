@@ -7,7 +7,8 @@
 
 #include <Eigen/Dense>
 
-#include "boundary_patch.hpp"
+#include "boundary_field.hpp"
+#include "patch_boundary.hpp"
 #include "bspline.hpp"
 #include "direct_constraint.hpp"
 #include "factories.hpp"
@@ -25,18 +26,20 @@ using namespace pyck;
 template <typename T>
 static void add_clamped_lagrange_all_edges(
     LinearElasticProblem<T, 2>& problem,
+    std::vector<Ptr<PatchBoundary<T, 2>>>& boundaries,
     const Ptr<Patch<T, 2>>& surface,
     const Element<T, 2>& element,
     const QuadratureRule<T, 1>& gauss1d)
 {
     for (std::size_t dim = 0; dim < 2; ++dim) {
         for (bool start : {true, false}) {
-            auto bdy = create_boundary<T, 2>(surface, dim, start);
-            auto cond = std::make_shared<LagrangeMultiplierCondition<T>>(
-                *bdy, element, gauss1d,
-                true, T(0),
-                true, T(0),
-                true, T(0));
+            auto bdy = create_patch_boundary<T, 2>(surface, dim, start);
+            boundaries.push_back(bdy);
+            auto cond = std::make_shared<LagrangeMultiplierCondition<T, 2>>(
+                *boundaries.back(), element, gauss1d);
+            cond->add(std::make_shared<TransverseDisplacement<T>>(), T(0));
+            cond->add(std::make_shared<NormalRotation<T>>(), T(0));
+            cond->add(std::make_shared<TangentialRotation<T>>(), T(0));
             problem.add_condition(cond);
         }
     }
@@ -91,12 +94,11 @@ TEST_CASE("LagrangeMultiplierCondition augments the system symmetrically", "[con
     auto gauss2d = std::make_shared<GaussLegendre<double, 2>>(p + 1);
     GaussLegendre<double, 1> gauss1d(p + 1);
 
-    auto boundary = create_boundary<double, 2>(surface, 0, true);
-    auto cond = std::make_shared<LagrangeMultiplierCondition<double>>(
-        *boundary, *element, gauss1d,
-        true, 0.0,
-        true, 0.0,
-        false, 0.0);
+    auto boundary = create_patch_boundary<double, 2>(surface, 0, true);
+    auto cond = std::make_shared<LagrangeMultiplierCondition<double, 2>>(
+        *boundary, *element, gauss1d);
+    cond->add(std::make_shared<TransverseDisplacement<double>>(), 0.0);
+    cond->add(std::make_shared<NormalRotation<double>>(), 0.0);
 
     LinearElasticProblem<double, 2> problem(surface, element, gauss2d);
     problem.add_condition(cond);
@@ -138,7 +140,9 @@ TEST_CASE("LagrangeMultiplierCondition matches direct clamped RM3 solution", "[c
     LinearElasticProblem<double, 2> lm_problem(surface, element, gauss2d);
     lm_problem.add_condition(std::make_shared<LoadCondition<double, 2>>(
         *surface, *element, *gauss2d, load));
-    add_clamped_lagrange_all_edges(lm_problem, surface, *element, gauss1d);
+    std::vector<Ptr<PatchBoundary<double, 2>>> lm_boundaries;
+    add_clamped_lagrange_all_edges(
+        lm_problem, lm_boundaries, surface, *element, gauss1d);
 
     LinearElasticProblem<double, 2> direct_problem(surface, element, gauss2d);
     direct_problem.add_condition(std::make_shared<LoadCondition<double, 2>>(
@@ -199,15 +203,16 @@ TEST_CASE("LagrangeMultiplierCondition solves an RM1 simply-supported plate", "[
     problem.add_condition(std::make_shared<LoadCondition<double, 2>>(
         *surface, *element, *gauss2d, load_vals));
 
+    std::vector<Ptr<PatchBoundary<double, 2>>> lm_boundaries;
     for (std::size_t dim = 0; dim < 2; ++dim) {
         for (bool start : {true, false}) {
-            auto bdy = create_boundary<double, 2>(surface, dim, start);
-            problem.add_condition(
-                std::make_shared<LagrangeMultiplierCondition<double>>(
-                    *bdy, *element, gauss1d,
-                    true, 0.0,
-                    false, 0.0,
-                    true, 0.0));
+            auto bdy = create_patch_boundary<double, 2>(surface, dim, start);
+            lm_boundaries.push_back(bdy);
+            auto cond = std::make_shared<LagrangeMultiplierCondition<double, 2>>(
+                *lm_boundaries.back(), *element, gauss1d);
+            cond->add(std::make_shared<TransverseDisplacement<double>>(), 0.0);
+            cond->add(std::make_shared<TangentialRotation<double>>(), 0.0);
+            problem.add_condition(cond);
         }
     }
 

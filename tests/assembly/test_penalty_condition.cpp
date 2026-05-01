@@ -10,7 +10,8 @@
 #include "factories.hpp"
 #include "bspline.hpp"
 #include "knots.hpp"
-#include "boundary_patch.hpp"
+#include "boundary_field.hpp"
+#include "patch_boundary.hpp"
 #include "gauss_legendre.hpp"
 #include "quadrature.hpp"
 #include "linear_elastic_problem.hpp"
@@ -59,22 +60,33 @@ static double navier_uniform(double x, double y, double a,
 template <typename T>
 static void add_penalty_all_edges(
     LinearElasticProblem<T, 2>& problem,
+    std::vector<Ptr<PatchBoundary<T, 2>>>& boundaries,
     const Ptr<Patch<T, 2>>& surface,
     const Element<T, 2>&    element,
     const QuadratureRule<T, 1>& gauss1d,
-    T alpha_w,    T w_bar,
-    T alpha_phi_n = T(0), T phi_n_bar = T(0),
-    T alpha_phi_s = T(0), T phi_s_bar = T(0))
+    T penalty_w,    T value_w,
+    T penalty_rot_n = T(0), T value_rot_n = T(0),
+    T penalty_rot_s = T(0), T value_rot_s = T(0))
 {
     for (std::size_t dim = 0; dim < 2; ++dim) {
         for (bool start : {true, false}) {
-            auto bdy = create_boundary<T, 2>(surface, dim, start);
-            auto pen = std::make_shared<PenaltyCondition<T>>(
-                *bdy, element, gauss1d,
-                alpha_w, w_bar,
-                alpha_phi_n, phi_n_bar,
-                alpha_phi_s, phi_s_bar);
-            problem.add_condition(pen);
+            auto bdy = create_patch_boundary<T, 2>(surface, dim, start);
+            boundaries.push_back(bdy);
+            auto cond = std::make_shared<PenaltyCondition<T, 2>>(
+                *boundaries.back(), element, gauss1d);
+            if (penalty_w != T(0)) {
+                cond->add(std::make_shared<TransverseDisplacement<T>>(),
+                          penalty_w, value_w);
+            }
+            if (penalty_rot_n != T(0)) {
+                cond->add(std::make_shared<NormalRotation<T>>(),
+                          penalty_rot_n, value_rot_n);
+            }
+            if (penalty_rot_s != T(0)) {
+                cond->add(std::make_shared<TangentialRotation<T>>(),
+                          penalty_rot_s, value_rot_s);
+            }
+            problem.add_condition(cond);
         }
     }
 }
@@ -120,7 +132,7 @@ TEST_CASE("PenaltyCondition structural properties", "[conditions][penalty]")
     auto elem_rm3 = std::make_shared<PlateReissnerMindlin3p<double>>(material);
     GaussLegendre<double, 1> g1(p + 1);
 
-    auto bdy = create_boundary<double, 2>(surface, 0, false);  // right edge
+    auto bdy = create_patch_boundary<double, 2>(surface, 0, false);  // right edge
 
     // Total DOFs = n_nodes_2d * ndof_per_node = (n*n) * 3
     const Index N_dof_rm3 = surface->num_control_pts() * 3;
@@ -133,8 +145,8 @@ TEST_CASE("PenaltyCondition structural properties", "[conditions][penalty]")
 
     SECTION("Stiffness is symmetric for w-only penalty")
     {
-        PenaltyCondition<double> pen(*bdy, *elem_rm3, g1,
-                                     1e6, 0.0);
+        PenaltyCondition<double, 2> pen(*bdy, *elem_rm3, g1);
+        pen.add(std::make_shared<TransverseDisplacement<double>>(), 1e6, 0.0);
         auto [layout, primal] = setup_layout_rm3();
         Matrix<double> K = Matrix<double>::Zero(N_dof_rm3, N_dof_rm3);
         Vector<double> F = Vector<double>::Zero(N_dof_rm3);
@@ -144,10 +156,10 @@ TEST_CASE("PenaltyCondition structural properties", "[conditions][penalty]")
 
     SECTION("Stiffness is symmetric with all three penalties")
     {
-        PenaltyCondition<double> pen(*bdy, *elem_rm3, g1,
-                                     1e6, 0.0,
-                                     1e6, 0.0,
-                                     1e6, 0.0);
+        PenaltyCondition<double, 2> pen(*bdy, *elem_rm3, g1);
+        pen.add(std::make_shared<TransverseDisplacement<double>>(), 1e6, 0.0);
+        pen.add(std::make_shared<NormalRotation<double>>(), 1e6, 0.0);
+        pen.add(std::make_shared<TangentialRotation<double>>(), 1e6, 0.0);
         auto [layout, primal] = setup_layout_rm3();
         Matrix<double> K = Matrix<double>::Zero(N_dof_rm3, N_dof_rm3);
         Vector<double> F = Vector<double>::Zero(N_dof_rm3);
@@ -157,10 +169,10 @@ TEST_CASE("PenaltyCondition structural properties", "[conditions][penalty]")
 
     SECTION("Zero alpha contributes nothing to K and F")
     {
-        PenaltyCondition<double> pen(*bdy, *elem_rm3, g1,
-                                     0.0, 5.0,
-                                     0.0, 3.0,
-                                     0.0, 1.0);
+        PenaltyCondition<double, 2> pen(*bdy, *elem_rm3, g1);
+        pen.add(std::make_shared<TransverseDisplacement<double>>(), 0.0, 5.0);
+        pen.add(std::make_shared<NormalRotation<double>>(), 0.0, 3.0);
+        pen.add(std::make_shared<TangentialRotation<double>>(), 0.0, 1.0);
         auto [layout, primal] = setup_layout_rm3();
         Index N_dof = surface->num_control_pts() * 3;
         Matrix<double> K = Matrix<double>::Zero(N_dof, N_dof);
@@ -173,8 +185,9 @@ TEST_CASE("PenaltyCondition structural properties", "[conditions][penalty]")
     SECTION("KL element (1 DOF): penalty K is symmetric and positive semi-definite")
     {
         auto elem_kl = std::make_shared<PlateKirchhoffLove1p<double>>(material);
-        auto bdy_kl  = create_boundary<double, 2>(surface, 1, true);  // bottom edge
-        PenaltyCondition<double> pen(*bdy_kl, *elem_kl, g1, 1e6, 0.0);
+        auto bdy_kl  = create_patch_boundary<double, 2>(surface, 1, true);  // bottom edge
+        PenaltyCondition<double, 2> pen(*bdy_kl, *elem_kl, g1);
+        pen.add(std::make_shared<TransverseDisplacement<double>>(), 1e6, 0.0);
 
         DofLayout layout;
         auto primal = layout.allocate(pyck::DofType::Primal, surface->num_control_pts() * 1, 1);
@@ -234,7 +247,9 @@ TEST_CASE("PenaltyCondition KL plate: SS via penalty matches Navier", "[conditio
     // For penalty BCs, a relative error O(D/(α*L³)) compared to the exact BC
     // is expected; 1e8 keeps this below 0.5 %.
     const double alpha = 1e8 * D / (L * L * L);
-    add_penalty_all_edges<double>(problem, surface, *element, gauss1d, alpha, 0.0);
+    std::vector<Ptr<PatchBoundary<double, 2>>> penalty_boundaries;
+    add_penalty_all_edges<double>(
+        problem, penalty_boundaries, surface, *element, gauss1d, alpha, 0.0);
 
     Matrix<double> K;
     Vector<double> F;
@@ -318,7 +333,9 @@ TEST_CASE("PenaltyCondition RM-1p plate: SS via penalty matches Navier", "[condi
         *surface, *element, *gauss2d, load_vals));
 
     const double alpha = 1e6 * D / (a * a * a);
-    add_penalty_all_edges<double>(problem, surface, *element, gauss1d, alpha, 0.0);
+    std::vector<Ptr<PatchBoundary<double, 2>>> penalty_boundaries;
+    add_penalty_all_edges<double>(
+        problem, penalty_boundaries, surface, *element, gauss1d, alpha, 0.0);
 
     Matrix<double> K;
     Vector<double> F;
@@ -387,9 +404,10 @@ TEST_CASE("PenaltyCondition RM-3p plate: SS (w-only) matches Navier", "[conditio
         *surface, *element, *gauss2d, load_vals));
 
     // Only penalise w; rotations are free (SS condition)
-    const double alpha_w = 1e6 * D / (a * a * a);
-    add_penalty_all_edges<double>(problem, surface, *element, gauss1d,
-                                  alpha_w, 0.0);
+    const double penalty_w = 1e6 * D / (a * a * a);
+    std::vector<Ptr<PatchBoundary<double, 2>>> penalty_boundaries;
+    add_penalty_all_edges<double>(problem, penalty_boundaries, surface, *element, gauss1d,
+                                  penalty_w, 0.0);
 
     Matrix<double> K;
     Vector<double> F;
@@ -502,10 +520,11 @@ TEST_CASE("PenaltyCondition RM-3p plate: clamped BCs agree with DirectConstraint
             *surface, *element, *gauss2d, load_vals));
 
         const double alpha = 1e4 * D / (a * a * a);
-        add_penalty_all_edges<double>(problem, surface, *element, gauss1d,
+        std::vector<Ptr<PatchBoundary<double, 2>>> penalty_boundaries;
+        add_penalty_all_edges<double>(problem, penalty_boundaries, surface, *element, gauss1d,
                                       alpha, 0.0,   // w
-                                      alpha, 0.0,   // phi_n
-                                      alpha, 0.0);  // phi_s
+                                      alpha, 0.0,   // rot_n
+                                      alpha, 0.0);  // rot_s
 
         Matrix<double> K;
         Vector<double> F;
@@ -537,9 +556,9 @@ TEST_CASE("PenaltyCondition RM-3p plate: clamped BCs agree with DirectConstraint
 }
 
 // ===========================================================================
-// TEST 6 — RM-3p plate: prescribed non-zero BC  f_pen = α ∫ N φ̄ dΓ
-// A plate with uniform prescribed w_bar ≠ 0 on all edges, zero load.
-// The expected solution is a rigid-body lift: w ≈ w_bar everywhere.
+// TEST 6 — RM-3p plate: prescribed non-zero BC
+// A plate with uniform prescribed value_w != 0 on all edges, zero load.
+// The expected solution is a rigid-body lift: w ≈ value_w everywhere.
 // ===========================================================================
 TEST_CASE("PenaltyCondition RM-3p: prescribed non-zero displacement",
           "[conditions][penalty]")
@@ -549,7 +568,7 @@ TEST_CASE("PenaltyCondition RM-3p: prescribed non-zero displacement",
     double h  = 0.01;
     double a  = 1.0;
     double D  = E * h*h*h / (12.0 * (1.0 - nu*nu));
-    double w_bar = 2.5;
+    double value_w = 2.5;
 
     Index p = 2, n_elem = 4;
     int   nq = p + 1;
@@ -569,9 +588,10 @@ TEST_CASE("PenaltyCondition RM-3p: prescribed non-zero displacement",
     LinearElasticProblem<double, 2> problem(surface, element, gauss2d);
     // No load — only prescribed displacement via penalty
 
-    const double alpha = 1e6 * D / (a * a * a);
-    add_penalty_all_edges<double>(problem, surface, *element, gauss1d,
-                                  alpha, w_bar);
+    const double penalty = 1e6 * D / (a * a * a);
+    std::vector<Ptr<PatchBoundary<double, 2>>> penalty_boundaries;
+    add_penalty_all_edges<double>(problem, penalty_boundaries, surface, *element, gauss1d,
+                                  penalty, value_w);
 
     Matrix<double> K;
     Vector<double> F;
@@ -583,10 +603,10 @@ TEST_CASE("PenaltyCondition RM-3p: prescribed non-zero displacement",
     Vector<double> u = solver.solve(F);
 
     double w_centre = eval_w_centre(surface, u, ndof);
-    INFO("Prescribed w_bar=" << w_bar << "  w_centre=" << w_centre);
+    INFO("Prescribed value_w=" << value_w << "  w_centre=" << w_centre);
 
     // Interior should be close to the prescribed value (plate rigid-body lift)
-    double rel_err = std::abs(w_centre - w_bar) / std::abs(w_bar);
+    double rel_err = std::abs(w_centre - value_w) / std::abs(value_w);
     REQUIRE(rel_err < 1e-2);
 }
 
@@ -618,16 +638,15 @@ TEST_CASE("PenaltyCondition normal direction: axis-aligned rectangle",
     auto element  = std::make_shared<PlateReissnerMindlin3p<double>>(material);
     GaussLegendre<double, 1> g1(p + 1);
 
-    const double alpha = 1e4;
+    const double penalty = 1e4;
     const Index  ndof  = 3;
     const Index  N     = surface->num_control_pts() * ndof;
 
     // Right edge: param_dim=0, at_start=false  →  n=(1,0), s=(0,1)
-    auto bdy_r = create_boundary<double, 2>(surface, 0, false);
-    PenaltyCondition<double> pen_r(*bdy_r, *element, g1,
-                                    0.0, 0.0,
-                                    alpha, 0.0,
-                                    alpha, 0.0);
+    auto bdy_r = create_patch_boundary<double, 2>(surface, 0, false);
+    PenaltyCondition<double, 2> pen_r(*bdy_r, *element, g1);
+    pen_r.add(std::make_shared<NormalRotation<double>>(), penalty, 0.0);
+    pen_r.add(std::make_shared<TangentialRotation<double>>(), penalty, 0.0);
     DofLayout layout_r;
     auto primal_r = layout_r.allocate(pyck::DofType::Primal, surface->num_control_pts() * ndof, ndof);
     Matrix<double> K_r = Matrix<double>::Zero(N, N);
@@ -635,7 +654,7 @@ TEST_CASE("PenaltyCondition normal direction: axis-aligned rectangle",
     pen_r.apply(K_r, F_r, layout_r, primal_r);
 
     // For each boundary node: K[θx, θy] = 0 (cross-term)
-    // and K[θx, θx] ≈ K[θy, θy] (same mass integral, same alpha)
+    // and K[θx, θx] ≈ K[θy, θy] (same mass integral, same penalty)
     auto edge_nodes = surface->dof_mapper().get_layer_dofs(0, false, 0);
     for (auto node : edge_nodes) {
         double K_xx = K_r(node*ndof+1, node*ndof+1);
@@ -648,11 +667,10 @@ TEST_CASE("PenaltyCondition normal direction: axis-aligned rectangle",
     }
 
     // Bottom edge: param_dim=1, at_start=true  →  n=(0,-1), s=(1,0)
-    auto bdy_b = create_boundary<double, 2>(surface, 1, true);
-    PenaltyCondition<double> pen_b(*bdy_b, *element, g1,
-                                    0.0, 0.0,
-                                    alpha, 0.0,
-                                    alpha, 0.0);
+    auto bdy_b = create_patch_boundary<double, 2>(surface, 1, true);
+    PenaltyCondition<double, 2> pen_b(*bdy_b, *element, g1);
+    pen_b.add(std::make_shared<NormalRotation<double>>(), penalty, 0.0);
+    pen_b.add(std::make_shared<TangentialRotation<double>>(), penalty, 0.0);
     DofLayout layout_b;
     auto primal_b = layout_b.allocate(pyck::DofType::Primal, surface->num_control_pts() * ndof, ndof);
     Matrix<double> K_b = Matrix<double>::Zero(N, N);

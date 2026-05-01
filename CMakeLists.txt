@@ -23,9 +23,10 @@ add_library(catch INTERFACE)
 target_include_directories(catch INTERFACE ${CMAKE_SOURCE_DIR}/external/catch)
 
 # BSpline library
-add_library(pyck_basis 
+add_library(pyck_basis
     cpp/basis/knots.cpp
     cpp/basis/bspline.cpp
+    cpp/basis/nurbs.cpp
     cpp/basis/tensor.cpp
 )
 target_include_directories(pyck_basis PUBLIC cpp/basis)
@@ -107,6 +108,7 @@ add_executable(pyck_tests
     tests/test_main.cpp
     tests/basis/test_knot_vector.cpp
     tests/basis/test_bspline.cpp
+    tests/basis/test_nurbs.cpp
     tests/basis/test_tensor_product.cpp
     tests/geometry/test_curve.cpp
     tests/geometry/test_surface.cpp

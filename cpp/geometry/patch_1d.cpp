@@ -113,35 +113,12 @@ Patch<T, d>::eval_shape_functions(const ColMatrix<T, d>& points, Index span, std
 template <std::floating_point T, std::size_t d>
 ColMatrix<T, 3> Patch<T, d>::eval_geometry(const ColMatrix<T, d>& points, Index span) const requires(d == 1)
 {
-    const Index Q = points.rows();
-    const Index degree = this->tensor_product().basis(0).degree();
-    const auto& knots = this->tensor_product().basis(0).knots();
-
+    // Evaluate via the basis (works uniformly for B-spline and NURBS,
+    // as NURBS::eval_on_span already returns rational shape functions).
     std::array<Index, 1> span_arr = {span};
+    auto basis_fns = this->tensor_product().eval_on_span(points, span_arr, 0);
     auto act_pts = this->active_control_pts(span_arr);
-    ColMatrix<T, 3> result(Q, 3);
-
-    for (Index q = 0; q < Q; ++q)
-    {
-        const T u = points(q, 0);
-        ColMatrix<T, 3> d_interp = act_pts;
-
-        // De Boor's recursion: triangular scheme
-        for (Index r = 1; r <= degree; ++r)
-        {
-            for (Index j = degree; j >= r; --j)
-            {
-                Index knot_idx = span - degree + j;
-                T left  = knots[knot_idx];
-                T right = knots[knot_idx + degree + 1 - r];
-                T denom = right - left;
-                T alpha = (std::abs(denom) > T(1e-14)) ? (u - left) / denom : T(0);
-                d_interp.row(j) = (T(1) - alpha) * d_interp.row(j - 1) + alpha * d_interp.row(j);
-            }
-        }
-        result.row(q) = d_interp.row(degree);
-    }
-    return result;
+    return basis_fns[0] * act_pts;
 }
 
 template <std::floating_point T, std::size_t d>

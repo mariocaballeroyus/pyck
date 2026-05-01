@@ -6,7 +6,11 @@ namespace pyck
 {
 
 /**
- * @brief Helper to compute Greville abscissae for BSpline bases.
+ * @brief Helper to compute Greville abscissae for any basis.
+ *
+ * Delegates to the basis's virtual greville_abscissae() method, which works
+ * for both B-splines and NURBS (the Greville points depend only on the knot
+ * vector and degree).
  *
  * @param bs The basis for which to compute the Greville abscissae.
  * @return A vector of Greville abscissae.
@@ -14,21 +18,8 @@ namespace pyck
 template <std::floating_point T>
 std::vector<T> greville_abscissae(Ptr<const Basis<T>> bs)
 {
-    const Index n = bs->num_basis();
-    const Index p = bs->degree();
-    auto bspline = std::dynamic_pointer_cast<const BSpline<T>>(bs);
-    if (!bspline) {
-        throw std::runtime_error("Greville abscissae requires a BSpline basis.");
-    }
-    const auto& knots_vec = bspline->knots();
-    std::vector<T> xi(n);
-    for (Index i = 0; i < n; ++i) {
-        T sum = T(0);
-        for (Index j = 1; j <= p; ++j)
-            sum += knots_vec[i + j];
-        xi[i] = sum / static_cast<T>(p);
-    }
-    return xi;
+    Vector<T> g = bs->greville_abscissae();
+    return std::vector<T>(g.data(), g.data() + g.size());
 }
 
 template <std::floating_point T>

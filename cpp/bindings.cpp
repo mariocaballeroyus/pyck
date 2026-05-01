@@ -3,6 +3,7 @@
 #include <pybind11/eigen.h>
 
 #include "bspline.hpp"
+#include "nurbs.hpp"
 #include "tensor.hpp"
 #include "factories.hpp"
 #include "evaluation.hpp"
@@ -70,6 +71,19 @@ PYBIND11_MODULE(_pyck, m) {
         .def(py::init<std::size_t, KnotVectorD>(),
              py::arg("degree"), py::arg("knot_vector"))
         .def("knot_vector", &BSplineD::knot_vector,
+             py::return_value_policy::reference_internal);
+
+    using NURBSD = pyck::NURBS<double>;
+    py::class_<NURBSD, BasisD, pyck::Ptr<NURBSD>>(m, "NURBS")
+        .def(py::init<std::size_t, KnotVectorD, std::vector<double>>(),
+             py::arg("degree"), py::arg("knot_vector"), py::arg("weights"))
+        .def("knot_vector", &NURBSD::knot_vector,
+             py::return_value_policy::reference_internal)
+        .def("weights", [](const NURBSD& nb) {
+                 const auto& w = nb.weights();
+                 return py::array_t<double>(w.size(), w.data(),
+                                            py::cast(&nb));
+             },
              py::return_value_policy::reference_internal);
 
     using Patch3D1D = pyck::Patch<double, 1>;
