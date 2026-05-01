@@ -13,7 +13,7 @@ import pyck._pyck as _pyck
 from pyck.basis import Basis, BSpline
 from pyck.basis.knot_vector import create_clamped_uniform_knots
 from pyck.geometry.patch import Patch
-from pyck.geometry.boundary_patch import BoundaryPatch
+from pyck.geometry.patch_boundary import PatchBoundary
 
 
 class SurfacePatch(Patch):
@@ -90,7 +90,7 @@ class SurfacePatch(Patch):
         """Return the basis for the given parametric direction (0=u, 1=v). Gordito."""
         return self._basis_u if direction == 0 else self._basis_v
 
-    def boundary(self, side: str) -> BoundaryPatch:
+    def boundary(self, side: str) -> PatchBoundary:
         """Extract a boundary from this patch.
 
         Parameters
@@ -100,7 +100,7 @@ class SurfacePatch(Patch):
 
         Returns
         -------
-        BoundaryPatch
+        PatchBoundary
             The extracted boundary patch.
         """
         mapping = {
@@ -115,7 +115,7 @@ class SurfacePatch(Patch):
             )
         param_dim, at_start = mapping[side]
         cpp_bp = self._cpp_object.boundary(param_dim, at_start)
-        return BoundaryPatch(cpp_bp, parent=self)
+        return PatchBoundary(cpp_bp, parent=self)
 
     def eval_geometry(self, uv: np.ndarray) -> np.ndarray:
         """Evaluate surface coordinates at parametric values.
@@ -212,35 +212,43 @@ def create_surface_patch(
     return SurfacePatch(basis_u, basis_v, control_pts, name=name)
 
 
-def create_rectangle(
-    nu: int, nv: int, deg: int,
-    l: float, w: float
-) -> SurfacePatch:
-    """Create a rectangular surface patch from basis counts and degree.
+def create_rectangle(*args, **kwargs) -> SurfacePatch:
+    """Create a planar rectangular surface patch.
 
-    Parameters
-    ----------
-    nu, nv : int
-        Number of basis functions in the u and v directions.
-    deg : int
-        Common polynomial degree in both parametric directions.
-    l, w : float
-        Rectangle length and width in physical space.
-
-    Returns
-    -------
-    SurfacePatch
-        A planar rectangular patch spanning `[0, l] x [0, w]` in physical space
-        and `[0, 1] x [0, 1]` in parametric space.
+    Supported call styles are ``create_rectangle(nu, nv, deg, l, w)`` and
+    ``create_rectangle(basis_u, basis_v, l, w)``.
     """
-    knots_u = create_clamped_uniform_knots(deg, nu)
-    knots_v = create_clamped_uniform_knots(deg, nv)
-
-    basis_u = BSpline(deg, knots_u)
-    basis_v = BSpline(deg, knots_v)
+    if kwargs:
+        nu = kwargs.pop("nu")
+        nv = kwargs.pop("nv")
+        deg = kwargs.pop("deg")
+        l = kwargs.pop("l")
+        w = kwargs.pop("w")
+        if kwargs:
+            unexpected = ", ".join(kwargs)
+            raise TypeError(f"Unexpected keyword arguments: {unexpected}")
+        knots_u = create_clamped_uniform_knots(deg, nu)
+        knots_v = create_clamped_uniform_knots(deg, nv)
+        basis_u = BSpline(deg, knots_u)
+        basis_v = BSpline(deg, knots_v)
+    elif len(args) == 5 and isinstance(args[0], Basis) and isinstance(args[1], Basis):
+        basis_u, basis_v, _, l, w = args
+    elif len(args) == 5:
+        nu, nv, deg, l, w = args
+        knots_u = create_clamped_uniform_knots(deg, nu)
+        knots_v = create_clamped_uniform_knots(deg, nv)
+        basis_u = BSpline(deg, knots_u)
+        basis_v = BSpline(deg, knots_v)
+    elif len(args) == 4 and isinstance(args[0], Basis) and isinstance(args[1], Basis):
+        basis_u, basis_v, l, w = args
+    else:
+        raise TypeError(
+            "create_rectangle expects (nu, nv, deg, l, w) or "
+            "(basis_u, basis_v, l, w)."
+        )
 
     cpp_patch = _pyck.rectangle(
-        basis_u._cpp_object, basis_v._cpp_object, l, w
+        basis_u._cpp_object, basis_v._cpp_object, float(l), float(w)
     )
     return SurfacePatch._from_cpp(cpp_patch, basis_u, basis_v)
     

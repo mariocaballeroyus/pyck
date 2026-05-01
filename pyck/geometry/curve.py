@@ -13,7 +13,7 @@ import pyck._pyck as _pyck
 
 from pyck.basis import Basis
 from pyck.geometry.patch import Patch
-from pyck.geometry.boundary_patch import BoundaryPatch
+from pyck.geometry.patch_boundary import PatchBoundary
 
 
 class CurvePatch(Patch):
@@ -68,7 +68,7 @@ class CurvePatch(Patch):
         """B-spline basis in the u parametric direction."""
         return self._basis
 
-    def boundary(self, side: str) -> BoundaryPatch:
+    def boundary(self, side: str) -> PatchBoundary:
         """Extract a boundary from this patch.
 
         Parameters
@@ -78,7 +78,7 @@ class CurvePatch(Patch):
 
         Returns
         -------
-        BoundaryPatch
+        PatchBoundary
             Object carrying the DOF indices on this boundary.
         """
         if side not in ("start", "end"):
@@ -86,7 +86,7 @@ class CurvePatch(Patch):
 
         at_start = side == "start"
         cpp_bp = self._cpp_object.boundary(0, at_start)
-        return BoundaryPatch(cpp_bp, parent=self)
+        return PatchBoundary(cpp_bp, parent=self)
 
     def eval_geometry(self, u: np.ndarray) -> np.ndarray:
         """Evaluate curve coordinates at given parametric values.

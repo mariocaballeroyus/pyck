@@ -114,7 +114,7 @@ class LinearElasticProblem:
  
     def add_condition(
         self,
-        condition: Condition,
+        condition: Condition | Sequence[Condition],
         *,
         patch: str | None = None,
     ) -> None:
@@ -122,11 +122,16 @@ class LinearElasticProblem:
  
         Parameters
         ----------
-        condition : Condition
-            A condition to be applied.
+        condition : Condition or sequence of Condition
+            One condition, or several conditions to be applied.
         patch : str, optional
             Name of the target patch. If None, applied to all patches.
         """
+        if isinstance(condition, (list, tuple)):
+            for item in condition:
+                self.add_condition(item, patch=patch)
+            return
+
         for name in self._resolve_patch_names(patch):
             cpp_obj = condition._cpp_object
             if cpp_obj is None:

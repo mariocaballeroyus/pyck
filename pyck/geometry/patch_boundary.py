@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from pyck.geometry.surface import SurfacePatch
 
 
-class BoundaryPatch:
+class PatchBoundary:
     """A boundary face of a parametric patch.
 
     Typically obtained via :func:`CurvePatch.boundary` or
@@ -21,18 +21,18 @@ class BoundaryPatch:
 
     Parameters
     ----------
-    cpp_object : _pyck.BoundaryPatch1D | _pyck.BoundaryPatch2D
+    cpp_object : _pyck.PatchBoundary1D | _pyck.PatchBoundary2D
         The underlying C++ boundary patch object.
     parent : CurvePatch | SurfacePatch
         The Python-side parent patch.
     """
 
-    _cpp_object: _pyck.BoundaryPatch1D | _pyck.BoundaryPatch2D
+    _cpp_object: _pyck.PatchBoundary1D | _pyck.PatchBoundary2D
     _parent: CurvePatch | SurfacePatch
 
     def __init__(
         self,
-        cpp_object: _pyck.BoundaryPatch1D | _pyck.BoundaryPatch2D,
+        cpp_object: _pyck.PatchBoundary1D | _pyck.PatchBoundary2D,
         parent: CurvePatch | SurfacePatch,
     ) -> None:
         self._cpp_object = cpp_object
@@ -89,7 +89,7 @@ class BoundaryPatch:
         parent_tdim = self._parent.tdim
         if parent_tdim != 2:
             raise NotImplementedError(
-                f"BoundaryPatch.quadrature is only defined for boundaries "
+                f"PatchBoundary.quadrature is only defined for boundaries "
                 f"of 2-D patches (got parent tdim={parent_tdim}). Pass an "
                 f"explicit quadrature rule instead."
             )
@@ -99,7 +99,7 @@ class BoundaryPatch:
 
     def __repr__(self) -> str:
         return (
-            f"BoundaryPatch(side='{self.side}', "
+            f"PatchBoundary(side='{self.side}', "
             f"param_dim={self.param_dim}, "
             f"disp_dofs={self.displacement_dofs}, "
             f"rot_dofs={self.rotation_dofs})"

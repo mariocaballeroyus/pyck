@@ -59,4 +59,9 @@ def create_bspline(degree: int, knots: KnotVector | Sequence[float]) -> BSpline:
     if not isinstance(knots, KnotVector):
         knots = KnotVector(knots)
     return BSpline(degree, knots)
+
+
+def create_clamped_uniform(degree: int, num_basis: int) -> BSpline:
+    """Create a B-spline basis with a clamped uniform knot vector."""
+    return BSpline(degree, create_clamped_uniform_knots(degree, num_basis))
     

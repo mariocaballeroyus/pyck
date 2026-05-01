@@ -16,7 +16,7 @@ import pyck._pyck as _pyck
 
 if typing.TYPE_CHECKING:
     from pyck.assembly.quadrature import QuadratureRule
-    from pyck.geometry.boundary_patch import BoundaryPatch
+    from pyck.geometry.patch_boundary import PatchBoundary
 
 
 class Patch(ABC):
@@ -65,7 +65,7 @@ class Patch(ABC):
         return self._cpp_object.layer_dofs(param_dim, at_start, layer_idx)
 
     @abstractmethod
-    def boundary(self, side: str) -> BoundaryPatch:
+    def boundary(self, side: str) -> PatchBoundary:
         """Extract a boundary patch from this patch."""
 
     @abstractmethod

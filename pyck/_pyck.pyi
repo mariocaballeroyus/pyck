@@ -1,10 +1,38 @@
 from __future__ import annotations
 import collections.abc
+import enum
 import numpy
 import numpy.typing
 import typing
 
-__all__: list[str] = ['BSpline', 'Basis', 'BeamEulerBernoulli1p', 'BeamTimoshenko1p', 'BeamTimoshenko2p', 'BoundaryPatch1d', 'BoundaryPatch2d', 'Condition', 'Constraint', 'CurvePatch', 'DirectConstraint', 'DofMapper1d', 'DofMapper2d', 'Element1d', 'Element2d', 'GaussLegendre', 'GaussLegendre2d', 'GaussLegendre3d', 'KnotVector', 'LagrangeMultiplierCondition2d', 'LinearConstraint', 'LinearElasticProblem1d', 'LinearElasticProblem2d', 'LoadCondition1d', 'LoadCondition2d', 'Material1d', 'Material2d', 'Patch1d', 'Patch2d', 'PenaltyCondition2d', 'PlaneStress2d', 'PlateKirchhoffLove1p', 'PlateReissnerMindlin1p', 'PlateReissnerMindlin3p', 'PlateReissnerMindlinDispl3p', 'PlateReissnerMindlinDispl2p', 'QuadratureRule1d', 'QuadratureRule2d', 'QuadratureRule3d', 'SlenderBeam1d', 'SurfacePatch', 'line_segment', 'rectangle', 'tensor_product', 'tensor_product_1d', 'tensor_product_2d', 'eval_shape_at', 'eval_geometry_at']
+__all__: list[str] = ['BSpline', 'Basis', 'BeamEulerBernoulli1p', 'BeamTimoshenko1p', 'BeamTimoshenko2p', 'BoundaryField', 'PatchBoundary1d', 'PatchBoundary2d', 'Condition', 'Constraint', 'CurvePatch', 'DirectConstraint', 'DofMapper1d', 'DofMapper2d', 'Element1d', 'Element2d', 'GaussLegendre', 'GaussLegendre2d', 'GaussLegendre3d', 'KnotVector', 'LagrangeMultiplierCondition2d', 'LinearConstraint', 'LinearElasticProblem1d', 'LinearElasticProblem2d', 'LoadCondition1d', 'LoadCondition2d', 'Material1d', 'Material2d', 'NitscheCondition2d', 'NormalBendingMoment', 'NormalRotation', 'NormalTransverseShear', 'Patch1d', 'Patch2d', 'PenaltyCondition2d', 'PlaneStress2d', 'PlateKirchhoffLove1p', 'PlateReissnerMindlin1p', 'PlateReissnerMindlin3p', 'PlateReissnerMindlinDispl3p', 'PlateReissnerMindlinDispl2p', 'QuadratureRule1d', 'QuadratureRule2d', 'QuadratureRule3d', 'SlenderBeam1d', 'SurfacePatch', 'TangentialRotation', 'TransverseDisplacement', 'TwistingMoment', 'line_segment', 'rectangle', 'tensor_product', 'tensor_product_1d', 'tensor_product_2d', 'eval_shape_at', 'eval_geometry_at']
+
+class BoundaryField:
+    pass
+
+class TransverseDisplacement(BoundaryField):
+    def __init__(self) -> None:
+        ...
+
+class NormalRotation(BoundaryField):
+    def __init__(self) -> None:
+        ...
+
+class TangentialRotation(BoundaryField):
+    def __init__(self) -> None:
+        ...
+
+class NormalTransverseShear(BoundaryField):
+    def __init__(self) -> None:
+        ...
+
+class NormalBendingMoment(BoundaryField):
+    def __init__(self) -> None:
+        ...
+
+class TwistingMoment(BoundaryField):
+    def __init__(self) -> None:
+        ...
 
 class BSpline(Basis):
     def __init__(self, degree: typing.SupportsInt | typing.SupportsIndex, knot_vector: KnotVector) -> None:
@@ -40,13 +68,13 @@ class BeamTimoshenko2p(Element1d):
     def __init__(self, material: SlenderBeam1d) -> None:
         ...
 
-class BoundaryPatch1d(Patch1d):
+class PatchBoundary1d(Patch1d):
     def at_start(self) -> bool:
         ...
     def param_dim(self) -> int:
         ...
 
-class BoundaryPatch2d(Patch2d):
+class PatchBoundary2d(Patch2d):
     def at_start(self) -> bool:
         ...
     def param_dim(self) -> int:
@@ -220,31 +248,50 @@ class LoadCondition2d(Condition):
 class PenaltyCondition2d(Condition):
     def __init__(
         self,
-        boundary: BoundaryPatch2d,
+        boundary: PatchBoundary2d,
         element: Element2d,
         quadrature: QuadratureRule1d,
-        alpha_w: typing.SupportsFloat | typing.SupportsIndex,
-        w_bar: typing.SupportsFloat | typing.SupportsIndex = 0.0,
-        alpha_phi_n: typing.SupportsFloat | typing.SupportsIndex = 0.0,
-        phi_n_bar: typing.SupportsFloat | typing.SupportsIndex = 0.0,
-        alpha_phi_s: typing.SupportsFloat | typing.SupportsIndex = 0.0,
-        phi_s_bar: typing.SupportsFloat | typing.SupportsIndex = 0.0,
     ) -> None:
+        ...
+    def add(
+        self,
+        field: BoundaryField,
+        penalty: typing.SupportsFloat | typing.SupportsIndex,
+        value: typing.SupportsFloat | typing.SupportsIndex = 0.0,
+    ) -> PenaltyCondition2d:
         ...
 
 class LagrangeMultiplierCondition2d(Condition):
     def __init__(
         self,
-        boundary: BoundaryPatch2d,
+        boundary: PatchBoundary2d,
         element: Element2d,
         quadrature: QuadratureRule1d,
-        enforce_w: bool = True,
-        w_bar: typing.SupportsFloat | typing.SupportsIndex = 0.0,
-        enforce_phi_n: bool = False,
-        phi_n_bar: typing.SupportsFloat | typing.SupportsIndex = 0.0,
-        enforce_phi_s: bool = False,
-        phi_s_bar: typing.SupportsFloat | typing.SupportsIndex = 0.0,
     ) -> None:
+        ...
+    def add(
+        self,
+        field: BoundaryField,
+        value: typing.SupportsFloat | typing.SupportsIndex = 0.0,
+    ) -> LagrangeMultiplierCondition2d:
+        ...
+
+class NitscheCondition2d(Condition):
+    def __init__(
+        self,
+        boundary: PatchBoundary2d,
+        element: Element2d,
+        quadrature: QuadratureRule1d,
+        thickness: typing.SupportsFloat | typing.SupportsIndex,
+    ) -> None:
+        ...
+    def add(
+        self,
+        displacement_field: BoundaryField,
+        traction_field: BoundaryField,
+        penalty: typing.SupportsFloat | typing.SupportsIndex,
+        value: typing.SupportsFloat | typing.SupportsIndex = 0.0,
+    ) -> NitscheCondition2d:
         ...
 
 class Material1d:
@@ -283,7 +330,7 @@ class Patch1d:
         """
     def active_control_pts(self, spans: typing.Annotated[collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex], "FixedSize(1)"]) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 3]"]:
         ...
-    def boundary(self, param_dim: typing.SupportsInt | typing.SupportsIndex, at_start: bool) -> BoundaryPatch1d:
+    def boundary(self, param_dim: typing.SupportsInt | typing.SupportsIndex, at_start: bool) -> PatchBoundary1d:
         """
         Extract a boundary face of this patch.
         """
@@ -310,7 +357,7 @@ class Patch2d:
         """
     def active_control_pts(self, spans: typing.Annotated[collections.abc.Sequence[typing.SupportsInt | typing.SupportsIndex], "FixedSize(2)"]) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 3]"]:
         ...
-    def boundary(self, param_dim: typing.SupportsInt | typing.SupportsIndex, at_start: bool) -> BoundaryPatch2d:
+    def boundary(self, param_dim: typing.SupportsInt | typing.SupportsIndex, at_start: bool) -> PatchBoundary2d:
         """
         Extract a boundary face of this patch.
         """
