@@ -1,5 +1,5 @@
-#ifndef PYCK_NITSCHE_CONDITION_HPP
-#define PYCK_NITSCHE_CONDITION_HPP
+#ifndef PYCK_NITSCHE_BOUNDARY_CONDITION_HPP
+#define PYCK_NITSCHE_BOUNDARY_CONDITION_HPP
 
 #include <Eigen/Dense>
 #include <vector>
@@ -39,13 +39,13 @@ namespace pyck
  */
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-class NitscheCondition : public Condition<T>
+class NitscheBoundaryCondition : public Condition<T>
 {
 public:
-    NitscheCondition(const PatchBoundary<T, d>& boundary,
-                     const Element<T, d>& element,
-                     const QuadratureRule<T, d - 1>& quadrature,
-                     T thickness);
+    NitscheBoundaryCondition(const PatchBoundary<T, d>& boundary,
+                              const Element<T, d>& element,
+                              const QuadratureRule<T, d - 1>& quadrature,
+                              T thickness);
 
     /**
      * @brief Register a Nitsche term on this boundary.
@@ -55,7 +55,7 @@ public:
      * @param penalty            Penalty parameter β; effective coefficient is β/h.
      * @param value              Prescribed value for the displacement field.
      */
-    NitscheCondition& add(Ptr<const BoundaryField<T>> displacement_field,
+    NitscheBoundaryCondition& add(Ptr<const BoundaryField<T>> displacement_field,
                           Ptr<const BoundaryField<T>> traction_field,
                           T penalty,
                           T value = T(0));
@@ -83,4 +83,4 @@ private:
 
 } // namespace pyck
 
-#endif // PYCK_NITSCHE_CONDITION_HPP
+#endif // PYCK_NITSCHE_BOUNDARY_CONDITION_HPP

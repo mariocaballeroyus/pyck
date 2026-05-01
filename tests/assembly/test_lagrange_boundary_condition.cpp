@@ -13,7 +13,7 @@
 #include "direct_constraint.hpp"
 #include "factories.hpp"
 #include "gauss_legendre.hpp"
-#include "lagrange_multiplier_condition.hpp"
+#include "lagrange_boundary_condition.hpp"
 #include "linear_elastic_problem.hpp"
 #include "load_condition.hpp"
 #include "patch.hpp"
@@ -35,7 +35,7 @@ static void add_clamped_lagrange_all_edges(
         for (bool start : {true, false}) {
             auto bdy = create_patch_boundary<T, 2>(surface, dim, start);
             boundaries.push_back(bdy);
-            auto cond = std::make_shared<LagrangeMultiplierCondition<T, 2>>(
+            auto cond = std::make_shared<LagrangeBoundaryCondition<T, 2>>(
                 *boundaries.back(), element, gauss1d);
             cond->add(std::make_shared<TransverseDisplacement<T>>(), T(0));
             cond->add(std::make_shared<NormalRotation<T>>(), T(0));
@@ -80,7 +80,7 @@ static Vector<double> make_uniform_load(
     return load_vals;
 }
 
-TEST_CASE("LagrangeMultiplierCondition augments the system symmetrically", "[conditions][lagrange]")
+TEST_CASE("LagrangeBoundaryCondition augments the system symmetrically", "[conditions][lagrange]")
 {
     Index p = 2;
     Index n = 5;
@@ -95,7 +95,7 @@ TEST_CASE("LagrangeMultiplierCondition augments the system symmetrically", "[con
     GaussLegendre<double, 1> gauss1d(p + 1);
 
     auto boundary = create_patch_boundary<double, 2>(surface, 0, true);
-    auto cond = std::make_shared<LagrangeMultiplierCondition<double, 2>>(
+    auto cond = std::make_shared<LagrangeBoundaryCondition<double, 2>>(
         *boundary, *element, gauss1d);
     cond->add(std::make_shared<TransverseDisplacement<double>>(), 0.0);
     cond->add(std::make_shared<NormalRotation<double>>(), 0.0);
@@ -117,7 +117,7 @@ TEST_CASE("LagrangeMultiplierCondition augments the system symmetrically", "[con
     REQUIRE(F.norm() == Approx(0.0).margin(1e-14));
 }
 
-TEST_CASE("LagrangeMultiplierCondition matches direct clamped RM3 solution", "[conditions][lagrange]")
+TEST_CASE("LagrangeBoundaryCondition matches direct clamped RM3 solution", "[conditions][lagrange]")
 {
     const double E = 1.0e7;
     const double nu = 0.3;
@@ -171,7 +171,7 @@ TEST_CASE("LagrangeMultiplierCondition matches direct clamped RM3 solution", "[c
     REQUIRE(rel < 1e-10);
 }
 
-TEST_CASE("LagrangeMultiplierCondition solves an RM1 simply-supported plate", "[conditions][lagrange]")
+TEST_CASE("LagrangeBoundaryCondition solves an RM1 simply-supported plate", "[conditions][lagrange]")
 {
     const double E = 1.0e7;
     const double nu = 0.3;
@@ -208,7 +208,7 @@ TEST_CASE("LagrangeMultiplierCondition solves an RM1 simply-supported plate", "[
         for (bool start : {true, false}) {
             auto bdy = create_patch_boundary<double, 2>(surface, dim, start);
             lm_boundaries.push_back(bdy);
-            auto cond = std::make_shared<LagrangeMultiplierCondition<double, 2>>(
+            auto cond = std::make_shared<LagrangeBoundaryCondition<double, 2>>(
                 *lm_boundaries.back(), *element, gauss1d);
             cond->add(std::make_shared<TransverseDisplacement<double>>(), 0.0);
             cond->add(std::make_shared<TangentialRotation<double>>(), 0.0);

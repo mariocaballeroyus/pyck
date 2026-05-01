@@ -13,7 +13,7 @@ class Condition(Protocol):
     """Protocol for conditions contributing to the global system.
 
     A condition may either expose a ready-to-use C++ object immediately
-    (for example ``PenaltyCondition``), or build it lazily during assembly
+    (for example ``PenaltyBoundaryCondition``), or build it lazily during assembly
     (for example ``LoadCondition``).
     """
 

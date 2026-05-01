@@ -15,20 +15,20 @@ from pyck.conditions.load_condition import (
     create_constant_load_condition,
     create_load_condition,
 )
-from pyck.conditions.lagrange_multiplier_condition import (
-    LagrangeMultiplierCondition,
+from pyck.conditions.lagrange_boundary_condition import (
+    LagrangeBoundaryCondition,
     create_displacement_lagrange,
     create_simply_supported_lagrange,
     create_clamped_lagrange,
 )
-from pyck.conditions.nitsche_condition import (
-    NitscheCondition,
+from pyck.conditions.nitsche_boundary_condition import (
+    NitscheBoundaryCondition,
     create_clamped_nitsche,
     create_displacement_nitsche,
     create_simply_supported_nitsche,
 )
-from pyck.conditions.penalty_condition import (
-    PenaltyCondition,
+from pyck.conditions.penalty_boundary_condition import (
+    PenaltyBoundaryCondition,
     create_displacement_penalty,
     create_simply_supported_penalty,
     create_clamped_penalty,
@@ -48,15 +48,15 @@ __all__ = [
     "LoadCondition",
     "create_constant_load_condition",
     "create_load_condition",
-    "LagrangeMultiplierCondition",
+    "LagrangeBoundaryCondition",
     "create_displacement_lagrange",
     "create_simply_supported_lagrange",
     "create_clamped_lagrange",
-    "NitscheCondition",
+    "NitscheBoundaryCondition",
     "create_clamped_nitsche",
     "create_displacement_nitsche",
     "create_simply_supported_nitsche",
-    "PenaltyCondition",
+    "PenaltyBoundaryCondition",
     "create_displacement_penalty",
     "create_simply_supported_penalty",
     "create_clamped_penalty",

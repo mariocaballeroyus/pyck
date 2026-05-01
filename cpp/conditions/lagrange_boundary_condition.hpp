@@ -1,5 +1,5 @@
-#ifndef PYCK_LAGRANGE_MULTIPLIER_CONDITION_HPP
-#define PYCK_LAGRANGE_MULTIPLIER_CONDITION_HPP
+#ifndef PYCK_LAGRANGE_MULTIPLIER_BOUNDARY_CONDITION_HPP
+#define PYCK_LAGRANGE_MULTIPLIER_BOUNDARY_CONDITION_HPP
 
 #include <Eigen/Dense>
 #include <vector>
@@ -28,12 +28,12 @@ namespace pyck
  */
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-class LagrangeMultiplierCondition : public Condition<T>
+class LagrangeBoundaryCondition : public Condition<T>
 {
 public:
-    LagrangeMultiplierCondition(const PatchBoundary<T, d>& boundary,
-                                const Element<T, d>& element,
-                                const QuadratureRule<T, d - 1>& quadrature);
+    LagrangeBoundaryCondition(const PatchBoundary<T, d>& boundary,
+                                        const Element<T, d>& element,
+                                        const QuadratureRule<T, d - 1>& quadrature);
 
     /**
      * @brief Register a field to be enforced on this boundary.
@@ -41,7 +41,7 @@ public:
      * @param field  Physical field (e.g. transverse displacement, normal rotation).
      * @param value  Prescribed value.
      */
-    LagrangeMultiplierCondition& add(Ptr<const BoundaryField<T>> field,
+    LagrangeBoundaryCondition& add(Ptr<const BoundaryField<T>> field,
                                      T value = T(0));
 
     std::size_t num_dofs() const override;
@@ -70,4 +70,4 @@ private:
 
 } // namespace pyck
 
-#endif // PYCK_LAGRANGE_MULTIPLIER_CONDITION_HPP
+#endif // PYCK_LAGRANGE_MULTIPLIER_BOUNDARY_CONDITION_HPP

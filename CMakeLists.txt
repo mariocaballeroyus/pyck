@@ -74,9 +74,9 @@ target_link_libraries(pyck_assembly PUBLIC eigen pyck_elements pyck_conditions p
 # Conditions library
 add_library(pyck_conditions
     cpp/conditions/load_condition.cpp
-    cpp/conditions/penalty_condition.cpp
-    cpp/conditions/lagrange_multiplier_condition.cpp
-    cpp/conditions/nitsche_condition.cpp
+    cpp/conditions/penalty_boundary_condition.cpp
+    cpp/conditions/lagrange_boundary_condition.cpp
+    cpp/conditions/nitsche_boundary_condition.cpp
 )
 target_include_directories(pyck_conditions PUBLIC cpp/conditions)
 target_link_libraries(pyck_conditions PUBLIC pyck_geometry pyck_assembly)
@@ -121,8 +121,8 @@ add_executable(pyck_tests
     tests/assembly/test_constraints.cpp
     tests/assembly/test_load_condition.cpp
     tests/assembly/test_materials.cpp
-    tests/assembly/test_penalty_condition.cpp
-    tests/assembly/test_lagrange_multiplier_condition.cpp
+    tests/assembly/test_penalty_boundary_condition.cpp
+    tests/assembly/test_lagrange_boundary_condition.cpp
 )
 target_link_libraries(pyck_tests PRIVATE 
     pyck_basis 

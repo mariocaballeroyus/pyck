@@ -26,16 +26,10 @@ def _solve_rm_displ_3p_case(L, W, h, f0, p, n, bc_method):
                 ck.create_simply_supported_lagrange(boundary, gauss1d)
             )
         elif bc_method == "penalty":
-            problem.add_condition(
-                ck.PenaltyCondition(
-                    boundary,
-                    gauss1d,
-                    alpha_w=1.0e7,
-                    w_bar=0.0,
-                    alpha_phi_s=1.0e7,
-                    phi_s_bar=0.0,
-                )
-            )
+            cond = ck.PenaltyBoundaryCondition(boundary, gauss1d)
+            cond.add("w", 1.0e7, 0.0)
+            cond.add("rot_s", 1.0e7, 0.0)
+            problem.add_condition(cond)
         else:
             raise ValueError(f"Unknown bc_method: {bc_method}")
 

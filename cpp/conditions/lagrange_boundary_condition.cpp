@@ -1,4 +1,4 @@
-#include "lagrange_multiplier_condition.hpp"
+#include "lagrange_boundary_condition.hpp"
 
 #include "patch_boundary.hpp"
 #include "patch.hpp"
@@ -12,7 +12,7 @@ namespace pyck
 
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-LagrangeMultiplierCondition<T, d>::LagrangeMultiplierCondition(
+LagrangeBoundaryCondition<T, d>::LagrangeBoundaryCondition(
     const PatchBoundary<T, d>& boundary,
     const Element<T, d>& element,
     const QuadratureRule<T, d - 1>& quadrature)
@@ -23,7 +23,7 @@ LagrangeMultiplierCondition<T, d>::LagrangeMultiplierCondition(
 {
     if (multiplier_dof_count_ == 0) {
         throw std::invalid_argument(
-            "LagrangeMultiplierCondition: "
+            "LagrangeBoundaryCondition: "
             "boundary has no active basis functions."
         );
     }
@@ -31,12 +31,12 @@ LagrangeMultiplierCondition<T, d>::LagrangeMultiplierCondition(
 
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-LagrangeMultiplierCondition<T, d>& LagrangeMultiplierCondition<T, d>::add(
+LagrangeBoundaryCondition<T, d>& LagrangeBoundaryCondition<T, d>::add(
     Ptr<const BoundaryField<T>> field, T value)
 {
     if (!field) {
         throw std::invalid_argument(
-            "LagrangeMultiplierCondition::add: field must not be null.");
+            "LagrangeBoundaryCondition::add: field must not be null.");
     }
     terms_.push_back({std::move(field), value, 0});
     return *this;
@@ -44,14 +44,14 @@ LagrangeMultiplierCondition<T, d>& LagrangeMultiplierCondition<T, d>::add(
 
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-std::size_t LagrangeMultiplierCondition<T, d>::num_dofs() const
+std::size_t LagrangeBoundaryCondition<T, d>::num_dofs() const
 {
     return static_cast<std::size_t>(multiplier_dof_count_) * terms_.size();
 }
 
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-void LagrangeMultiplierCondition<T, d>::allocate_dofs(
+void LagrangeBoundaryCondition<T, d>::allocate_dofs(
     DofLayout& layout, DofLayout::BlockId primal_block)
 {
     (void)primal_block;
@@ -63,7 +63,7 @@ void LagrangeMultiplierCondition<T, d>::allocate_dofs(
 
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-void LagrangeMultiplierCondition<T, d>::apply(
+void LagrangeBoundaryCondition<T, d>::apply(
     Matrix<T>& stiffness, Vector<T>& load, const DofLayout& layout,
     DofLayout::BlockId primal_block) const
 {
@@ -141,10 +141,10 @@ void LagrangeMultiplierCondition<T, d>::apply(
     }
 }
 
-template class LagrangeMultiplierCondition<double, 2>;
+template class LagrangeBoundaryCondition<double, 2>;
 
 #ifdef PYCK_BUILD_SINGLE_PRECISION
-template class LagrangeMultiplierCondition<float, 2>;
+template class LagrangeBoundaryCondition<float, 2>;
 #endif
 
 } // namespace pyck

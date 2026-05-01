@@ -1,4 +1,4 @@
-#include "nitsche_condition.hpp"
+#include "nitsche_boundary_condition.hpp"
 
 #include "patch_boundary.hpp"
 #include "patch.hpp"
@@ -11,7 +11,7 @@ namespace pyck
 
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-NitscheCondition<T, d>::NitscheCondition(
+NitscheBoundaryCondition<T, d>::NitscheBoundaryCondition(
     const PatchBoundary<T, d>& boundary,
     const Element<T, d>& element,
     const QuadratureRule<T, d - 1>& quadrature,
@@ -22,13 +22,13 @@ NitscheCondition<T, d>::NitscheCondition(
       thickness_(thickness)
 {
     if (thickness_ <= T(0)) {
-        throw std::invalid_argument("NitscheCondition: thickness must be positive.");
+        throw std::invalid_argument("NitscheBoundaryCondition: thickness must be positive.");
     }
 }
 
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-NitscheCondition<T, d>& NitscheCondition<T, d>::add(
+NitscheBoundaryCondition<T, d>& NitscheBoundaryCondition<T, d>::add(
     Ptr<const BoundaryField<T>> displacement_field,
     Ptr<const BoundaryField<T>> traction_field,
     T penalty,
@@ -36,11 +36,11 @@ NitscheCondition<T, d>& NitscheCondition<T, d>::add(
 {
     if (!displacement_field) {
         throw std::invalid_argument(
-            "NitscheCondition::add: displacement_field must not be null.");
+            "NitscheBoundaryCondition::add: displacement_field must not be null.");
     }
     if (!traction_field) {
         throw std::invalid_argument(
-            "NitscheCondition::add: traction_field must not be null.");
+            "NitscheBoundaryCondition::add: traction_field must not be null.");
     }
     terms_.push_back({std::move(displacement_field),
                       std::move(traction_field), penalty, value});
@@ -49,7 +49,7 @@ NitscheCondition<T, d>& NitscheCondition<T, d>::add(
 
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-void NitscheCondition<T, d>::apply(Matrix<T>& stiffness,
+void NitscheBoundaryCondition<T, d>::apply(Matrix<T>& stiffness,
                                    Vector<T>& load,
                                    const DofLayout& layout,
                                    DofLayout::BlockId primal_block) const
@@ -145,10 +145,10 @@ void NitscheCondition<T, d>::apply(Matrix<T>& stiffness,
     }
 }
 
-template class NitscheCondition<double, 2>;
+template class NitscheBoundaryCondition<double, 2>;
 
 #ifdef PYCK_BUILD_SINGLE_PRECISION
-template class NitscheCondition<float, 2>;
+template class NitscheBoundaryCondition<float, 2>;
 #endif
 
 } // namespace pyck

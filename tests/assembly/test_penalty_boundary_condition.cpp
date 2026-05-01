@@ -17,7 +17,7 @@
 #include "linear_elastic_problem.hpp"
 #include "load_condition.hpp"
 #include "direct_constraint.hpp"
-#include "penalty_condition.hpp"
+#include "penalty_boundary_condition.hpp"
 #include "dof_layout.hpp"
 #include "plane_stress_2d.hpp"
 #include "plate_kirchhoff_love_1p.hpp"
@@ -72,7 +72,7 @@ static void add_penalty_all_edges(
         for (bool start : {true, false}) {
             auto bdy = create_patch_boundary<T, 2>(surface, dim, start);
             boundaries.push_back(bdy);
-            auto cond = std::make_shared<PenaltyCondition<T, 2>>(
+            auto cond = std::make_shared<PenaltyBoundaryCondition<T, 2>>(
                 *boundaries.back(), element, gauss1d);
             if (penalty_w != T(0)) {
                 cond->add(std::make_shared<TransverseDisplacement<T>>(),
@@ -120,7 +120,7 @@ static double eval_w_centre(const Ptr<Patch<double,2>>& surf,
 // ===========================================================================
 // TEST 1 — Structural checks: symmetry and zero-alpha no-contribution
 // ===========================================================================
-TEST_CASE("PenaltyCondition structural properties", "[conditions][penalty]")
+TEST_CASE("PenaltyBoundaryCondition structural properties", "[conditions][penalty]")
 {
     Index p = 2, n = 4;
     auto bsp = std::make_shared<BSpline<double>>(
@@ -145,7 +145,7 @@ TEST_CASE("PenaltyCondition structural properties", "[conditions][penalty]")
 
     SECTION("Stiffness is symmetric for w-only penalty")
     {
-        PenaltyCondition<double, 2> pen(*bdy, *elem_rm3, g1);
+        PenaltyBoundaryCondition<double, 2> pen(*bdy, *elem_rm3, g1);
         pen.add(std::make_shared<TransverseDisplacement<double>>(), 1e6, 0.0);
         auto [layout, primal] = setup_layout_rm3();
         Matrix<double> K = Matrix<double>::Zero(N_dof_rm3, N_dof_rm3);
@@ -156,7 +156,7 @@ TEST_CASE("PenaltyCondition structural properties", "[conditions][penalty]")
 
     SECTION("Stiffness is symmetric with all three penalties")
     {
-        PenaltyCondition<double, 2> pen(*bdy, *elem_rm3, g1);
+        PenaltyBoundaryCondition<double, 2> pen(*bdy, *elem_rm3, g1);
         pen.add(std::make_shared<TransverseDisplacement<double>>(), 1e6, 0.0);
         pen.add(std::make_shared<NormalRotation<double>>(), 1e6, 0.0);
         pen.add(std::make_shared<TangentialRotation<double>>(), 1e6, 0.0);
@@ -169,7 +169,7 @@ TEST_CASE("PenaltyCondition structural properties", "[conditions][penalty]")
 
     SECTION("Zero alpha contributes nothing to K and F")
     {
-        PenaltyCondition<double, 2> pen(*bdy, *elem_rm3, g1);
+        PenaltyBoundaryCondition<double, 2> pen(*bdy, *elem_rm3, g1);
         pen.add(std::make_shared<TransverseDisplacement<double>>(), 0.0, 5.0);
         pen.add(std::make_shared<NormalRotation<double>>(), 0.0, 3.0);
         pen.add(std::make_shared<TangentialRotation<double>>(), 0.0, 1.0);
@@ -186,7 +186,7 @@ TEST_CASE("PenaltyCondition structural properties", "[conditions][penalty]")
     {
         auto elem_kl = std::make_shared<PlateKirchhoffLove1p<double>>(material);
         auto bdy_kl  = create_patch_boundary<double, 2>(surface, 1, true);  // bottom edge
-        PenaltyCondition<double, 2> pen(*bdy_kl, *elem_kl, g1);
+        PenaltyBoundaryCondition<double, 2> pen(*bdy_kl, *elem_kl, g1);
         pen.add(std::make_shared<TransverseDisplacement<double>>(), 1e6, 0.0);
 
         DofLayout layout;
@@ -207,7 +207,7 @@ TEST_CASE("PenaltyCondition structural properties", "[conditions][penalty]")
 // ===========================================================================
 // TEST 2 — KL plate: penalty SS BCs reproduce Navier bi-sinusoidal solution
 // ===========================================================================
-TEST_CASE("PenaltyCondition KL plate: SS via penalty matches Navier", "[conditions][penalty]")
+TEST_CASE("PenaltyBoundaryCondition KL plate: SS via penalty matches Navier", "[conditions][penalty]")
 {
     double E  = 1.0e7;
     double nu = 0.3;
@@ -290,7 +290,7 @@ TEST_CASE("PenaltyCondition KL plate: SS via penalty matches Navier", "[conditio
 // ===========================================================================
 // TEST 3 — RM-1p plate: penalty SS BCs reproduce Navier solution
 // ===========================================================================
-TEST_CASE("PenaltyCondition RM-1p plate: SS via penalty matches Navier", "[conditions][penalty]")
+TEST_CASE("PenaltyBoundaryCondition RM-1p plate: SS via penalty matches Navier", "[conditions][penalty]")
 {
     double E  = 1.0e7;
     double nu = 0.3;
@@ -358,7 +358,7 @@ TEST_CASE("PenaltyCondition RM-1p plate: SS via penalty matches Navier", "[condi
 // ===========================================================================
 // TEST 4 — RM-3p plate: w-only penalty (SS) matches Navier
 // ===========================================================================
-TEST_CASE("PenaltyCondition RM-3p plate: SS (w-only) matches Navier", "[conditions][penalty]")
+TEST_CASE("PenaltyBoundaryCondition RM-3p plate: SS (w-only) matches Navier", "[conditions][penalty]")
 {
     double E  = 1.0e7;
     double nu = 0.3;
@@ -430,7 +430,7 @@ TEST_CASE("PenaltyCondition RM-3p plate: SS (w-only) matches Navier", "[conditio
 // ===========================================================================
 // TEST 5 — RM-3p plate: clamped via penalty agrees with DirectConstraint reference
 // ===========================================================================
-TEST_CASE("PenaltyCondition RM-3p plate: clamped BCs agree with DirectConstraint",
+TEST_CASE("PenaltyBoundaryCondition RM-3p plate: clamped BCs agree with DirectConstraint",
           "[conditions][penalty]")
 {
     double E  = 1.0e7;
@@ -560,7 +560,7 @@ TEST_CASE("PenaltyCondition RM-3p plate: clamped BCs agree with DirectConstraint
 // A plate with uniform prescribed value_w != 0 on all edges, zero load.
 // The expected solution is a rigid-body lift: w ≈ value_w everywhere.
 // ===========================================================================
-TEST_CASE("PenaltyCondition RM-3p: prescribed non-zero displacement",
+TEST_CASE("PenaltyBoundaryCondition RM-3p: prescribed non-zero displacement",
           "[conditions][penalty]")
 {
     double E  = 1.0e7;
@@ -615,7 +615,7 @@ TEST_CASE("PenaltyCondition RM-3p: prescribed non-zero displacement",
 // For an axis-aligned rectangle, normal contribution to K_φn must vanish
 // in the direction parallel to the boundary (where n is perpendicular).
 // ===========================================================================
-TEST_CASE("PenaltyCondition normal direction: axis-aligned rectangle",
+TEST_CASE("PenaltyBoundaryCondition normal direction: axis-aligned rectangle",
           "[conditions][penalty]")
 {
     // For a boundary at x = const (param_dim=0), outward normal n = (±1, 0).
@@ -644,7 +644,7 @@ TEST_CASE("PenaltyCondition normal direction: axis-aligned rectangle",
 
     // Right edge: param_dim=0, at_start=false  →  n=(1,0), s=(0,1)
     auto bdy_r = create_patch_boundary<double, 2>(surface, 0, false);
-    PenaltyCondition<double, 2> pen_r(*bdy_r, *element, g1);
+    PenaltyBoundaryCondition<double, 2> pen_r(*bdy_r, *element, g1);
     pen_r.add(std::make_shared<NormalRotation<double>>(), penalty, 0.0);
     pen_r.add(std::make_shared<TangentialRotation<double>>(), penalty, 0.0);
     DofLayout layout_r;
@@ -668,7 +668,7 @@ TEST_CASE("PenaltyCondition normal direction: axis-aligned rectangle",
 
     // Bottom edge: param_dim=1, at_start=true  →  n=(0,-1), s=(1,0)
     auto bdy_b = create_patch_boundary<double, 2>(surface, 1, true);
-    PenaltyCondition<double, 2> pen_b(*bdy_b, *element, g1);
+    PenaltyBoundaryCondition<double, 2> pen_b(*bdy_b, *element, g1);
     pen_b.add(std::make_shared<NormalRotation<double>>(), penalty, 0.0);
     pen_b.add(std::make_shared<TangentialRotation<double>>(), penalty, 0.0);
     DofLayout layout_b;

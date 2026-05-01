@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from pyck.geometry.patch_boundary import PatchBoundary
 
 
-class NitscheCondition:
+class NitscheBoundaryCondition:
     """Nitsche method for weakly enforcing boundary fields.
 
     Stable, consistent, and symmetric Dirichlet enforcement without auxiliary
@@ -24,7 +24,7 @@ class NitscheCondition:
     the ``thickness`` passed at construction.
     """
 
-    _cpp_object: _pyck.NitscheCondition2d | None
+    _cpp_object: _pyck.NitscheBoundaryCondition2d | None
 
     def __init__(
         self,
@@ -34,11 +34,11 @@ class NitscheCondition:
     ) -> None:
         if not isinstance(boundary._cpp_object, _pyck.PatchBoundary2d):
             raise TypeError(
-                f"NitscheCondition requires a 2-D boundary patch, "
+                f"NitscheBoundaryCondition requires a 2-D boundary patch, "
                 f"got {type(boundary._cpp_object).__name__}."
             )
         if thickness <= 0.0:
-            raise ValueError("NitscheCondition: thickness must be positive.")
+            raise ValueError("NitscheBoundaryCondition: thickness must be positive.")
 
         self._boundary = boundary
         self._thickness = float(thickness)
@@ -54,7 +54,7 @@ class NitscheCondition:
         traction_field: FieldName | _pyck.BoundaryField,
         penalty: float,
         value: float = 0.0,
-    ) -> "NitscheCondition":
+    ) -> "NitscheBoundaryCondition":
         """Add a Nitsche term to enforce on this boundary.
 
         Parameters
@@ -71,7 +71,7 @@ class NitscheCondition:
 
         Returns
         -------
-        NitscheCondition
+        NitscheBoundaryCondition
             Self, to allow chaining.
         """
         if self._cpp_object is not None:
@@ -91,7 +91,7 @@ class NitscheCondition:
     def bind(self, _: "QuadratureRule", element: "Element") -> None:
         """Build the C++ object using the element from the parent problem."""
         rule = self._quadrature if self._quadrature is not None else self._boundary.quadrature
-        cpp = _pyck.NitscheCondition2d(
+        cpp = _pyck.NitscheBoundaryCondition2d(
             self._boundary._cpp_object,
             element._cpp_object,
             rule._cpp_object,
@@ -103,7 +103,7 @@ class NitscheCondition:
 
     def __repr__(self) -> str:
         return (
-            f"NitscheCondition(thickness={self._thickness!r}, "
+            f"NitscheBoundaryCondition(thickness={self._thickness!r}, "
             f"num_terms={len(self._terms)})"
         )
 
@@ -113,7 +113,7 @@ def create_clamped_nitsche(
     thickness: float,
     penalty: float,
     quadrature: "QuadratureRule | None" = None,
-) -> NitscheCondition:
+) -> NitscheBoundaryCondition:
     """Create a clamped Nitsche condition (W = 0, ROT_N = 0, ROT_S = 0).
 
     Pairs each displacement field with its work-conjugate traction:
@@ -121,7 +121,7 @@ def create_clamped_nitsche(
       * rot_n ↔  m_n
       * rot_s ↔  m_{ns}
     """
-    cond = NitscheCondition(boundary, thickness, quadrature)
+    cond = NitscheBoundaryCondition(boundary, thickness, quadrature)
     cond.add("w",     "q_n",  penalty, 0.0)
     cond.add("rot_n", "m_n",  penalty, 0.0)
     cond.add("rot_s", "m_ns", penalty, 0.0)
@@ -133,9 +133,9 @@ def create_simply_supported_nitsche(
     thickness: float,
     penalty: float,
     quadrature: "QuadratureRule | None" = None,
-) -> NitscheCondition:
+) -> NitscheBoundaryCondition:
     """Create a simply-supported Nitsche condition (W = 0, ROT_S = 0)."""
-    cond = NitscheCondition(boundary, thickness, quadrature)
+    cond = NitscheBoundaryCondition(boundary, thickness, quadrature)
     cond.add("w",     "q_n",  penalty, 0.0)
     cond.add("rot_s", "m_ns", penalty, 0.0)
     return cond
@@ -147,8 +147,8 @@ def create_displacement_nitsche(
     penalty: float,
     value_w: float = 0.0,
     quadrature: "QuadratureRule | None" = None,
-) -> NitscheCondition:
+) -> NitscheBoundaryCondition:
     """Create a displacement-only Nitsche condition (W = value_w)."""
-    cond = NitscheCondition(boundary, thickness, quadrature)
+    cond = NitscheBoundaryCondition(boundary, thickness, quadrature)
     cond.add("w", "q_n", penalty, value_w)
     return cond

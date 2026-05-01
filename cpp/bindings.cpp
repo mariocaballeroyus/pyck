@@ -16,9 +16,9 @@
 #include "boundary_field.hpp"
 #include "condition.hpp"
 #include "load_condition.hpp"
-#include "lagrange_multiplier_condition.hpp"
-#include "nitsche_condition.hpp"
-#include "penalty_condition.hpp"
+#include "lagrange_boundary_condition.hpp"
+#include "nitsche_boundary_condition.hpp"
+#include "penalty_boundary_condition.hpp"
 #include "linear_constraint.hpp"
 #include "beam_timoshenko_1p.hpp"
 #include "beam_timoshenko_2p.hpp"
@@ -467,8 +467,8 @@ PYBIND11_MODULE(_pyck, m) {
         .def(py::init<const Patch3D2D&, const Elem2D&, const QR2D&, const pyck::Vector<double>&>(),
              py::arg("patch"), py::arg("element"), py::arg("quadrature"), py::arg("load_values"));
 
-    using PenCond2D = pyck::PenaltyCondition<double, 2>;
-    py::class_<PenCond2D, CondD, pyck::Ptr<PenCond2D>>(m, "PenaltyCondition2d")
+    using PenCond2D = pyck::PenaltyBoundaryCondition<double, 2>;
+    py::class_<PenCond2D, CondD, pyck::Ptr<PenCond2D>>(m, "PenaltyBoundaryCondition2d")
         .def(py::init<const PatchBoundary2D&, const Elem2D&, const QR1D&>(),
              py::arg("boundary"), py::arg("element"), py::arg("quadrature"))
         .def("add",
@@ -481,8 +481,8 @@ PYBIND11_MODULE(_pyck, m) {
              py::arg("field"), py::arg("penalty"), py::arg("value") = 0.0,
              py::return_value_policy::reference);
 
-    using LMCond2D = pyck::LagrangeMultiplierCondition<double, 2>;
-    py::class_<LMCond2D, CondD, pyck::Ptr<LMCond2D>>(m, "LagrangeMultiplierCondition2d")
+    using LMCond2D = pyck::LagrangeBoundaryCondition<double, 2>;
+    py::class_<LMCond2D, CondD, pyck::Ptr<LMCond2D>>(m, "LagrangeBoundaryCondition2d")
         .def(py::init<const PatchBoundary2D&, const Elem2D&, const QR1D&>(),
              py::arg("boundary"), py::arg("element"), py::arg("quadrature"))
         .def("add",
@@ -494,8 +494,8 @@ PYBIND11_MODULE(_pyck, m) {
              py::arg("field"), py::arg("value") = 0.0,
              py::return_value_policy::reference);
 
-    using NitCond2D = pyck::NitscheCondition<double, 2>;
-    py::class_<NitCond2D, CondD, pyck::Ptr<NitCond2D>>(m, "NitscheCondition2d")
+    using NitCond2D = pyck::NitscheBoundaryCondition<double, 2>;
+    py::class_<NitCond2D, CondD, pyck::Ptr<NitCond2D>>(m, "NitscheBoundaryCondition2d")
         .def(py::init<const PatchBoundary2D&, const Elem2D&, const QR1D&, double>(),
              py::arg("boundary"), py::arg("element"), py::arg("quadrature"),
              py::arg("thickness"))

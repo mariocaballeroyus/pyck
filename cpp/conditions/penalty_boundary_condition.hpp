@@ -1,5 +1,5 @@
-#ifndef PYCK_PENALTY_CONDITION_HPP
-#define PYCK_PENALTY_CONDITION_HPP
+#ifndef PYCK_PENALTY_BOUNDARY_CONDITION_HPP
+#define PYCK_PENALTY_BOUNDARY_CONDITION_HPP
 
 #include <Eigen/Dense>
 #include <vector>
@@ -27,12 +27,12 @@ namespace pyck
  */
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-class PenaltyCondition : public Condition<T>
+class PenaltyBoundaryCondition : public Condition<T>
 {
 public:
-    PenaltyCondition(const PatchBoundary<T, d>& boundary,
-                     const Element<T, d>& element,
-                     const QuadratureRule<T, d - 1>& quadrature);
+    PenaltyBoundaryCondition(const PatchBoundary<T, d>& boundary,
+                              const Element<T, d>& element,
+                              const QuadratureRule<T, d - 1>& quadrature);
 
     /**
      * @brief Register a field to be enforced on this boundary.
@@ -41,7 +41,7 @@ public:
      * @param penalty  Penalty factor.
      * @param value    Prescribed value.
      */
-    PenaltyCondition& add(Ptr<const BoundaryField<T>> field,
+    PenaltyBoundaryCondition& add(Ptr<const BoundaryField<T>> field,
                           T penalty,
                           T value = T(0));
 
@@ -66,4 +66,4 @@ private:
 
 } // namespace pyck
 
-#endif // PYCK_PENALTY_CONDITION_HPP
+#endif // PYCK_PENALTY_BOUNDARY_CONDITION_HPP

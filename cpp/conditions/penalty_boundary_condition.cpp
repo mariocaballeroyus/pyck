@@ -1,4 +1,4 @@
-#include "penalty_condition.hpp"
+#include "penalty_boundary_condition.hpp"
 
 #include "patch_boundary.hpp"
 #include "patch.hpp"
@@ -11,7 +11,7 @@ namespace pyck
 
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-PenaltyCondition<T, d>::PenaltyCondition(
+PenaltyBoundaryCondition<T, d>::PenaltyBoundaryCondition(
     const PatchBoundary<T, d>& boundary,
     const Element<T, d>& element,
     const QuadratureRule<T, d - 1>& quadrature)
@@ -22,11 +22,11 @@ PenaltyCondition<T, d>::PenaltyCondition(
 
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-PenaltyCondition<T, d>& PenaltyCondition<T, d>::add(
+PenaltyBoundaryCondition<T, d>& PenaltyBoundaryCondition<T, d>::add(
     Ptr<const BoundaryField<T>> field, T penalty, T value)
 {
     if (!field) {
-        throw std::invalid_argument("PenaltyCondition::add: field must not be null.");
+        throw std::invalid_argument("PenaltyBoundaryCondition::add: field must not be null.");
     }
     terms_.push_back({std::move(field), penalty, value});
     return *this;
@@ -34,7 +34,7 @@ PenaltyCondition<T, d>& PenaltyCondition<T, d>::add(
 
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-void PenaltyCondition<T, d>::apply(Matrix<T>& stiffness,
+void PenaltyBoundaryCondition<T, d>::apply(Matrix<T>& stiffness,
                                    Vector<T>& load,
                                    const DofLayout& layout,
                                    DofLayout::BlockId primal_block) const
@@ -106,10 +106,10 @@ void PenaltyCondition<T, d>::apply(Matrix<T>& stiffness,
     }
 }
 
-template class PenaltyCondition<double, 2>;
+template class PenaltyBoundaryCondition<double, 2>;
 
 #ifdef PYCK_BUILD_SINGLE_PRECISION
-template class PenaltyCondition<float, 2>;
+template class PenaltyBoundaryCondition<float, 2>;
 #endif
 
 } // namespace pyck

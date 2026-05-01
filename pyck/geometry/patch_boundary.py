@@ -80,8 +80,8 @@ class PatchBoundary:
         For a 2-D surface boundary this returns a 1-D rule with
         ``deg_tangent + 1`` points, where the tangent direction is the
         parametric direction *not* normal to the boundary. Used as the
-        fallback rule by :class:`PenaltyCondition`,
-        :class:`LagrangeMultiplierCondition`, and their factories when no
+        fallback rule by :class:`PenaltyBoundaryCondition`,
+        :class:`LagrangeBoundaryCondition`, and their factories when no
         explicit quadrature is provided.
         """
         from pyck.assembly.gauss import GaussLegendre

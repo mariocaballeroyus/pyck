@@ -13,14 +13,10 @@ def test_lagrange_multiplier_condition_augments_system():
 
     boundary = surface.boundary("u0")
     problem = ck.create_linear_elastic_problem([surface], element, gauss2d)
-    problem.add_condition(
-        ck.LagrangeMultiplierCondition(
-            boundary,
-            gauss1d,
-            w_bar=0.0,
-            phi_n_bar=0.0,
-        )
-    )
+    cond = ck.LagrangeBoundaryCondition(boundary, gauss1d)
+    cond.add("w", 0.0)
+    cond.add("rot_n", 0.0)
+    problem.add_condition(cond)
 
     K, f = problem.assemble()
 
