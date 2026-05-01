@@ -139,7 +139,7 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
 
     // Stash CP indices and per-node DOF count; absolute global IDs are
     // resolved at declare_dofs / apply time via the layout.
-    cp_indices_ = patch.global_indices();
+    cp_indices_ = patch.assembly_dofs();
     node_dofs_ = ndof;
 }
 

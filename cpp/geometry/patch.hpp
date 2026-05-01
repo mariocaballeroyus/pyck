@@ -128,17 +128,16 @@ public:
     std::vector<Index> layer_dofs(std::size_t param_dim, bool at_start, Index layer_idx = 0) const;
     std::array<Index, d> decode_span(Index flat_idx) const;
 
-    /**
-     * @brief Get the global indices for the control points in the system.
-     * 
-     * For a regular patch, these are just the local indices (0, 1, ..., N-1).
-     * For a boundary patch, these are the indices of the parent patch.
-     */
+    /// @brief Local indices of this patch's control points (0, 1, …, N−1).
     virtual std::vector<Index> global_indices() const {
         std::vector<Index> indices(num_control_pts());
         for (Index i = 0; i < indices.size(); ++i) indices[i] = i;
         return indices;
     }
+
+    /// @brief DOF indices used for assembly scatter. Defaults to global_indices();
+    ///        overridden by PatchBoundary to return the parent patch's DOF indices.
+    virtual std::vector<Index> assembly_dofs() const { return global_indices(); }
 
 protected:
     ColMatrix<T, 3> control_pts_;

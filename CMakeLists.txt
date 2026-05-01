@@ -36,7 +36,7 @@ add_library(pyck_geometry
     cpp/geometry/dof_mapper.cpp
     cpp/geometry/patch_1d.cpp
     cpp/geometry/patch_2d.cpp
-    cpp/geometry/boundary_patch.cpp
+    cpp/geometry/patch_2d_boundary.cpp
     cpp/geometry/factories.cpp
     cpp/geometry/evaluation.cpp
 )

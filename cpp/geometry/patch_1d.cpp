@@ -20,12 +20,14 @@ Patch<T, d>::Patch(Ptr<const Basis<T>> basis_u, const ColMatrix<T, 3>& control_p
       dof_mapper_({tensor_product_.basis(0).num_basis()}, {tensor_product_.basis(0).degree()})
 {
     if (control_pts.cols() != 3) {
-        throw std::invalid_argument("Patch<T, 1>: Control points must be embedded in 3D space.");
+        throw std::invalid_argument("Patch<T, 1>: "
+                                    "Control points must be embedded in 3D space.");
     }
     const Index expected_n = this->tensor_product_.basis(0).num_basis();
     const Index actual_n = static_cast<Index>(control_pts.rows());
     if (actual_n != expected_n) {
-        throw std::invalid_argument("Patch<T, 1>: Dimension mismatch.");
+        throw std::invalid_argument("Patch<T, 1>: "
+                                    "Dimension mismatch.");
     }
 
     // Initialize Greville points and spans

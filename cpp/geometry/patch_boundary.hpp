@@ -1,5 +1,5 @@
-#ifndef PYCK_BOUNDARY_PATCH_HPP
-#define PYCK_BOUNDARY_PATCH_HPP
+#ifndef PYCK_PATCH_BOUNDARY_HPP
+#define PYCK_PATCH_BOUNDARY_HPP
 
 #include <cstddef>
 #include <vector>
@@ -19,54 +19,57 @@ template <std::floating_point T, std::size_t d> class Patch;
  * @brief Represents a boundary face of a d-dimensional patch.
  *
  * @tparam T  Scalar floating-point type.
- * @tparam d  Parametric dimension of the **parent** patch.
+ * @tparam d  Parametric dimension of the parent patch.
  */
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-class BoundaryPatch : public Patch<T, d - 1>
+class PatchBoundary : public Patch<T, d - 1>
 {
 public:
 
     /**
-     * @brief Construct a BoundaryPatch
+     * @brief Construct a PatchBoundary
      *
      * @param parent     The parent patch
      * @param param_dim  Parametric direction normal to the boundary (0, 1, …, d−1)
      * @param at_start   True for the boundary at the start of the parametric
      *                   direction (e.g. u = 0), false for the end (e.g. u = 1)
      */
-    BoundaryPatch(const Ptr<Patch<T, d>>& parent,
+    PatchBoundary(const Ptr<Patch<T, d>>& parent,
                   std::size_t param_dim,
                   bool at_start);
 
     /// @brief All parent DOFs on the boundary
-    const std::vector<Index>& parent_dofs() const 
+    const std::vector<Index>& parent_dofs() const
     { return parent_dofs_; }
 
-    /**
-     * @brief Override global_indices to return the parent's DOF indices.
-     */
-    std::vector<Index> global_indices() const override {
-        return parent_dofs_;
-    }
+    /// @brief Returns parent DOFs for assembly, overriding the base class local indices.
+    std::vector<Index> assembly_dofs() const override
+    { return parent_dofs_; }
 
     /// @brief Parametric direction normal to this boundary
-    std::size_t param_dim() const { return param_dim_; }
+    std::size_t param_dim() const 
+    { return param_dim_; }
 
     /// @brief Whether this is the start or end boundary
-    bool at_start() const { return at_start_; }
+    bool at_start() const 
+    { return at_start_; }
 
     /// @brief Reference to the parent patch
-    const Ptr<Patch<T, d>>& parent() const { return parent_; }
+    const Ptr<const Patch<T, d>>& parent() const
+    { return parent_; }
 
     /// @brief First non-degenerate span in the parent along the fixed direction
-    Index span_fixed() const { return span_fixed_; }
+    Index span_fixed() const 
+    { return span_fixed_; }
 
     /// @brief Parameter value at which to evaluate the parent along the fixed direction
-    T u_eval_fixed() const { return u_eval_fixed_; }
+    T u_eval_fixed() const 
+    { return u_eval_fixed_; }
 
     /// @brief Sign of the outward normal (+1 or -1) consistent with parametric orientation
-    T sign_n() const { return sign_n_; }
+    T sign_n() const 
+    { return sign_n_; }
 
     /**
      * @brief Compute outward unit normal at quadrature points.
@@ -76,7 +79,6 @@ public:
      */
     ColMatrix<T, 3> eval_normal(
         const std::array<ColMatrix<T, 3>, d - 1>& tangents,
-        T sign_n,
         const std::array<ColMatrix<T, 3>, d>& parent_tangents) const requires(d == 2);
 
     /**
@@ -87,7 +89,6 @@ public:
      */
     ColMatrix<T, 3> eval_normal(
         const std::array<ColMatrix<T, 3>, d - 1>& tangents,
-        T sign_n,
         const std::array<ColMatrix<T, 3>, d>& parent_tangents) const requires(d == 3);
 
     /**
@@ -100,7 +101,7 @@ public:
      *        (the fixed direction is set to u_eval_fixed, the free direction
      *        is filled with the given boundary parameters).
      */
-    ColMatrix<T, d> lift_to_parent(const Vector<T>& boundary_pts) const;
+    ColMatrix<T, d> lift_to_parent(const Vector<T>& boundary_pts) const requires(d == 2);
 
     /**
      * @brief Compute the Q×3 outward unit normal at the boundary quadrature points,
@@ -115,8 +116,8 @@ public:
 
 private:
 
-    /// @brief Pointer to the parent patch (non-owning, for DOF mapping and geometry access)
-    Ptr<Patch<T, d>> parent_;
+    /// @brief Non-owning const reference to the parent patch, for DOF mapping and geometry access
+    Ptr<const Patch<T, d>> parent_;
 
     /// @brief Parametric direction normal to the boundary
     std::size_t param_dim_;
@@ -144,23 +145,23 @@ private:
 };
 
 /**
- * @brief Factory function to create a BoundaryPatch.
+ * @brief Factory function to create a PatchBoundary.
  * 
  * @tparam T Scalars type
  * @tparam d Parametric dimension of the parent patch
  * @param parent Pointer to the parent patch
  * @param param_dim Parametric dimension normal to the boundary
  * @param at_start True for start boundary, false for end
- * @return A shared pointer to the new BoundaryPatch
+ * @return A shared pointer to the new PatchBoundary
  */
 template <std::floating_point T, std::size_t d>
-Ptr<BoundaryPatch<T, d>> create_boundary(const Ptr<Patch<T, d>>& parent,
+Ptr<PatchBoundary<T, d>> create_patch_boundary(const Ptr<Patch<T, d>>& parent,
                                          std::size_t param_dim,
                                          bool at_start)
 {
-    return std::make_shared<BoundaryPatch<T, d>>(parent, param_dim, at_start);
+    return std::make_shared<PatchBoundary<T, d>>(parent, param_dim, at_start);
 }
 
 } // namespace pyck
 
-#endif // PYCK_BOUNDARY_PATCH_HPP
+#endif // PYCK_PATCH_BOUNDARY_HPP
