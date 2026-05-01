@@ -68,13 +68,50 @@ public:
     /// @brief Sign of the outward normal (+1 or -1) consistent with parametric orientation
     T sign_n() const { return sign_n_; }
 
-    /// @brief Compute outward unit normal at quadrature points.
-    /// For d=2 (1D boundary): normal = tangent × parent_surface_normal
-    /// For d=3 (2D boundary): normal = tangent0 × tangent1
+    /**
+     * @brief Compute outward unit normal at quadrature points.
+     *
+     * 1D boundary on a 2D surface: normal = boundary_tangent × surface_normal,
+     * where surface_normal = parent_tangents[0] × parent_tangents[1].
+     */
     ColMatrix<T, 3> eval_normal(
         const std::array<ColMatrix<T, 3>, d - 1>& tangents,
         T sign_n,
-        const std::array<Eigen::Matrix<T, 3, 1>, d>& parent_tangents) const;
+        const std::array<ColMatrix<T, 3>, d>& parent_tangents) const requires(d == 2);
+
+    /**
+     * @brief Compute outward unit normal at quadrature points.
+     *
+     * 2D boundary on a 3D volume: normal = tangent0 × tangent1; parent
+     * tangents are unused (the boundary surface defines its own normal).
+     */
+    ColMatrix<T, 3> eval_normal(
+        const std::array<ColMatrix<T, 3>, d - 1>& tangents,
+        T sign_n,
+        const std::array<ColMatrix<T, 3>, d>& parent_tangents) const requires(d == 3);
+
+    /**
+     * @brief Convert a boundary span index to the flat span index of the parent patch.
+     */
+    Index parent_flat_span(Index boundary_span) const;
+
+    /**
+     * @brief Lift Q boundary parameter values into Q parent parametric coordinates
+     *        (the fixed direction is set to u_eval_fixed, the free direction
+     *        is filled with the given boundary parameters).
+     */
+    ColMatrix<T, d> lift_to_parent(const Vector<T>& boundary_pts) const;
+
+    /**
+     * @brief Compute the Q×3 outward unit normal at the boundary quadrature points,
+     *        end-to-end from shape function derivatives. Encapsulates the tangent
+     *        and surface-normal computations on both the boundary and its parent.
+     */
+    ColMatrix<T, 3> eval_outward_normal(
+        Index boundary_span,
+        const std::vector<Matrix<T>>& boundary_derivs,
+        Index parent_flat_span,
+        const std::vector<Matrix<T>>& parent_derivs) const;
 
 private:
 
@@ -90,9 +127,20 @@ private:
     /// @brief Global DOF indices of the parent patch on the boundary
     std::vector<Index> parent_dofs_;
 
+    /// @brief Fixed span in the parent along the fixed direction
     Index span_fixed_;
+    
+    /// @brief Parameter value at which to evaluate the parent along the fixed direction
     T u_eval_fixed_;
+    
+    /// @brief Sign of the outward normal (+1 or -1) consistent with parametric orientation
     T sign_n_;
+
+    /// @brief Offset for flat span indexing
+    Index parent_span_offset_;
+    
+    /// @brief Stride for flat span indexing
+    Index parent_span_stride_;
 };
 
 /**
