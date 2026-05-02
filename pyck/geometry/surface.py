@@ -31,7 +31,7 @@ class SurfacePatch(Patch):
         Human-readable label (default "patch").
     """
 
-    _cpp_object: _pyck.SurfacePatch
+    _cpp_object: _pyck.Patch2d
     _basis_u: Basis
     _basis_v: Basis
 
@@ -53,17 +53,17 @@ class SurfacePatch(Patch):
         self._basis_u = basis_u
         self._basis_v = basis_v
         self._name = name
-        self._cpp_object = _pyck.SurfacePatch(
+        self._cpp_object = _pyck.Patch2d(
             basis_u._cpp_object, basis_v._cpp_object, control_pts
         )
 
     @classmethod
     def _from_cpp(
-        cls, cpp_obj: _pyck.SurfacePatch,
+        cls, cpp_obj: _pyck.Patch2d,
         basis_u: Basis, basis_v: Basis,
         *, name: str = "patch",
     ) -> SurfacePatch:
-        """Wrap an existing C++ `SurfacePatch`."""
+        """Wrap an existing C++ `Patch2d` object."""
         obj = object.__new__(cls)
         obj._cpp_object = cpp_obj
         obj._basis_u = basis_u

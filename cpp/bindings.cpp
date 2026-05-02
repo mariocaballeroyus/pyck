@@ -542,12 +542,20 @@ PYBIND11_MODULE(_pyck, m) {
 
     using LEP1D = pyck::LinearElasticProblem<double, 1>;
     py::class_<LEP1D>(m, "LinearElasticProblem1d")
+        .def(py::init<>())
         .def(py::init<const pyck::Ptr<Patch3D1D>&,
                       const pyck::Ptr<Elem1D>&,
                       const pyck::Ptr<QR1D>&>(),
              py::arg("patch"), py::arg("element"), py::arg("quadrature"))
+        .def(py::init<const std::vector<pyck::Ptr<Patch3D1D>>&,
+                      const std::vector<pyck::Ptr<Elem1D>>&,
+                      const std::vector<pyck::Ptr<QR1D>>&>(),
+             py::arg("patches"), py::arg("elements"), py::arg("quadratures"))
+        .def("add_patch", &LEP1D::add_patch,
+             py::arg("patch"), py::arg("element"), py::arg("quadrature"))
+        .def("num_patches", &LEP1D::num_patches)
         .def("add_condition", &LEP1D::add_condition,
-             py::arg("condition"))
+             py::arg("condition"), py::arg("patch_idx") = 0)
         .def("add_constraint", &LEP1D::add_constraint,
              py::arg("constraint"))
         .def("add_constraint", &LEP1D::add_direct_constraint,
@@ -563,12 +571,20 @@ PYBIND11_MODULE(_pyck, m) {
 
     using LEP2D = pyck::LinearElasticProblem<double, 2>;
     py::class_<LEP2D>(m, "LinearElasticProblem2d")
+        .def(py::init<>())
         .def(py::init<const pyck::Ptr<Patch3D2D>&,
                       const pyck::Ptr<Elem2D>&,
                       const pyck::Ptr<QR2D>&>(),
              py::arg("patch"), py::arg("element"), py::arg("quadrature"))
+        .def(py::init<const std::vector<pyck::Ptr<Patch3D2D>>&,
+                      const std::vector<pyck::Ptr<Elem2D>>&,
+                      const std::vector<pyck::Ptr<QR2D>>&>(),
+             py::arg("patches"), py::arg("elements"), py::arg("quadratures"))
+        .def("add_patch", &LEP2D::add_patch,
+             py::arg("patch"), py::arg("element"), py::arg("quadrature"))
+        .def("num_patches", &LEP2D::num_patches)
         .def("add_condition", &LEP2D::add_condition,
-             py::arg("condition"))
+             py::arg("condition"), py::arg("patch_idx") = 0)
         .def("add_constraint", &LEP2D::add_constraint,
              py::arg("constraint"))
         .def("add_constraint", &LEP2D::add_direct_constraint,

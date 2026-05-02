@@ -123,6 +123,7 @@ add_executable(pyck_tests
     tests/assembly/test_materials.cpp
     tests/assembly/test_penalty_boundary_condition.cpp
     tests/assembly/test_lagrange_boundary_condition.cpp
+    tests/assembly/test_multi_patch_problem.cpp
 )
 target_link_libraries(pyck_tests PRIVATE 
     pyck_basis 

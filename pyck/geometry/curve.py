@@ -29,7 +29,7 @@ class CurvePatch(Patch):
         Human-readable label for the patch (default "patch").
     """
 
-    _cpp_object: _pyck.CurvePatch
+    _cpp_object: _pyck.Patch1d
     _basis: Basis
 
     def __init__(
@@ -45,13 +45,13 @@ class CurvePatch(Patch):
 
         self._basis = basis
         self._name = name
-        self._cpp_object = _pyck.CurvePatch(basis._cpp_object, control_pts)
+        self._cpp_object = _pyck.Patch1d(basis._cpp_object, control_pts)
 
     @classmethod
     def _from_cpp(
-        cls, cpp_obj: _pyck.CurvePatch, basis: Basis, *, name: str = "patch"
+        cls, cpp_obj: _pyck.Patch1d, basis: Basis, *, name: str = "patch"
     ) -> CurvePatch:
-        """Wrap an existing C++ `CurvePatch`."""
+        """Wrap an existing C++ `Patch1d` object."""
         obj = object.__new__(cls)
         obj._cpp_object = cpp_obj
         obj._basis = basis
