@@ -150,7 +150,7 @@ TEST_CASE("PenaltyBoundaryCondition structural properties", "[conditions][penalt
         auto [layout, primal] = setup_layout_rm3();
         Matrix<double> K = Matrix<double>::Zero(N_dof_rm3, N_dof_rm3);
         Vector<double> F = Vector<double>::Zero(N_dof_rm3);
-        pen.apply(K, F, layout, primal);
+        pen.apply(K, F, layout, std::vector<DofLayout::BlockId>{primal});
         REQUIRE((K - K.transpose()).norm() < 1e-12 * K.norm());
     }
 
@@ -163,7 +163,7 @@ TEST_CASE("PenaltyBoundaryCondition structural properties", "[conditions][penalt
         auto [layout, primal] = setup_layout_rm3();
         Matrix<double> K = Matrix<double>::Zero(N_dof_rm3, N_dof_rm3);
         Vector<double> F = Vector<double>::Zero(N_dof_rm3);
-        pen.apply(K, F, layout, primal);
+        pen.apply(K, F, layout, std::vector<DofLayout::BlockId>{primal});
         REQUIRE((K - K.transpose()).norm() < 1e-12 * K.norm());
     }
 
@@ -177,7 +177,7 @@ TEST_CASE("PenaltyBoundaryCondition structural properties", "[conditions][penalt
         Index N_dof = surface->num_control_pts() * 3;
         Matrix<double> K = Matrix<double>::Zero(N_dof, N_dof);
         Vector<double> F = Vector<double>::Zero(N_dof);
-        pen.apply(K, F, layout, primal);
+        pen.apply(K, F, layout, std::vector<DofLayout::BlockId>{primal});
         REQUIRE(K.norm() == Approx(0.0).margin(1e-15));
         REQUIRE(F.norm() == Approx(0.0).margin(1e-15));
     }
@@ -195,7 +195,7 @@ TEST_CASE("PenaltyBoundaryCondition structural properties", "[conditions][penalt
         Index N_dof = surface->num_control_pts();
         Matrix<double> K = Matrix<double>::Zero(N_dof, N_dof);
         Vector<double> F = Vector<double>::Zero(N_dof);
-        pen.apply(K, F, layout, primal);
+        pen.apply(K, F, layout, std::vector<DofLayout::BlockId>{primal});
 
         REQUIRE((K - K.transpose()).norm() < 1e-12 * K.norm());
         // All eigenvalues >= 0 (PSD)
@@ -651,7 +651,7 @@ TEST_CASE("PenaltyBoundaryCondition normal direction: axis-aligned rectangle",
     auto primal_r = layout_r.allocate(pyck::DofType::Primal, surface->num_control_pts() * ndof, ndof);
     Matrix<double> K_r = Matrix<double>::Zero(N, N);
     Vector<double> F_r = Vector<double>::Zero(N);
-    pen_r.apply(K_r, F_r, layout_r, primal_r);
+    pen_r.apply(K_r, F_r, layout_r, std::vector<DofLayout::BlockId>{primal_r});
 
     // For each boundary node: K[θx, θy] = 0 (cross-term)
     // and K[θx, θx] ≈ K[θy, θy] (same mass integral, same penalty)
@@ -675,7 +675,7 @@ TEST_CASE("PenaltyBoundaryCondition normal direction: axis-aligned rectangle",
     auto primal_b = layout_b.allocate(pyck::DofType::Primal, surface->num_control_pts() * ndof, ndof);
     Matrix<double> K_b = Matrix<double>::Zero(N, N);
     Vector<double> F_b = Vector<double>::Zero(N);
-    pen_b.apply(K_b, F_b, layout_b, primal_b);
+    pen_b.apply(K_b, F_b, layout_b, std::vector<DofLayout::BlockId>{primal_b});
 
     auto bot_nodes = surface->dof_mapper().get_layer_dofs(1, true, 0);
     for (auto node : bot_nodes) {

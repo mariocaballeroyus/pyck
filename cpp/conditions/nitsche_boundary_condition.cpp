@@ -52,9 +52,10 @@ requires (d > 1)
 void NitscheBoundaryCondition<T, d>::apply(Matrix<T>& stiffness,
                                    Vector<T>& load,
                                    const DofLayout& layout,
-                                   DofLayout::BlockId primal_block) const
+                                   const std::vector<DofLayout::BlockId>& primal_blocks) const
 {
     if (terms_.empty()) return;
+    const DofLayout::BlockId primal_block = primal_blocks.at(this->patch_idx_);
 
     const auto& boundary = boundary_;
     const auto& element = element_;

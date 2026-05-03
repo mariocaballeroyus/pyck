@@ -137,15 +137,15 @@ class SurfacePatch(Patch):
         kv_v_cpp = self._basis_v.knot_vector._cpp_object
         deg_u = self._basis_u.degree
         deg_v = self._basis_v.degree
-        num_intervals_v = len(self._basis_v.knots) - 1
+        num_intervals_u = len(self._basis_u.knots) - 1
 
         for i, row in enumerate(uv):
             u, v = row
             span_u = kv_u_cpp.find_span(deg_u, float(u))
             span_v = kv_v_cpp.find_span(deg_v, float(v))
 
-            # Flat element index (lexicographical u-fastest)
-            element_idx = span_u * num_intervals_v + span_v
+            # Match C++ decode_span: flat_idx = span_u + span_v * num_intervals_u
+            element_idx = span_u + span_v * num_intervals_u
 
             pt = np.array([[u, v]], dtype=np.float64)
             results[i, :] = self._cpp_object.eval_geometry(pt, element_idx)[0, :]

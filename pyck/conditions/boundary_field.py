@@ -14,6 +14,12 @@ NormalTransverseShear = _pyck.NormalTransverseShear
 NormalBendingMoment = _pyck.NormalBendingMoment
 TwistingMoment = _pyck.TwistingMoment
 
+# Generic basis-DOF fields, parameterised by `dof_index` (which slot of the
+# per-node DOF block to read). C^k building blocks for inter-patch coupling.
+BasisValue = _pyck.BasisValue
+BasisNormalSlope = _pyck.BasisNormalSlope
+BasisNormalCurvature = _pyck.BasisNormalCurvature
+
 # Displacement-side fields: w (transverse displacement), rot_n (normal rotation),
 # rot_s (tangential rotation).
 # Traction-side fields: q_n (normal transverse shear), m_n (normal bending

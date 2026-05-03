@@ -18,6 +18,8 @@
 #include "load_condition.hpp"
 #include "lagrange_boundary_condition.hpp"
 #include "nitsche_boundary_condition.hpp"
+#include "penalty_coupling_condition.hpp"
+#include "assert_conforming.hpp"
 #include "penalty_boundary_condition.hpp"
 #include "linear_constraint.hpp"
 #include "beam_timoshenko_1p.hpp"
@@ -236,6 +238,7 @@ PYBIND11_MODULE(_pyck, m) {
         py::arg("basis_u"), py::arg("basis_v"),
         py::arg("width"), py::arg("height"),
         "Create a flat rectangular surface patch in the xy-plane.");
+
 
     // === DOF Mapping ================================================================
 
@@ -457,6 +460,24 @@ PYBIND11_MODULE(_pyck, m) {
                pyck::Ptr<pyck::TwistingMoment<double>>>(m, "TwistingMoment")
         .def(py::init<>());
 
+    py::class_<pyck::BasisValue<double>, BoundaryFieldD,
+               pyck::Ptr<pyck::BasisValue<double>>>(m, "BasisValue")
+        .def(py::init<std::size_t>(), py::arg("dof_index") = 0,
+             "Spline value of a single DOF slot. Building block for C^0 "
+             "inter-patch coupling on a primary basis field.");
+
+    py::class_<pyck::BasisNormalSlope<double>, BoundaryFieldD,
+               pyck::Ptr<pyck::BasisNormalSlope<double>>>(m, "BasisNormalSlope")
+        .def(py::init<std::size_t>(), py::arg("dof_index") = 0,
+             "Outward-normal slope (n . grad N) of a single DOF slot. "
+             "Use sign_b = -1 in PenaltyCouplingCondition for opposing normals.");
+
+    py::class_<pyck::BasisNormalCurvature<double>, BoundaryFieldD,
+               pyck::Ptr<pyck::BasisNormalCurvature<double>>>(m, "BasisNormalCurvature")
+        .def(py::init<std::size_t>(), py::arg("dof_index") = 0,
+             "Outward-normal curvature (n^T H_N n) of a single DOF slot. "
+             "Use sign_b = +1 in PenaltyCouplingCondition for opposing normals.");
+
     using LC1D = pyck::LoadCondition<double, 1>;
     py::class_<LC1D, CondD, pyck::Ptr<LC1D>>(m, "LoadCondition1d")
         .def(py::init<const Patch3D1D&, const Elem1D&, const QR1D&, const pyck::Vector<double>&>(),
@@ -511,6 +532,48 @@ PYBIND11_MODULE(_pyck, m) {
              py::arg("displacement_field"), py::arg("traction_field"),
              py::arg("penalty"), py::arg("value") = 0.0,
              py::return_value_policy::reference);
+
+    using CplCond2D = pyck::PenaltyCouplingCondition<double, 2>;
+    py::class_<CplCond2D, CondD, pyck::Ptr<CplCond2D>>(m, "PenaltyCouplingCondition2d")
+        .def(py::init<const PatchBoundary2D&,
+                      const PatchBoundary2D&,
+                      std::size_t,
+                      std::size_t,
+                      const Elem2D&,
+                      const Elem2D&,
+                      const QR1D&,
+                      bool>(),
+             py::arg("side_a"), py::arg("side_b"),
+             py::arg("patch_a_idx"), py::arg("patch_b_idx"),
+             py::arg("element_a"), py::arg("element_b"),
+             py::arg("quadrature"), py::arg("reverse") = false)
+        .def("add",
+             [](CplCond2D& self,
+                pyck::Ptr<const BoundaryFieldD> field_a,
+                pyck::Ptr<const BoundaryFieldD> field_b,
+                double penalty,
+                double sign_b,
+                double value) -> CplCond2D& {
+                 return self.add(std::move(field_a), std::move(field_b),
+                                 penalty, sign_b, value);
+             },
+             py::arg("field_a"), py::arg("field_b"),
+             py::arg("penalty"), py::arg("sign_b") = 1.0, py::arg("value") = 0.0,
+             py::return_value_policy::reference)
+        .def("patch_a_idx", &CplCond2D::patch_a_idx)
+        .def("patch_b_idx", &CplCond2D::patch_b_idx)
+        .def("reverse", &CplCond2D::reverse);
+
+    m.def("assert_conforming_2d",
+          [](const PatchBoundary2D& side_a,
+             const PatchBoundary2D& side_b,
+             bool reverse, double tol) {
+              pyck::assert_conforming<double, 2>(side_a, side_b, reverse, tol);
+          },
+          py::arg("side_a"), py::arg("side_b"),
+          py::arg("reverse") = false, py::arg("tol") = 1e-12,
+          "Verify two boundaries are conforming (matching knots, "
+          "coincident control points). Raises ValueError on mismatch.");
 
     // === Constraints ================================================================
 

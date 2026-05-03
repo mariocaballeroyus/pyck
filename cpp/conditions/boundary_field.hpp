@@ -38,6 +38,145 @@ public:
 };
 
 /**
+ * @brief Basis-DOF value field: extracts the spline value of a single DOF
+ *        slot within each node block, ignoring all others.
+ *
+ * Used as the `C^0` building block for inter-patch coupling: pinning a
+ * primary DOF directly (e.g. `w_b` at index 0 or `psi` at index 1 on
+ * `PlateReissnerMindlinDispl2p`) sidesteps the linear-combination
+ * identities baked into the element's `displacement_shape_matrix`.
+ */
+template <std::floating_point T>
+class BasisValue : public BoundaryField<T>
+{
+public:
+    explicit BasisValue(std::size_t dof_index = 0) : dof_index_(dof_index) {}
+
+    Matrix<T> evaluate(
+        const Element<T, 2>& element,
+        const PatchBoundary<T, 2>& /*boundary*/,
+        Index /*boundary_span*/,
+        const std::vector<Matrix<T>>& /*boundary_derivs*/,
+        Index /*parent_flat_span*/,
+        const std::vector<Matrix<T>>& parent_derivs) const override
+    {
+        const Index ndof = static_cast<Index>(element.num_node_dofs());
+        const Matrix<T>& N = parent_derivs[0];   // shape values
+        const Index Q = N.rows();
+        const Index n = N.cols();
+
+        Matrix<T> C = Matrix<T>::Zero(Q, n * ndof);
+        const Index slot = static_cast<Index>(dof_index_);
+        for (Index i = 0; i < n; ++i) {
+            C.col(i * ndof + slot) = N.col(i);
+        }
+        return C;
+    }
+
+private:
+    std::size_t dof_index_;
+};
+
+/**
+ * @brief Basis-DOF normal-slope field: `n · grad N` of a single DOF slot.
+ *
+ *        `C^1` building block. With opposing outward normals across the
+ *        interface this field carries `sign_b = -1` (one application of
+ *        `n` flips sign).
+ */
+template <std::floating_point T>
+class BasisNormalSlope : public BoundaryField<T>
+{
+public:
+    explicit BasisNormalSlope(std::size_t dof_index = 0) : dof_index_(dof_index) {}
+
+    Matrix<T> evaluate(
+        const Element<T, 2>& element,
+        const PatchBoundary<T, 2>& boundary,
+        Index boundary_span,
+        const std::vector<Matrix<T>>& boundary_derivs,
+        Index parent_flat_span,
+        const std::vector<Matrix<T>>& parent_derivs) const override
+    {
+        const Index ndof = static_cast<Index>(element.num_node_dofs());
+        const Matrix<T>& Nx = parent_derivs[1];  // dN/dx
+        const Matrix<T>& Ny = parent_derivs[2];  // dN/dy
+        const Index Q = Nx.rows();
+        const Index n = Nx.cols();
+
+        const ColMatrix<T, 3> normal = boundary.eval_outward_normal(
+            boundary_span, boundary_derivs, parent_flat_span, parent_derivs);
+
+        Matrix<T> C = Matrix<T>::Zero(Q, n * ndof);
+        const Index slot = static_cast<Index>(dof_index_);
+        for (Index q = 0; q < Q; ++q) {
+            const T n_x = normal(q, 0);
+            const T n_y = normal(q, 1);
+            for (Index i = 0; i < n; ++i) {
+                C(q, i * ndof + slot) = n_x * Nx(q, i) + n_y * Ny(q, i);
+            }
+        }
+        return C;
+    }
+
+private:
+    std::size_t dof_index_;
+};
+
+/**
+ * @brief Basis-DOF normal-curvature field:
+ *        `n^T H_N n = n_x^2 N,xx + 2 n_x n_y N,xy + n_y^2 N,yy` of a
+ *        single DOF slot.
+ *
+ *        `C^2` building block. With opposing outward normals across the
+ *        interface this field carries `sign_b = +1` (two applications of
+ *        `n` cancel).
+ */
+template <std::floating_point T>
+class BasisNormalCurvature : public BoundaryField<T>
+{
+public:
+    explicit BasisNormalCurvature(std::size_t dof_index = 0) : dof_index_(dof_index) {}
+
+    Matrix<T> evaluate(
+        const Element<T, 2>& element,
+        const PatchBoundary<T, 2>& boundary,
+        Index boundary_span,
+        const std::vector<Matrix<T>>& boundary_derivs,
+        Index parent_flat_span,
+        const std::vector<Matrix<T>>& parent_derivs) const override
+    {
+        const Index ndof = static_cast<Index>(element.num_node_dofs());
+        const Matrix<T>& Nxx = parent_derivs[3];  // d^2N/dx^2
+        const Matrix<T>& Nxy = parent_derivs[4];  // d^2N/dxdy
+        const Matrix<T>& Nyy = parent_derivs[5];  // d^2N/dy^2
+        const Index Q = Nxx.rows();
+        const Index n = Nxx.cols();
+
+        const ColMatrix<T, 3> normal = boundary.eval_outward_normal(
+            boundary_span, boundary_derivs, parent_flat_span, parent_derivs);
+
+        Matrix<T> C = Matrix<T>::Zero(Q, n * ndof);
+        const Index slot = static_cast<Index>(dof_index_);
+        for (Index q = 0; q < Q; ++q) {
+            const T n_x = normal(q, 0);
+            const T n_y = normal(q, 1);
+            const T n_x2 = n_x * n_x;
+            const T n_y2 = n_y * n_y;
+            const T two_nxny = T(2) * n_x * n_y;
+            for (Index i = 0; i < n; ++i) {
+                C(q, i * ndof + slot) =
+                    n_x2 * Nxx(q, i) + two_nxny * Nxy(q, i) + n_y2 * Nyy(q, i);
+            }
+        }
+        return C;
+    }
+
+private:
+    std::size_t dof_index_;
+};
+
+/**
  * @brief Transverse displacement w.
  */
 template <std::floating_point T>

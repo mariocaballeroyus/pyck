@@ -109,6 +109,7 @@ public:
             throw std::out_of_range(
                 "LinearElasticProblem::add_condition: patch_idx out of range.");
         }
+        condition->set_patch_idx(patch_idx);
         conditions_per_patch_[patch_idx].push_back(condition);
     }
 

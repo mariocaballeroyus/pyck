@@ -9,7 +9,11 @@ from pyck.conditions.boundary_field import (
     TangentialRotation,
     TransverseDisplacement,
     TwistingMoment,
+    BasisValue,
+    BasisNormalSlope,
+    BasisNormalCurvature,
 )
+from pyck.conditions.penalty_coupling_condition import PenaltyCouplingCondition
 from pyck.conditions.load_condition import (
     LoadCondition,
     create_constant_load_condition,
@@ -45,6 +49,10 @@ __all__ = [
     "TangentialRotation",
     "TransverseDisplacement",
     "TwistingMoment",
+    "BasisValue",
+    "BasisNormalSlope",
+    "BasisNormalCurvature",
+    "PenaltyCouplingCondition",
     "LoadCondition",
     "create_constant_load_condition",
     "create_load_condition",

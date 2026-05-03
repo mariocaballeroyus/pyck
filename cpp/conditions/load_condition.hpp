@@ -52,7 +52,7 @@ public:
     void apply(Matrix<T>& stiffness,
                Vector<T>& load,
                const DofLayout& layout,
-               DofLayout::BlockId primal_block) const override;
+               const std::vector<DofLayout::BlockId>& primal_blocks) const override;
 
 private:
     /// @brief Patch control-point indices contributing to the load.

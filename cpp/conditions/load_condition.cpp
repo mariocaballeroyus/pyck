@@ -147,9 +147,10 @@ template <std::floating_point T, std::size_t d>
 void LoadCondition<T, d>::apply(Matrix<T>& /*stiffness*/,
                                 Vector<T>& load,
                                 const DofLayout& layout,
-                                DofLayout::BlockId primal_block) const
+                                const std::vector<DofLayout::BlockId>& primal_blocks) const
 {
     // The load condition is a RHS-only contribution.
+    const DofLayout::BlockId primal_block = primal_blocks.at(this->patch_idx_);
     const Index ndof = node_dofs_;
     const Index base_offset = layout.block_base(primal_block);
     const Index stride = layout.block_stride(primal_block);

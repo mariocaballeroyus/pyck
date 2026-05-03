@@ -70,6 +70,10 @@ from pyck.conditions import (
     create_displacement_penalty,
     create_simply_supported_penalty,
     create_clamped_penalty,
+    PenaltyCouplingCondition,
+    BasisValue,
+    BasisNormalSlope,
+    BasisNormalCurvature,
 )
 from pyck.constraints import (
     Constraint,
@@ -163,6 +167,10 @@ __all__ = [
     "create_displacement_nitsche",
     "create_simply_supported_nitsche",
     "PenaltyBoundaryCondition",
+    "PenaltyCouplingCondition",
+    "BasisValue",
+    "BasisNormalSlope",
+    "BasisNormalCurvature",
     "create_displacement_penalty",
     "create_simply_supported_penalty",
     "create_clamped_penalty",

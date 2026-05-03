@@ -1,7 +1,7 @@
 """Linear-elastic assembly (stiffness + load)."""
- 
+
 from __future__ import annotations
- 
+
 from typing import TYPE_CHECKING, Sequence, Union, cast, Any
 
 import numpy as np
@@ -16,40 +16,52 @@ if TYPE_CHECKING:
     from pyck.conditions.condition import Condition
     from pyck.elements.element import Element
     from pyck.geometry.patch import Patch
- 
- 
+
+
 class LinearElasticProblem:
     """Assemble global stiffness and load from per-element contributions.
- 
-    A problem contains a list of named patches and a single element
-    formulation shared by all patches. Quadrature rules and conditions
-    are assigned per-patch.
- 
+
+    A problem contains a list of named patches that share a single element
+    formulation and a single quadrature rule. Each patch occupies its own
+    primal DOF block in the global system; conditions are routed to a
+    specific patch via the ``patch`` keyword argument on
+    :meth:`add_condition`.
+
     Parameters
     ----------
     patches : Patch or Sequence[Patch]
-        The geometry patches. Each must have a unique `name`.
+        The geometry patches. Each must have a unique ``name`` and all must
+        share the same topological dimension.
     element : Element
-        Finite element providing local stiffness.
+        Finite element providing local stiffness, shared across patches.
+    quadrature : QuadratureRule, optional
+        Quadrature rule for assembly. Defaults to ``patches[0].quadrature``.
     """
- 
+
     def __init__(
         self,
         patches: Sequence[Patch],
         element: Element,
         quadrature: QuadratureRule | None = None,
     ) -> None:
-        if len(patches) != 1:
-            raise NotImplementedError(
-                f"LinearElasticProblem currently supports exactly 1 patch, "
-                f"got {len(patches)}."
+        if len(patches) == 0:
+            raise ValueError("LinearElasticProblem requires at least one patch.")
+
+        tdims = {p.tdim for p in patches}
+        if len(tdims) > 1:
+            raise ValueError(
+                "All patches must share the same topological dimension; "
+                f"got {sorted(tdims)}."
             )
+        tdim = next(iter(tdims))
 
         self._patches: dict[str, Patch] = {}
-        for p in patches:
+        self._patch_idx: dict[str, int] = {}
+        for i, p in enumerate(patches):
             if p.name in self._patches:
                 raise ValueError(f"Duplicate patch name: '{p.name}'")
             self._patches[p.name] = p
+            self._patch_idx[p.name] = i
 
         self._element = element
         if quadrature is None:
@@ -58,24 +70,27 @@ class LinearElasticProblem:
         self._conditions: dict[str, list[Condition]] = {
             name: [] for name in self._patches
         }
- 
-        self._cpp_objects: dict[str, Union[_pyck.LinearElasticProblem1d, _pyck.LinearElasticProblem2d]] = {}
-        for name, patch in self._patches.items():
-            if patch.tdim == 1:
-                self._cpp_objects[name] = _pyck.LinearElasticProblem1d(
-                    cast(_pyck.Patch1d, patch._cpp_object), 
-                    cast(_pyck.Element1d, element._cpp_object),
-                    cast(_pyck.QuadratureRule1d, quadrature._cpp_object)
-                )
-            elif patch.tdim == 2:
-                self._cpp_objects[name] = _pyck.LinearElasticProblem2d(
-                    cast(_pyck.Patch2d, patch._cpp_object), 
-                    cast(_pyck.Element2d, element._cpp_object),
-                    cast(_pyck.QuadratureRule2d, quadrature._cpp_object)
-                )
-            else:
-                raise ValueError(f"Unsupported topological dimension: {patch.tdim}")
- 
+
+        cpp_patches = [p._cpp_object for p in patches]
+        cpp_elements = [element._cpp_object for _ in patches]
+        cpp_quadratures = [quadrature._cpp_object for _ in patches]
+
+        self._cpp_object: Union[_pyck.LinearElasticProblem1d, _pyck.LinearElasticProblem2d]
+        if tdim == 1:
+            self._cpp_object = _pyck.LinearElasticProblem1d(
+                cast(Any, cpp_patches),
+                cast(Any, cpp_elements),
+                cast(Any, cpp_quadratures),
+            )
+        elif tdim == 2:
+            self._cpp_object = _pyck.LinearElasticProblem2d(
+                cast(Any, cpp_patches),
+                cast(Any, cpp_elements),
+                cast(Any, cpp_quadratures),
+            )
+        else:
+            raise ValueError(f"Unsupported topological dimension: {tdim}")
+
     @property
     def element(self) -> Element:
         """Return the element formulation."""
@@ -99,7 +114,7 @@ class LinearElasticProblem:
             patch.num_control_pts * num_node_dofs
             for patch in self._patches.values()
         )
- 
+
     def _resolve_patch_names(self, patch: str | None = None) -> list[str]:
         """Return the list of patch names targeted by *patch*."""
         if patch is None:
@@ -110,8 +125,8 @@ class LinearElasticProblem:
                 f"Available patches: {list(self._patches.keys())}"
             )
         return [patch]
- 
- 
+
+
     def add_condition(
         self,
         condition: Condition | Sequence[Condition],
@@ -119,7 +134,7 @@ class LinearElasticProblem:
         patch: str | None = None,
     ) -> None:
         """Register a load/boundary condition for one or all patches.
- 
+
         Parameters
         ----------
         condition : Condition or sequence of Condition
@@ -149,35 +164,43 @@ class LinearElasticProblem:
                     )
 
             self._conditions[name].append(condition)
-            self._cpp_objects[name].add_condition(cast(Any, cpp_obj))
- 
+            self._cpp_object.add_condition(cast(Any, cpp_obj), self._patch_idx[name])
+
+    def add_coupling(self, coupling_condition: Any) -> None:
+        """Attach an inter-patch coupling condition.
+
+        The condition stores its own patch indices (``patch_a_idx``,
+        ``patch_b_idx``); the ``patch_idx`` we hand to the C++ layer is
+        therefore irrelevant — we just need it to be valid, so we use
+        ``patch_a_idx``.
+        """
+        cpp_obj = getattr(coupling_condition, "_cpp_object", coupling_condition)
+        idx = getattr(coupling_condition, "patch_a_idx", 0)
+        self._cpp_object.add_condition(cast(Any, cpp_obj), int(idx))
+
     def add_constraint(
         self,
         constraint: Any,
         *,
         patch: str | None = None,
     ) -> None:
-        """Register a constraint for one or all patches.
- 
-        Parameters
-        ----------
-        constraint : Constraint
-            A constraint to be applied.
-        patch : str, optional
-            Name of the target patch. If None, applied to all patches.
+        """Register a constraint on the global system.
+
+        Constraints reference absolute global DOF indices in the unified
+        layout and are applied after all element + condition assembly.
+        The ``patch`` keyword is accepted for backward compatibility but is
+        ignored: constraints act on the global DOF vector directly.
         """
+        del patch  # constraints are global; argument retained for API stability
         if isinstance(constraint, DirectConstraint):
-            cpp = constraint._cpp_object
-            for name in self._resolve_patch_names(patch):
-                self._cpp_objects[name].add_direct_constraint(cpp)
+            self._cpp_object.add_direct_constraint(constraint._cpp_object)
         else:
             cpp = getattr(constraint, "_cpp_object", constraint)
-            for name in self._resolve_patch_names(patch):
-                self._cpp_objects[name].add_constraint(cpp)
- 
+            self._cpp_object.add_constraint(cpp)
+
     def assemble(self) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
         """Assemble the global system.
- 
+
         Returns
         -------
         K : ndarray, shape (n, n)
@@ -185,16 +208,14 @@ class LinearElasticProblem:
         F : ndarray, shape (n,)
             Global load vector.
         """
-        # For now, single-patch only
-        name = next(iter(self._cpp_objects))
-        K, F = self._cpp_objects[name].assemble()
+        K, F = self._cpp_object.assemble()
         return np.asarray(K), np.asarray(F).ravel()
- 
+
     def __repr__(self) -> str:
         patches = ", ".join(f"'{n}'" for n in self._patches)
         return f"LinearElasticProblem(patches=[{patches}])"
- 
- 
+
+
 def create_linear_elastic_problem(
     patches: Sequence[Patch],
     element: Element,

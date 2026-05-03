@@ -52,9 +52,10 @@ std::size_t LagrangeBoundaryCondition<T, d>::num_dofs() const
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
 void LagrangeBoundaryCondition<T, d>::allocate_dofs(
-    DofLayout& layout, DofLayout::BlockId primal_block)
+    DofLayout& layout,
+    const std::vector<DofLayout::BlockId>& primal_blocks)
 {
-    (void)primal_block;
+    (void)primal_blocks;
     for (auto& term : terms_) {
         term.block_id = layout.allocate(
             DofType::LagrangeMultiplier, multiplier_dof_count_, 1);
@@ -65,9 +66,10 @@ template <std::floating_point T, std::size_t d>
 requires (d > 1)
 void LagrangeBoundaryCondition<T, d>::apply(
     Matrix<T>& stiffness, Vector<T>& load, const DofLayout& layout,
-    DofLayout::BlockId primal_block) const
+    const std::vector<DofLayout::BlockId>& primal_blocks) const
 {
     if (terms_.empty()) return;
+    const DofLayout::BlockId primal_block = primal_blocks.at(this->patch_idx_);
 
     const auto& boundary = boundary_;
     const auto& element = element_;

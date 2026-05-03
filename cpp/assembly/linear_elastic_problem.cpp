@@ -34,10 +34,10 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
             layout_.allocate(DofType::Primal, num_cps * ndof, ndof));
     }
 
-    // Conditions allocate their auxiliary DOFs against their owning patch's block.
+    // Conditions allocate their auxiliary DOFs (e.g. Lagrange multipliers).
     for (std::size_t p = 0; p < patches_.size(); ++p) {
         for (const auto& cond : conditions_per_patch_[p]) {
-            cond->allocate_dofs(layout_, primal_blocks[p]);
+            cond->allocate_dofs(layout_, primal_blocks);
         }
     }
 
@@ -110,9 +110,11 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
     }
 
     // Apply per-patch conditions (loads, penalty/Nitsche/Lagrange BCs, etc.).
+    // Conditions receive the full primal_blocks vector and use their stored
+    // patch_idx_ (or interface info, for coupling) to pick the relevant blocks.
     for (std::size_t p = 0; p < patches_.size(); ++p) {
         for (const auto& cond : conditions_per_patch_[p]) {
-            cond->apply(K, F, layout_, primal_blocks[p]);
+            cond->apply(K, F, layout_, primal_blocks);
         }
     }
 

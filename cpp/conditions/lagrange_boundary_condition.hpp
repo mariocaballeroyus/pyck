@@ -46,12 +46,13 @@ public:
 
     std::size_t num_dofs() const override;
 
-    void allocate_dofs(DofLayout& layout, DofLayout::BlockId primal_block) override;
+    void allocate_dofs(DofLayout& layout,
+                       const std::vector<DofLayout::BlockId>& primal_blocks) override;
 
     void apply(Matrix<T>& stiffness,
                Vector<T>& load,
                const DofLayout& layout,
-               DofLayout::BlockId primal_block) const override;
+               const std::vector<DofLayout::BlockId>& primal_blocks) const override;
 
 private:
     struct Term {

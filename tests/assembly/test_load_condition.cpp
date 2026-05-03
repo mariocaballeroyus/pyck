@@ -53,7 +53,7 @@ TEST_CASE("LoadCondition 1D", "[conditions][load_condition]") {
         F.setZero();
         Matrix<double> K(num_pts, num_pts); // dummy
 
-        load_cond.apply(K, F, layout, primal);
+        load_cond.apply(K, F, layout, std::vector<DofLayout::BlockId>{primal});
         
         // Total load should be \int_0^2 10 dx = 20.
         // Distributed among 3 nodes based on shape functions.
