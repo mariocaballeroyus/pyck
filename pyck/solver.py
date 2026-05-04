@@ -9,6 +9,7 @@ least-squares solve to recover a consistent solution.
 
 from __future__ import annotations
 
+import sys
 from typing import TYPE_CHECKING, Any, overload
 
 import numpy as np
@@ -71,8 +72,14 @@ def solve(
 
     try:
         solution = np.linalg.solve(K, f)
-    except np.linalg.LinAlgError:
-        solution, *_ = np.linalg.lstsq(K, f, rcond=None)
+    except np.linalg.LinAlgError as exc:
+        solution, residuals, rank, _ = np.linalg.lstsq(K, f, rcond=None)
+        print(
+            f"[pyck.solve] np.linalg.solve failed ({exc}); "
+            f"falling back to lstsq. K shape={K.shape}, rank={rank} "
+            f"(deficit={K.shape[0] - rank}).",
+            file=sys.stderr,
+        )
 
     solution = np.asarray(solution, dtype=np.float64).ravel()
     if physical_dofs is not None:

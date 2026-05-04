@@ -114,17 +114,19 @@ def create_clamped_nitsche(
     penalty: float,
     quadrature: "QuadratureRule | None" = None,
 ) -> NitscheBoundaryCondition:
-    """Create a clamped Nitsche condition (W = 0, ROT_N = 0, ROT_S = 0).
+    """Create a clamped Nitsche condition (W = 0, ROT_N = 0).
 
     Pairs each displacement field with its work-conjugate traction:
       * w     ↔  q_n
       * rot_n ↔  m_n
-      * rot_s ↔  m_{ns}
+
+    Tangential rotation is not enforced explicitly: w = 0 along the entire
+    edge already implies phi_s = -dw/dt = 0 along that edge, so adding the
+    rot_s ↔ m_{ns} term is redundant.
     """
     cond = NitscheBoundaryCondition(boundary, thickness, quadrature)
     cond.add("w",     "q_n",  penalty, 0.0)
     cond.add("rot_n", "m_n",  penalty, 0.0)
-    cond.add("rot_s", "m_ns", penalty, 0.0)
     return cond
 
 

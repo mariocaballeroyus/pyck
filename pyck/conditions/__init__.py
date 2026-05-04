@@ -14,6 +14,7 @@ from pyck.conditions.boundary_field import (
     BasisNormalCurvature,
 )
 from pyck.conditions.penalty_coupling_condition import PenaltyCouplingCondition
+from pyck.conditions.lagrange_coupling_condition import LagrangeCouplingCondition
 from pyck.conditions.load_condition import (
     LoadCondition,
     create_constant_load_condition,
@@ -53,6 +54,7 @@ __all__ = [
     "BasisNormalSlope",
     "BasisNormalCurvature",
     "PenaltyCouplingCondition",
+    "LagrangeCouplingCondition",
     "LoadCondition",
     "create_constant_load_condition",
     "create_load_condition",

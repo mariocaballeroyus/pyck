@@ -19,6 +19,7 @@
 #include "lagrange_boundary_condition.hpp"
 #include "nitsche_boundary_condition.hpp"
 #include "penalty_coupling_condition.hpp"
+#include "lagrange_coupling_condition.hpp"
 #include "assert_conforming.hpp"
 #include "penalty_boundary_condition.hpp"
 #include "linear_constraint.hpp"
@@ -563,6 +564,36 @@ PYBIND11_MODULE(_pyck, m) {
         .def("patch_a_idx", &CplCond2D::patch_a_idx)
         .def("patch_b_idx", &CplCond2D::patch_b_idx)
         .def("reverse", &CplCond2D::reverse);
+
+    using LCplCond2D = pyck::LagrangeCouplingCondition<double, 2>;
+    py::class_<LCplCond2D, CondD, pyck::Ptr<LCplCond2D>>(m, "LagrangeCouplingCondition2d")
+        .def(py::init<const PatchBoundary2D&,
+                      const PatchBoundary2D&,
+                      std::size_t,
+                      std::size_t,
+                      const Elem2D&,
+                      const Elem2D&,
+                      const QR1D&,
+                      bool>(),
+             py::arg("side_a"), py::arg("side_b"),
+             py::arg("patch_a_idx"), py::arg("patch_b_idx"),
+             py::arg("element_a"), py::arg("element_b"),
+             py::arg("quadrature"), py::arg("reverse") = false)
+        .def("add",
+             [](LCplCond2D& self,
+                pyck::Ptr<const BoundaryFieldD> field_a,
+                pyck::Ptr<const BoundaryFieldD> field_b,
+                double sign_b,
+                double value) -> LCplCond2D& {
+                 return self.add(std::move(field_a), std::move(field_b),
+                                 sign_b, value);
+             },
+             py::arg("field_a"), py::arg("field_b"),
+             py::arg("sign_b") = 1.0, py::arg("value") = 0.0,
+             py::return_value_policy::reference)
+        .def("patch_a_idx", &LCplCond2D::patch_a_idx)
+        .def("patch_b_idx", &LCplCond2D::patch_b_idx)
+        .def("reverse", &LCplCond2D::reverse);
 
     m.def("assert_conforming_2d",
           [](const PatchBoundary2D& side_a,

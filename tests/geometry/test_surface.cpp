@@ -181,41 +181,26 @@ TEST_CASE("Patch<double, 2>: Twisted Bilinear Plate (z = u*v)", "[geometry][surf
             for (int a = 0; a < 4; ++a)
                 CHECK(result[0](0, a) == Approx(N[a]).margin(1e-14));
 
-            // --- First derivatives (metric-normalised: N_{,u}/sqrt(g11), N_{,v}/sqrt(g22)) ---
+            // First-derivative semantics now: planar (x, y) Cartesian via 2D
+            // inverse Jacobian. For this curved surface (z = u*v) the planar
+            // Jacobian is the identity (∂x/∂u = ∂y/∂v = 1, off-diagonals 0),
+            // so result[1] = N_{,u} and result[2] = N_{,v}.
             double Nu[4] = {-(1.0-v), -v, (1.0-v), v};
             double Nv[4] = {-(1.0-u), (1.0-u), -u, u};
-            double sq_g11 = std::sqrt(g11);
-            double sq_g22 = std::sqrt(g22);
             for (int a = 0; a < 4; ++a) {
-                CHECK(result[1](0, a) == Approx(Nu[a] / sq_g11).margin(1e-14));
-                CHECK(result[2](0, a) == Approx(Nv[a] / sq_g22).margin(1e-14));
+                CHECK(result[1](0, a) == Approx(Nu[a]).margin(1e-14));
+                CHECK(result[2](0, a) == Approx(Nv[a]).margin(1e-14));
             }
 
-            // --- Analytical Christoffel symbols ---
-            // Only Γ^1_{12} and Γ^2_{12} are non-zero for z = u*v
-            double inv_det = 1.0 / det_g;
-            double gi11 =  g22 * inv_det;
-            double gi12 = -g12 * inv_det;
-            double gi22 =  g11 * inv_det;
-
-            // a_{12} · a_1 = v,  a_{12} · a_2 = u  (a_{12} = (0,0,1))
-            double G1_12 = gi11 * v + gi12 * u;
-            double G2_12 = gi12 * v + gi22 * u;
-
-            // --- N_{;uu} and N_{;vv}: Γ_{11} and Γ_{22} vanish ---
-            double Nuu[4] = {0.0, 0.0, 0.0, 0.0};
-            double Nvv[4] = {0.0, 0.0, 0.0, 0.0};
+            // Second derivatives in (x, y): for the bilinear basis the
+            // parametric N_{,uu} and N_{,vv} are zero, and N_{,uv} = ±1.
+            // With the planar identity Jacobian and zero second-geometry
+            // (x, y) derivatives, result[3]=result[5]=0 and result[4]=N_{,uv}.
+            double Nuv[4] = {1.0, -1.0, -1.0, 1.0};
             for (int a = 0; a < 4; ++a) {
-                CHECK(result[3](0, a) == Approx(Nuu[a]).margin(1e-14));
-                CHECK(result[5](0, a) == Approx(Nvv[a]).margin(1e-14));
-            }
-
-            // --- N_{;uv} / sqrt(g11*g22) = (N_{,uv} − Γ^1_{12} N_{,u} − Γ^2_{12} N_{,v}) / sqrt(g11*g22) ---
-            double Nuv_param[4] = {1.0, -1.0, -1.0, 1.0};
-            double sq_g1g2 = std::sqrt(g11 * g22);
-            for (int a = 0; a < 4; ++a) {
-                double cov = Nuv_param[a] - G1_12 * Nu[a] - G2_12 * Nv[a];
-                CHECK(result[4](0, a) == Approx(cov / sq_g1g2).margin(1e-12));
+                CHECK(result[3](0, a) == Approx(0.0).margin(1e-14));
+                CHECK(result[5](0, a) == Approx(0.0).margin(1e-14));
+                CHECK(result[4](0, a) == Approx(Nuv[a]).margin(1e-12));
             }
         }
     }
@@ -313,34 +298,34 @@ TEST_CASE("Patch<double, 2>: Physical Points Evaluation", "[geometry][surface]")
 
 
 // ===========================================================================
-// Test 5: Higher-order basis with curved surface
+// Test 5: Higher-order basis on a flat trapezoidal patch
 // ===========================================================================
 
 TEST_CASE("Patch<double, 2>: Quadratic Basis — Partition of Unity", "[geometry][surface]") {
 
-    // p=2 quadratic basis in both directions, single element
+    // p=2 quadratic basis in both directions, single element.
     auto kv = KnotVector<double>({0, 0, 0, 1, 1, 1});
     auto basis_u = std::make_shared<BSpline<double>>(2, kv);
     auto basis_v = std::make_shared<BSpline<double>>(2, kv);
 
-    // 3x3 = 9 control points defining a half-cylinder-like surface
-    //   x(u,v) = u, y(u,v) = R*sin(pi*v), z(u,v) = R*(1-cos(pi*v))
-    // Approximate with quadratic control points
+    // 3x3 = 9 control points defining a flat trapezoidal patch in the (x, y)
+    // plane (non-axis-aligned, non-orthogonal parametric coordinates).
+    // Bilinear corners (0,0), (1,0), (2,3), (0,3); quadratic by interpolating
+    // at Greville (parametric mid) points.
     Eigen::MatrixXd cp(9, 3);
-    double R = 2.0;
-    // u-fastest: global = iu + iv * 3
-    // iv=0 (v=0): P on bottom
-    cp.row(0) << 0.0, 0.0, 0.0;
-    cp.row(1) << 0.5, 0.0, 0.0;
-    cp.row(2) << 1.0, 0.0, 0.0;
-    // iv=1 (v=0.5): P at mid-height
-    cp.row(3) << 0.0, R, R;
-    cp.row(4) << 0.5, R, R;
-    cp.row(5) << 1.0, R, R;
-    // iv=2 (v=1): P on top
-    cp.row(6) << 0.0, 0.0, 2.0*R;
-    cp.row(7) << 0.5, 0.0, 2.0*R;
-    cp.row(8) << 1.0, 0.0, 2.0*R;
+    auto bilin = [](double u, double v) {
+        // (1-u)(1-v)·(0,0) + u(1-v)·(1,0) + (1-u)v·(0,3) + uv·(2,3)
+        double x = u * (1.0 - v) + 2.0 * u * v;
+        double y = 3.0 * v;
+        return std::tuple{x, y, 0.0};
+    };
+    int row = 0;
+    for (double v : {0.0, 0.5, 1.0}) {
+        for (double u : {0.0, 0.5, 1.0}) {
+            auto [x, y, z] = bilin(u, v);
+            cp.row(row++) << x, y, z;
+        }
+    }
 
     Patch<double, 2> surf(basis_u, basis_v, cp);
 

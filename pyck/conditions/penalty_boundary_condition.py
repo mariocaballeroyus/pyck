@@ -113,9 +113,13 @@ def create_clamped_penalty(
     quadrature: "QuadratureRule | None" = None,
     penalty: float = 1e12,
 ) -> PenaltyBoundaryCondition:
-    """Create a clamped penalty condition (W = 0, ROT_N = 0, ROT_S = 0)."""
+    """Create a clamped penalty condition (W = 0, ROT_N = 0).
+
+    Tangential rotation is not enforced explicitly: w = 0 along the entire
+    edge already implies phi_s = -dw/dt = 0 along that edge, so a rot_s
+    penalty term is redundant.
+    """
     cond = PenaltyBoundaryCondition(boundary, quadrature)
     cond.add("w", penalty, 0.0)
     cond.add("rot_n", penalty, 0.0)
-    cond.add("rot_s", penalty, 0.0)
     return cond

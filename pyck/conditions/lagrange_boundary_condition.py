@@ -107,9 +107,14 @@ def create_clamped_lagrange(
     boundary: "PatchBoundary",
     quadrature: "QuadratureRule | None" = None,
 ) -> LagrangeBoundaryCondition:
-    """Create a clamped Lagrange multiplier condition (W = 0, ROT_N = 0, ROT_S = 0)."""
+    """Create a clamped Lagrange multiplier condition (W = 0, ROT_N = 0).
+
+    Tangential rotation is not enforced explicitly: w = 0 along the entire
+    edge already implies phi_s = -dw/dt = 0 along that edge, so adding a
+    rot_s constraint produces linearly dependent multiplier rows and a
+    singular augmented system.
+    """
     cond = LagrangeBoundaryCondition(boundary, quadrature)
     cond.add("w", 0.0)
     cond.add("rot_n", 0.0)
-    cond.add("rot_s", 0.0)
     return cond

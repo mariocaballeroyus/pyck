@@ -77,6 +77,8 @@ add_library(pyck_conditions
     cpp/conditions/penalty_boundary_condition.cpp
     cpp/conditions/lagrange_boundary_condition.cpp
     cpp/conditions/nitsche_boundary_condition.cpp
+    cpp/conditions/penalty_coupling_condition.cpp
+    cpp/conditions/lagrange_coupling_condition.cpp
 )
 target_include_directories(pyck_conditions PUBLIC cpp/conditions)
 target_link_libraries(pyck_conditions PUBLIC pyck_geometry pyck_assembly)
@@ -124,6 +126,8 @@ add_executable(pyck_tests
     tests/assembly/test_penalty_boundary_condition.cpp
     tests/assembly/test_lagrange_boundary_condition.cpp
     tests/assembly/test_multi_patch_problem.cpp
+    tests/assembly/test_penalty_coupling_condition.cpp
+    tests/assembly/test_lagrange_coupling_condition.cpp
 )
 target_link_libraries(pyck_tests PRIVATE 
     pyck_basis 
