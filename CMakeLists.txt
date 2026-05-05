@@ -76,6 +76,7 @@ add_library(pyck_conditions
     cpp/conditions/load_condition.cpp
     cpp/conditions/penalty_boundary_condition.cpp
     cpp/conditions/lagrange_boundary_condition.cpp
+    cpp/conditions/lagrange_domain_condition.cpp
     cpp/conditions/nitsche_boundary_condition.cpp
     cpp/conditions/penalty_coupling_condition.cpp
     cpp/conditions/lagrange_coupling_condition.cpp
@@ -91,6 +92,8 @@ add_library(pyck_elements
     cpp/elements/plate_kirchhoff_love_1p.cpp
     cpp/elements/plate_reissner_mindlin_3p.cpp
     cpp/elements/plate_reissner_mindlin_1p.cpp
+    cpp/elements/plate_reissner_mindlin_displ_2p.cpp
+    cpp/elements/plate_reissner_mindlin_displ_3p.cpp
 )
 target_include_directories(pyck_elements PUBLIC cpp/elements)
 target_link_libraries(pyck_elements PUBLIC pyck_geometry pyck_assembly pyck_materials)
@@ -125,6 +128,7 @@ add_executable(pyck_tests
     tests/assembly/test_materials.cpp
     tests/assembly/test_penalty_boundary_condition.cpp
     tests/assembly/test_lagrange_boundary_condition.cpp
+    tests/assembly/test_lagrange_domain_condition.cpp
     tests/assembly/test_multi_patch_problem.cpp
     tests/assembly/test_penalty_coupling_condition.cpp
     tests/assembly/test_lagrange_coupling_condition.cpp

@@ -17,6 +17,7 @@
 #include "condition.hpp"
 #include "load_condition.hpp"
 #include "lagrange_boundary_condition.hpp"
+#include "lagrange_domain_condition.hpp"
 #include "nitsche_boundary_condition.hpp"
 #include "penalty_coupling_condition.hpp"
 #include "lagrange_coupling_condition.hpp"
@@ -514,6 +515,17 @@ PYBIND11_MODULE(_pyck, m) {
                  return self.add(std::move(field), value);
              },
              py::arg("field"), py::arg("value") = 0.0,
+             py::return_value_policy::reference);
+
+    using LDCond2D = pyck::LagrangeDomainCondition<double, 2>;
+    py::class_<LDCond2D, CondD, pyck::Ptr<LDCond2D>>(m, "LagrangeDomainCondition2d")
+        .def(py::init<const Patch3D2D&, const Elem2D&, const QR2D&>(),
+             py::arg("patch"), py::arg("element"), py::arg("quadrature"))
+        .def("add",
+             [](LDCond2D& self, std::size_t dof_index, double value) -> LDCond2D& {
+                 return self.add(dof_index, value);
+             },
+             py::arg("dof_index"), py::arg("value") = 0.0,
              py::return_value_policy::reference);
 
     using NitCond2D = pyck::NitscheBoundaryCondition<double, 2>;

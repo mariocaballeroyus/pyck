@@ -37,103 +37,22 @@ class PlateReissnerMindlinDispl3p : public Element<T, 2>
     using idx = typename Element<T, 2>::idx;
 
 public:
-    explicit PlateReissnerMindlinDispl3p(Ptr<PlaneStress2d<T>> material)
-        : material_(material)
-    {
-        if (!material_) {
-            throw std::invalid_argument(
-                "PlateReissnerMindlinDispl3p: material is null."
-            );
-        }
-    }
+    explicit PlateReissnerMindlinDispl3p(Ptr<PlaneStress2d<T>> material);
 
     Matrix<T> bending_constitutive_matrix() const override { return material_->bending_matrix(); }
     Matrix<T> shear_constitutive_matrix() const override { return material_->shear_matrix(); }
 
-    Matrix<T> displacement_shape_matrix(
-        const std::vector<Matrix<T>>& shape_derivs) const override
-    {
-        const auto& N = shape_derivs;
-        const Index Q = N[idx::val].rows();
-        const Index n = N[idx::val].cols();
-        Matrix<T> Nw = Matrix<T>::Zero(Q, 3 * n);
+    Matrix<T> displacement_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
+    Matrix<T> rotation_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
 
-        for (Index i = 0; i < n; ++i) {
-            Nw.col(3 * i    ) = N[idx::val].col(i);
-            Nw.col(3 * i + 1) = N[idx::val].col(i);
-            Nw.col(3 * i + 2) = N[idx::val].col(i);
-        }
-        return Nw;
-    }
-
-    Matrix<T> rotation_shape_matrix(
-        const std::vector<Matrix<T>>& shape_derivs) const override
-    {
-        const auto& N = shape_derivs;
-        const Index Q = N[idx::val].rows();
-        const Index n = N[idx::val].cols();
-        Matrix<T> Nphi = Matrix<T>::Zero(2 * Q, 3 * n);
-
-        for (Index q = 0; q < Q; ++q) {
-            for (Index i = 0; i < n; ++i) {
-                Nphi(2 * q,     3 * i)     = -N[idx::d1](q, i);
-                Nphi(2 * q,     3 * i + 2) = -N[idx::d1](q, i);
-                Nphi(2 * q + 1, 3 * i)     = -N[idx::d2](q, i);
-                Nphi(2 * q + 1, 3 * i + 1) = -N[idx::d2](q, i);
-            }
-        }
-        return Nphi;
-    }
-
-    Matrix<T> bending_strain_matrix(
-        const std::vector<Matrix<T>>& shape_derivs) const override
-    {
-        const auto& N = shape_derivs;
-        const Index Q = N[idx::val].rows();
-        const Index n = N[idx::val].cols();
-        Matrix<T> Bb = Matrix<T>::Zero(3 * Q, 3 * n);
-
-        for (Index q = 0; q < Q; ++q) {
-            for (Index i = 0; i < n; ++i) {
-                Bb(3 * q,     3 * i)     = -N[idx::d11](q, i);
-                Bb(3 * q,     3 * i + 2) = -N[idx::d11](q, i);
-
-                Bb(3 * q + 1, 3 * i)     = -N[idx::d22](q, i);
-                Bb(3 * q + 1, 3 * i + 1) = -N[idx::d22](q, i);
-
-                Bb(3 * q + 2, 3 * i)     = -T(2) * N[idx::d12](q, i);
-                Bb(3 * q + 2, 3 * i + 1) = -N[idx::d12](q, i);
-                Bb(3 * q + 2, 3 * i + 2) = -N[idx::d12](q, i);
-            }
-        }
-        return Bb;
-    }
-
-    Matrix<T> shear_strain_matrix(
-        const std::vector<Matrix<T>>& shape_derivs) const override
-    {
-        const auto& N = shape_derivs;
-        const Index Q = N[idx::val].rows();
-        const Index n = N[idx::val].cols();
-        Matrix<T> Bs = Matrix<T>::Zero(2 * Q, 3 * n);
-
-        for (Index q = 0; q < Q; ++q) {
-            for (Index i = 0; i < n; ++i) {
-                Bs(2 * q,     3 * i + 1) = N[idx::d1](q, i);
-                Bs(2 * q + 1, 3 * i + 2) = N[idx::d2](q, i);
-            }
-        }
-        return Bs;
-    }
+    Matrix<T> bending_strain_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
+    Matrix<T> shear_strain_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
 
     std::size_t num_node_dofs() const override { return 3; }
 
     std::size_t min_order() const override { return 2; }
 
-    std::array<std::size_t, 2> rotation_dof_indices() const override
-    {
-        return {0, 0};
-    }
+    std::array<std::size_t, 2> rotation_dof_indices() const override { return {0, 0}; }
 
 private:
     Ptr<PlaneStress2d<T>> material_;
