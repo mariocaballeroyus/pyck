@@ -1,6 +1,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/eigen.h>
+#include <pybind11/functional.h>
 
 #include "bspline.hpp"
 #include "nurbs.hpp"
@@ -36,6 +37,7 @@
 #include "material.hpp"
 #include "slender_beam_1d.hpp"
 #include "plane_stress_2d.hpp"
+#include "integrate.hpp"
 
 namespace py = pybind11;
 
@@ -401,6 +403,12 @@ PYBIND11_MODULE(_pyck, m) {
         .def("min_order", &Elem2D::min_order)
         .def("displacement_shape_matrix", &Elem2D::displacement_shape_matrix, py::arg("shape_derivs"))
         .def("rotation_shape_matrix", &Elem2D::rotation_shape_matrix, py::arg("shape_derivs"))
+        .def("bending_strain_matrix", &Elem2D::bending_strain_matrix, py::arg("shape_derivs"))
+        .def("shear_strain_matrix", &Elem2D::shear_strain_matrix, py::arg("shape_derivs"))
+        .def("moment_matrix", &Elem2D::moment_matrix, py::arg("shape_derivs"))
+        .def("transverse_shear_matrix", &Elem2D::transverse_shear_matrix, py::arg("shape_derivs"))
+        .def("bending_constitutive_matrix", &Elem2D::bending_constitutive_matrix)
+        .def("shear_constitutive_matrix", &Elem2D::shear_constitutive_matrix)
         .def("displacement_dof_index", &Elem2D::displacement_dof_index)
         .def("rotation_dof_indices", &Elem2D::rotation_dof_indices)
         .def("strain_displacement_matrix", &Elem2D::strain_displacement_matrix, py::arg("shape_derivs"));
@@ -794,11 +802,55 @@ PYBIND11_MODULE(_pyck, m) {
     m.def("eval_shape_at", &pyck::eval_shape_at<double, 2>,
           py::arg("patch"), py::arg("params"), py::arg("order") = 0,
           "Evaluate shape functions at given parametric points (auto span finding).");
-    
+
     m.def("eval_geometry_at", &pyck::eval_geometry_at<double, 1>,
           py::arg("patch"), py::arg("params"),
           "Evaluate physical coordinates at given parametric points.");
     m.def("eval_geometry_at", &pyck::eval_geometry_at<double, 2>,
           py::arg("patch"), py::arg("params"),
           "Evaluate physical coordinates at given parametric points.");
+
+    // === Postprocessing: generic per-patch field integrator =========================
+
+    using IntegrandFn2D = std::function<pyck::Matrix<double>(
+        const pyck::ColMatrix<double, 3>&,
+        const std::vector<pyck::Matrix<double>>&,
+        const pyck::Vector<double>&)>;
+
+    using IntegrandFn1D = std::function<pyck::Matrix<double>(
+        const pyck::ColMatrix<double, 3>&,
+        const std::vector<pyck::Matrix<double>>&,
+        const pyck::Vector<double>&)>;
+
+    m.def("integrate_on_patch",
+          [](const Patch3D2D& patch,
+             const QR2D& quadrature,
+             std::size_t order,
+             const pyck::Vector<double>& cp_values,
+             std::size_t ndof,
+             IntegrandFn2D integrand) {
+              return pyck::integrate_on_patch<double, 2>(
+                  patch, quadrature, order, cp_values, ndof, integrand);
+          },
+          py::arg("patch"), py::arg("quadrature"), py::arg("order"),
+          py::arg("cp_values"), py::arg("ndof"), py::arg("integrand"),
+          "Element-wise integration on a 2D patch. Integrand returns a "
+          "(Q, n_components) matrix per element; the integrator multiplies by "
+          "dV = w * |J| and accumulates each component. Pass an empty "
+          "cp_values to skip the per-element DOF gather.");
+
+    m.def("integrate_on_patch",
+          [](const Patch3D1D& patch,
+             const QR1D& quadrature,
+             std::size_t order,
+             const pyck::Vector<double>& cp_values,
+             std::size_t ndof,
+             IntegrandFn1D integrand) {
+              return pyck::integrate_on_patch<double, 1>(
+                  patch, quadrature, order, cp_values, ndof, integrand);
+          },
+          py::arg("patch"), py::arg("quadrature"), py::arg("order"),
+          py::arg("cp_values"), py::arg("ndof"), py::arg("integrand"),
+          "Element-wise integration on a 1D patch. See the 2D overload for "
+          "the integrand contract.");
 }

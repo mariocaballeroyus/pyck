@@ -62,6 +62,8 @@ from pyck.conditions import (
     create_displacement_lagrange,
     create_simply_supported_lagrange,
     create_clamped_lagrange,
+    LagrangeDomainCondition,
+    create_zero_mean_lagrange,
     NitscheBoundaryCondition,
     create_clamped_nitsche,
     create_displacement_nitsche,
@@ -102,6 +104,7 @@ from pyck.io import (
 )
 from pyck.solver import solve
 import pyck.solver as solver
+from pyck.postprocessing import integrate_on_patch
 
 __all__ = [
     "assembly",
@@ -163,6 +166,8 @@ __all__ = [
     "create_displacement_lagrange",
     "create_simply_supported_lagrange",
     "create_clamped_lagrange",
+    "LagrangeDomainCondition",
+    "create_zero_mean_lagrange",
     "NitscheBoundaryCondition",
     "create_clamped_nitsche",
     "create_displacement_nitsche",
@@ -196,4 +201,5 @@ __all__ = [
     "export_field_vtk",
     "solve",
     "solver",
+    "integrate_on_patch",
 ]

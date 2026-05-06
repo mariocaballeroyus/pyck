@@ -26,6 +26,10 @@ from pyck.conditions.lagrange_boundary_condition import (
     create_simply_supported_lagrange,
     create_clamped_lagrange,
 )
+from pyck.conditions.lagrange_domain_condition import (
+    LagrangeDomainCondition,
+    create_zero_mean_lagrange,
+)
 from pyck.conditions.nitsche_boundary_condition import (
     NitscheBoundaryCondition,
     create_clamped_nitsche,
@@ -62,6 +66,8 @@ __all__ = [
     "create_displacement_lagrange",
     "create_simply_supported_lagrange",
     "create_clamped_lagrange",
+    "LagrangeDomainCondition",
+    "create_zero_mean_lagrange",
     "NitscheBoundaryCondition",
     "create_clamped_nitsche",
     "create_displacement_nitsche",
