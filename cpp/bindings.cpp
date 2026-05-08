@@ -17,6 +17,7 @@
 #include "boundary_field.hpp"
 #include "condition.hpp"
 #include "load_condition.hpp"
+#include "load_boundary_condition.hpp"
 #include "lagrange_boundary_condition.hpp"
 #include "lagrange_domain_condition.hpp"
 #include "nitsche_boundary_condition.hpp"
@@ -497,6 +498,28 @@ PYBIND11_MODULE(_pyck, m) {
     py::class_<LC2D, CondD, pyck::Ptr<LC2D>>(m, "LoadCondition2d")
         .def(py::init<const Patch3D2D&, const Elem2D&, const QR2D&, const pyck::Vector<double>&>(),
              py::arg("patch"), py::arg("element"), py::arg("quadrature"), py::arg("load_values"));
+
+    using LBC2D = pyck::LoadBoundaryCondition<double, 2>;
+    py::class_<LBC2D, CondD, pyck::Ptr<LBC2D>>(m, "LoadBoundaryCondition2d")
+        .def(py::init<const PatchBoundary2D&, const Elem2D&, const QR1D&>(),
+             py::arg("boundary"), py::arg("element"), py::arg("quadrature"))
+        .def("add",
+             [](LBC2D& self,
+                pyck::Ptr<const BoundaryFieldD> field,
+                double value) -> LBC2D& {
+                 return self.add(std::move(field), value);
+             },
+             py::arg("field"), py::arg("value") = 0.0,
+             py::return_value_policy::reference)
+        .def("add",
+             [](LBC2D& self,
+                pyck::Ptr<const BoundaryFieldD> field,
+                const pyck::Vector<double>& values) -> LBC2D& {
+                 return self.add(std::move(field), values);
+             },
+             py::arg("field"), py::arg("values"),
+             py::return_value_policy::reference)
+        .def("num_active_qpts", &LBC2D::num_active_qpts);
 
     using PenCond2D = pyck::PenaltyBoundaryCondition<double, 2>;
     py::class_<PenCond2D, CondD, pyck::Ptr<PenCond2D>>(m, "PenaltyBoundaryCondition2d")

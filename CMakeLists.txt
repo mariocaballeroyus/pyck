@@ -74,6 +74,7 @@ target_link_libraries(pyck_assembly PUBLIC eigen pyck_elements pyck_conditions p
 # Conditions library
 add_library(pyck_conditions
     cpp/conditions/load_condition.cpp
+    cpp/conditions/load_boundary_condition.cpp
     cpp/conditions/penalty_boundary_condition.cpp
     cpp/conditions/lagrange_boundary_condition.cpp
     cpp/conditions/lagrange_domain_condition.cpp
@@ -132,6 +133,7 @@ add_executable(pyck_tests
     tests/elements/test_reissner_mindlin_1p.cpp
     tests/assembly/test_constraints.cpp
     tests/assembly/test_load_condition.cpp
+    tests/assembly/test_load_boundary_condition.cpp
     tests/assembly/test_materials.cpp
     tests/assembly/test_penalty_boundary_condition.cpp
     tests/assembly/test_lagrange_boundary_condition.cpp

@@ -20,6 +20,11 @@ from pyck.conditions.load_condition import (
     create_constant_load_condition,
     create_load_condition,
 )
+from pyck.conditions.load_boundary_condition import (
+    LoadBoundaryCondition,
+    create_shear_load,
+    create_load_boundary_from_function,
+)
 from pyck.conditions.lagrange_boundary_condition import (
     LagrangeBoundaryCondition,
     create_displacement_lagrange,
@@ -62,6 +67,9 @@ __all__ = [
     "LoadCondition",
     "create_constant_load_condition",
     "create_load_condition",
+    "LoadBoundaryCondition",
+    "create_shear_load",
+    "create_load_boundary_from_function",
     "LagrangeBoundaryCondition",
     "create_displacement_lagrange",
     "create_simply_supported_lagrange",
