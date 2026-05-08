@@ -12,9 +12,10 @@
 namespace pyck
 {
 
-/// @brief Abstract base class for elements (generic).
-/// @tparam T Scalar type.
-/// @tparam d Dimension.
+/** @brief Abstract base class for elements (generic).
+ * @tparam T Scalar type.
+ * @tparam d Dimension.
+ */
 template <std::floating_point T, std::size_t d>
 class Element
 {
@@ -22,8 +23,9 @@ class Element
 public:
     virtual ~Element() = default;
 
-    virtual void compute_local_stiffness(const std::vector<Matrix<T>>& shape_fns,
-                                         const Vector<T>& jacobian,
+    virtual void compute_local_stiffness(const Patch<T, d>& patch,
+                                         Index elem_idx,
+                                         const ColMatrix<T, d>& mapped_pts,
                                          const Vector<T>& q_weights,
                                          Matrix<T>& stiffness) const = 0;
 
@@ -81,11 +83,15 @@ public:
     }
 
     /// @brief Default local stiffness assembly: Ke = sum_q dV[q] * (Kb Bb^T Bb + Ks Bs^T Bs).
-    virtual void compute_local_stiffness(const std::vector<Matrix<T>>& shape_fns,
-                                         const Vector<T>& jacobian,
+    virtual void compute_local_stiffness(const Patch<T, 1>& patch,
+                                         Index elem_idx,
+                                         const ColMatrix<T, 1>& mapped_pts,
                                          const Vector<T>& q_weights,
                                          Matrix<T>& stiffness) const
     {
+        auto [shape_fns, jacobian] =
+            patch.eval_shape_functions(mapped_pts, elem_idx, min_order());
+
         const Matrix<T> Bb = bending_strain_matrix(shape_fns);
         const Matrix<T> Bs = shear_strain_matrix(shape_fns);
         const T Kb = bending_stiffness();
@@ -180,11 +186,15 @@ public:
     }
 
     /// @brief Default local stiffness assembly: Ke = sum_q dV[q] * (Bb^T Db Bb + Bs^T Ds Bs).
-    virtual void compute_local_stiffness(const std::vector<Matrix<T>>& shape_fns,
-                                         const Vector<T>& jacobian,
+    virtual void compute_local_stiffness(const Patch<T, 2>& patch,
+                                         Index elem_idx,
+                                         const ColMatrix<T, 2>& mapped_pts,
                                          const Vector<T>& q_weights,
                                          Matrix<T>& stiffness) const
     {
+        auto [shape_fns, jacobian] =
+            patch.eval_shape_functions(mapped_pts, elem_idx, min_order());
+
         const Matrix<T> Bb = bending_strain_matrix(shape_fns);
         const Matrix<T> Bs = shear_strain_matrix(shape_fns);
         const Matrix<T> Db = bending_constitutive_matrix();

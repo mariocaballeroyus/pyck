@@ -89,13 +89,11 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
             }
             if (zero_volume) continue;
 
-            // Map quadrature points and evaluate shape functions on this span.
+            // Map quadrature points; the element evaluates whatever it needs.
             auto [mapped_pts, mapped_weights] = quadrature.map_to_domain(u_a, u_b);
-            auto [shape_fns, jac] = patch.eval_shape_functions(
-                mapped_pts, elem_idx, element.min_order());
 
             // Local element stiffness.
-            element.compute_local_stiffness(shape_fns, jac, mapped_weights, Ke);
+            element.compute_local_stiffness(patch, elem_idx, mapped_pts, mapped_weights, Ke);
 
             // Scatter into the per-patch primal block.
             auto elem_nodes = mapper.get_element_dofs(elem_idx);

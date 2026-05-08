@@ -198,9 +198,8 @@ TEST_CASE("RM 1P Plate: stiffness matrix size and symmetry", "[RM1P]")
     ColMatrix<double, 2> q_points = gauss->points();
     Vector<double> q_weights = gauss->weights();
 
-    auto [shape_fns, jac] = surface->eval_shape_functions(q_points, elem_idx, element.min_order());
     Matrix<double> stiffness;
-    element.compute_local_stiffness(shape_fns, jac, q_weights, stiffness);
+    element.compute_local_stiffness(*surface, elem_idx, q_points, q_weights, stiffness);
 
     // n*n = 36 total, but element-level is (p+1)^2 = 16 for p=3
     Index local_n = (p + 1) * (p + 1);

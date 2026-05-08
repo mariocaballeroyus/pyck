@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pyck._pyck as _pyck
-from pyck.materials import PlaneStress2d
+from pyck.materials import PlaneStress2d, PlaneStressShell
 
 
 class PlateKirchhoffLove1p:
@@ -186,3 +186,37 @@ def create_reissner_mindlin_displ_2p_plate(
 ) -> PlateReissnerMindlinDispl2p:
     """Create a :class:`PlateReissnerMindlinDispl2p` element."""
     return PlateReissnerMindlinDispl2p(material)
+
+
+class ShellReissnerMindlin5p:
+    """Reissner-Mindlin 5-parameter shell element.
+
+    DOFs per control point:
+        slot 0..2 : Cartesian displacements (u_x, u_y, u_z)
+        slot 3..4 : director rotation amplitudes (theta_1, theta_2)
+
+    See ``docs/shell_reissner_mindlin_5p.md`` for the formulation.
+
+    Parameters
+    ----------
+    material : PlaneStressShell
+        Shell material model.
+    """
+
+    def __init__(self, material: PlaneStressShell) -> None:
+        self._material = material
+        self._cpp_object = _pyck.ShellReissnerMindlin5p(self._material._cpp_object)
+
+    @property
+    def material(self) -> PlaneStressShell:
+        return self._material
+
+    def __repr__(self) -> str:
+        return f"ShellReissnerMindlin5p(material={self._material})"
+
+
+def create_reissner_mindlin_shell(
+    material: PlaneStressShell,
+) -> ShellReissnerMindlin5p:
+    """Create a :class:`ShellReissnerMindlin5p` element."""
+    return ShellReissnerMindlin5p(material)

@@ -33,11 +33,13 @@
 #include "plate_reissner_mindlin_displ_3p.hpp"
 #include "plate_reissner_mindlin_displ_2p.hpp"
 #include "plate_reissner_mindlin_1p.hpp"
+#include "shell_reissner_mindlin_5p.hpp"
 #include "dof_layout.hpp"
 #include "linear_elastic_problem.hpp"
 #include "material.hpp"
 #include "slender_beam_1d.hpp"
 #include "plane_stress_2d.hpp"
+#include "plane_stress_shell.hpp"
 #include "integrate.hpp"
 
 namespace py = pybind11;
@@ -369,6 +371,13 @@ PYBIND11_MODULE(_pyck, m) {
         .def("bending_matrix", &PS2D::bending_matrix)
         .def("shear_matrix", &PS2D::shear_matrix);
 
+    using PSSH = pyck::PlaneStressShell<double>;
+    py::class_<PSSH, Material2D, pyck::Ptr<PSSH>>(m, "PlaneStressShell")
+        .def(py::init<double, double, double, double>(),
+             py::arg("E"), py::arg("nu") = 0.3, py::arg("t") = 1.0, py::arg("k_s") = 5.0 / 6.0)
+        .def("thickness", &PSSH::thickness)
+        .def("shear_correction_factor", &PSSH::shear_correction_factor);
+
     // === Elements ===================================================================
 
     using Elem1D = pyck::Element<double, 1>;
@@ -437,6 +446,11 @@ PYBIND11_MODULE(_pyck, m) {
     using RM1P = pyck::PlateReissnerMindlin1p<double>;
     py::class_<RM1P, Elem2D, pyck::Ptr<RM1P>>(m, "PlateReissnerMindlin1p")
         .def(py::init<pyck::Ptr<pyck::PlaneStress2d<double>>>(),
+             py::arg("material"));
+
+    using SHRM5P = pyck::ShellReissnerMindlin5p<double>;
+    py::class_<SHRM5P, Elem2D, pyck::Ptr<SHRM5P>>(m, "ShellReissnerMindlin5p")
+        .def(py::init<pyck::Ptr<pyck::PlaneStressShell<double>>>(),
              py::arg("material"));
 
     // === Conditions =================================================================

@@ -102,6 +102,7 @@ add_library(pyck_elements
     cpp/elements/plate_reissner_mindlin_1p.cpp
     cpp/elements/plate_reissner_mindlin_displ_2p.cpp
     cpp/elements/plate_reissner_mindlin_displ_3p.cpp
+    cpp/elements/shell_reissner_mindlin_5p.cpp
 )
 target_include_directories(pyck_elements PUBLIC cpp/elements)
 target_link_libraries(pyck_elements PUBLIC pyck_geometry pyck_assembly pyck_materials)
@@ -131,6 +132,7 @@ add_executable(pyck_tests
     tests/elements/test_kirchhoff_love_1p.cpp
     tests/elements/test_reissner_mindlin.cpp
     tests/elements/test_reissner_mindlin_1p.cpp
+    tests/elements/test_shell_reissner_mindlin_5p.cpp
     tests/assembly/test_constraints.cpp
     tests/assembly/test_load_condition.cpp
     tests/assembly/test_load_boundary_condition.cpp
