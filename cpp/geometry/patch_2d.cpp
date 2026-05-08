@@ -344,58 +344,106 @@ Patch<T, d>::eval_local_frame(const ColMatrix<T, d>& points,
 }
 
 template <std::floating_point T, std::size_t d>
+SurfaceKinematics<T>
+Patch<T, d>::eval_surface_kinematics(const ColMatrix<T, d>& points,
+                                     Index span,
+                                     std::size_t order_in) const requires(d == 2)
+{
+    const Index order = std::max(Index(1), std::min(static_cast<Index>(order_in), Index(3)));
+    auto spans   = this->decode_span(span);
+    auto act_pts = this->active_control_pts(spans);
+
+    SurfaceKinematics<T> sk;
+    sk.basis_derivs = this->tensor_product().eval_on_span(points, spans, order);
+    const Index Q = points.rows();
+    const Index S = order + 1;
+
+    sk.a1 = sk.basis_derivs[1 * S + 0] * act_pts;
+    sk.a2 = sk.basis_derivs[0 * S + 1] * act_pts;
+
+    sk.a3.resize(Q, 3);
+    sk.aup1.resize(Q, 3);
+    sk.aup2.resize(Q, 3);
+    sk.g_inv.resize(Q, 3);
+    sk.jac.resize(Q);
+
+    if (order >= 2) {
+        sk.a11 = sk.basis_derivs[2 * S + 0] * act_pts;
+        sk.a12 = sk.basis_derivs[1 * S + 1] * act_pts;
+        sk.a22 = sk.basis_derivs[0 * S + 2] * act_pts;
+        sk.b.resize(Q, 3);
+        sk.christoffel.resize(Q, 6);
+    }
+    if (order >= 3) {
+        sk.a111 = sk.basis_derivs[3 * S + 0] * act_pts;
+        sk.a112 = sk.basis_derivs[2 * S + 1] * act_pts;
+        sk.a122 = sk.basis_derivs[1 * S + 2] * act_pts;
+        sk.a222 = sk.basis_derivs[0 * S + 3] * act_pts;
+    }
+
+    for (Index q = 0; q < Q; ++q) {
+        const auto a1_q = sk.a1.row(q);
+        const auto a2_q = sk.a2.row(q);
+
+        // Director a3 = a1 × a2, with jacobian = ||a1 × a2||.
+        Eigen::Matrix<T, 3, 1> a3_q = a1_q.transpose().cross(a2_q.transpose());
+        const T n = a3_q.norm();
+        sk.jac(q) = n;
+        if (n > T(1e-14)) a3_q /= n;
+        else a3_q = Eigen::Matrix<T, 3, 1>(T(0), T(0), T(1));
+        sk.a3.row(q) = a3_q.transpose();
+
+        // Metric.
+        const T g11 = a1_q.squaredNorm();
+        const T g12 = a1_q.dot(a2_q);
+        const T g22 = a2_q.squaredNorm();
+        const T det_g  = g11 * g22 - g12 * g12;
+        const T inv_dg = T(1) / det_g;
+        const T gi11 =  g22 * inv_dg;
+        const T gi12 = -g12 * inv_dg;
+        const T gi22 =  g11 * inv_dg;
+        sk.g_inv(q, 0) = gi11;
+        sk.g_inv(q, 1) = gi12;
+        sk.g_inv(q, 2) = gi22;
+
+        // Dual basis a^α = g^{αβ} a_β.
+        sk.aup1.row(q) = gi11 * a1_q + gi12 * a2_q;
+        sk.aup2.row(q) = gi12 * a1_q + gi22 * a2_q;
+
+        if (order < 2) continue;
+
+        const auto a11_q = sk.a11.row(q);
+        const auto a12_q = sk.a12.row(q);
+        const auto a22_q = sk.a22.row(q);
+
+        // Second fundamental form b_αβ = a_{αβ} · a3.
+        sk.b(q, 0) = a11_q.dot(a3_q.transpose());
+        sk.b(q, 1) = a12_q.dot(a3_q.transpose());
+        sk.b(q, 2) = a22_q.dot(a3_q.transpose());
+
+        // Christoffels Γ^δ_{αβ} = a^δ · a_{αβ}, packed as
+        // (Γ¹₁₁, Γ¹₁₂, Γ¹₂₂, Γ²₁₁, Γ²₁₂, Γ²₂₂).
+        const auto aup1_q = sk.aup1.row(q);
+        const auto aup2_q = sk.aup2.row(q);
+        sk.christoffel(q, 0) = aup1_q.dot(a11_q);
+        sk.christoffel(q, 1) = aup1_q.dot(a12_q);
+        sk.christoffel(q, 2) = aup1_q.dot(a22_q);
+        sk.christoffel(q, 3) = aup2_q.dot(a11_q);
+        sk.christoffel(q, 4) = aup2_q.dot(a12_q);
+        sk.christoffel(q, 5) = aup2_q.dot(a22_q);
+    }
+    return sk;
+}
+
+template <std::floating_point T, std::size_t d>
 std::tuple<ColMatrix<T, 3>, ColMatrix<T, 3>, ColMatrix<T, 3>,
            ColMatrix<T, 3>, ColMatrix<T, 3>, Vector<T>>
 Patch<T, d>::eval_surface_geometry(const ColMatrix<T, d>& points,
                                    Index span) const requires(d == 2)
 {
-    auto spans = this->decode_span(span);
-    auto basis_derivs = this->tensor_product().eval_on_span(points, spans, Index(2));
-    auto act_pts = this->active_control_pts(spans);
-
-    const Index Q = points.rows();
-    const Index S = 3;  // (order + 1) for order = 2
-
-    ColMatrix<T, 3> a1  = basis_derivs[1 * S + 0] * act_pts;
-    ColMatrix<T, 3> a2  = basis_derivs[0 * S + 1] * act_pts;
-    ColMatrix<T, 3> a11 = basis_derivs[2 * S + 0] * act_pts;
-    ColMatrix<T, 3> a12 = basis_derivs[1 * S + 1] * act_pts;
-    ColMatrix<T, 3> a22 = basis_derivs[0 * S + 2] * act_pts;
-
-    ColMatrix<T, 3> a3(Q, 3);
-    ColMatrix<T, 3> g_inv(Q, 3);
-    ColMatrix<T, 3> b(Q, 3);
-    Vector<T> jac(Q);
-
-    for (Index q = 0; q < Q; ++q) {
-        Eigen::Matrix<T, 3, 1> a1_q  = a1.row(q).transpose();
-        Eigen::Matrix<T, 3, 1> a2_q  = a2.row(q).transpose();
-        Eigen::Matrix<T, 3, 1> a11_q = a11.row(q).transpose();
-        Eigen::Matrix<T, 3, 1> a12_q = a12.row(q).transpose();
-        Eigen::Matrix<T, 3, 1> a22_q = a22.row(q).transpose();
-
-        Eigen::Matrix<T, 3, 1> a3_q = a1_q.cross(a2_q);
-        const T n = a3_q.norm();
-        jac(q) = n;
-        if (n > T(1e-14)) a3_q /= n;
-        else a3_q = Eigen::Matrix<T, 3, 1>(T(0), T(0), T(1));
-        a3.row(q) = a3_q.transpose();
-
-        const T g11 = a1_q.dot(a1_q);
-        const T g12 = a1_q.dot(a2_q);
-        const T g22 = a2_q.dot(a2_q);
-        const T det_g  = g11 * g22 - g12 * g12;
-        const T inv_dg = T(1) / det_g;
-        g_inv(q, 0) =  g22 * inv_dg;   // g^11
-        g_inv(q, 1) = -g12 * inv_dg;   // g^12
-        g_inv(q, 2) =  g11 * inv_dg;   // g^22
-
-        b(q, 0) = a11_q.dot(a3_q);     // b_11
-        b(q, 1) = a12_q.dot(a3_q);     // b_12
-        b(q, 2) = a22_q.dot(a3_q);     // b_22
-    }
-    return {std::move(a1), std::move(a2), std::move(a3),
-            std::move(g_inv), std::move(b), std::move(jac)};
+    SurfaceKinematics<T> sk = this->eval_surface_kinematics(points, span, 2);
+    return {std::move(sk.a1), std::move(sk.a2), std::move(sk.a3),
+            std::move(sk.g_inv), std::move(sk.b), std::move(sk.jac)};
 }
 
 template <std::floating_point T, std::size_t d>
@@ -404,18 +452,15 @@ std::vector<Matrix<T>> Patch<T, d>::eval_covariant_derivatives(
     Index span,
     std::size_t order_in) const requires(d == 2)
 {
-    Index order = std::max(Index(1), std::min(static_cast<Index>(order_in), Index(3)));
+    const Index order = std::max(Index(1), std::min(static_cast<Index>(order_in), Index(3)));
 
-    auto spans = this->decode_span(span);
-    auto basis_derivs = this->tensor_product().eval_on_span(points, spans, order);
-    auto act_pts = this->active_control_pts(spans);
-
+    SurfaceKinematics<T> sk = this->eval_surface_kinematics(points, span, order);
     const Index Q = points.rows();
     const Index S = order + 1;
 
-    const Matrix<T>& N   = basis_derivs[0 * S + 0];
-    const Matrix<T>& N_u = basis_derivs[1 * S + 0];
-    const Matrix<T>& N_v = basis_derivs[0 * S + 1];
+    const Matrix<T>& N   = sk.basis_derivs[0 * S + 0];
+    const Matrix<T>& N_u = sk.basis_derivs[1 * S + 0];
+    const Matrix<T>& N_v = sk.basis_derivs[0 * S + 1];
     const Index K = N.cols();
 
     const std::size_t out_size = (order == 1) ? 3 : (order == 2 ? 6 : 12);
@@ -426,57 +471,27 @@ std::vector<Matrix<T>> Patch<T, d>::eval_covariant_derivatives(
 
     if (order < 2) return result;
 
-    const Matrix<T>& N_uu = basis_derivs[2 * S + 0];
-    const Matrix<T>& N_uv = basis_derivs[1 * S + 1];
-    const Matrix<T>& N_vv = basis_derivs[0 * S + 2];
-
-    ColMatrix<T, 3> a1  = N_u  * act_pts;
-    ColMatrix<T, 3> a2  = N_v  * act_pts;
-    ColMatrix<T, 3> a11 = N_uu * act_pts;
-    ColMatrix<T, 3> a12 = N_uv * act_pts;
-    ColMatrix<T, 3> a22 = N_vv * act_pts;
+    const Matrix<T>& N_uu = sk.basis_derivs[2 * S + 0];
+    const Matrix<T>& N_uv = sk.basis_derivs[1 * S + 1];
+    const Matrix<T>& N_vv = sk.basis_derivs[0 * S + 2];
 
     result[3] = Matrix<T>(Q, K);
     result[4] = Matrix<T>(Q, K);
     result[5] = Matrix<T>(Q, K);
 
-    // Order-3 specifics: third parametric derivatives of the geometry.
-    ColMatrix<T, 3> a111, a112, a122, a222;
     if (order >= 3) {
-        a111 = basis_derivs[3 * S + 0] * act_pts;
-        a112 = basis_derivs[2 * S + 1] * act_pts;
-        a122 = basis_derivs[1 * S + 2] * act_pts;
-        a222 = basis_derivs[0 * S + 3] * act_pts;
         for (Index k = 6; k < 12; ++k) result[k] = Matrix<T>(Q, K);
     }
 
     for (Index q = 0; q < Q; ++q) {
-        Eigen::Matrix<T, 3, 1> a1_q  = a1.row(q).transpose();
-        Eigen::Matrix<T, 3, 1> a2_q  = a2.row(q).transpose();
-        Eigen::Matrix<T, 3, 1> a11_q = a11.row(q).transpose();
-        Eigen::Matrix<T, 3, 1> a12_q = a12.row(q).transpose();
-        Eigen::Matrix<T, 3, 1> a22_q = a22.row(q).transpose();
-
-        const T g11 = a1_q.dot(a1_q);
-        const T g12 = a1_q.dot(a2_q);
-        const T g22 = a2_q.dot(a2_q);
-        const T det_g  = g11 * g22 - g12 * g12;
-        const T inv_dg = T(1) / det_g;
-        const T gi11 =  g22 * inv_dg;
-        const T gi12 = -g12 * inv_dg;
-        const T gi22 =  g11 * inv_dg;
-
-        // Dual basis a^γ = g^{γδ} a_δ.
-        Eigen::Matrix<T, 3, 1> aup1 = gi11 * a1_q + gi12 * a2_q;
-        Eigen::Matrix<T, 3, 1> aup2 = gi12 * a1_q + gi22 * a2_q;
-
-        // Christoffels Γ^γ_{αβ} = a^γ · a_{αβ}.
-        const T G1_11 = aup1.dot(a11_q);
-        const T G1_12 = aup1.dot(a12_q);
-        const T G1_22 = aup1.dot(a22_q);
-        const T G2_11 = aup2.dot(a11_q);
-        const T G2_12 = aup2.dot(a12_q);
-        const T G2_22 = aup2.dot(a22_q);
+        // Christoffels Γ^δ_{αβ} from the kinematics bundle. Packing:
+        // (Γ¹₁₁, Γ¹₁₂, Γ¹₂₂, Γ²₁₁, Γ²₁₂, Γ²₂₂).
+        const T G1_11 = sk.christoffel(q, 0);
+        const T G1_12 = sk.christoffel(q, 1);
+        const T G1_22 = sk.christoffel(q, 2);
+        const T G2_11 = sk.christoffel(q, 3);
+        const T G2_12 = sk.christoffel(q, 4);
+        const T G2_22 = sk.christoffel(q, 5);
 
         // Covariant 2nd: N_{|αβ} = N_{,αβ} - Γ^γ_{αβ} N_{,γ}.
         result[3].row(q) = N_uu.row(q) - G1_11 * N_u.row(q) - G2_11 * N_v.row(q);
@@ -486,10 +501,21 @@ std::vector<Matrix<T>> Patch<T, d>::eval_covariant_derivatives(
         if (order < 3) continue;
 
         // ===== Christoffel derivatives Γ^δ_{αβ,γ} =====
-        Eigen::Matrix<T, 3, 1> a111_q = a111.row(q).transpose();
-        Eigen::Matrix<T, 3, 1> a112_q = a112.row(q).transpose();
-        Eigen::Matrix<T, 3, 1> a122_q = a122.row(q).transpose();
-        Eigen::Matrix<T, 3, 1> a222_q = a222.row(q).transpose();
+        const auto a1_q   = sk.a1.row(q);
+        const auto a2_q   = sk.a2.row(q);
+        const auto a11_q  = sk.a11.row(q);
+        const auto a12_q  = sk.a12.row(q);
+        const auto a22_q  = sk.a22.row(q);
+        const auto a111_q = sk.a111.row(q);
+        const auto a112_q = sk.a112.row(q);
+        const auto a122_q = sk.a122.row(q);
+        const auto a222_q = sk.a222.row(q);
+        const auto aup1   = sk.aup1.row(q);
+        const auto aup2   = sk.aup2.row(q);
+
+        const T gi11 = sk.g_inv(q, 0);
+        const T gi12 = sk.g_inv(q, 1);
+        const T gi22 = sk.g_inv(q, 2);
 
         // Metric derivatives g_{αβ,γ} = a_α · a_{βγ} + a_{αγ} · a_β.
         const T g11_1 = T(2) * a1_q.dot(a11_q);
@@ -514,10 +540,10 @@ std::vector<Matrix<T>> Patch<T, d>::eval_covariant_derivatives(
         const T gi22_2 = dg_inv(gi12, gi22, gi12, gi22, g11_2, g12_2, g22_2);
 
         // Dual-basis derivatives a^δ_{,γ} = g^{δσ}_{,γ} a_σ + g^{δσ} a_{σγ}.
-        Eigen::Matrix<T, 3, 1> aup1_1 = gi11_1 * a1_q + gi12_1 * a2_q + gi11 * a11_q + gi12 * a12_q;
-        Eigen::Matrix<T, 3, 1> aup1_2 = gi11_2 * a1_q + gi12_2 * a2_q + gi11 * a12_q + gi12 * a22_q;
-        Eigen::Matrix<T, 3, 1> aup2_1 = gi12_1 * a1_q + gi22_1 * a2_q + gi12 * a11_q + gi22 * a12_q;
-        Eigen::Matrix<T, 3, 1> aup2_2 = gi12_2 * a1_q + gi22_2 * a2_q + gi12 * a12_q + gi22 * a22_q;
+        Eigen::RowVector<T, 3> aup1_1 = gi11_1 * a1_q + gi12_1 * a2_q + gi11 * a11_q + gi12 * a12_q;
+        Eigen::RowVector<T, 3> aup1_2 = gi11_2 * a1_q + gi12_2 * a2_q + gi11 * a12_q + gi12 * a22_q;
+        Eigen::RowVector<T, 3> aup2_1 = gi12_1 * a1_q + gi22_1 * a2_q + gi12 * a11_q + gi22 * a12_q;
+        Eigen::RowVector<T, 3> aup2_2 = gi12_2 * a1_q + gi22_2 * a2_q + gi12 * a12_q + gi22 * a22_q;
 
         // Γ^δ_{αβ,γ} = a^δ_{,γ} · a_{αβ} + a^δ · a_{αβγ}.
         const T G1_11_1 = aup1_1.dot(a11_q) + aup1.dot(a111_q);
@@ -536,10 +562,10 @@ std::vector<Matrix<T>> Patch<T, d>::eval_covariant_derivatives(
         // ===== Covariant 3rd derivatives =====
         // f_{|αβγ} = ∂_γ f_{|αβ} - Γ^σ_{γα} f_{|σβ} - Γ^σ_{γβ} f_{|ασ}
         // ∂_γ f_{|αβ} = f_{,αβγ} - Γ^δ_{αβ,γ} f_{,δ} - Γ^δ_{αβ} f_{,δγ}
-        const auto N_uuu = basis_derivs[3 * S + 0].row(q);
-        const auto N_uuv = basis_derivs[2 * S + 1].row(q);
-        const auto N_uvv = basis_derivs[1 * S + 2].row(q);
-        const auto N_vvv = basis_derivs[0 * S + 3].row(q);
+        const auto N_uuu = sk.basis_derivs[3 * S + 0].row(q);
+        const auto N_uuv = sk.basis_derivs[2 * S + 1].row(q);
+        const auto N_uvv = sk.basis_derivs[1 * S + 2].row(q);
+        const auto N_vvv = sk.basis_derivs[0 * S + 3].row(q);
 
         const auto Nu  = N_u.row(q);
         const auto Nv  = N_v.row(q);

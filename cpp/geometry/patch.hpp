@@ -21,7 +21,47 @@ class QuadratureRule;
 
 
 /**
- * @brief Primary template for parametric patches defined by the tensor-product 
+ * @brief Per-element surface kinematic data: basis derivatives plus all geometric
+ *        quantities derived from them.
+ *
+ * Single source of truth for `Patch<T, 2>` consumers (shell element, covariant
+ * shape-derivative correction, future curved-surface boundary conditions). The
+ * geometric quantities cost O(Q) to compute given `basis_derivs`; bundling them
+ * here lets multiple consumers share a single evaluation.
+ *
+ * Layout (all matrices have Q rows; K = (p_u+1)*(p_v+1) is active basis count):
+ *   - basis_derivs[du*(order+1) + dv] = parametric N^{(du,dv)}, size Q×K
+ *   - a1, a2, a3                       — covariant tangents and unit director (Q×3)
+ *   - aup1, aup2                       — dual basis a^α = g^{αβ} a_β (Q×3)
+ *   - g_inv                            — (g^11, g^12, g^22) (Q×3)
+ *   - jac                              — √det g = ||a1×a2|| (Q)
+ *   - a11, a12, a22                    — geometry 2nd derivatives (Q×3, order ≥ 2)
+ *   - b                                — (b_11, b_12, b_22), b_αβ = a_{αβ}·a3 (Q×3, order ≥ 2)
+ *   - christoffel                      — Γ packed as (Γ¹₁₁, Γ¹₁₂, Γ¹₂₂, Γ²₁₁, Γ²₁₂, Γ²₂₂) (Q×6, order ≥ 2)
+ *   - a111, a112, a122, a222           — geometry 3rd derivatives (Q×3, order ≥ 3)
+ *
+ * Fields not produced at the requested order are left default-constructed (size 0).
+ */
+template <std::floating_point T>
+struct SurfaceKinematics
+{
+    std::vector<Matrix<T>> basis_derivs;
+
+    ColMatrix<T, 3> a1, a2, a3;
+    ColMatrix<T, 3> aup1, aup2;
+    ColMatrix<T, 3> g_inv;
+    Vector<T>       jac;
+
+    ColMatrix<T, 3> a11, a12, a22;
+    ColMatrix<T, 3> b;
+    ColMatrix<T, 6> christoffel;
+
+    ColMatrix<T, 3> a111, a112, a122, a222;
+};
+
+
+/**
+ * @brief Primary template for parametric patches defined by the tensor-product
  *        of univariate basis functions.
  * 
  * This class provides common data and logic for all patches (curves, surfaces, etc.).
@@ -135,6 +175,25 @@ public:
                ColMatrix<T, 3>, ColMatrix<T, 3>, Vector<T>>
     eval_surface_geometry(const ColMatrix<T, d>& points,
                           Index span) const requires(d == 2);
+
+    /**
+     * @brief Evaluate per-element surface kinematics: basis derivatives + all
+     *        geometric quantities (tangents, director, metric, curvature,
+     *        Christoffels) packaged in a single `SurfaceKinematics<T>` bundle.
+     *
+     * @param order Highest parametric-derivative order to compute (1, 2, or 3).
+     *              Order 1 returns frame + jac; order 2 adds a_{αβ}, b, Γ;
+     *              order 3 adds a_{αβγ}.
+     *
+     * Designed as the single source of truth for surface kernels: callers pull
+     * what they need by name, avoiding duplicate basis evaluations and
+     * duplicate Christoffel computations across `eval_covariant_derivatives`
+     * and shell elements.
+     */
+    SurfaceKinematics<T>
+    eval_surface_kinematics(const ColMatrix<T, d>& points,
+                            Index span,
+                            std::size_t order = 2) const requires(d == 2);
 
     /**
      * @brief Evaluate shape functions and their covariant derivatives w.r.t.

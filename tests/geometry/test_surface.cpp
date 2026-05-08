@@ -667,6 +667,86 @@ TEST_CASE("Patch<double, 2>::eval_surface_geometry: twisted z=u*v patch",
 
 
 // ===========================================================================
+// Test 11b: Patch<T,2>::eval_surface_kinematics returns Christoffels matching
+//           an analytic z=u*v reference, and matches the legacy inline
+//           shell-element formula at every quadrature point.
+// ===========================================================================
+
+TEST_CASE("Patch<double, 2>::eval_surface_kinematics: Christoffels on twisted z=u*v patch",
+          "[geometry][surface][shell-kernel]") {
+
+    auto kv = KnotVector<double>({0, 0, 1, 1});
+    auto basis_u = std::make_shared<BSpline<double>>(1, kv);
+    auto basis_v = std::make_shared<BSpline<double>>(1, kv);
+
+    Eigen::MatrixXd cp(4, 3);
+    cp.row(0) << 0.0, 0.0, 0.0;
+    cp.row(1) << 1.0, 0.0, 0.0;
+    cp.row(2) << 0.0, 1.0, 0.0;
+    cp.row(3) << 1.0, 1.0, 1.0;
+    Patch<double, 2> surf(basis_u, basis_v, cp);
+    Index elem_idx = 4;
+
+    Eigen::MatrixXd pts(3, 2);
+    pts << 0.3, 0.4,
+           0.5, 0.5,
+           0.8, 0.2;
+
+    auto sk = surf.eval_surface_kinematics(pts, elem_idx, 2);
+
+    REQUIRE(sk.christoffel.rows() == 3);
+    REQUIRE(sk.christoffel.cols() == 6);
+
+    for (Eigen::Index q = 0; q < pts.rows(); ++q) {
+        const double u = pts(q, 0);
+        const double v = pts(q, 1);
+        const double D = 1.0 + u * u + v * v;
+
+        // For z = u*v: a_{11} = a_{22} = 0, a_{12} = (0,0,1).
+        // Γ^δ_{αβ} = a^δ · a_{αβ}, so Γ^δ_{11} = Γ^δ_{22} = 0 and
+        // Γ^1_{12} = a^1·(0,0,1), Γ^2_{12} = a^2·(0,0,1).
+        // a^1 = (g^11, g^12, ?)·(a_1, a_2) gives z-component = g^12·u + g^11·v
+        //     = (-uv·u + (1+u²)·v)/D = v/D.
+        // Symmetrically Γ^2_{12} = u/D.
+        const double G1_11 = sk.christoffel(q, 0);
+        const double G1_12 = sk.christoffel(q, 1);
+        const double G1_22 = sk.christoffel(q, 2);
+        const double G2_11 = sk.christoffel(q, 3);
+        const double G2_12 = sk.christoffel(q, 4);
+        const double G2_22 = sk.christoffel(q, 5);
+
+        CHECK(G1_11 == Approx(0.0).margin(1e-14));
+        CHECK(G1_22 == Approx(0.0).margin(1e-14));
+        CHECK(G2_11 == Approx(0.0).margin(1e-14));
+        CHECK(G2_22 == Approx(0.0).margin(1e-14));
+        CHECK(G1_12 == Approx(v / D).margin(1e-12));
+        CHECK(G2_12 == Approx(u / D).margin(1e-12));
+
+        // Cross-check that Christoffels equal the legacy shell formula
+        // Γ^δ_{αβ} = (g^{δσ} a_σ) · a_{αβ}, computed inline from the bundle's
+        // own primitives: this guards against drift between the kinematics
+        // helper and any future inline duplicate.
+        Eigen::Vector3d a1q   = sk.a1.row(q).transpose();
+        Eigen::Vector3d a2q   = sk.a2.row(q).transpose();
+        Eigen::Vector3d a11q  = sk.a11.row(q).transpose();
+        Eigen::Vector3d a12q  = sk.a12.row(q).transpose();
+        Eigen::Vector3d a22q  = sk.a22.row(q).transpose();
+        const double gi11 = sk.g_inv(q, 0);
+        const double gi12 = sk.g_inv(q, 1);
+        const double gi22 = sk.g_inv(q, 2);
+        Eigen::Vector3d aup1 = gi11 * a1q + gi12 * a2q;
+        Eigen::Vector3d aup2 = gi12 * a1q + gi22 * a2q;
+        CHECK(G1_11 == Approx(aup1.dot(a11q)).margin(1e-13));
+        CHECK(G1_12 == Approx(aup1.dot(a12q)).margin(1e-13));
+        CHECK(G1_22 == Approx(aup1.dot(a22q)).margin(1e-13));
+        CHECK(G2_11 == Approx(aup2.dot(a11q)).margin(1e-13));
+        CHECK(G2_12 == Approx(aup2.dot(a12q)).margin(1e-13));
+        CHECK(G2_22 == Approx(aup2.dot(a22q)).margin(1e-13));
+    }
+}
+
+
+// ===========================================================================
 // Test 12: eval_covariant_derivatives on flat unit square (Christoffels=0)
 // ===========================================================================
 

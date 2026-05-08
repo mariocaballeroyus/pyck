@@ -21,27 +21,13 @@ void ShellReissnerMindlin5p<T>::compute_local_stiffness(
     const Vector<T>& q_weights,
     Matrix<T>& stiffness) const
 {
-    // ---- Surface geometry: tangents, director, inverse metric, jac.
-    auto [a1, a2, a3, g_inv, b, jac] =
-        patch.eval_surface_geometry(mapped_pts, elem_idx);
+    // ---- Single-pass surface kinematics: basis derivatives at order 2 plus
+    //      tangents, director, metric, Christoffels.
+    SurfaceKinematics<T> sk = patch.eval_surface_kinematics(mapped_pts, elem_idx, 2);
 
-    // ---- Parametric basis derivatives (order 2: needed for a_{αβ} → Christoffels).
-    auto spans        = patch.decode_span(elem_idx);
-    auto basis_derivs = patch.tensor_product().eval_on_span(mapped_pts, spans, Index(2));
-    auto act_pts      = patch.active_control_pts(spans);
-
-    // For order=2: idx = du * 3 + dv.
-    const Matrix<T>& N    = basis_derivs[0 * 3 + 0];
-    const Matrix<T>& N_u  = basis_derivs[1 * 3 + 0];
-    const Matrix<T>& N_v  = basis_derivs[0 * 3 + 1];
-    const Matrix<T>& N_uu = basis_derivs[2 * 3 + 0];
-    const Matrix<T>& N_uv = basis_derivs[1 * 3 + 1];
-    const Matrix<T>& N_vv = basis_derivs[0 * 3 + 2];
-
-    // Geometry second derivatives at each quadrature point.
-    ColMatrix<T, 3> a11 = N_uu * act_pts;
-    ColMatrix<T, 3> a12 = N_uv * act_pts;
-    ColMatrix<T, 3> a22 = N_vv * act_pts;
+    const Matrix<T>& N    = sk.basis_derivs[0 * 3 + 0];
+    const Matrix<T>& N_u  = sk.basis_derivs[1 * 3 + 0];
+    const Matrix<T>& N_v  = sk.basis_derivs[0 * 3 + 1];
 
     const Index Q     = mapped_pts.rows();
     const Index n     = N.cols();
@@ -59,29 +45,19 @@ void ShellReissnerMindlin5p<T>::compute_local_stiffness(
         Bb.setZero();
         Bs.setZero();
 
-        Eigen::Matrix<T, 3, 1> a1_q  = a1.row(q).transpose();
-        Eigen::Matrix<T, 3, 1> a2_q  = a2.row(q).transpose();
-        Eigen::Matrix<T, 3, 1> a3_q  = a3.row(q).transpose();
-        Eigen::Matrix<T, 3, 1> a11_q = a11.row(q).transpose();
-        Eigen::Matrix<T, 3, 1> a12_q = a12.row(q).transpose();
-        Eigen::Matrix<T, 3, 1> a22_q = a22.row(q).transpose();
-        Eigen::Matrix<T, 3, 1> g_inv_q = g_inv.row(q).transpose();
+        const auto a1_q = sk.a1.row(q);
+        const auto a2_q = sk.a2.row(q);
+        const auto a3_q = sk.a3.row(q);
+        Eigen::Matrix<T, 3, 1> g_inv_q = sk.g_inv.row(q).transpose();
 
-        const T gi11 = g_inv_q(0);
-        const T gi12 = g_inv_q(1);
-        const T gi22 = g_inv_q(2);
-
-        // Dual basis a^γ = g^{γσ} a_σ.
-        Eigen::Matrix<T, 3, 1> aup1 = gi11 * a1_q + gi12 * a2_q;
-        Eigen::Matrix<T, 3, 1> aup2 = gi12 * a1_q + gi22 * a2_q;
-
-        // Christoffels Γ^δ_{αβ} = a^δ · a_{αβ}.
-        const T G1_11 = aup1.dot(a11_q);
-        const T G1_12 = aup1.dot(a12_q);
-        const T G1_22 = aup1.dot(a22_q);
-        const T G2_11 = aup2.dot(a11_q);
-        const T G2_12 = aup2.dot(a12_q);
-        const T G2_22 = aup2.dot(a22_q);
+        // Christoffels Γ^δ_{αβ} from kinematics. Packing:
+        // (Γ¹₁₁, Γ¹₁₂, Γ¹₂₂, Γ²₁₁, Γ²₁₂, Γ²₂₂).
+        const T G1_11 = sk.christoffel(q, 0);
+        const T G1_12 = sk.christoffel(q, 1);
+        const T G1_22 = sk.christoffel(q, 2);
+        const T G2_11 = sk.christoffel(q, 3);
+        const T G2_12 = sk.christoffel(q, 4);
+        const T G2_22 = sk.christoffel(q, 5);
 
         // Per-node B-matrix contributions.
         for (Index i = 0; i < n; ++i)
@@ -119,7 +95,7 @@ void ShellReissnerMindlin5p<T>::compute_local_stiffness(
         const Matrix<T> Db = material_->bending_voigt (g_inv_q);
         const Matrix<T> Ds = material_->shear_voigt   (g_inv_q);
 
-        const T dV = q_weights(q) * jac(q);
+        const T dV = q_weights(q) * sk.jac(q);
         stiffness.noalias() += dV * (Bm.transpose() * Dm * Bm
                                    + Bb.transpose() * Db * Bb
                                    + Bs.transpose() * Ds * Bs);
