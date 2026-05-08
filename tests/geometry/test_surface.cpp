@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "patch.hpp"
+#include "patch_boundary.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
 #include "knots.hpp"
@@ -359,5 +360,207 @@ TEST_CASE("Patch<double, 2>: Quadratic Basis — Partition of Unity", "[geometry
             // Jacobian must be positive
             CHECK(jac(0) > 0.0);
         }
+    }
+}
+
+
+// ===========================================================================
+// Test 6: Patch<T,2>::eval_local_frame on a flat rectangle
+// ===========================================================================
+
+TEST_CASE("Patch<double, 2>::eval_local_frame: flat rectangle", "[geometry][surface][frame]") {
+
+    auto kv = KnotVector<double>({0, 0, 1, 1});
+    auto basis_u = std::make_shared<BSpline<double>>(1, kv);
+    auto basis_v = std::make_shared<BSpline<double>>(1, kv);
+
+    double Lx = 3.0, Ly = 5.0;
+    Eigen::MatrixXd cp(4, 3);
+    cp.row(0) <<  0.0,  0.0, 0.0;
+    cp.row(1) <<   Lx,  0.0, 0.0;
+    cp.row(2) <<  0.0,   Ly, 0.0;
+    cp.row(3) <<   Lx,   Ly, 0.0;
+
+    Patch<double, 2> surf(basis_u, basis_v, cp);
+    Index elem_idx = 4;  // (span_u=1, span_v=1) flat-indexed u-fastest
+
+    Eigen::MatrixXd pts(1, 2);
+    pts << 0.3, 0.7;
+
+    auto [a1, a2, a3, jac] = surf.eval_local_frame(pts, elem_idx);
+
+    // Raw covariant tangents have magnitudes = (Lx, Ly)
+    CHECK(a1(0, 0) == Approx(Lx).margin(1e-14));
+    CHECK(a1(0, 1) == Approx(0.0).margin(1e-14));
+    CHECK(a1(0, 2) == Approx(0.0).margin(1e-14));
+    CHECK(a2(0, 0) == Approx(0.0).margin(1e-14));
+    CHECK(a2(0, 1) == Approx(Ly).margin(1e-14));
+    CHECK(a2(0, 2) == Approx(0.0).margin(1e-14));
+
+    // Director is +ẑ
+    CHECK(a3(0, 0) == Approx(0.0).margin(1e-14));
+    CHECK(a3(0, 1) == Approx(0.0).margin(1e-14));
+    CHECK(a3(0, 2) == Approx(1.0).margin(1e-14));
+
+    // Area element = ||a1 × a2|| = Lx * Ly
+    CHECK(jac(0) == Approx(Lx * Ly).margin(1e-12));
+}
+
+
+// ===========================================================================
+// Test 7: Patch<T,2>::eval_local_frame on a curved (twisted) bilinear patch
+// ===========================================================================
+
+TEST_CASE("Patch<double, 2>::eval_local_frame: twisted z=u*v patch", "[geometry][surface][frame]") {
+
+    auto kv = KnotVector<double>({0, 0, 1, 1});
+    auto basis_u = std::make_shared<BSpline<double>>(1, kv);
+    auto basis_v = std::make_shared<BSpline<double>>(1, kv);
+
+    Eigen::MatrixXd cp(4, 3);
+    cp.row(0) << 0.0, 0.0, 0.0;
+    cp.row(1) << 1.0, 0.0, 0.0;
+    cp.row(2) << 0.0, 1.0, 0.0;
+    cp.row(3) << 1.0, 1.0, 1.0;
+    Patch<double, 2> surf(basis_u, basis_v, cp);
+    Index elem_idx = 4;
+
+    std::vector<std::pair<double, double>> test_pts = {
+        {0.3, 0.4}, {0.5, 0.5}, {0.8, 0.2}};
+
+    for (auto [u, v] : test_pts) {
+        SECTION("at u=" + std::to_string(u) + ", v=" + std::to_string(v)) {
+            Eigen::MatrixXd pts(1, 2);
+            pts << u, v;
+
+            auto [a1, a2, a3, jac] = surf.eval_local_frame(pts, elem_idx);
+
+            // Analytical: a_1 = (1,0,v), a_2 = (0,1,u),
+            //             a_3 = (-v,-u,1) / sqrt(1+u^2+v^2)
+            CHECK(a1(0, 0) == Approx(1.0).margin(1e-14));
+            CHECK(a1(0, 1) == Approx(0.0).margin(1e-14));
+            CHECK(a1(0, 2) == Approx(v).margin(1e-14));
+            CHECK(a2(0, 0) == Approx(0.0).margin(1e-14));
+            CHECK(a2(0, 1) == Approx(1.0).margin(1e-14));
+            CHECK(a2(0, 2) == Approx(u).margin(1e-14));
+
+            const double n = std::sqrt(1.0 + u * u + v * v);
+            CHECK(a3(0, 0) == Approx(-v / n).margin(1e-12));
+            CHECK(a3(0, 1) == Approx(-u / n).margin(1e-12));
+            CHECK(a3(0, 2) == Approx( 1.0 / n).margin(1e-12));
+
+            CHECK(jac(0) == Approx(n).margin(1e-12));
+        }
+    }
+}
+
+
+// ===========================================================================
+// Test 8: PatchBoundary<T,2>::eval_local_frame delegates a3 to parent
+// ===========================================================================
+
+TEST_CASE("PatchBoundary<double, 2>::eval_local_frame: a3 delegated from parent",
+          "[geometry][surface][boundary][frame]") {
+
+    auto kv = KnotVector<double>({0, 0, 1, 1});
+    auto basis_u = std::make_shared<BSpline<double>>(1, kv);
+    auto basis_v = std::make_shared<BSpline<double>>(1, kv);
+
+    // Twisted patch z = u*v
+    Eigen::MatrixXd cp(4, 3);
+    cp.row(0) << 0.0, 0.0, 0.0;
+    cp.row(1) << 1.0, 0.0, 0.0;
+    cp.row(2) << 0.0, 1.0, 0.0;
+    cp.row(3) << 1.0, 1.0, 1.0;
+    auto surf = std::make_shared<Patch<double, 2>>(basis_u, basis_v, cp);
+
+    // Boundary at u = 1 (param_dim = 0, at_start = false)
+    auto bdy = create_patch_boundary<double, 2>(surf, 0, false);
+
+    // Single non-zero boundary span = 1
+    Index boundary_span = 1;
+    Eigen::VectorXd bdy_pts(2);
+    bdy_pts << 0.25, 0.75;
+
+    auto [b_a1, b_a2, b_a3, b_jac] = bdy->eval_local_frame(bdy_pts, boundary_span);
+
+    // Parent frame at the lifted points
+    auto parent_pts_lifted = bdy->lift_to_parent(bdy_pts);
+    Index parent_span = bdy->parent_flat_span(boundary_span);
+    auto [p_a1, p_a2, p_a3, p_jac] = surf->eval_local_frame(parent_pts_lifted, parent_span);
+
+    // Boundary a3 must equal parent a3 exactly (the delegation invariant).
+    for (Eigen::Index q = 0; q < bdy_pts.size(); ++q) {
+        CHECK(b_a3(q, 0) == Approx(p_a3(q, 0)).margin(1e-14));
+        CHECK(b_a3(q, 1) == Approx(p_a3(q, 1)).margin(1e-14));
+        CHECK(b_a3(q, 2) == Approx(p_a3(q, 2)).margin(1e-14));
+    }
+
+    // Boundary tangent at u=1 is ∂x/∂v = (0, 1, u=1), magnitude √2.
+    for (Eigen::Index q = 0; q < bdy_pts.size(); ++q) {
+        CHECK(b_a1(q, 0) == Approx(0.0).margin(1e-14));
+        CHECK(b_a1(q, 1) == Approx(1.0).margin(1e-14));
+        CHECK(b_a1(q, 2) == Approx(1.0).margin(1e-14));
+        CHECK(b_jac(q) == Approx(std::sqrt(2.0)).margin(1e-14));
+    }
+
+    // Orthogonality: a2 ⊥ a1 and a2 ⊥ a3 at every quadrature point.
+    for (Eigen::Index q = 0; q < bdy_pts.size(); ++q) {
+        const double dot12 = b_a1.row(q).dot(b_a2.row(q));
+        const double dot32 = b_a3.row(q).dot(b_a2.row(q));
+        CHECK(dot12 == Approx(0.0).margin(1e-12));
+        CHECK(dot32 == Approx(0.0).margin(1e-12));
+        // a2 is unit
+        CHECK(b_a2.row(q).norm() == Approx(1.0).margin(1e-12));
+    }
+}
+
+
+// ===========================================================================
+// Test 9: PatchBoundary::eval_local_frame.a2 matches legacy eval_outward_normal
+// on a flat plate (regression).
+// ===========================================================================
+
+TEST_CASE("PatchBoundary<double, 2>: flat-plate regression vs eval_outward_normal",
+          "[geometry][surface][boundary][frame]") {
+
+    auto kv = KnotVector<double>({0, 0, 1, 1});
+    auto basis_u = std::make_shared<BSpline<double>>(1, kv);
+    auto basis_v = std::make_shared<BSpline<double>>(1, kv);
+
+    double Lx = 2.0, Ly = 3.0;
+    Eigen::MatrixXd cp(4, 3);
+    cp.row(0) << 0.0, 0.0, 0.0;
+    cp.row(1) <<  Lx, 0.0, 0.0;
+    cp.row(2) << 0.0,  Ly, 0.0;
+    cp.row(3) <<  Lx,  Ly, 0.0;
+    auto surf = std::make_shared<Patch<double, 2>>(basis_u, basis_v, cp);
+
+    auto bdy = create_patch_boundary<double, 2>(surf, 0, false);  // u = Lx edge
+    Index boundary_span = 1;
+
+    Eigen::VectorXd bdy_pts(3);
+    bdy_pts << 0.1, 0.5, 0.9;
+
+    // New frame method
+    auto [b_a1, b_a2, b_a3, b_jac] = bdy->eval_local_frame(bdy_pts, boundary_span);
+
+    // Legacy eval_outward_normal needs derivative matrices at the same points.
+    auto bdy_derivs = bdy->eval_basis_functions(bdy_pts, boundary_span, 1);
+    auto parent_pts_lifted = bdy->lift_to_parent(bdy_pts);
+    Index parent_span = bdy->parent_flat_span(boundary_span);
+    auto [parent_res, parent_jac] = surf->eval_shape_functions(parent_pts_lifted, parent_span, 1);
+
+    auto n_legacy = bdy->eval_outward_normal(boundary_span, bdy_derivs,
+                                             parent_span, parent_res);
+
+    // For u=Lx edge of a flat rectangle, outward normal = (+1, 0, 0).
+    for (Eigen::Index q = 0; q < bdy_pts.size(); ++q) {
+        CHECK(n_legacy(q, 0) == Approx(1.0).margin(1e-12));
+        CHECK(n_legacy(q, 1) == Approx(0.0).margin(1e-12));
+        CHECK(n_legacy(q, 2) == Approx(0.0).margin(1e-12));
+        CHECK(b_a2(q, 0) == Approx(n_legacy(q, 0)).margin(1e-12));
+        CHECK(b_a2(q, 1) == Approx(n_legacy(q, 1)).margin(1e-12));
+        CHECK(b_a2(q, 2) == Approx(n_legacy(q, 2)).margin(1e-12));
     }
 }

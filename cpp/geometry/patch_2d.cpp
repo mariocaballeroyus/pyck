@@ -313,6 +313,36 @@ std::array<ColMatrix<T, 3>, d> Patch<T, d>::eval_tangent(
     return tangents;
 }
 
+template <std::floating_point T, std::size_t d>
+std::tuple<ColMatrix<T, 3>, ColMatrix<T, 3>, ColMatrix<T, 3>, Vector<T>>
+Patch<T, d>::eval_local_frame(const ColMatrix<T, d>& points,
+                              Index span) const requires(d == 2)
+{
+    auto spans = this->decode_span(span);
+    auto basis_derivs = this->tensor_product().eval_on_span(points, spans, Index(1));
+    auto act_pts = this->active_control_pts(spans);
+
+    const Index Q = points.rows();
+    const Index S = 2;  // (order + 1) for order = 1
+
+    ColMatrix<T, 3> a1 = basis_derivs[1 * S + 0] * act_pts;  // ∂x/∂ξ⁰
+    ColMatrix<T, 3> a2 = basis_derivs[0 * S + 1] * act_pts;  // ∂x/∂ξ¹
+    ColMatrix<T, 3> a3(Q, 3);
+    Vector<T> jac(Q);
+
+    for (Index q = 0; q < Q; ++q) {
+        Eigen::Matrix<T, 3, 1> a1_q = a1.row(q).transpose();
+        Eigen::Matrix<T, 3, 1> a2_q = a2.row(q).transpose();
+        Eigen::Matrix<T, 3, 1> a3_q = a1_q.cross(a2_q);
+        const T n = a3_q.norm();
+        jac(q) = n;
+        if (n > T(1e-14)) a3_q /= n;
+        else a3_q = Eigen::Matrix<T, 3, 1>(T(0), T(0), T(1));
+        a3.row(q) = a3_q.transpose();
+    }
+    return {std::move(a1), std::move(a2), std::move(a3), std::move(jac)};
+}
+
 template class Patch<double, 2>;
 
 #ifdef PYCK_BUILD_SINGLE_PRECISION

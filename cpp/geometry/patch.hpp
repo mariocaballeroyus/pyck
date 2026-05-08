@@ -2,6 +2,7 @@
 #define PYCK_PATCH_HPP
 
 #include <utility>
+#include <tuple>
 #include <vector>
 #include <memory>
 #include <Eigen/Core>
@@ -17,6 +18,7 @@ namespace pyck
 
 template <std::floating_point T, std::size_t d>
 class QuadratureRule;
+
 
 /**
  * @brief Primary template for parametric patches defined by the tensor-product 
@@ -93,6 +95,27 @@ public:
     std::array<ColMatrix<T, 3>, d> eval_tangent(
         const std::vector<Matrix<T>>& N,
         const ColMatrix<T, 3>& act_pts) const requires(d == 2);
+
+    /**
+     * @brief Evaluate the local covariant frame {a1, a2, a3} at a set of
+     *        parametric points within a single span.
+     *
+     * Returns (a1, a2, a3, jac):
+     *   - a1, a2: raw covariant tangents a_α = ∂x/∂ξ^α (Q×3, NOT
+     *             unit-normalised; their magnitudes are √g_αα).
+     *   - a3:     unit director a3 = (a1×a2)/||a1×a2|| (Q×3).
+     *   - jac:    area element ||a1×a2|| = √det(g) (Q).
+     *
+     * Boundary callers should delegate the surface normal a3 to the parent
+     * patch via this method rather than recomputing it locally.
+     *
+     * @note BoundaryField subclasses currently consume the boundary outward
+     * normal as (n_x, n_y) and silently drop n_z. That's fine on flat plates
+     * but must be revisited before shipping shell elements where a3 ≠ ẑ.
+     */
+    std::tuple<ColMatrix<T, 3>, ColMatrix<T, 3>, ColMatrix<T, 3>, Vector<T>>
+    eval_local_frame(const ColMatrix<T, d>& points,
+                     Index span) const requires(d == 2);
 
     /// @brief Basis in the given parametric direction.
     const Basis<T>& basis(std::size_t dir) const 

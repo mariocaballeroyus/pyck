@@ -2,6 +2,7 @@
 #define PYCK_PATCH_BOUNDARY_HPP
 
 #include <cstddef>
+#include <tuple>
 #include <vector>
 #include <memory>
 #include <stdexcept>
@@ -113,6 +114,21 @@ public:
         const std::vector<Matrix<T>>& boundary_derivs,
         Index parent_flat_span,
         const std::vector<Matrix<T>>& parent_derivs) const;
+
+    /**
+     * @brief Evaluate the local covariant frame on this boundary, delegating
+     *        the surface normal a3 to the parent patch.
+     *
+     * Returns (a1, a2, a3, jac):
+     *   - a1: boundary tangent ∂x/∂s (Q×3, raw covariant; magnitude = √g_ss).
+     *   - a3: surface normal supplied by the parent patch (Q×3 unit vector).
+     *   - a2: outward in-surface normal sign_n · (a1×a3) / ||a1×a3|| (Q×3 unit
+     *         vector). This matches eval_outward_normal's result.
+     *   - jac: ||a1|| = √g_ss, the boundary line element (Q).
+     */
+    std::tuple<ColMatrix<T, 3>, ColMatrix<T, 3>, ColMatrix<T, 3>, Vector<T>>
+    eval_local_frame(const Vector<T>& boundary_pts,
+                     Index boundary_span) const requires(d == 2);
 
 private:
 

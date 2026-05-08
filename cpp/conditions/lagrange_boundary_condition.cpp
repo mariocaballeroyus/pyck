@@ -111,7 +111,7 @@ void LagrangeBoundaryCondition<T, d>::apply(
         // shape data computed above.
         for (const auto& term : terms_)
         {
-            Matrix<T> C = term. ->evaluate(
+            Matrix<T> C = term.field->evaluate(
                 element, boundary, s, boundary_derivs,
                 flat_parent, parent_derivs);
 
