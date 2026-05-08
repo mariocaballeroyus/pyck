@@ -117,6 +117,52 @@ public:
     eval_local_frame(const ColMatrix<T, d>& points,
                      Index span) const requires(d == 2);
 
+    /**
+     * @brief Evaluate surface geometry at parametric points within a single span.
+     *
+     * Returns (a1, a2, a3, g_inv, b, jac):
+     *   - a1, a2 (Q×3): raw covariant tangents a_α = ∂x/∂ξ^α.
+     *   - a3     (Q×3): unit director (a1×a2)/||a1×a2||.
+     *   - g_inv  (Q×3): contravariant metric components (g^11, g^12, g^22).
+     *                   The covariant metric is recoverable as g_αβ = a_α·a_β.
+     *   - b      (Q×3): second fundamental form (b_11, b_12, b_22),
+     *                   b_αβ = a_{α,β}·a3.
+     *   - jac    (Q):   √det(g) = ||a1×a2|| (surface area element).
+     *
+     * Pure geometry — independent of any field defined on the patch.
+     */
+    std::tuple<ColMatrix<T, 3>, ColMatrix<T, 3>, ColMatrix<T, 3>,
+               ColMatrix<T, 3>, ColMatrix<T, 3>, Vector<T>>
+    eval_surface_geometry(const ColMatrix<T, d>& points,
+                          Index span) const requires(d == 2);
+
+    /**
+     * @brief Evaluate shape functions and their covariant derivatives w.r.t.
+     *        the surface coordinates at parametric points within a single span.
+     *
+     * Returns std::vector<Matrix<T>> of length 3, 6, or 12 depending on order
+     * (clamped to [1, 3]). Layout:
+     *   [0]            N (values, Q×K)
+     *   [1], [2]       N_{,1}, N_{,2}            parametric 1st = covariant 1st
+     *   [3], [4], [5]  N_{|11}, N_{|12}, N_{|22}  covariant 2nd, symmetric in (α,β)
+     *   [6], [7]       N_{|11,1}, N_{|11,2}       covariant 3rd, αβ = 11
+     *   [8], [9]       N_{|12,1}, N_{|12,2}       covariant 3rd, αβ = 12
+     *   [10], [11]     N_{|22,1}, N_{|22,2}       covariant 3rd, αβ = 22
+     *
+     * Covariant derivatives are computed via Christoffel correction:
+     *   N_{|αβ}  = N_{,αβ}  - Γ^γ_{αβ} N_{,γ}
+     *   N_{|αβγ} = ∂_γ N_{|αβ}  - Γ^σ_{γβ} N_{|ασ}  - Γ^σ_{γα} N_{|βσ}
+     * with Christoffel symbols Γ^γ_{αβ} = a^γ · a_{αβ} computed internally.
+     *
+     * @note On curved surfaces the 3rd-order tensor is symmetric in (α,β) but
+     *       NOT in (γ, α/β) — Riemann curvature breaks full symmetry. The
+     *       6 entries above are the unique components.
+     */
+    std::vector<Matrix<T>> eval_covariant_derivatives(
+        const ColMatrix<T, d>& points,
+        Index span,
+        std::size_t order = 2) const requires(d == 2);
+
     /// @brief Basis in the given parametric direction.
     const Basis<T>& basis(std::size_t dir) const 
     { return tensor_product_.basis(dir); }
