@@ -588,7 +588,7 @@ TEST_CASE("Patch<double, 2>::eval_surface_geometry: flat rectangle",
 
     Eigen::MatrixXd pts(1, 2);
     pts << 0.3, 0.7;
-    auto [a1, a2, a3, g_inv, b, jac] = surf.eval_surface_geometry(pts, elem_idx);
+    auto [a1, a2, a3, g_inv, jac] = surf.eval_surface_geometry(pts, elem_idx);
 
     // Tangents and director
     CHECK(a1(0, 0) == Approx(Lx).margin(1e-14));
@@ -602,11 +602,6 @@ TEST_CASE("Patch<double, 2>::eval_surface_geometry: flat rectangle",
     CHECK(g_inv(0, 0) == Approx(1.0 / (Lx * Lx)).margin(1e-12));
     CHECK(g_inv(0, 1) == Approx(0.0).margin(1e-14));
     CHECK(g_inv(0, 2) == Approx(1.0 / (Ly * Ly)).margin(1e-12));
-
-    // Flat → b vanishes
-    CHECK(b(0, 0) == Approx(0.0).margin(1e-14));
-    CHECK(b(0, 1) == Approx(0.0).margin(1e-14));
-    CHECK(b(0, 2) == Approx(0.0).margin(1e-14));
 }
 
 
@@ -636,7 +631,7 @@ TEST_CASE("Patch<double, 2>::eval_surface_geometry: twisted z=u*v patch",
         SECTION("at u=" + std::to_string(u) + ", v=" + std::to_string(v)) {
             Eigen::MatrixXd pts(1, 2);
             pts << u, v;
-            auto [a1, a2, a3, g_inv, b, jac] = surf.eval_surface_geometry(pts, elem_idx);
+            auto [a1, a2, a3, g_inv, jac] = surf.eval_surface_geometry(pts, elem_idx);
 
             const double D = 1.0 + u * u + v * v;
             const double sqrtD = std::sqrt(D);
@@ -655,12 +650,6 @@ TEST_CASE("Patch<double, 2>::eval_surface_geometry: twisted z=u*v patch",
             CHECK(g_inv(0, 0) == Approx((1.0 + u * u) / D).margin(1e-12));
             CHECK(g_inv(0, 1) == Approx(-u * v / D).margin(1e-12));
             CHECK(g_inv(0, 2) == Approx((1.0 + v * v) / D).margin(1e-12));
-
-            // Curvature: a_11 = a_22 = 0, a_12 = (0,0,1) → b_11 = b_22 = 0,
-            //            b_12 = a_12 · a_3 = 1/sqrt(D)
-            CHECK(b(0, 0) == Approx(0.0).margin(1e-14));
-            CHECK(b(0, 1) == Approx(1.0 / sqrtD).margin(1e-12));
-            CHECK(b(0, 2) == Approx(0.0).margin(1e-14));
         }
     }
 }
@@ -805,11 +794,13 @@ TEST_CASE("Patch<double, 2>::eval_surface_kinematics: director derivatives on tw
         CHECK(a3.dot(a3_2) == Approx(0.0).margin(1e-13));
 
         // Identity 2: Weingarten ⇒ a_γ · a_{3,β} = -b_{γβ}.
+        // For z = u*v: a_{11} = a_{22} = 0, a_{12} = (0,0,1) ⇒ b_11 = b_22 = 0,
+        // b_12 = a_{12}·a_3 = 1/√D.
         Eigen::Vector3d a1 = sk.a1.row(q).transpose();
         Eigen::Vector3d a2 = sk.a2.row(q).transpose();
-        const double b11 = sk.b(q, 0);
-        const double b12 = sk.b(q, 1);
-        const double b22 = sk.b(q, 2);
+        const double b11 = 0.0;
+        const double b12 = 1.0 / std::sqrt(D);
+        const double b22 = 0.0;
         CHECK(a1.dot(a3_1) == Approx(-b11).margin(1e-13));
         CHECK(a1.dot(a3_2) == Approx(-b12).margin(1e-13));
         CHECK(a2.dot(a3_1) == Approx(-b12).margin(1e-13));

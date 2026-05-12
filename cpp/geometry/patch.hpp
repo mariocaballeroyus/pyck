@@ -36,10 +36,12 @@ class QuadratureRule;
  *   - g_inv                            — (g^11, g^12, g^22) (Q×3)
  *   - jac                              — √det g = ||a1×a2|| (Q)
  *   - a11, a12, a22                    — geometry 2nd derivatives (Q×3, order ≥ 2)
- *   - b                                — (b_11, b_12, b_22), b_αβ = a_{αβ}·a3 (Q×3, order ≥ 2)
  *   - christoffel                      — Γ packed as (Γ¹₁₁, Γ¹₁₂, Γ¹₂₂, Γ²₁₁, Γ²₁₂, Γ²₂₂) (Q×6, order ≥ 2)
- *   - a3_1, a3_2                       — director derivatives a_{3,β} = -b^γ_β a_γ
- *                                        (Weingarten) (Q×3, order ≥ 2)
+ *   - a3_1, a3_2                       — director derivatives a_{3,β} (Q×3, order ≥ 2),
+ *                                        built via Weingarten a_{3,β} = -g^{γδ}b_{δβ}a_γ
+ *                                        with b_αβ = a_{αβ}·a_3 kept as a local
+ *                                        scalar (not stored). Consumers that need
+ *                                        b can recover it as b_αβ = -a_α · a_{3,β}.
  *   - a111, a112, a122, a222           — geometry 3rd derivatives (Q×3, order ≥ 3)
  *
  * Fields not produced at the requested order are left default-constructed (size 0).
@@ -55,7 +57,6 @@ struct SurfaceKinematics
     Vector<T>       jac;
 
     ColMatrix<T, 3> a11, a12, a22;
-    ColMatrix<T, 3> b;
     ColMatrix<T, 6> christoffel;
     ColMatrix<T, 3> a3_1, a3_2;
 
@@ -163,19 +164,17 @@ public:
     /**
      * @brief Evaluate surface geometry at parametric points within a single span.
      *
-     * Returns (a1, a2, a3, g_inv, b, jac):
+     * Returns (a1, a2, a3, g_inv, jac):
      *   - a1, a2 (Q×3): raw covariant tangents a_α = ∂x/∂ξ^α.
      *   - a3     (Q×3): unit director (a1×a2)/||a1×a2||.
      *   - g_inv  (Q×3): contravariant metric components (g^11, g^12, g^22).
      *                   The covariant metric is recoverable as g_αβ = a_α·a_β.
-     *   - b      (Q×3): second fundamental form (b_11, b_12, b_22),
-     *                   b_αβ = a_{α,β}·a3.
      *   - jac    (Q):   √det(g) = ||a1×a2|| (surface area element).
      *
      * Pure geometry — independent of any field defined on the patch.
      */
     std::tuple<ColMatrix<T, 3>, ColMatrix<T, 3>, ColMatrix<T, 3>,
-               ColMatrix<T, 3>, ColMatrix<T, 3>, Vector<T>>
+               ColMatrix<T, 3>, Vector<T>>
     eval_surface_geometry(const ColMatrix<T, d>& points,
                           Index span) const requires(d == 2);
 

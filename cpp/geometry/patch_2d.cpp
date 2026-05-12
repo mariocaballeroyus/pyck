@@ -371,7 +371,6 @@ Patch<T, d>::eval_surface_kinematics(const ColMatrix<T, d>& points,
         sk.a11 = sk.basis_derivs[2 * S + 0] * act_pts;
         sk.a12 = sk.basis_derivs[1 * S + 1] * act_pts;
         sk.a22 = sk.basis_derivs[0 * S + 2] * act_pts;
-        sk.b.resize(Q, 3);
         sk.christoffel.resize(Q, 6);
         sk.a3_1.resize(Q, 3);
         sk.a3_2.resize(Q, 3);
@@ -418,11 +417,6 @@ Patch<T, d>::eval_surface_kinematics(const ColMatrix<T, d>& points,
         const auto a12_q = sk.a12.row(q);
         const auto a22_q = sk.a22.row(q);
 
-        // Second fundamental form b_αβ = a_{αβ} · a3.
-        sk.b(q, 0) = a11_q.dot(a3_q.transpose());
-        sk.b(q, 1) = a12_q.dot(a3_q.transpose());
-        sk.b(q, 2) = a22_q.dot(a3_q.transpose());
-
         // Christoffels Γ^δ_{αβ} = a^δ · a_{αβ}, packed as
         // (Γ¹₁₁, Γ¹₁₂, Γ¹₂₂, Γ²₁₁, Γ²₁₂, Γ²₂₂).
         const auto aup1_q = sk.aup1.row(q);
@@ -434,12 +428,12 @@ Patch<T, d>::eval_surface_kinematics(const ColMatrix<T, d>& points,
         sk.christoffel(q, 4) = aup2_q.dot(a12_q);
         sk.christoffel(q, 5) = aup2_q.dot(a22_q);
 
-        // Director derivatives a_{3,β} = -b^γ_β a_γ (Weingarten), with
-        // b^γ_β = g^{γδ} b_{δβ}. Used by the membrane–bending coupling
-        // term u_{,α}·a_{3,β} in the full Naghdi bending strain.
-        const T b11 = sk.b(q, 0);
-        const T b12 = sk.b(q, 1);
-        const T b22 = sk.b(q, 2);
+        // Director derivatives a_{3,β} via Weingarten: a_{3,β} = -b^γ_β a_γ,
+        // with b^γ_β = g^{γδ} b_{δβ} and b_{αβ} = a_{αβ}·a_3. The curvature
+        // scalars b_{αβ} are kept local — the bundle exposes a_{3,β} directly.
+        const T b11 = a11_q.dot(a3_q.transpose());
+        const T b12 = a12_q.dot(a3_q.transpose());
+        const T b22 = a22_q.dot(a3_q.transpose());
         const T bup11 = gi11 * b11 + gi12 * b12;   // b^1_1
         const T bup12 = gi11 * b12 + gi12 * b22;   // b^1_2
         const T bup21 = gi12 * b11 + gi22 * b12;   // b^2_1
@@ -452,13 +446,13 @@ Patch<T, d>::eval_surface_kinematics(const ColMatrix<T, d>& points,
 
 template <std::floating_point T, std::size_t d>
 std::tuple<ColMatrix<T, 3>, ColMatrix<T, 3>, ColMatrix<T, 3>,
-           ColMatrix<T, 3>, ColMatrix<T, 3>, Vector<T>>
+           ColMatrix<T, 3>, Vector<T>>
 Patch<T, d>::eval_surface_geometry(const ColMatrix<T, d>& points,
                                    Index span) const requires(d == 2)
 {
     SurfaceKinematics<T> sk = this->eval_surface_kinematics(points, span, 2);
     return {std::move(sk.a1), std::move(sk.a2), std::move(sk.a3),
-            std::move(sk.g_inv), std::move(sk.b), std::move(sk.jac)};
+            std::move(sk.g_inv), std::move(sk.jac)};
 }
 
 template <std::floating_point T, std::size_t d>
