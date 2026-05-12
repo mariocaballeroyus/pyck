@@ -747,6 +747,78 @@ TEST_CASE("Patch<double, 2>::eval_surface_kinematics: Christoffels on twisted z=
 
 
 // ===========================================================================
+// Test 11c: Patch<T,2>::eval_surface_kinematics returns director derivatives
+//           a_{3,β} matching (i) the closed-form ∂a_3/∂ξ^β on the z=u*v patch
+//           and (ii) the Weingarten identity a_γ·a_{3,β} = -b_{γβ}.
+// ===========================================================================
+
+TEST_CASE("Patch<double, 2>::eval_surface_kinematics: director derivatives on twisted z=u*v patch",
+          "[geometry][surface][shell-kernel]") {
+
+    auto kv = KnotVector<double>({0, 0, 1, 1});
+    auto basis_u = std::make_shared<BSpline<double>>(1, kv);
+    auto basis_v = std::make_shared<BSpline<double>>(1, kv);
+
+    Eigen::MatrixXd cp(4, 3);
+    cp.row(0) << 0.0, 0.0, 0.0;
+    cp.row(1) << 1.0, 0.0, 0.0;
+    cp.row(2) << 0.0, 1.0, 0.0;
+    cp.row(3) << 1.0, 1.0, 1.0;
+    Patch<double, 2> surf(basis_u, basis_v, cp);
+    Index elem_idx = 4;
+
+    Eigen::MatrixXd pts(3, 2);
+    pts << 0.3, 0.4,
+           0.5, 0.5,
+           0.8, 0.2;
+
+    auto sk = surf.eval_surface_kinematics(pts, elem_idx, 2);
+
+    REQUIRE(sk.a3_1.rows() == 3);
+    REQUIRE(sk.a3_2.rows() == 3);
+    REQUIRE(sk.a3_1.cols() == 3);
+    REQUIRE(sk.a3_2.cols() == 3);
+
+    for (Eigen::Index q = 0; q < pts.rows(); ++q) {
+        const double u = pts(q, 0);
+        const double v = pts(q, 1);
+        const double D = 1.0 + u * u + v * v;
+        const double D32 = D * std::sqrt(D);
+
+        // Closed-form ∂a_3/∂ξ^β on z = u*v, with a_3 = (-v, -u, 1)/√D:
+        //   a_{3,1} = ( u v,         -(1+v²),   -u ) / D^{3/2}
+        //   a_{3,2} = (-(1+u²),       u v,      -v ) / D^{3/2}
+        Eigen::Vector3d a3_1_exact = Eigen::Vector3d(u * v, -(1.0 + v * v), -u) / D32;
+        Eigen::Vector3d a3_2_exact = Eigen::Vector3d(-(1.0 + u * u), u * v, -v) / D32;
+
+        Eigen::Vector3d a3_1 = sk.a3_1.row(q).transpose();
+        Eigen::Vector3d a3_2 = sk.a3_2.row(q).transpose();
+
+        for (int k = 0; k < 3; ++k) {
+            CHECK(a3_1(k) == Approx(a3_1_exact(k)).margin(1e-12));
+            CHECK(a3_2(k) == Approx(a3_2_exact(k)).margin(1e-12));
+        }
+
+        // Identity 1: a_3 is unit ⇒ a_3 · a_{3,β} = 0.
+        Eigen::Vector3d a3 = sk.a3.row(q).transpose();
+        CHECK(a3.dot(a3_1) == Approx(0.0).margin(1e-13));
+        CHECK(a3.dot(a3_2) == Approx(0.0).margin(1e-13));
+
+        // Identity 2: Weingarten ⇒ a_γ · a_{3,β} = -b_{γβ}.
+        Eigen::Vector3d a1 = sk.a1.row(q).transpose();
+        Eigen::Vector3d a2 = sk.a2.row(q).transpose();
+        const double b11 = sk.b(q, 0);
+        const double b12 = sk.b(q, 1);
+        const double b22 = sk.b(q, 2);
+        CHECK(a1.dot(a3_1) == Approx(-b11).margin(1e-13));
+        CHECK(a1.dot(a3_2) == Approx(-b12).margin(1e-13));
+        CHECK(a2.dot(a3_1) == Approx(-b12).margin(1e-13));
+        CHECK(a2.dot(a3_2) == Approx(-b22).margin(1e-13));
+    }
+}
+
+
+// ===========================================================================
 // Test 12: eval_covariant_derivatives on flat unit square (Christoffels=0)
 // ===========================================================================
 

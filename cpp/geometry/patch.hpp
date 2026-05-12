@@ -38,6 +38,8 @@ class QuadratureRule;
  *   - a11, a12, a22                    — geometry 2nd derivatives (Q×3, order ≥ 2)
  *   - b                                — (b_11, b_12, b_22), b_αβ = a_{αβ}·a3 (Q×3, order ≥ 2)
  *   - christoffel                      — Γ packed as (Γ¹₁₁, Γ¹₁₂, Γ¹₂₂, Γ²₁₁, Γ²₁₂, Γ²₂₂) (Q×6, order ≥ 2)
+ *   - a3_1, a3_2                       — director derivatives a_{3,β} = -b^γ_β a_γ
+ *                                        (Weingarten) (Q×3, order ≥ 2)
  *   - a111, a112, a122, a222           — geometry 3rd derivatives (Q×3, order ≥ 3)
  *
  * Fields not produced at the requested order are left default-constructed (size 0).
@@ -55,6 +57,7 @@ struct SurfaceKinematics
     ColMatrix<T, 3> a11, a12, a22;
     ColMatrix<T, 3> b;
     ColMatrix<T, 6> christoffel;
+    ColMatrix<T, 3> a3_1, a3_2;
 
     ColMatrix<T, 3> a111, a112, a122, a222;
 };
@@ -182,8 +185,8 @@ public:
      *        Christoffels) packaged in a single `SurfaceKinematics<T>` bundle.
      *
      * @param order Highest parametric-derivative order to compute (1, 2, or 3).
-     *              Order 1 returns frame + jac; order 2 adds a_{αβ}, b, Γ;
-     *              order 3 adds a_{αβγ}.
+     *              Order 1 returns frame + jac; order 2 adds a_{αβ}, b, Γ,
+     *              a_{3,β}; order 3 adds a_{αβγ}.
      *
      * Designed as the single source of truth for surface kernels: callers pull
      * what they need by name, avoiding duplicate basis evaluations and

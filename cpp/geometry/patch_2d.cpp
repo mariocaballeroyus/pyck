@@ -373,6 +373,8 @@ Patch<T, d>::eval_surface_kinematics(const ColMatrix<T, d>& points,
         sk.a22 = sk.basis_derivs[0 * S + 2] * act_pts;
         sk.b.resize(Q, 3);
         sk.christoffel.resize(Q, 6);
+        sk.a3_1.resize(Q, 3);
+        sk.a3_2.resize(Q, 3);
     }
     if (order >= 3) {
         sk.a111 = sk.basis_derivs[3 * S + 0] * act_pts;
@@ -431,6 +433,19 @@ Patch<T, d>::eval_surface_kinematics(const ColMatrix<T, d>& points,
         sk.christoffel(q, 3) = aup2_q.dot(a11_q);
         sk.christoffel(q, 4) = aup2_q.dot(a12_q);
         sk.christoffel(q, 5) = aup2_q.dot(a22_q);
+
+        // Director derivatives a_{3,β} = -b^γ_β a_γ (Weingarten), with
+        // b^γ_β = g^{γδ} b_{δβ}. Used by the membrane–bending coupling
+        // term u_{,α}·a_{3,β} in the full Naghdi bending strain.
+        const T b11 = sk.b(q, 0);
+        const T b12 = sk.b(q, 1);
+        const T b22 = sk.b(q, 2);
+        const T bup11 = gi11 * b11 + gi12 * b12;   // b^1_1
+        const T bup12 = gi11 * b12 + gi12 * b22;   // b^1_2
+        const T bup21 = gi12 * b11 + gi22 * b12;   // b^2_1
+        const T bup22 = gi12 * b12 + gi22 * b22;   // b^2_2
+        sk.a3_1.row(q) = -(bup11 * a1_q + bup21 * a2_q);
+        sk.a3_2.row(q) = -(bup12 * a1_q + bup22 * a2_q);
     }
     return sk;
 }
