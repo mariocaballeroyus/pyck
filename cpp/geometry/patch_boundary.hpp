@@ -10,6 +10,8 @@
 
 #include "../types.hpp"
 #include "patch.hpp"
+#include "basis_derivs.hpp"
+#include "local_frame.hpp"
 
 namespace pyck
 {
@@ -69,10 +71,6 @@ public:
     /// @brief Sign of the outward normal (+1 or -1) consistent with parametric orientation
     T sign_n() const
     { return sign_n_; }
-
-    /// Bring the inherited base-class eval_local_frame(basis, act_pts) into
-    /// scope alongside the boundary's own eval_local_frame(pts, span).
-    using Patch<T, d - 1>::eval_local_frame;
 
     /**
      * @brief Convert a boundary span index to the flat span index of the parent patch.

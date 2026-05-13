@@ -1,5 +1,6 @@
 #include "beam_timoshenko_1p.hpp"
 #include "patch.hpp"
+#include "christoffels.hpp"
 
 namespace pyck
 {
@@ -18,7 +19,7 @@ BeamTimoshenko1p<T>::displacement_shape_matrix(const Patch<T, 1>& patch,
                                                const BasisDerivs<T, 1>& basis,
                                                const LocalFrame<T, 1>& local) const
 {
-    auto chr = patch.eval_christoffel(local);
+    auto chr = eval_christoffel(local);
     const T ratio = material_->bending_stiffness() / material_->shear_stiffness();
     const Index Q = basis.N.rows();
     const Index n = basis.N.cols();
@@ -62,7 +63,7 @@ BeamTimoshenko1p<T>::bending_strain_matrix(const Patch<T, 1>& patch,
                                            const BasisDerivs<T, 1>& basis,
                                            const LocalFrame<T, 1>& local) const
 {
-    auto chr = patch.eval_christoffel(local);
+    auto chr = eval_christoffel(local);
     const Index Q = basis.N_u.rows();
     const Index n = basis.N_u.cols();
     Matrix<T> Bb(Q, n);
@@ -80,7 +81,7 @@ BeamTimoshenko1p<T>::shear_strain_matrix(const Patch<T, 1>& patch,
                                          const BasisDerivs<T, 1>& basis,
                                          const LocalFrame<T, 1>& local) const
 {
-    auto chr = patch.eval_christoffel(local);
+    auto chr = eval_christoffel(local);
     const T ratio = material_->bending_stiffness() / material_->shear_stiffness();
     const Index Q = basis.N_u.rows();
     const Index n = basis.N_u.cols();

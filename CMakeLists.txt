@@ -39,6 +39,11 @@ add_library(pyck_geometry
     cpp/geometry/patch_2d.cpp
     cpp/geometry/patch_2d_boundary.cpp
     cpp/geometry/factories.cpp
+    cpp/geometry/basis_derivs.cpp
+    cpp/geometry/local_frame.cpp
+    cpp/geometry/christoffels.cpp
+    cpp/geometry/directors.cpp
+    cpp/geometry/laplace_beltrami.cpp
 )
 target_include_directories(pyck_geometry PUBLIC cpp/geometry)
 target_link_libraries(pyck_geometry PUBLIC pyck_basis pyck_quadrature)

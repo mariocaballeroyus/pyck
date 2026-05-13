@@ -1,5 +1,7 @@
 #include "plate_kirchhoff_love_1p.hpp"
 #include "patch.hpp"
+#include "christoffels.hpp"
+#include "laplace_beltrami.hpp"
 
 namespace pyck
 {
@@ -56,7 +58,7 @@ PlateKirchhoffLove1p<T>::bending_strain_matrix(const Patch<T, 2>& patch,
                                                const BasisDerivs<T, 2>& basis,
                                                const LocalFrame<T, 2>& local) const
 {
-    auto chr = patch.eval_christoffel(local);
+    auto chr = eval_christoffel(local);
     const Matrix<T>& N_u  = basis.N_u;
     const Matrix<T>& N_v  = basis.N_v;
     const Matrix<T>& N_uu = basis.N_uu;
@@ -95,7 +97,7 @@ PlateKirchhoffLove1p<T>::transverse_shear_matrix(const Patch<T, 2>& patch,
                                                  const BasisDerivs<T, 2>& basis,
                                                  const LocalFrame<T, 2>& local) const
 {
-    auto chr = patch.eval_christoffel(local);
+    auto chr = eval_christoffel(local);
     auto aux = compute_laplace_grad_aux(local, chr);
     const T Kb = material_->bending_stiffness();
     const Index Q = basis.N.rows();

@@ -73,9 +73,9 @@ Vector<T> integrate_on_patch(
 
         auto [mapped_pts, mapped_weights] = quadrature.map_to_domain(u_a, u_b);
 
-        auto basis   = patch.eval_basis(mapped_pts, static_cast<Index>(elem_idx), order);
+        auto basis   = eval_basis(patch, mapped_pts, static_cast<Index>(elem_idx), order);
         auto act_pts = patch.active_control_pts(static_cast<Index>(elem_idx));
-        auto local   = patch.eval_local_frame(basis, act_pts);
+        auto local   = eval_local_frame(basis, act_pts);
 
         // Physical coords at qpts: N * act_pts (basis already at order ≥ 0).
         ColMatrix<T, 3> phys_pts = basis.N * act_pts;

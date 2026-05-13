@@ -5,6 +5,8 @@
 
 #include "../elements/element.hpp"
 #include "../geometry/patch_boundary.hpp"
+#include "../geometry/christoffels.hpp"
+#include "../geometry/directors.hpp"
 #include "../types.hpp"
 
 namespace pyck
@@ -244,7 +246,7 @@ public:
         const auto [n_up_1, n_up_2] =
             detail::contravariant_components(normal, parent_local);
         const ChristoffelSymbols<T, 2> chr =
-            boundary.parent()->eval_christoffel(parent_local);
+            eval_christoffel(parent_local);
 
         Matrix<T> C = Matrix<T>::Zero(Q, n * ndof);
         const Index slot = static_cast<Index>(dof_index_);
@@ -357,7 +359,7 @@ public:
             *boundary.parent(), parent_basis, parent_local);
         const ColMatrix<T, 3> n =
             boundary.eval_outward_normal(boundary_local, parent_local);
-        const ColMatrix<T, 3> a_3 = boundary.parent()->eval_normal(parent_local);
+        const ColMatrix<T, 3> a_3 = eval_normal(parent_local);
         const ColMatrix<T, 3> s = detail::surface_tangent(n, a_3);
         const auto [s_up_1, s_up_2] =
             detail::contravariant_components(s, parent_local);
@@ -477,7 +479,7 @@ public:
             *boundary.parent(), parent_basis, parent_local);
         const ColMatrix<T, 3> n =
             boundary.eval_outward_normal(boundary_local, parent_local);
-        const ColMatrix<T, 3> a_3 = boundary.parent()->eval_normal(parent_local);
+        const ColMatrix<T, 3> a_3 = eval_normal(parent_local);
         const ColMatrix<T, 3> s = detail::surface_tangent(n, a_3);
         const auto [n_cov_1, n_cov_2] =
             detail::covariant_components(n, parent_local);

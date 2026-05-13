@@ -8,6 +8,8 @@
 #include "tensor.hpp"
 #include "factories.hpp"
 #include "patch_boundary.hpp"
+#include "basis_derivs.hpp"
+#include "local_frame.hpp"
 #include "dof_mapper.hpp"
 #include "quadrature.hpp"
 #include "gauss_legendre.hpp"
@@ -146,17 +148,6 @@ PYBIND11_MODULE(_pyck, m) {
         .def_readonly("g_inv",  &pyck::LocalFrame<double, 2>::g_inv)
         .def_readonly("jac",    &pyck::LocalFrame<double, 2>::jac);
 
-    py::class_<pyck::ChristoffelSymbols<double, 1>>(m, "ChristoffelSymbols1d")
-        .def_readonly("G1_11", &pyck::ChristoffelSymbols<double, 1>::G1_11);
-
-    py::class_<pyck::ChristoffelSymbols<double, 2>>(m, "ChristoffelSymbols2d")
-        .def_readonly("G1_11", &pyck::ChristoffelSymbols<double, 2>::G1_11)
-        .def_readonly("G1_12", &pyck::ChristoffelSymbols<double, 2>::G1_12)
-        .def_readonly("G1_22", &pyck::ChristoffelSymbols<double, 2>::G1_22)
-        .def_readonly("G2_11", &pyck::ChristoffelSymbols<double, 2>::G2_11)
-        .def_readonly("G2_12", &pyck::ChristoffelSymbols<double, 2>::G2_12)
-        .def_readonly("G2_22", &pyck::ChristoffelSymbols<double, 2>::G2_22);
-
 
     using Patch3D1D = pyck::Patch<double, 1>;
     py::class_<Patch3D1D, pyck::Ptr<Patch3D1D>>(m, "Patch1d")
@@ -195,23 +186,19 @@ PYBIND11_MODULE(_pyck, m) {
         .def("greville_span", &Patch3D1D::greville_span, py::arg("dof_index"),
              "Get the element span containing the Greville point for a global DOF index.")
         .def("eval_basis",
-             static_cast<pyck::BasisDerivs<double, 1> (Patch3D1D::*)(
-                 const pyck::ColMatrix<double, 1>&, pyck::Index, std::size_t) const>(
-                 &Patch3D1D::eval_basis),
+             [](const Patch3D1D& p, const pyck::ColMatrix<double, 1>& params,
+                pyck::Index span, std::size_t order) {
+                 return pyck::eval_basis(p, params, span, order);
+             },
              py::arg("params"), py::arg("span"), py::arg("order") = 0,
              "Parametric basis derivatives (BasisDerivs1d) on one span.")
         .def("eval_local_frame",
-             static_cast<pyck::LocalFrame<double, 1> (Patch3D1D::*)(
-                 const pyck::BasisDerivs<double, 1>&, const pyck::ColMatrix<double, 3>&) const>(
-                 &Patch3D1D::eval_local_frame),
+             [](const Patch3D1D&, const pyck::BasisDerivs<double, 1>& basis,
+                const pyck::ColMatrix<double, 3>& act_pts) {
+                 return pyck::eval_local_frame(basis, act_pts);
+             },
              py::arg("basis"), py::arg("active_control_points"),
-             "Local frame (tangent, metric, jac) built from a BasisDerivs1d and the active control points.")
-        .def("eval_christoffel",
-             static_cast<pyck::ChristoffelSymbols<double, 1> (Patch3D1D::*)(
-                 const pyck::LocalFrame<double, 1>&) const>(
-                 &Patch3D1D::eval_christoffel),
-             py::arg("local"),
-             "Christoffel symbols (Γ¹_{11}) at each quadrature point.");
+             "Local frame (tangent, metric, jac) built from a BasisDerivs1d and the active control points.");
 
     // line_segment factory
     m.def("line_segment", [](pyck::Ptr<BasisD> basis, double length) {
@@ -276,26 +263,19 @@ PYBIND11_MODULE(_pyck, m) {
              py::arg("param_dim"), py::arg("at_start"),
              "Extract a boundary face of this patch.")
         .def("eval_basis",
-             static_cast<pyck::BasisDerivs<double, 2> (Patch3D2D::*)(
-                 const pyck::ColMatrix<double, 2>&, pyck::Index, std::size_t) const>(
-                 &Patch3D2D::eval_basis),
+             [](const Patch3D2D& p, const pyck::ColMatrix<double, 2>& params,
+                pyck::Index span, std::size_t order) {
+                 return pyck::eval_basis(p, params, span, order);
+             },
              py::arg("params"), py::arg("span"), py::arg("order") = 0,
              "Parametric basis derivatives (BasisDerivs2d) on one span.")
         .def("eval_local_frame",
-             static_cast<pyck::LocalFrame<double, 2> (Patch3D2D::*)(
-                 const pyck::BasisDerivs<double, 2>&, const pyck::ColMatrix<double, 3>&) const>(
-                 &Patch3D2D::eval_local_frame),
+             [](const Patch3D2D&, const pyck::BasisDerivs<double, 2>& basis,
+                const pyck::ColMatrix<double, 3>& act_pts) {
+                 return pyck::eval_local_frame(basis, act_pts);
+             },
              py::arg("basis"), py::arg("active_control_points"),
-             "Local frame (tangents, metric, jac) built from a BasisDerivs2d and the active control points.")
-        .def("eval_christoffel",
-             static_cast<pyck::ChristoffelSymbols<double, 2> (Patch3D2D::*)(
-                 const pyck::LocalFrame<double, 2>&) const>(
-                 &Patch3D2D::eval_christoffel),
-             py::arg("local"),
-             "Christoffel symbols Γ^γ_{αβ} at each quadrature point.")
-        .def("eval_normal", &Patch3D2D::eval_normal,
-             py::arg("local"),
-             "Surface unit normal a_3 from the local frame.");
+             "Local frame (tangents, metric, jac) built from a BasisDerivs2d and the active control points.");
 
     // rectangle factory
     m.def("rectangle", [](pyck::Ptr<BasisD> basis_u,
@@ -896,9 +876,10 @@ PYBIND11_MODULE(_pyck, m) {
              py::arg("param_dim"), py::arg("at_start"),
              "Extract a boundary face of this patch.")
         .def("eval_basis",
-             static_cast<pyck::BasisDerivs<float, 1> (Patch3D1DF::*)(
-                 const pyck::ColMatrix<float, 1>&, pyck::Index, std::size_t) const>(
-                 &Patch3D1DF::eval_basis),
+             [](const Patch3D1DF& p, const pyck::ColMatrix<float, 1>& params,
+                pyck::Index span, std::size_t order) {
+                 return pyck::eval_basis(p, params, span, order);
+             },
              py::arg("params"), py::arg("span"), py::arg("order") = 0);
 #endif
 

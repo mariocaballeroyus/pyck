@@ -1,5 +1,7 @@
 #include "load_condition.hpp"
 #include "../geometry/patch.hpp"
+#include "../geometry/basis_derivs.hpp"
+#include "../geometry/local_frame.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
 #include <stdexcept>
@@ -110,9 +112,9 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
         
         // Composable geometric primitives.
         std::size_t req_order = element.min_order();
-        auto basis   = patch.eval_basis(mapped_pts, elem_idx, req_order);
+        auto basis   = eval_basis(patch, mapped_pts, elem_idx, req_order);
         auto act_pts = patch.active_control_pts(elem_idx);
-        auto local   = patch.eval_local_frame(basis, act_pts);
+        auto local   = eval_local_frame(basis, act_pts);
 
         // N_w is the transverse-displacement shape matrix (Q × K_elem) with
         // nonzero columns only at each node's w-slot.  Because the distributed

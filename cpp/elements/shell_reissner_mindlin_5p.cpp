@@ -1,5 +1,9 @@
 #include "shell_reissner_mindlin_5p.hpp"
 #include "patch.hpp"
+#include "basis_derivs.hpp"
+#include "local_frame.hpp"
+#include "christoffels.hpp"
+#include "directors.hpp"
 
 namespace pyck
 {
@@ -21,11 +25,11 @@ ShellReissnerMindlin5p<T>::compute_local_stiffness(const Patch<T, 2>& patch,
                                                    const Vector<T>& q_weights, 
                                                    Matrix<T>& stiffness) const
 {
-    auto basis        = patch.eval_basis(mapped_pts, elem_idx, 2);
+    auto basis        = eval_basis(patch, mapped_pts, elem_idx, 2);
     auto act_pts      = patch.active_control_pts(elem_idx);
-    auto local        = patch.eval_local_frame(basis, act_pts);
-    auto christoffel  = patch.eval_christoffel(local);
-    auto a_3          = patch.eval_normal(local);
+    auto local        = eval_local_frame(basis, act_pts);
+    auto christoffel  = eval_christoffel(local);
+    auto a_3          = eval_normal(local);
 
     const Matrix<T>& N    = basis.N;
     const Matrix<T>& N_u  = basis.N_u;

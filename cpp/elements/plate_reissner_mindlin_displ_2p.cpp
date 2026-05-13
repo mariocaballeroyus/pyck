@@ -1,5 +1,7 @@
 #include "plate_reissner_mindlin_displ_2p.hpp"
 #include "patch.hpp"
+#include "christoffels.hpp"
+#include "laplace_beltrami.hpp"
 
 namespace pyck
 {
@@ -18,7 +20,7 @@ Matrix<T> PlateReissnerMindlinDispl2p<T>::displacement_shape_matrix(
     const Patch<T, 2>& patch, const BasisDerivs<T, 2>& basis, const LocalFrame<T, 2>& local) const
 {
     // N_w = [ N_i − (K_b/K_s) Δ_g N_i   0 ]
-    auto chr = patch.eval_christoffel(local);
+    auto chr = eval_christoffel(local);
     const T ratio = material_->bending_stiffness() / material_->shear_stiffness();
     const Index Q = basis.N.rows();
     const Index n = basis.N.cols();
@@ -78,7 +80,7 @@ template <std::floating_point T>
 Matrix<T> PlateReissnerMindlinDispl2p<T>::bending_strain_matrix(
     const Patch<T, 2>& patch, const BasisDerivs<T, 2>& basis, const LocalFrame<T, 2>& local) const
 {
-    auto chr = patch.eval_christoffel(local);
+    auto chr = eval_christoffel(local);
     const Index Q = basis.N.rows();
     const Index n = basis.N.cols();
     Matrix<T> Bb = Matrix<T>::Zero(3 * Q, 2 * n);
@@ -111,7 +113,7 @@ template <std::floating_point T>
 Matrix<T> PlateReissnerMindlinDispl2p<T>::shear_strain_matrix(
     const Patch<T, 2>& patch, const BasisDerivs<T, 2>& basis, const LocalFrame<T, 2>& local) const
 {
-    auto chr = patch.eval_christoffel(local);
+    auto chr = eval_christoffel(local);
     auto aux = compute_laplace_grad_aux(local, chr);
     const T ratio = material_->bending_stiffness() / material_->shear_stiffness();
     const Index Q = basis.N.rows();

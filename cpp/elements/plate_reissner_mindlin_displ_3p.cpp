@@ -1,5 +1,6 @@
 #include "plate_reissner_mindlin_displ_3p.hpp"
 #include "patch.hpp"
+#include "christoffels.hpp"
 
 namespace pyck
 {
@@ -75,7 +76,7 @@ PlateReissnerMindlinDispl3p<T>::bending_strain_matrix(const Patch<T, 2>& patch,
                                                       const BasisDerivs<T, 2>& basis, 
                                                       const LocalFrame<T, 2>& local) const
 {
-    auto chr = patch.eval_christoffel(local);
+    auto chr = eval_christoffel(local);
     const Index Q = basis.N.rows();
     const Index n = basis.N.cols();
     Matrix<T> Bb = Matrix<T>::Zero(3 * Q, 3 * n);

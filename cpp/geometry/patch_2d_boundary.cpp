@@ -2,6 +2,9 @@
 #include "patch.hpp"
 #include "factories.hpp"
 #include "dof_mapper.hpp"
+#include "basis_derivs.hpp"
+#include "local_frame.hpp"
+#include "directors.hpp"
 
 namespace pyck
 {
@@ -91,22 +94,20 @@ PatchBoundary<T, d>::eval_local_frame(
     Index boundary_span) const requires(d == 2)
 {
     // Boundary frame (a_1^bdy, jac) via the composable primitives.
-    // Qualify the inherited Patch<T,1> methods to bypass name hiding.
-    auto boundary_basis  = this->Patch<T, 1>::eval_basis(
-        boundary_pts, boundary_span, Index(1));
-    auto boundary_act_pts = this->Patch<T, 1>::active_control_pts(boundary_span);
-    auto bdy_local       = this->Patch<T, 1>::eval_local_frame(
-        boundary_basis, boundary_act_pts);
+    // Qualify with `pyck::` to bypass the member `eval_local_frame` overload.
+    auto boundary_basis  = pyck::eval_basis(*this, boundary_pts, boundary_span, Index(1));
+    auto boundary_act_pts = this->active_control_pts(boundary_span);
+    auto bdy_local        = pyck::eval_local_frame(boundary_basis, boundary_act_pts);
 
     // Parent frame at the lifted points, used for the surface normal a_3.
     const Patch<T, 2>& parent = *parent_;
     const Index parent_flat = parent_flat_span(boundary_span);
     const ColMatrix<T, 2> parent_pts = lift_to_parent(boundary_pts);
-    auto parent_basis   = parent.eval_basis(parent_pts, parent_flat, Index(1));
+    auto parent_basis   = pyck::eval_basis(parent, parent_pts, parent_flat, Index(1));
     auto parent_act_pts = parent.active_control_pts(parent_flat);
-    auto par_local      = parent.eval_local_frame(parent_basis, parent_act_pts);
+    auto par_local      = pyck::eval_local_frame(parent_basis, parent_act_pts);
 
-    ColMatrix<T, 3> a3 = parent.eval_normal(par_local);
+    ColMatrix<T, 3> a3 = pyck::eval_normal(par_local);
     ColMatrix<T, 3> a2 = this->eval_outward_normal(bdy_local, par_local);
     return {std::move(bdy_local.a1), std::move(a2), std::move(a3),
             std::move(bdy_local.jac)};

@@ -2,6 +2,8 @@
 
 #include "patch_boundary.hpp"
 #include "patch.hpp"
+#include "basis_derivs.hpp"
+#include "local_frame.hpp"
 
 #include <cmath>
 #include <stdexcept>
@@ -60,15 +62,15 @@ void PenaltyBoundaryCondition<T, d>::apply(Matrix<T>& stiffness,
         auto [mapped_pts, mapped_weights] = quadrature.map_to_domain(lo, hi);
         const Index Q = static_cast<Index>(mapped_pts.rows());
 
-        auto boundary_basis  = boundary.eval_basis(mapped_pts, span, 1);
+        auto boundary_basis  = eval_basis(boundary, mapped_pts, span, 1);
         auto boundary_act    = boundary.active_control_pts(span);
-        auto boundary_local  = boundary.eval_local_frame(boundary_basis, boundary_act);
+        auto boundary_local  = eval_local_frame(boundary_basis, boundary_act);
 
         const Index flat_parent = boundary.parent_flat_span(span);
         const ColMatrix<T, 2> parent_pts = boundary.lift_to_parent(mapped_pts);
-        auto parent_basis  = parent.eval_basis(parent_pts, flat_parent, req_order);
+        auto parent_basis  = eval_basis(parent, parent_pts, flat_parent, req_order);
         auto parent_act    = parent.active_control_pts(flat_parent);
-        auto parent_local  = parent.eval_local_frame(parent_basis, parent_act);
+        auto parent_local  = eval_local_frame(parent_basis, parent_act);
 
         auto elem_dofs = parent.dof_mapper().get_element_dofs(flat_parent);
         const Index n_elem = static_cast<Index>(elem_dofs.size());

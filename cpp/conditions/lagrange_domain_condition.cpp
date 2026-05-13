@@ -1,6 +1,8 @@
 #include "lagrange_domain_condition.hpp"
 
 #include "patch.hpp"
+#include "basis_derivs.hpp"
+#include "local_frame.hpp"
 
 #include <array>
 #include <cmath>
@@ -96,9 +98,9 @@ void LagrangeDomainCondition<T, d>::apply(
         auto [mapped_pts, mapped_weights] = quadrature_.map_to_domain(u_a, u_b);
         const Index Q = static_cast<Index>(mapped_pts.rows());
 
-        auto basis   = patch_.eval_basis(mapped_pts, elem_idx, req_order);
+        auto basis   = eval_basis(patch_, mapped_pts, elem_idx, req_order);
         auto act_pts = patch_.active_control_pts(elem_idx);
-        auto local   = patch_.eval_local_frame(basis, act_pts);
+        auto local   = eval_local_frame(basis, act_pts);
         const Matrix<T>& N = basis.N;   // Q × n_basis
         const Index n_basis = N.cols();
 

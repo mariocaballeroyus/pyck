@@ -6,6 +6,8 @@
 #include <Eigen/Dense>
 
 #include "patch.hpp"
+#include "basis_derivs.hpp"
+#include "local_frame.hpp"
 #include "quadrature.hpp"
 #include "../types.hpp"
 
@@ -16,7 +18,7 @@ namespace pyck
  * @brief Integrate a user-defined per-quadrature-point functional over a patch.
  *
  * Loops over elements; per element, evaluates the active (p+1)^d basis
- * derivatives via `Patch::eval_basis` plus the local frame `LocalFrame<T,d>`
+ * derivatives via `eval_basis` plus the local frame `LocalFrame<T,d>`
  * (tangents, metric, inverse metric, area element); also returns the physical
  * coordinates of the mapped quadrature points and (optionally) gathers the
  * active DOF block from `cp_values`. The user-provided `integrand` returns a
@@ -28,7 +30,7 @@ namespace pyck
  *
  * @param patch        Patch to integrate over.
  * @param quadrature   Reference quadrature rule (mapped per element).
- * @param order        Basis-derivative order to request from `Patch::eval_basis`.
+ * @param order        Basis-derivative order to request from `eval_basis`.
  * @param cp_values    Per-control-point DOFs in node-major order, length
  *                     n_cp * ndof. Pass an empty vector when the integrand
  *                     does not need DOF data.

@@ -1,5 +1,6 @@
 #include "beam_timoshenko_2p.hpp"
 #include "patch.hpp"
+#include "christoffels.hpp"
 
 namespace pyck
 {
@@ -68,7 +69,7 @@ BeamTimoshenko2p<T>::bending_strain_matrix(const Patch<T, 1>& patch,
                                            const BasisDerivs<T, 1>& basis,
                                            const LocalFrame<T, 1>& local) const
 {
-    auto chr = patch.eval_christoffel(local);
+    auto chr = eval_christoffel(local);
     const Index Q = basis.N.rows();
     const Index n = basis.N.cols();
     Matrix<T> Bb = Matrix<T>::Zero(Q, 2 * n);

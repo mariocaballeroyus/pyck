@@ -7,6 +7,8 @@
 #include <Eigen/Dense>
 
 #include "patch.hpp"
+#include "basis_derivs.hpp"
+#include "local_frame.hpp"
 #include "../types.hpp"
 
 namespace pyck
@@ -119,9 +121,9 @@ public:
                                          const Vector<T>& q_weights,
                                          Matrix<T>& stiffness) const
     {
-        auto basis   = patch.eval_basis(mapped_pts, elem_idx, min_order());
+        auto basis   = eval_basis(patch, mapped_pts, elem_idx, min_order());
         auto act_pts = patch.active_control_pts(elem_idx);
-        auto local   = patch.eval_local_frame(basis, act_pts);
+        auto local   = eval_local_frame(basis, act_pts);
         const Matrix<T> B = strain_displacement_matrix(patch, basis, local);
         const Index Q = q_weights.size();
         const Index n_strain = B.rows() / Q;
@@ -162,7 +164,7 @@ public:
 ///
 /// Concrete elements provide bending and shear B-blocks plus surface-tensor
 /// constitutives. All auxiliary methods take `(patch, basis, local)` and
-/// compute Christoffel symbols internally via `patch.eval_christoffel(local)`
+/// compute Christoffel symbols internally via `eval_christoffel(local)`
 /// when needed.
 template <std::floating_point T>
 class Element<T, 2>
@@ -240,9 +242,9 @@ public:
                                          const Vector<T>& q_weights,
                                          Matrix<T>& stiffness) const
     {
-        auto basis   = patch.eval_basis(mapped_pts, elem_idx, min_order());
+        auto basis   = eval_basis(patch, mapped_pts, elem_idx, min_order());
         auto act_pts = patch.active_control_pts(elem_idx);
-        auto local   = patch.eval_local_frame(basis, act_pts);
+        auto local   = eval_local_frame(basis, act_pts);
         const Matrix<T> B = strain_displacement_matrix(patch, basis, local);
         const Index Q = q_weights.size();
         const Index n_strain = B.rows() / Q;
