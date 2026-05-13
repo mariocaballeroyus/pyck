@@ -1,5 +1,5 @@
 #include "factories.hpp"
-#include "../basis/bspline.hpp"
+
 #include <cmath>
 
 namespace pyck

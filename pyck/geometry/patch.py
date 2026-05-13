@@ -105,24 +105,3 @@ class Patch(ABC):
             (Shape function derivatives, Jacobian determinants)
         """
 
-    @property
-    def greville_points(self) -> np.ndarray:
-        """Get the Greville points of the patch in the parametric domain."""
-        return self._cpp_object.greville_points()
-
-    def greville_span(self, dof_index: int) -> int:
-        """Get the element span containing the Greville point for a global DOF index."""
-        return self._cpp_object.greville_span(int(dof_index))
-
-    def eval_shape_functions_at_greville(
-        self, dof_index: int, order: int = 0
-    ) -> tuple[list[np.ndarray], np.ndarray]:
-        """Evaluate shape functions and their derivatives at the Greville point corresponding to a global DOF index.
-        
-        Returns
-        -------
-        tuple[list[np.ndarray], np.ndarray]
-            (Shape function derivatives, Jacobian determinants)
-        """
-        sf, jac = self._cpp_object.eval_shape_functions_at_greville(int(dof_index), int(order))
-        return list(sf), np.asarray(jac)

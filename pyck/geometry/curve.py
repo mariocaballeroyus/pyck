@@ -196,5 +196,9 @@ def create_line_segment(
     CurvePatch
         The line-segment patch.
     """
-    cpp = _pyck.line_segment(basis._cpp_object, float(length))
-    return CurvePatch._from_cpp(cpp, basis, name=name)
+    xi = np.asarray(basis._cpp_object.greville_abscissae(), dtype=np.float64)
+    u_min, u_max = xi[0], xi[-1]
+    u_range = u_max - u_min if abs(u_max - u_min) > 1e-14 else 1.0
+    control_pts = np.zeros((xi.size, 3), dtype=np.float64)
+    control_pts[:, 0] = float(length) * (xi - u_min) / u_range
+    return CurvePatch(basis, control_pts, name=name)

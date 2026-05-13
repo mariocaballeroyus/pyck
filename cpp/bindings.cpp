@@ -6,7 +6,6 @@
 #include "bspline.hpp"
 #include "nurbs.hpp"
 #include "tensor.hpp"
-#include "factories.hpp"
 #include "patch_boundary.hpp"
 #include "basis_derivs.hpp"
 #include "local_frame.hpp"
@@ -58,7 +57,9 @@ PYBIND11_MODULE(_pyck, m) {
              py::arg("u"), py::arg("span"), py::arg("order") = 0)
         .def("eval_all", &BasisD::eval_all,
              py::arg("u"), py::arg("order") = 0,
-             "Evaluate all basis functions and derivatives (vector of matrices).");
+             "Evaluate all basis functions and derivatives (vector of matrices).")
+        .def("greville_abscissae", &BasisD::greville_abscissae,
+             "Greville abscissae of the basis (one per basis function).");
 
     using KnotVectorD = pyck::KnotVector<double>;
     py::class_<KnotVectorD>(m, "KnotVector")
@@ -174,17 +175,9 @@ PYBIND11_MODULE(_pyck, m) {
                  &Patch3D1D::active_control_pts),
              py::arg("span"),
              "Active control points on the given flat span.")
-        .def("get_control_points", &Patch3D1D::get_control_points,
-             py::arg("indices"),
-             "Map control point indices to physical coordinates.")
         .def("basis", &Patch3D1D::basis,
              py::arg("dir") = 0,
              py::return_value_policy::reference_internal)
-        .def("greville_points", &Patch3D1D::greville_points,
-             py::return_value_policy::reference_internal,
-             "Get the Greville points of the patch in the parametric domain.")
-        .def("greville_span", &Patch3D1D::greville_span, py::arg("dof_index"),
-             "Get the element span containing the Greville point for a global DOF index.")
         .def("eval_basis",
              [](const Patch3D1D& p, const pyck::ColMatrix<double, 1>& params,
                 pyck::Index span, std::size_t order) {
@@ -199,14 +192,6 @@ PYBIND11_MODULE(_pyck, m) {
              },
              py::arg("basis"), py::arg("active_control_points"),
              "Local frame (tangent, metric, jac) built from a BasisDerivs1d and the active control points.");
-
-    // line_segment factory
-    m.def("line_segment", [](pyck::Ptr<BasisD> basis, double length) {
-            return std::make_shared<Patch3D1D>(
-                pyck::line_segment<double>(basis, length));
-        },
-        py::arg("basis"), py::arg("length"),
-        "Create a straight line segment C(u) = (L*u, 0, 0) along the x-axis.");
 
     // === Surface Patch (2D) =========================================================
 
@@ -246,17 +231,9 @@ PYBIND11_MODULE(_pyck, m) {
                  &Patch3D2D::active_control_pts),
              py::arg("span"),
              "Active control points on the given flat span.")
-        .def("get_control_points", &Patch3D2D::get_control_points,
-             py::arg("indices"),
-             "Map control point indices to physical coordinates.")
         .def("basis", &Patch3D2D::basis,
              py::arg("dir"),
              py::return_value_policy::reference_internal)
-        .def("greville_points", &Patch3D2D::greville_points,
-             py::return_value_policy::reference_internal,
-             "Get the Greville points of the patch in the parametric domain.")
-        .def("greville_span", &Patch3D2D::greville_span, py::arg("dof_index"),
-             "Get the element span containing the Greville point for a global DOF index.")
         .def("boundary", [](pyck::Ptr<Patch3D2D> self, std::size_t param_dim, bool at_start) {
                  return pyck::create_patch_boundary<double, 2>(self, param_dim, at_start);
              },
@@ -276,17 +253,6 @@ PYBIND11_MODULE(_pyck, m) {
              },
              py::arg("basis"), py::arg("active_control_points"),
              "Local frame (tangents, metric, jac) built from a BasisDerivs2d and the active control points.");
-
-    // rectangle factory
-    m.def("rectangle", [](pyck::Ptr<BasisD> basis_u,
-                           pyck::Ptr<BasisD> basis_v,
-                           double width, double height) {
-            return std::make_shared<Patch3D2D>(
-                pyck::rectangle<double>(basis_u, basis_v, width, height));
-        },
-        py::arg("basis_u"), py::arg("basis_v"),
-        py::arg("width"), py::arg("height"),
-        "Create a flat rectangular surface patch in the xy-plane.");
 
 
     // === DOF Mapping ================================================================
@@ -810,7 +776,9 @@ PYBIND11_MODULE(_pyck, m) {
         .def("num_basis", &BasisF::num_basis)
         .def("find_span", &BasisF::find_span, py::arg("u"))
         .def("eval", &BasisF::eval_on_span,
-             py::arg("u"), py::arg("span"), py::arg("order") = 0);
+             py::arg("u"), py::arg("span"), py::arg("order") = 0)
+        .def("greville_abscissae", &BasisF::greville_abscissae,
+             "Greville abscissae of the basis (one per basis function).");
 
     using KnotVectorF = pyck::KnotVector<float>;
     py::class_<KnotVectorF>(m, "KnotVector32")

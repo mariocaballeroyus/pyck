@@ -1,6 +1,5 @@
 #include "patch_boundary.hpp"
 #include "patch.hpp"
-#include "factories.hpp"
 #include "dof_mapper.hpp"
 #include "basis_derivs.hpp"
 #include "local_frame.hpp"

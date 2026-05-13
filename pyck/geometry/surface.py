@@ -252,9 +252,22 @@ def create_rectangle(*args, **kwargs) -> SurfacePatch:
             "(basis_u, basis_v, l, w)."
         )
 
-    cpp_patch = _pyck.rectangle(
-        basis_u._cpp_object, basis_v._cpp_object, float(l), float(w)
-    )
-    return SurfacePatch._from_cpp(cpp_patch, basis_u, basis_v)
-    
-    
+    xi_u = np.asarray(basis_u._cpp_object.greville_abscissae(), dtype=np.float64)
+    xi_v = np.asarray(basis_v._cpp_object.greville_abscissae(), dtype=np.float64)
+    nu, nv = xi_u.size, xi_v.size
+
+    u_min, u_max = xi_u[0], xi_u[-1]
+    v_min, v_max = xi_v[0], xi_v[-1]
+    u_range = u_max - u_min if abs(u_max - u_min) > 1e-14 else 1.0
+    v_range = v_max - v_min if abs(v_max - v_min) > 1e-14 else 1.0
+
+    xs = float(l) * (xi_u - u_min) / u_range
+    ys = float(w) * (xi_v - v_min) / v_range
+
+    # u-fastest ordering: flat index = iu + iv * nu
+    control_pts = np.zeros((nu * nv, 3), dtype=np.float64)
+    XX, YY = np.meshgrid(xs, ys, indexing="xy")
+    control_pts[:, 0] = XX.ravel()
+    control_pts[:, 1] = YY.ravel()
+    return SurfacePatch(basis_u, basis_v, control_pts)
+

@@ -35,10 +35,8 @@ target_link_libraries(pyck_basis PUBLIC eigen)
 # Geometry library
 add_library(pyck_geometry
     cpp/geometry/dof_mapper.cpp
-    cpp/geometry/patch_1d.cpp
-    cpp/geometry/patch_2d.cpp
+    cpp/geometry/patch.cpp
     cpp/geometry/patch_2d_boundary.cpp
-    cpp/geometry/factories.cpp
     cpp/geometry/basis_derivs.cpp
     cpp/geometry/local_frame.cpp
     cpp/geometry/christoffels.cpp
@@ -125,6 +123,7 @@ install(TARGETS _pyck DESTINATION pyck)
 # Test executable (unified runner)
 add_executable(pyck_tests
     tests/test_main.cpp
+    tests/support/factories.cpp
     tests/basis/test_knot_vector.cpp
     tests/basis/test_bspline.cpp
     tests/basis/test_nurbs.cpp
@@ -149,6 +148,7 @@ add_executable(pyck_tests
     # tests/assembly/test_penalty_coupling_condition.cpp  # TODO: migrate
     # tests/assembly/test_lagrange_coupling_condition.cpp # TODO: migrate
 )
+target_include_directories(pyck_tests PRIVATE tests/support)
 target_link_libraries(pyck_tests PRIVATE
     pyck_basis
     pyck_geometry

@@ -8,9 +8,9 @@
 #include <memory>
 #include <Eigen/Core>
 
-#include "../basis/basis.hpp"
-#include "../basis/tensor.hpp"
-#include "../basis/bspline.hpp"
+#include "basis.hpp"
+#include "tensor.hpp"
+#include "bspline.hpp"
 #include "dof_mapper.hpp"
 #include "../types.hpp"
 
@@ -20,25 +20,24 @@ namespace pyck
 template <std::floating_point T, std::size_t d>
 class QuadratureRule;
 
-// === Patches ========================================================================
-
 /**
- * @brief Primary template for parametric patches defined by the tensor-product
- *        of univariate basis functions.
+ * @brief Parametric patch defined by the tensor-product of univariate basis functions.
  */
 template <std::floating_point T, std::size_t d>
 class Patch
 {
 public:
 
+    // === Constructors ===============================================================
+
     /**
-     * @brief 1D Constructor (Curve).
+     * @brief 1d constructor (curve patch).
      */
     Patch(Ptr<const Basis<T>> basis_u, 
           const ColMatrix<T, 3>& control_pts) requires(d == 1);
 
     /**
-     * @brief 2D Constructor (Surface).
+     * @brief 2d constructor (surface patch).
      */
     Patch(Ptr<const Basis<T>> basis_u,
           Ptr<const Basis<T>> basis_v,
@@ -49,15 +48,7 @@ public:
      */
     virtual ~Patch() = default;
 
-    // === Getter Functions ===========================================================
-
-    /// @brief Get the Greville points of the patch in the parametric domain.
-    const ColMatrix<T, d>& greville_points() const 
-    { return greville_points_; }
-
-    /// @brief Get the element span containing the Greville point for a global DOF index.
-    Index greville_span(Index dof_index) const 
-    { return greville_spans_[dof_index]; }
+    // === Getters ====================================================================
 
     /// @brief Basis in the given parametric direction.
     const Basis<T>& basis(std::size_t dir) const 
@@ -76,10 +67,12 @@ public:
     { return dof_mapper_; }
 
     /// @brief Get the geometric dimension (always 3 for now).
-    constexpr std::size_t gdim() const { return 3; }
+    constexpr std::size_t gdim() const 
+    { return 3; }
 
     /// @brief Get the topological dimension.
-    constexpr std::size_t tdim() const { return d; }
+    constexpr std::size_t tdim() const 
+    { return d; }
 
     /// @brief Get the control points matrix (const).
     const ColMatrix<T, 3>& control_pts() const 
@@ -99,72 +92,51 @@ public:
     ColMatrix<T, 3> active_control_pts(Index span_idx) const
     { return this->active_control_pts(this->decode_span(span_idx)); }
 
+    /// @brief Get the DOF indices used for assembly scatter. Defaults to the
+    ///        local indices (0, 1, …, N−1); overridden by PatchBoundary.
+    virtual std::vector<Index> assembly_dofs() const;
+
+    // === Utility Functions ==========================================================
+
+    /**
+     * @brief Get the control points for a given vector of indices.
+     *
+     * @param indices Vector of control point indices.
+     * @return Matrix containing the control points.
+     */
     ColMatrix<T, 3> get_control_points(const std::vector<Index>& indices) const;
-    std::vector<Index> layer_dofs(std::size_t param_dim, bool at_start, Index layer_idx = 0) const;
+
+    /**
+     * @brief Get the layer DOFs for a given parameter dimension and layer index.
+     *
+     * @param param_dim Parameter dimension.
+     * @param at_start Whether the layer is at the start of the parameter dimension.
+     * @param layer_idx Layer index.
+     * @return Vector of DOF indices.
+     */
+    std::vector<Index> layer_dofs(std::size_t param_dim,
+                                  bool at_start,
+                                  Index layer_idx = 0) const;
+
+    /**
+     * @brief Decode a flat span index into an array of span indices.
+     *
+     * @param flat_idx Flat span index.
+     * @return Array of span indices.
+     */
     std::array<Index, d> decode_span(Index flat_idx) const;
 
-    /// @brief Local indices of this patch's control points (0, 1, …, N−1).
-    virtual std::vector<Index> global_indices() const {
-        std::vector<Index> indices(num_control_pts());
-        for (Index i = 0; i < indices.size(); ++i) indices[i] = i;
-        return indices;
-    }
-
-    /// @brief DOF indices used for assembly scatter. Defaults to global_indices();
-    ///        overridden by PatchBoundary to return the parent patch's DOF indices.
-    virtual std::vector<Index> assembly_dofs() const { return global_indices(); }
-
 protected:
+
+    /// @brief Patch control point coordinates in the 3-dimensional Euclidean space.
     ColMatrix<T, 3> control_pts_;
+
+    /// @brief Tensor product of univariate basis functions defining the patch geometry.
     TensorProduct<T, d> tensor_product_;
+
+    /// @brief Map from global DOF indices to local indices on this patch.
     DofMapper<d> dof_mapper_;
-    ColMatrix<T, d> greville_points_;
-    std::vector<Index> greville_spans_;
 };
-
-template <std::floating_point T, std::size_t d>
-ColMatrix<T, 3> Patch<T, d>::active_control_pts(const std::array<Index, d>& spans) const
-{
-    auto dofs = dof_mapper_.get_element_dofs(spans);
-    ColMatrix<T, 3> pts(dofs.size(), 3);
-    for (Index i = 0; i < dofs.size(); ++i) {
-        pts.row(i) = control_pts_.row(dofs[i]);
-    }
-    return pts;
-}
-
-template <std::floating_point T, std::size_t d>
-ColMatrix<T, 3> Patch<T, d>::get_control_points(const std::vector<Index>& indices) const
-{
-    ColMatrix<T, 3> pts(indices.size(), 3);
-    for (Index i = 0; i < indices.size(); ++i) {
-        pts.row(i) = control_pts_.row(indices[i]);
-    }
-    return pts;
-}
-
-template <std::floating_point T, std::size_t d>
-std::vector<Index> Patch<T, d>::layer_dofs(std::size_t param_dim, bool at_start, Index layer_idx) const
-{
-    return dof_mapper_.get_layer_dofs(param_dim, at_start, layer_idx);
-}
-
-template <std::floating_point T, std::size_t d>
-std::array<Index, d> Patch<T, d>::decode_span(Index flat_idx) const
-{
-    if constexpr (d == 1) {
-        return {flat_idx};
-    } else {
-        auto intervals = tensor_product_.num_intervals();
-        std::array<Index, d> spans;
-        Index temp = flat_idx;
-        for (std::size_t i = 0; i < d; ++i) {
-            spans[i] = temp % intervals[i];
-            temp /= intervals[i];
-        }
-        return spans;
-    }
-}
 
 } // namespace pyck
 

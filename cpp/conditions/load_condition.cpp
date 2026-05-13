@@ -1,8 +1,7 @@
 #include "load_condition.hpp"
-#include "../geometry/patch.hpp"
-#include "../geometry/basis_derivs.hpp"
-#include "../geometry/local_frame.hpp"
-#include "factories.hpp"
+#include "patch.hpp"
+#include "basis_derivs.hpp"
+#include "local_frame.hpp"
 #include "bspline.hpp"
 #include <stdexcept>
 

@@ -2,7 +2,6 @@
 #include "bspline.hpp"
 #include "direct_constraint.hpp"
 #include "patch.hpp"
-#include "factories.hpp"
 
 #include <stdexcept>
 #include <string>
