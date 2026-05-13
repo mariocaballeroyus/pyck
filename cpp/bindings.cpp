@@ -7,7 +7,6 @@
 #include "nurbs.hpp"
 #include "tensor.hpp"
 #include "factories.hpp"
-#include "evaluation.hpp"
 #include "patch_boundary.hpp"
 #include "dof_mapper.hpp"
 #include "quadrature.hpp"
@@ -41,6 +40,7 @@
 #include "plane_stress_2d.hpp"
 #include "plane_stress_shell.hpp"
 #include "integrate.hpp"
+#include "physical_points.hpp"
 
 namespace py = pybind11;
 
@@ -95,6 +95,69 @@ PYBIND11_MODULE(_pyck, m) {
              },
              py::return_value_policy::reference_internal);
 
+    // === Composable geometric primitives ============================================
+    //
+    // BasisDerivs<T, d> bundles parametric basis derivatives at the quadrature
+    // points of one span; LocalFrame<T, d> is the surface-geometric frame
+    // (tangents, metric, area element) built from a BasisDerivs and the
+    // active control points.  Both are passed end-to-end to element methods
+    // (compute_local_stiffness, displacement_shape_matrix, etc.) and to the
+    // integrate_on_patch integrand.
+
+    py::class_<pyck::BasisDerivs<double, 1>>(m, "BasisDerivs1d")
+        .def_readonly("N",       &pyck::BasisDerivs<double, 1>::N)
+        .def_readonly("N_u",     &pyck::BasisDerivs<double, 1>::N_u)
+        .def_readonly("N_uu",    &pyck::BasisDerivs<double, 1>::N_uu)
+        .def_readonly("N_uuu",   &pyck::BasisDerivs<double, 1>::N_uuu)
+        .def_readonly("order",   &pyck::BasisDerivs<double, 1>::order);
+
+    py::class_<pyck::BasisDerivs<double, 2>>(m, "BasisDerivs2d")
+        .def_readonly("N",       &pyck::BasisDerivs<double, 2>::N)
+        .def_readonly("N_u",     &pyck::BasisDerivs<double, 2>::N_u)
+        .def_readonly("N_v",     &pyck::BasisDerivs<double, 2>::N_v)
+        .def_readonly("N_uu",    &pyck::BasisDerivs<double, 2>::N_uu)
+        .def_readonly("N_uv",    &pyck::BasisDerivs<double, 2>::N_uv)
+        .def_readonly("N_vv",    &pyck::BasisDerivs<double, 2>::N_vv)
+        .def_readonly("N_uuu",   &pyck::BasisDerivs<double, 2>::N_uuu)
+        .def_readonly("N_uuv",   &pyck::BasisDerivs<double, 2>::N_uuv)
+        .def_readonly("N_uvv",   &pyck::BasisDerivs<double, 2>::N_uvv)
+        .def_readonly("N_vvv",   &pyck::BasisDerivs<double, 2>::N_vvv)
+        .def_readonly("order",   &pyck::BasisDerivs<double, 2>::order);
+
+    py::class_<pyck::LocalFrame<double, 1>>(m, "LocalFrame1d")
+        .def_readonly("a1",        &pyck::LocalFrame<double, 1>::a1)
+        .def_readonly("a11",       &pyck::LocalFrame<double, 1>::a11)
+        .def_readonly("a111",      &pyck::LocalFrame<double, 1>::a111)
+        .def_readonly("g11",       &pyck::LocalFrame<double, 1>::g11)
+        .def_readonly("g_inv_11",  &pyck::LocalFrame<double, 1>::g_inv_11)
+        .def_readonly("jac",       &pyck::LocalFrame<double, 1>::jac);
+
+    py::class_<pyck::LocalFrame<double, 2>>(m, "LocalFrame2d")
+        .def_readonly("a1",     &pyck::LocalFrame<double, 2>::a1)
+        .def_readonly("a2",     &pyck::LocalFrame<double, 2>::a2)
+        .def_readonly("a11",    &pyck::LocalFrame<double, 2>::a11)
+        .def_readonly("a12",    &pyck::LocalFrame<double, 2>::a12)
+        .def_readonly("a22",    &pyck::LocalFrame<double, 2>::a22)
+        .def_readonly("a111",   &pyck::LocalFrame<double, 2>::a111)
+        .def_readonly("a112",   &pyck::LocalFrame<double, 2>::a112)
+        .def_readonly("a122",   &pyck::LocalFrame<double, 2>::a122)
+        .def_readonly("a222",   &pyck::LocalFrame<double, 2>::a222)
+        .def_readonly("g",      &pyck::LocalFrame<double, 2>::g)
+        .def_readonly("g_inv",  &pyck::LocalFrame<double, 2>::g_inv)
+        .def_readonly("jac",    &pyck::LocalFrame<double, 2>::jac);
+
+    py::class_<pyck::ChristoffelSymbols<double, 1>>(m, "ChristoffelSymbols1d")
+        .def_readonly("G1_11", &pyck::ChristoffelSymbols<double, 1>::G1_11);
+
+    py::class_<pyck::ChristoffelSymbols<double, 2>>(m, "ChristoffelSymbols2d")
+        .def_readonly("G1_11", &pyck::ChristoffelSymbols<double, 2>::G1_11)
+        .def_readonly("G1_12", &pyck::ChristoffelSymbols<double, 2>::G1_12)
+        .def_readonly("G1_22", &pyck::ChristoffelSymbols<double, 2>::G1_22)
+        .def_readonly("G2_11", &pyck::ChristoffelSymbols<double, 2>::G2_11)
+        .def_readonly("G2_12", &pyck::ChristoffelSymbols<double, 2>::G2_12)
+        .def_readonly("G2_22", &pyck::ChristoffelSymbols<double, 2>::G2_22);
+
+
     using Patch3D1D = pyck::Patch<double, 1>;
     py::class_<Patch3D1D, pyck::Ptr<Patch3D1D>>(m, "Patch1d")
         .def(py::init([](pyck::Ptr<BasisD> basis,
@@ -115,8 +178,11 @@ PYBIND11_MODULE(_pyck, m) {
         .def("dof_mapper", &Patch3D1D::dof_mapper,
              py::return_value_policy::reference_internal,
              "Return the DofMapper of this patch.")
-        .def("active_control_pts", &Patch3D1D::active_control_pts,
-             py::arg("spans"))
+        .def("active_control_pts",
+             static_cast<pyck::ColMatrix<double, 3> (Patch3D1D::*)(pyck::Index) const>(
+                 &Patch3D1D::active_control_pts),
+             py::arg("span"),
+             "Active control points on the given flat span.")
         .def("get_control_points", &Patch3D1D::get_control_points,
              py::arg("indices"),
              "Map control point indices to physical coordinates.")
@@ -126,31 +192,26 @@ PYBIND11_MODULE(_pyck, m) {
         .def("greville_points", &Patch3D1D::greville_points,
              py::return_value_policy::reference_internal,
              "Get the Greville points of the patch in the parametric domain.")
-        .def("eval_shape_functions_at_greville", [](const Patch3D1D& p, pyck::Index dof_index, std::size_t order) {
-                 return p.eval_shape_functions_at_greville(dof_index, order);
-             },
-             py::arg("dof_index"), py::arg("order") = 0,
-             "Evaluate shape functions and their derivatives at the Greville point corresponding to a global DOF index.")
-        .def("greville_span", &Patch3D1D::greville_span, py::arg("dof_index"), 
+        .def("greville_span", &Patch3D1D::greville_span, py::arg("dof_index"),
              "Get the element span containing the Greville point for a global DOF index.")
-        .def("eval_physical_points", [](const Patch3D1D& self, const pyck::QuadratureRule<double, 1>& quad) {
-                 return self.eval_physical_points(quad);
-             },
-             py::arg("quadrature"),
-             "Coordinate mapping of all quadrature points in active elements.")
-        .def("eval_basis_functions", &Patch3D1D::eval_basis_functions,
-             py::arg("params"), py::arg("span"), py::arg("order") = 0)
-        .def("eval_shape_functions", [](const Patch3D1D& p,
-                 const pyck::ColMatrix<double, 1>& pts,
-                 pyck::Index span,
-                 std::size_t order) {
-                 return p.eval_shape_functions(pts, span, order);
-             },
-             py::arg("params"), py::arg("span"), py::arg("order") = 0)
-        .def("eval_geometry", [](const Patch3D1D& self, const pyck::ColMatrix<double, 1>& pts, pyck::Index span) {
-                 return self.eval_geometry(pts, span);
-             },
-             py::arg("params"), py::arg("span"));
+        .def("eval_basis",
+             static_cast<pyck::BasisDerivs<double, 1> (Patch3D1D::*)(
+                 const pyck::ColMatrix<double, 1>&, pyck::Index, std::size_t) const>(
+                 &Patch3D1D::eval_basis),
+             py::arg("params"), py::arg("span"), py::arg("order") = 0,
+             "Parametric basis derivatives (BasisDerivs1d) on one span.")
+        .def("eval_local_frame",
+             static_cast<pyck::LocalFrame<double, 1> (Patch3D1D::*)(
+                 const pyck::BasisDerivs<double, 1>&, const pyck::ColMatrix<double, 3>&) const>(
+                 &Patch3D1D::eval_local_frame),
+             py::arg("basis"), py::arg("active_control_points"),
+             "Local frame (tangent, metric, jac) built from a BasisDerivs1d and the active control points.")
+        .def("eval_christoffel",
+             static_cast<pyck::ChristoffelSymbols<double, 1> (Patch3D1D::*)(
+                 const pyck::LocalFrame<double, 1>&) const>(
+                 &Patch3D1D::eval_christoffel),
+             py::arg("local"),
+             "Christoffel symbols (Γ¹_{11}) at each quadrature point.");
 
     // line_segment factory
     m.def("line_segment", [](pyck::Ptr<BasisD> basis, double length) {
@@ -193,8 +254,11 @@ PYBIND11_MODULE(_pyck, m) {
         .def("dof_mapper", &Patch3D2D::dof_mapper,
              py::return_value_policy::reference_internal,
              "Return the DofMapper of this patch.")
-        .def("active_control_pts", &Patch3D2D::active_control_pts,
-             py::arg("spans"))
+        .def("active_control_pts",
+             static_cast<pyck::ColMatrix<double, 3> (Patch3D2D::*)(pyck::Index) const>(
+                 &Patch3D2D::active_control_pts),
+             py::arg("span"),
+             "Active control points on the given flat span.")
         .def("get_control_points", &Patch3D2D::get_control_points,
              py::arg("indices"),
              "Map control point indices to physical coordinates.")
@@ -204,36 +268,34 @@ PYBIND11_MODULE(_pyck, m) {
         .def("greville_points", &Patch3D2D::greville_points,
              py::return_value_policy::reference_internal,
              "Get the Greville points of the patch in the parametric domain.")
-        .def("eval_shape_functions_at_greville", [](const Patch3D2D& p, pyck::Index dof_index, std::size_t order) {
-                 return p.eval_shape_functions_at_greville(dof_index, order);
-             },
-             py::arg("dof_index"), py::arg("order") = 0,
-             "Evaluate shape functions and their derivatives at the Greville point corresponding to a global DOF index.")
-        .def("greville_span", &Patch3D2D::greville_span, py::arg("dof_index"), 
+        .def("greville_span", &Patch3D2D::greville_span, py::arg("dof_index"),
              "Get the element span containing the Greville point for a global DOF index.")
         .def("boundary", [](pyck::Ptr<Patch3D2D> self, std::size_t param_dim, bool at_start) {
                  return pyck::create_patch_boundary<double, 2>(self, param_dim, at_start);
              },
              py::arg("param_dim"), py::arg("at_start"),
              "Extract a boundary face of this patch.")
-        .def("eval_physical_points", [](const Patch3D2D& self, const pyck::QuadratureRule<double, 2>& quad) {
-                 return self.eval_physical_points(quad);
-             },
-             py::arg("quadrature"),
-             "Coordinate mapping of all quadrature points in active elements.")
-        .def("eval_basis_functions", &Patch3D2D::eval_basis_functions,
-             py::arg("params"), py::arg("span"), py::arg("order") = 0)
-        .def("eval_shape_functions", [](const Patch3D2D& p,
-                 const pyck::ColMatrix<double, 2>& pts,
-                 pyck::Index span,
-                 std::size_t order) {
-                 return p.eval_shape_functions(pts, span, order);
-             },
-             py::arg("params"), py::arg("span"), py::arg("order") = 0)
-        .def("eval_geometry", [](const Patch3D2D& self, const pyck::ColMatrix<double, 2>& pts, pyck::Index span) {
-                 return self.eval_geometry(pts, span);
-             },
-             py::arg("params"), py::arg("span"));
+        .def("eval_basis",
+             static_cast<pyck::BasisDerivs<double, 2> (Patch3D2D::*)(
+                 const pyck::ColMatrix<double, 2>&, pyck::Index, std::size_t) const>(
+                 &Patch3D2D::eval_basis),
+             py::arg("params"), py::arg("span"), py::arg("order") = 0,
+             "Parametric basis derivatives (BasisDerivs2d) on one span.")
+        .def("eval_local_frame",
+             static_cast<pyck::LocalFrame<double, 2> (Patch3D2D::*)(
+                 const pyck::BasisDerivs<double, 2>&, const pyck::ColMatrix<double, 3>&) const>(
+                 &Patch3D2D::eval_local_frame),
+             py::arg("basis"), py::arg("active_control_points"),
+             "Local frame (tangents, metric, jac) built from a BasisDerivs2d and the active control points.")
+        .def("eval_christoffel",
+             static_cast<pyck::ChristoffelSymbols<double, 2> (Patch3D2D::*)(
+                 const pyck::LocalFrame<double, 2>&) const>(
+                 &Patch3D2D::eval_christoffel),
+             py::arg("local"),
+             "Christoffel symbols Γ^γ_{αβ} at each quadrature point.")
+        .def("eval_normal", &Patch3D2D::eval_normal,
+             py::arg("local"),
+             "Surface unit normal a_3 from the local frame.");
 
     // rectangle factory
     m.def("rectangle", [](pyck::Ptr<BasisD> basis_u,
@@ -384,11 +446,14 @@ PYBIND11_MODULE(_pyck, m) {
     py::class_<Elem1D, pyck::Ptr<Elem1D>>(m, "Element1d")
         .def("num_node_dofs", &Elem1D::num_node_dofs)
         .def("min_order", &Elem1D::min_order)
-        .def("displacement_shape_matrix", &Elem1D::displacement_shape_matrix, py::arg("shape_derivs"))
-        .def("rotation_shape_matrix", &Elem1D::rotation_shape_matrix, py::arg("shape_derivs"))
+        .def("displacement_shape_matrix", &Elem1D::displacement_shape_matrix,
+             py::arg("patch"), py::arg("basis"), py::arg("local"))
+        .def("rotation_shape_matrix", &Elem1D::rotation_shape_matrix,
+             py::arg("patch"), py::arg("basis"), py::arg("local"))
         .def("displacement_dof_index", &Elem1D::displacement_dof_index)
         .def("rotation_dof_index", &Elem1D::rotation_dof_index)
-        .def("strain_displacement_matrix", &Elem1D::strain_displacement_matrix, py::arg("shape_derivs"));
+        .def("strain_displacement_matrix", &Elem1D::strain_displacement_matrix,
+             py::arg("patch"), py::arg("basis"), py::arg("local"));
 
     using EBB = pyck::BeamEulerBernoulli1p<double>;
     py::class_<EBB, Elem1D, pyck::Ptr<EBB>>(m, "BeamEulerBernoulli1p")
@@ -411,17 +476,26 @@ PYBIND11_MODULE(_pyck, m) {
     py::class_<Elem2D, pyck::Ptr<Elem2D>>(m, "Element2d")
         .def("num_node_dofs", &Elem2D::num_node_dofs)
         .def("min_order", &Elem2D::min_order)
-        .def("displacement_shape_matrix", &Elem2D::displacement_shape_matrix, py::arg("shape_derivs"))
-        .def("rotation_shape_matrix", &Elem2D::rotation_shape_matrix, py::arg("shape_derivs"))
-        .def("bending_strain_matrix", &Elem2D::bending_strain_matrix, py::arg("shape_derivs"))
-        .def("shear_strain_matrix", &Elem2D::shear_strain_matrix, py::arg("shape_derivs"))
-        .def("moment_matrix", &Elem2D::moment_matrix, py::arg("shape_derivs"))
-        .def("transverse_shear_matrix", &Elem2D::transverse_shear_matrix, py::arg("shape_derivs"))
-        .def("bending_constitutive_matrix", &Elem2D::bending_constitutive_matrix)
-        .def("shear_constitutive_matrix", &Elem2D::shear_constitutive_matrix)
+        .def("displacement_shape_matrix", &Elem2D::displacement_shape_matrix,
+             py::arg("patch"), py::arg("basis"), py::arg("local"))
+        .def("rotation_shape_matrix", &Elem2D::rotation_shape_matrix,
+             py::arg("patch"), py::arg("basis"), py::arg("local"))
+        .def("bending_strain_matrix", &Elem2D::bending_strain_matrix,
+             py::arg("patch"), py::arg("basis"), py::arg("local"))
+        .def("shear_strain_matrix", &Elem2D::shear_strain_matrix,
+             py::arg("patch"), py::arg("basis"), py::arg("local"))
+        .def("moment_matrix", &Elem2D::moment_matrix,
+             py::arg("patch"), py::arg("basis"), py::arg("local"))
+        .def("transverse_shear_matrix", &Elem2D::transverse_shear_matrix,
+             py::arg("patch"), py::arg("basis"), py::arg("local"))
+        .def("bending_constitutive_matrix", &Elem2D::bending_constitutive_matrix,
+             py::arg("local"), py::arg("q"))
+        .def("shear_constitutive_matrix", &Elem2D::shear_constitutive_matrix,
+             py::arg("local"), py::arg("q"))
         .def("displacement_dof_index", &Elem2D::displacement_dof_index)
         .def("rotation_dof_indices", &Elem2D::rotation_dof_indices)
-        .def("strain_displacement_matrix", &Elem2D::strain_displacement_matrix, py::arg("shape_derivs"));
+        .def("strain_displacement_matrix", &Elem2D::strain_displacement_matrix,
+             py::arg("patch"), py::arg("basis"), py::arg("local"));
 
     using KLP = pyck::PlateKirchhoffLove1p<double>;
     py::class_<KLP, Elem2D, pyck::Ptr<KLP>>(m, "PlateKirchhoffLove1p")
@@ -821,42 +895,38 @@ PYBIND11_MODULE(_pyck, m) {
              },
              py::arg("param_dim"), py::arg("at_start"),
              "Extract a boundary face of this patch.")
-        .def("eval_basis_functions", &Patch3D1DF::eval_basis_functions,
-             py::arg("params"), py::arg("span"), py::arg("order") = 0)
-        .def("eval_shape_functions", [](const Patch3D1DF& p,
-                 const pyck::ColMatrix<float, 1>& pts,
-                 pyck::Index span,
-                 std::size_t order) {
-                 return p.eval_shape_functions(pts, span, order);
-             },
-             py::arg("params"), py::arg("span"), py::arg("order") = 0)
-        .def("eval_geometry", &Patch3D1DF::eval_geometry,
-             py::arg("params"), py::arg("span"));
+        .def("eval_basis",
+             static_cast<pyck::BasisDerivs<float, 1> (Patch3D1DF::*)(
+                 const pyck::ColMatrix<float, 1>&, pyck::Index, std::size_t) const>(
+                 &Patch3D1DF::eval_basis),
+             py::arg("params"), py::arg("span"), py::arg("order") = 0);
 #endif
-    m.def("eval_shape_at", &pyck::eval_shape_at<double, 1>,
-          py::arg("patch"), py::arg("params"), py::arg("order") = 0,
-          "Evaluate shape functions at given parametric points (auto span finding).");
-    m.def("eval_shape_at", &pyck::eval_shape_at<double, 2>,
-          py::arg("patch"), py::arg("params"), py::arg("order") = 0,
-          "Evaluate shape functions at given parametric points (auto span finding).");
 
-    m.def("eval_geometry_at", &pyck::eval_geometry_at<double, 1>,
-          py::arg("patch"), py::arg("params"),
-          "Evaluate physical coordinates at given parametric points.");
-    m.def("eval_geometry_at", &pyck::eval_geometry_at<double, 2>,
-          py::arg("patch"), py::arg("params"),
-          "Evaluate physical coordinates at given parametric points.");
+    // === Postprocessing: physical-point sampling ====================================
+
+    m.def("eval_physical_points",
+          &pyck::eval_physical_points<double, 1>,
+          py::arg("patch"), py::arg("quadrature"),
+          "Physical coordinates of every active quadrature point on a 1D patch, "
+          "in flat-element assembly order.");
+    m.def("eval_physical_points",
+          &pyck::eval_physical_points<double, 2>,
+          py::arg("patch"), py::arg("quadrature"),
+          "Physical coordinates of every active quadrature point on a 2D patch, "
+          "in flat-element assembly order.");
 
     // === Postprocessing: generic per-patch field integrator =========================
 
     using IntegrandFn2D = std::function<pyck::Matrix<double>(
         const pyck::ColMatrix<double, 3>&,
-        const std::vector<pyck::Matrix<double>>&,
+        const pyck::BasisDerivs<double, 2>&,
+        const pyck::LocalFrame<double, 2>&,
         const pyck::Vector<double>&)>;
 
     using IntegrandFn1D = std::function<pyck::Matrix<double>(
         const pyck::ColMatrix<double, 3>&,
-        const std::vector<pyck::Matrix<double>>&,
+        const pyck::BasisDerivs<double, 1>&,
+        const pyck::LocalFrame<double, 1>&,
         const pyck::Vector<double>&)>;
 
     m.def("integrate_on_patch",

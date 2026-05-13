@@ -1,4 +1,5 @@
 #include "plate_reissner_mindlin_displ_3p.hpp"
+#include "patch.hpp"
 
 namespace pyck
 {
@@ -8,95 +9,119 @@ PlateReissnerMindlinDispl3p<T>::PlateReissnerMindlinDispl3p(Ptr<PlaneStress2d<T>
     : material_(material)
 {
     if (!material_) {
-        throw std::invalid_argument("PlateReissnerMindlinDispl3p: material is null.");
+        throw std::invalid_argument("PlateReissnerMindlinDispl3p: "
+                                    "material is null.");
     }
 }
 
-template <std::floating_point T>
-Matrix<T> PlateReissnerMindlinDispl3p<T>::displacement_shape_matrix(
-    const std::vector<Matrix<T>>& shape_derivs) const
+template <std::floating_point T> Matrix<T> 
+PlateReissnerMindlinDispl3p<T>::displacement_shape_matrix(const Patch<T, 2>& /*patch*/, 
+                                                          const BasisDerivs<T, 2>& basis, 
+                                                          const LocalFrame<T, 2>& /*local*/) const
 {
-    const auto& N = shape_derivs;
-    const Index Q = N[idx::val].rows();
-    const Index n = N[idx::val].cols();
+    const Index Q = basis.N.rows();
+    const Index n = basis.N.cols();
     Matrix<T> Nw = Matrix<T>::Zero(Q, 3 * n);
 
-    // Nw_i = [ N_i  N_i  N_i ]   (w = w_b + w_s1 + w_s2)
-    for (Index i = 0; i < n; ++i) {
-        Nw.col(3 * i    ) = N[idx::val].col(i);
-        Nw.col(3 * i + 1) = N[idx::val].col(i);
-        Nw.col(3 * i + 2) = N[idx::val].col(i);
+    // N_w = [ N_i  N_i  N_i ]
+    for (Index i = 0; i < n; ++i) 
+    {
+        Nw.col(3 * i    ) = basis.N.col(i);
+        Nw.col(3 * i + 1) = basis.N.col(i);
+        Nw.col(3 * i + 2) = basis.N.col(i);
     }
     return Nw;
 }
 
 template <std::floating_point T>
 Matrix<T> PlateReissnerMindlinDispl3p<T>::rotation_shape_matrix(
-    const std::vector<Matrix<T>>& shape_derivs) const
+    const Patch<T, 2>& /*patch*/, const BasisDerivs<T, 2>& basis, const LocalFrame<T, 2>& /*local*/) const
 {
-    const auto& N = shape_derivs;
-    const Index Q = N[idx::val].rows();
-    const Index n = N[idx::val].cols();
+    const Index Q = basis.N.rows();
+    const Index n = basis.N.cols();
     Matrix<T> Nphi = Matrix<T>::Zero(2 * Q, 3 * n);
 
-    // Nphi_i = [ -N_i,x   0       -N_i,x
-    //            -N_i,y  -N_i,y    0     ]
-    for (Index q = 0; q < Q; ++q) {
-        for (Index i = 0; i < n; ++i) {
-            Nphi(2 * q,     3 * i)     = -N[idx::d1](q, i);
-            Nphi(2 * q,     3 * i + 2) = -N[idx::d1](q, i);
-            Nphi(2 * q + 1, 3 * i)     = -N[idx::d2](q, i);
-            Nphi(2 * q + 1, 3 * i + 1) = -N[idx::d2](q, i);
+    // N_rot = [ -N_{i|1}   0         -N_{i|1} ]
+    //         [ -N_{i|2}  -N_{i|2}    0       ]
+    for (Index q = 0; q < Q; ++q) 
+    {
+        for (Index i = 0; i < n; ++i) 
+        {
+            Nphi(2 * q,     3 * i)     = -basis.N_u(q, i);
+            Nphi(2 * q,     3 * i + 2) = -basis.N_u(q, i);
+            Nphi(2 * q + 1, 3 * i)     = -basis.N_v(q, i);
+            Nphi(2 * q + 1, 3 * i + 1) = -basis.N_v(q, i);
         }
     }
     return Nphi;
 }
 
-template <std::floating_point T>
-Matrix<T> PlateReissnerMindlinDispl3p<T>::bending_strain_matrix(
-    const std::vector<Matrix<T>>& shape_derivs) const
+template <std::floating_point T> Matrix<T> 
+PlateReissnerMindlinDispl3p<T>::bending_constitutive_matrix(const LocalFrame<T, 2>& local, 
+                                                            Index q) const
 {
-    const auto& N = shape_derivs;
-    const Index Q = N[idx::val].rows();
-    const Index n = N[idx::val].cols();
+    return material_->bending_voigt(local.g_inv.row(q).transpose());
+}
 
-    // Bb_i (3 x 3): kappa = L phi, phi = -grad(w_b) - (w_s2,x, w_s1,y)
-    //   row 0 (kappa_x):    [ -N_i,xx   0          -N_i,xx          ]
-    //   row 1 (kappa_y):    [ -N_i,yy  -N_i,yy      0               ]
-    //   row 2 (2 kappa_xy): [ -2 N_i,xy -N_i,xy    -N_i,xy           ]
+template <std::floating_point T> Matrix<T> 
+PlateReissnerMindlinDispl3p<T>::shear_constitutive_matrix(const LocalFrame<T, 2>& local, 
+                                                          Index q) const
+{
+    return material_->shear_voigt(local.g_inv.row(q).transpose());
+}
+
+template <std::floating_point T> Matrix<T> 
+PlateReissnerMindlinDispl3p<T>::bending_strain_matrix(const Patch<T, 2>& patch, 
+                                                      const BasisDerivs<T, 2>& basis, 
+                                                      const LocalFrame<T, 2>& local) const
+{
+    auto chr = patch.eval_christoffel(local);
+    const Index Q = basis.N.rows();
+    const Index n = basis.N.cols();
     Matrix<T> Bb = Matrix<T>::Zero(3 * Q, 3 * n);
-    for (Index q = 0; q < Q; ++q) {
-        for (Index i = 0; i < n; ++i) {
-            Bb(3 * q,     3 * i)     = -N[idx::d11](q, i);
-            Bb(3 * q,     3 * i + 2) = -N[idx::d11](q, i);
 
-            Bb(3 * q + 1, 3 * i)     = -N[idx::d22](q, i);
-            Bb(3 * q + 1, 3 * i + 1) = -N[idx::d22](q, i);
+    // B_b = [ -N_{i|11}     0           -N_{i|11} ]
+    //       [ -N_{i|22}    -N_{i|22}     0        ]
+    //       [ -2 N_{i|12}  -N_{i|12}    -N_{i|12} ]
+    for (Index q = 0; q < Q; ++q) 
+    {
+        const T Gam1_11 = chr.G1_11(q), Gam1_12 = chr.G1_12(q), Gam1_22 = chr.G1_22(q);
+        const T Gam2_11 = chr.G2_11(q), Gam2_12 = chr.G2_12(q), Gam2_22 = chr.G2_22(q);
+        const auto N11 = basis.N_uu.row(q) - Gam1_11 * basis.N_u.row(q) - Gam2_11 * basis.N_v.row(q);
+        const auto N12 = basis.N_uv.row(q) - Gam1_12 * basis.N_u.row(q) - Gam2_12 * basis.N_v.row(q);
+        const auto N22 = basis.N_vv.row(q) - Gam1_22 * basis.N_u.row(q) - Gam2_22 * basis.N_v.row(q);
 
-            Bb(3 * q + 2, 3 * i)     = -T(2) * N[idx::d12](q, i);
-            Bb(3 * q + 2, 3 * i + 1) = -N[idx::d12](q, i);
-            Bb(3 * q + 2, 3 * i + 2) = -N[idx::d12](q, i);
+        for (Index i = 0; i < n; ++i) 
+        {
+            Bb(3 * q,     3 * i)     = -N11(i);
+            Bb(3 * q,     3 * i + 2) = -N11(i);
+            Bb(3 * q + 1, 3 * i)     = -N22(i);
+            Bb(3 * q + 1, 3 * i + 1) = -N22(i);
+            Bb(3 * q + 2, 3 * i)     = -T(2) * N12(i);
+            Bb(3 * q + 2, 3 * i + 1) = -N12(i);
+            Bb(3 * q + 2, 3 * i + 2) = -N12(i);
         }
     }
     return Bb;
 }
 
-template <std::floating_point T>
-Matrix<T> PlateReissnerMindlinDispl3p<T>::shear_strain_matrix(
-    const std::vector<Matrix<T>>& shape_derivs) const
+template <std::floating_point T> Matrix<T> 
+PlateReissnerMindlinDispl3p<T>::shear_strain_matrix(const Patch<T, 2>& /*patch*/, 
+                                                    const BasisDerivs<T, 2>& basis, 
+                                                    const LocalFrame<T, 2>& /*local*/) const
 {
-    const auto& N = shape_derivs;
-    const Index Q = N[idx::val].rows();
-    const Index n = N[idx::val].cols();
-
-    // Bs_i (2 x 3): gamma = [w_s1,x, w_s2,y]
-    //   row 0 (gamma_x): [ 0   N_i,x  0     ]
-    //   row 1 (gamma_y): [ 0   0      N_i,y ]
+    const Index Q = basis.N.rows();
+    const Index n = basis.N.cols();
     Matrix<T> Bs = Matrix<T>::Zero(2 * Q, 3 * n);
-    for (Index q = 0; q < Q; ++q) {
-        for (Index i = 0; i < n; ++i) {
-            Bs(2 * q,     3 * i + 1) = N[idx::d1](q, i);
-            Bs(2 * q + 1, 3 * i + 2) = N[idx::d2](q, i);
+
+    // B_s = [ 0   N_{i|1}   0       ]
+    //       [ 0   0         N_{i|2} ]
+    for (Index q = 0; q < Q; ++q) 
+    {
+        for (Index i = 0; i < n; ++i) 
+        {
+            Bs(2 * q,     3 * i + 1) = basis.N_u(q, i);
+            Bs(2 * q + 1, 3 * i + 2) = basis.N_v(q, i);
         }
     }
     return Bs;

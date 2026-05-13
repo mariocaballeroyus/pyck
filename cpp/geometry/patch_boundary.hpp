@@ -9,12 +9,10 @@
 #include <concepts>
 
 #include "../types.hpp"
+#include "patch.hpp"
 
 namespace pyck
 {
-
-// Forward declaration
-template <std::floating_point T, std::size_t d> class Patch;
 
 /**
  * @brief Represents a boundary face of a d-dimensional patch.
@@ -69,28 +67,12 @@ public:
     { return u_eval_fixed_; }
 
     /// @brief Sign of the outward normal (+1 or -1) consistent with parametric orientation
-    T sign_n() const 
+    T sign_n() const
     { return sign_n_; }
 
-    /**
-     * @brief Compute outward unit normal at quadrature points.
-     *
-     * 1D boundary on a 2D surface: normal = boundary_tangent × surface_normal,
-     * where surface_normal = parent_tangents[0] × parent_tangents[1].
-     */
-    ColMatrix<T, 3> eval_normal(
-        const std::array<ColMatrix<T, 3>, d - 1>& tangents,
-        const std::array<ColMatrix<T, 3>, d>& parent_tangents) const requires(d == 2);
-
-    /**
-     * @brief Compute outward unit normal at quadrature points.
-     *
-     * 2D boundary on a 3D volume: normal = tangent0 × tangent1; parent
-     * tangents are unused (the boundary surface defines its own normal).
-     */
-    ColMatrix<T, 3> eval_normal(
-        const std::array<ColMatrix<T, 3>, d - 1>& tangents,
-        const std::array<ColMatrix<T, 3>, d>& parent_tangents) const requires(d == 3);
+    /// Bring the inherited base-class eval_local_frame(basis, act_pts) into
+    /// scope alongside the boundary's own eval_local_frame(pts, span).
+    using Patch<T, d - 1>::eval_local_frame;
 
     /**
      * @brief Convert a boundary span index to the flat span index of the parent patch.
@@ -105,15 +87,14 @@ public:
     ColMatrix<T, d> lift_to_parent(const Vector<T>& boundary_pts) const requires(d == 2);
 
     /**
-     * @brief Compute the Q×3 outward unit normal at the boundary quadrature points,
-     *        end-to-end from shape function derivatives. Encapsulates the tangent
-     *        and surface-normal computations on both the boundary and its parent.
+     * @brief Outward in-surface unit normal at the boundary quadrature points
+     *        from precomputed local frames. Computed intrinsically:
+     *            n = sign_n · (a_1^bdy × a_3^parent) / ||a_1^bdy × a_3^parent||
+     *        where a_3^parent = (a_1 × a_2) / jac is the parent surface normal.
      */
     ColMatrix<T, 3> eval_outward_normal(
-        Index boundary_span,
-        const std::vector<Matrix<T>>& boundary_derivs,
-        Index parent_flat_span,
-        const std::vector<Matrix<T>>& parent_derivs) const;
+        const LocalFrame<T, d - 1>& boundary_local,
+        const LocalFrame<T, d>& parent_local) const requires(d == 2);
 
     /**
      * @brief Evaluate the local covariant frame on this boundary, delegating

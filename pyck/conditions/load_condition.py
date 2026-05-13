@@ -117,7 +117,7 @@ def create_constant_load_condition(
         quadrature = patch.quadrature
 
     x_phys = np.asarray(
-        patch._cpp_object.eval_physical_points(quadrature._cpp_object)
+        _pyck.eval_physical_points(patch._cpp_object, quadrature._cpp_object)
     )
     n_points = x_phys.shape[0]
 
@@ -154,7 +154,7 @@ def create_load_condition(
         quadrature = patch.quadrature
 
     x_phys = np.asarray(
-        patch._cpp_object.eval_physical_points(quadrature._cpp_object)
+        _pyck.eval_physical_points(patch._cpp_object, quadrature._cpp_object)
     )
 
     load_values = np.asarray(load_fn(x_phys), dtype=float).ravel()

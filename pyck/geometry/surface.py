@@ -120,6 +120,10 @@ class SurfacePatch(Patch):
     def eval_geometry(self, uv: np.ndarray) -> np.ndarray:
         """Evaluate surface coordinates at parametric values.
 
+        Composed in numpy: for each point, find the containing span, evaluate
+        the basis values N (order 0), and matrix-multiply by the active
+        control points.
+
         Parameters
         ----------
         uv : np.ndarray, shape (Q, 2)
@@ -137,18 +141,19 @@ class SurfacePatch(Patch):
         kv_v_cpp = self._basis_v.knot_vector._cpp_object
         deg_u = self._basis_u.degree
         deg_v = self._basis_v.degree
-        num_intervals_u = len(self._basis_u.knots) - 1
+        intervals_u = self._basis_u.num_intervals
 
         for i, row in enumerate(uv):
             u, v = row
             span_u = kv_u_cpp.find_span(deg_u, float(u))
             span_v = kv_v_cpp.find_span(deg_v, float(v))
-
-            # Match C++ decode_span: flat_idx = span_u + span_v * num_intervals_u
-            element_idx = span_u + span_v * num_intervals_u
+            # Match C++ decode_span: flat_idx = span_u + span_v * intervals_u
+            element_idx = span_u + span_v * intervals_u
 
             pt = np.array([[u, v]], dtype=np.float64)
-            results[i, :] = self._cpp_object.eval_geometry(pt, element_idx)[0, :]
+            basis = self._cpp_object.eval_basis(pt, element_idx, 0)
+            act_pts = self._cpp_object.active_control_pts(element_idx)
+            results[i, :] = (np.asarray(basis.N) @ np.asarray(act_pts))[0, :]
 
         return results
 

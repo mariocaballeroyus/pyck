@@ -9,6 +9,7 @@
 
 #include "boundary_field.hpp"
 #include "patch_boundary.hpp"
+#include "physical_points.hpp"
 #include "bspline.hpp"
 #include "direct_constraint.hpp"
 #include "factories.hpp"
@@ -74,7 +75,7 @@ static Vector<double> make_uniform_load(
     const QuadratureRule<double, 2>& gauss2d,
     double q0)
 {
-    auto phys_pts = surface->eval_physical_points(gauss2d);
+    auto phys_pts = pyck::eval_physical_points(*surface, gauss2d);
     Vector<double> load_vals(phys_pts.rows());
     load_vals.setConstant(q0);
     return load_vals;
@@ -192,7 +193,7 @@ TEST_CASE("LagrangeBoundaryCondition solves an RM1 simply-supported plate", "[co
     auto gauss2d = std::make_shared<GaussLegendre<double, 2>>(p + 1);
     GaussLegendre<double, 1> gauss1d(p + 1);
 
-    auto phys_pts = surface->eval_physical_points(*gauss2d);
+    auto phys_pts = pyck::eval_physical_points(*surface, *gauss2d);
     Vector<double> load_vals(phys_pts.rows());
     for (Index i = 0; i < phys_pts.rows(); ++i) {
         load_vals(i) = f0 * std::sin(M_PI * phys_pts(i, 0) / L)

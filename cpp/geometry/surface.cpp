@@ -57,7 +57,7 @@ Patch<T, 2>::Patch(Ptr<const Basis<T>> basis_u,
 }
 
 template <std::floating_point T>
-std::vector<Matrix<T>> Patch<T, 2>::eval_basis_functions(
+std::vector<Matrix<T>> Patch<T, 2>::eval_basis(
     const ColMatrix<T, 2>& points,
     Index span,
     std::size_t order) const

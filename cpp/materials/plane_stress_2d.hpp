@@ -93,11 +93,66 @@ public:
     }
 
     /**
+     * @brief Surface-tensor bending constitutive matrix at one quadrature point.
+     *
+     * Builds D_b = (h^3/12) * H^V(g^{-1}), where H^V is the 3×3 Voigt form of
+     * the surface elasticity tensor
+     *   H^{αβγδ} = (E/(1−ν²)) [½(1−ν)(g^{αγ}g^{βδ} + g^{αδ}g^{βγ}) + ν g^{αβ}g^{γδ}].
+     *
+     * Voigt convention: rows/cols (αβ) ∈ {(11), (22), (12)}, engineering shear.
+     * Used by intrinsic (surface-aware) plate kernels that pair this with
+     * covariant strain measures κ_αβ = -w_{|αβ}. On a flat axis-aligned
+     * patch with g^{αβ} = diag(1, 1) this reduces to the standard plate D_b.
+     */
+    Eigen::Matrix<T, 3, 3> bending_voigt(const Eigen::Matrix<T, 3, 1>& g_inv) const
+    {
+        const T g11 = g_inv(0);
+        const T g12 = g_inv(1);
+        const T g22 = g_inv(2);
+        const T factor = E_ / (T(1) - nu_ * nu_);
+        const T half_1mnu = (T(1) - nu_) / T(2);
+
+        auto H = [&](T gac, T gbd, T gad, T gbc, T gab, T gcd) -> T {
+            return factor * (half_1mnu * (gac * gbd + gad * gbc) + nu_ * gab * gcd);
+        };
+
+        Eigen::Matrix<T, 3, 3> D;
+        D(0, 0) = H(g11, g11, g11, g11, g11, g11);
+        D(0, 1) = H(g12, g12, g12, g12, g11, g22);
+        D(0, 2) = H(g11, g12, g12, g11, g11, g12);
+        D(1, 0) = D(0, 1);
+        D(1, 1) = H(g22, g22, g22, g22, g22, g22);
+        D(1, 2) = H(g12, g22, g22, g12, g22, g12);
+        D(2, 0) = D(0, 2);
+        D(2, 1) = D(1, 2);
+        D(2, 2) = H(g11, g22, g12, g12, g12, g12);
+        return (h_ * h_ * h_ / T(12)) * D;
+    }
+
+    /**
      * @brief Get the 2x2 shear constitutive matrix D_s.
      */
     Matrix<T> shear_matrix() const
     {
         return Matrix<T>::Identity(2, 2) * shear_stiffness();
+    }
+
+    /**
+     * @brief Surface-tensor transverse-shear matrix at one quadrature point.
+     *
+     * Builds D_s = κ_s G h · g^{αβ}, the 2×2 Voigt form paired with covariant
+     * shear strains γ_α = w_{,α} + θ_α. Reduces to the constant Cartesian
+     * D_s = κ_s G h · I on a flat axis-aligned patch with g^{αβ} = I.
+     */
+    Eigen::Matrix<T, 2, 2> shear_voigt(const Eigen::Matrix<T, 3, 1>& g_inv) const
+    {
+        const T scale = k_ * shear_modulus() * h_;
+        Eigen::Matrix<T, 2, 2> Ds;
+        Ds(0, 0) = scale * g_inv(0);
+        Ds(0, 1) = scale * g_inv(1);
+        Ds(1, 0) = scale * g_inv(1);
+        Ds(1, 1) = scale * g_inv(2);
+        return Ds;
     }
 
 private:

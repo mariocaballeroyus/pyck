@@ -96,9 +96,10 @@ void LagrangeDomainCondition<T, d>::apply(
         auto [mapped_pts, mapped_weights] = quadrature_.map_to_domain(u_a, u_b);
         const Index Q = static_cast<Index>(mapped_pts.rows());
 
-        auto [shape_derivs, jacobian] =
-            patch_.eval_shape_functions(mapped_pts, elem_idx, req_order);
-        const Matrix<T>& N = shape_derivs[0];   // Q × n_basis
+        auto basis   = patch_.eval_basis(mapped_pts, elem_idx, req_order);
+        auto act_pts = patch_.active_control_pts(elem_idx);
+        auto local   = patch_.eval_local_frame(basis, act_pts);
+        const Matrix<T>& N = basis.N;   // Q × n_basis
         const Index n_basis = N.cols();
 
         auto elem_cps = patch_.dof_mapper().get_element_dofs(elem_idx);
@@ -110,7 +111,7 @@ void LagrangeDomainCondition<T, d>::apply(
         // contribution of every term.
         T elem_measure = T(0);
         for (Index q = 0; q < Q; ++q) {
-            elem_measure += mapped_weights(q) * jacobian(q);
+            elem_measure += mapped_weights(q) * local.jac(q);
         }
 
         for (const auto& term : terms_)
@@ -123,7 +124,7 @@ void LagrangeDomainCondition<T, d>::apply(
             for (Index i = 0; i < n_basis; ++i) {
                 T C_i = T(0);
                 for (Index q = 0; q < Q; ++q) {
-                    C_i += mapped_weights(q) * jacobian(q) * N(q, i);
+                    C_i += mapped_weights(q) * local.jac(q) * N(q, i);
                 }
                 if (C_i == T(0)) continue;
                 const Index col = primal_dofs[i * ndof + slot];

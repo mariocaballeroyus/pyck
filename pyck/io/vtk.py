@@ -17,7 +17,7 @@ from typing import Iterable
 import numpy as np
 import numpy.typing as npt
 
-from pyck.geometry.evaluation import eval_geometry_at, eval_shape_at
+from pyck.postprocessing import eval_geometry_at, eval_shape_at
 from pyck.geometry.surface import SurfacePatch
 
 

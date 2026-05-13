@@ -22,10 +22,8 @@ LagrangeBoundaryCondition<T, d>::LagrangeBoundaryCondition(
       multiplier_dof_count_(static_cast<Index>(boundary.num_control_pts()))
 {
     if (multiplier_dof_count_ == 0) {
-        throw std::invalid_argument(
-            "LagrangeBoundaryCondition: "
-            "boundary has no active basis functions."
-        );
+        throw std::invalid_argument("LagrangeBoundaryCondition: "
+                                    "boundary has no active basis functions.");
     }
 }
 
@@ -35,8 +33,8 @@ LagrangeBoundaryCondition<T, d>& LagrangeBoundaryCondition<T, d>::add(
     Ptr<const BoundaryField<T>> field, T value)
 {
     if (!field) {
-        throw std::invalid_argument(
-            "LagrangeBoundaryCondition::add: field must not be null.");
+        throw std::invalid_argument("LagrangeBoundaryCondition::add: "
+                                    "field must not be null.");
     }
     terms_.push_back({std::move(field), value, 0});
     return *this;
@@ -56,7 +54,8 @@ void LagrangeBoundaryCondition<T, d>::allocate_dofs(
     const std::vector<DofLayout::BlockId>& primal_blocks)
 {
     (void)primal_blocks;
-    for (auto& term : terms_) {
+    for (auto& term : terms_)
+    {
         term.block_id = layout.allocate(
             DofType::LagrangeMultiplier, multiplier_dof_count_, 1);
     }
@@ -71,10 +70,10 @@ void LagrangeBoundaryCondition<T, d>::apply(
     if (terms_.empty()) return;
     const DofLayout::BlockId primal_block = primal_blocks.at(this->patch_idx_);
 
-    const auto& boundary = boundary_;
+    const PatchBoundary<T, 2>& boundary = boundary_;
     const auto& element = element_;
     const auto& quadrature = quadrature_;
-    const auto& parent = *boundary.parent();
+    const Patch<T, 2>& parent = *boundary.parent();
     const Index ndof = static_cast<Index>(element.num_node_dofs());
     const std::size_t req_order = element.min_order();
     const Index num_spans_bdy = boundary.basis(0).knot_vector().num_spans();
@@ -88,15 +87,17 @@ void LagrangeBoundaryCondition<T, d>::apply(
         auto [mapped_pts, mapped_weights] = quadrature.map_to_domain(lo, hi);
         const Index Q = static_cast<Index>(mapped_pts.rows());
 
-        auto [boundary_derivs, boundary_jac] =
-            boundary.eval_shape_functions(mapped_pts, s, 1);
+        auto boundary_basis  = boundary.eval_basis(mapped_pts, s, 1);
+        auto boundary_act    = boundary.active_control_pts(s);
+        auto boundary_local  = boundary.eval_local_frame(boundary_basis, boundary_act);
 
         auto multiplier_basis_ids = boundary.dof_mapper().get_element_dofs(s);
 
         const Index flat_parent = boundary.parent_flat_span(s);
         const ColMatrix<T, 2> parent_pts = boundary.lift_to_parent(mapped_pts);
-        auto [parent_derivs, _] =
-            parent.eval_shape_functions(parent_pts, flat_parent, req_order);
+        auto parent_basis  = parent.eval_basis(parent_pts, flat_parent, req_order);
+        auto parent_act    = parent.active_control_pts(flat_parent);
+        auto parent_local  = parent.eval_local_frame(parent_basis, parent_act);
 
         auto elem_dofs = parent.dof_mapper().get_element_dofs(flat_parent);
         const Index n_elem = static_cast<Index>(elem_dofs.size());
@@ -112,19 +113,19 @@ void LagrangeBoundaryCondition<T, d>::apply(
         for (const auto& term : terms_)
         {
             Matrix<T> C = term.field->evaluate(
-                element, boundary, s, boundary_derivs,
-                flat_parent, parent_derivs);
+                element, boundary, s, boundary_basis, boundary_local,
+                flat_parent, parent_basis, parent_local);
 
             Matrix<T> C_local = Matrix<T>::Zero(n_lambda, K_elem);
             Vector<T> G_local = Vector<T>::Zero(n_lambda);
 
             for (Index q = 0; q < Q; ++q)
             {
-                const T dGamma = boundary_jac(q) * mapped_weights(q);
+                const T dGamma = boundary_local.jac(q) * mapped_weights(q);
                 C_local.noalias() += dGamma
-                    * boundary_derivs[0].row(q).transpose() * C.row(q);
+                    * boundary_basis.N.row(q).transpose() * C.row(q);
                 G_local.noalias() += dGamma * term.value
-                    * boundary_derivs[0].row(q).transpose();
+                    * boundary_basis.N.row(q).transpose();
             }
 
             const Index multiplier_base = layout.block_base(term.block_id);

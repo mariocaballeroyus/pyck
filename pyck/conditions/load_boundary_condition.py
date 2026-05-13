@@ -130,7 +130,7 @@ def create_load_boundary_from_function(
     """
     rule = quadrature if quadrature is not None else boundary.quadrature
     x_phys = np.asarray(
-        boundary._cpp_object.eval_physical_points(rule._cpp_object)
+        _pyck.eval_physical_points(boundary._cpp_object, rule._cpp_object)
     )
     values = np.asarray(fn(x_phys), dtype=float).ravel()
     return LoadBoundaryCondition(boundary, rule).add(field, values)

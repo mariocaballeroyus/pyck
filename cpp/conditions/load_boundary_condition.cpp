@@ -88,10 +88,10 @@ void LoadBoundaryCondition<T, d>::apply(
     if (terms_.empty()) return;
     const DofLayout::BlockId primal_block = primal_blocks.at(this->patch_idx_);
 
-    const auto& boundary = boundary_;
+    const PatchBoundary<T, 2>& boundary = boundary_;
     const auto& element = element_;
     const auto& quadrature = quadrature_;
-    const auto& parent = *boundary.parent();
+    const Patch<T, 2>& parent = *boundary.parent();
     const Index ndof = static_cast<Index>(element.num_node_dofs());
     const std::size_t req_order = element.min_order();
 
@@ -107,13 +107,15 @@ void LoadBoundaryCondition<T, d>::apply(
         auto [mapped_pts, mapped_weights] = quadrature.map_to_domain(lo, hi);
         const Index Q = static_cast<Index>(mapped_pts.rows());
 
-        auto [boundary_derivs, boundary_jac] =
-            boundary.eval_shape_functions(mapped_pts, span, 1);
+        auto boundary_basis  = boundary.eval_basis(mapped_pts, span, 1);
+        auto boundary_act    = boundary.active_control_pts(span);
+        auto boundary_local  = boundary.eval_local_frame(boundary_basis, boundary_act);
 
         const Index flat_parent = boundary.parent_flat_span(span);
         const ColMatrix<T, 2> parent_pts = boundary.lift_to_parent(mapped_pts);
-        auto [parent_derivs, _] =
-            parent.eval_shape_functions(parent_pts, flat_parent, req_order);
+        auto parent_basis  = parent.eval_basis(parent_pts, flat_parent, req_order);
+        auto parent_act    = parent.active_control_pts(flat_parent);
+        auto parent_local  = parent.eval_local_frame(parent_basis, parent_act);
 
         auto elem_dofs = parent.dof_mapper().get_element_dofs(flat_parent);
         const Index n_elem = static_cast<Index>(elem_dofs.size());
@@ -124,15 +126,15 @@ void LoadBoundaryCondition<T, d>::apply(
         for (const auto& term : terms_)
         {
             Matrix<T> C = term.field->evaluate(
-                element, boundary, span, boundary_derivs,
-                flat_parent, parent_derivs);
+                element, boundary, span, boundary_basis, boundary_local,
+                flat_parent, parent_basis, parent_local);
 
             for (Index q = 0; q < Q; ++q)
             {
                 const T t_bar = term.varying
                     ? term.values_at_qpts(static_cast<Eigen::Index>(qpt_offset + q))
                     : term.constant_value;
-                const T dGamma = boundary_jac(q) * mapped_weights(q);
+                const T dGamma = boundary_local.jac(q) * mapped_weights(q);
                 F_local.noalias() += (dGamma * t_bar) * C.row(q).transpose();
             }
         }

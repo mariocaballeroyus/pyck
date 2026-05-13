@@ -2,7 +2,6 @@
 #define PYCK_BOUNDARY_FIELD_HPP
 
 #include <concepts>
-#include <vector>
 
 #include "../elements/element.hpp"
 #include "../geometry/patch_boundary.hpp"
@@ -13,29 +12,99 @@ namespace pyck
 
 /**
  * @brief Polymorphic boundary-field operator.
- *
- * A BoundaryField builds the Q×K constraint-row matrix that picks out a
- * scalar quantity (e.g. transverse displacement, normal rotation) from the
- * element's shape functions at each quadrature point on the boundary.
- *
- * Fields that need the outward normal derive it lazily from the boundary
- * patch via PatchBoundary::eval_outward_normal; fields that don't (e.g.
- * transverse displacement) ignore the geometric inputs entirely.
  */
 template <std::floating_point T>
 class BoundaryField
 {
 public:
+
+    /**
+     * @brief Default destructor.
+     */
     virtual ~BoundaryField() = default;
 
-    virtual Matrix<T> evaluate(
-        const Element<T, 2>& element,
-        const PatchBoundary<T, 2>& boundary,
-        Index boundary_span,
-        const std::vector<Matrix<T>>& boundary_derivs,
-        Index parent_flat_span,
-        const std::vector<Matrix<T>>& parent_derivs) const = 0;
+    /**
+     * @brief Evaluate the boundary field.
+     * 
+     * @param element The element to evaluate the boundary field on.
+     * @param boundary The boundary of the patch.
+     * @param boundary_span The span of the boundary.
+     * @param boundary_basis The basis derivatives of the boundary.
+     * @param boundary_local The local frame of the boundary.
+     * @param parent_flat_span The flat span of the parent.
+     * @param parent_basis The basis derivatives of the parent.
+     * @param parent_local The local frame of the parent.
+     * @return The boundary field evaluated at the quadrature points.
+     */
+    virtual Matrix<T> evaluate(const Element<T, 2>& element,
+                               const PatchBoundary<T, 2>& boundary,
+                               Index boundary_span,
+                               const BasisDerivs<T, 1>& boundary_basis,
+                               const LocalFrame<T, 1>& boundary_local,
+                               Index parent_flat_span,
+                               const BasisDerivs<T, 2>& parent_basis,
+                               const LocalFrame<T, 2>& parent_local) const = 0;
 };
+
+namespace detail
+{
+
+/// Covariant components of a 3D in-surface vector v in the parent surface:
+///   v_α = v · a_α.
+template <std::floating_point T>
+inline std::pair<Vector<T>, Vector<T>>
+covariant_components(const ColMatrix<T, 3>& v,
+                     const LocalFrame<T, 2>& local)
+{
+    const Index Q = v.rows();
+    Vector<T> v_cov_1(Q), v_cov_2(Q);
+    for (Index q = 0; q < Q; ++q) {
+        v_cov_1(q) = v.row(q).dot(local.a1.row(q));
+        v_cov_2(q) = v.row(q).dot(local.a2.row(q));
+    }
+    return {std::move(v_cov_1), std::move(v_cov_2)};
+}
+
+/// Contravariant components of a 3D in-surface vector v in the parent surface:
+///   v^α = g^{αβ} (v · a_β).
+/// Pairs naturally with covariant strains/derivatives (θ_α, N_{,α}, N_{|αβ}).
+template <std::floating_point T>
+inline std::pair<Vector<T>, Vector<T>>
+contravariant_components(const ColMatrix<T, 3>& v,
+                         const LocalFrame<T, 2>& local)
+{
+    auto [v_cov_1, v_cov_2] = covariant_components(v, local);
+    const Index Q = v.rows();
+    Vector<T> v_up_1(Q), v_up_2(Q);
+    for (Index q = 0; q < Q; ++q) {
+        const T gi11 = local.g_inv(q, 0);
+        const T gi12 = local.g_inv(q, 1);
+        const T gi22 = local.g_inv(q, 2);
+        v_up_1(q) = gi11 * v_cov_1(q) + gi12 * v_cov_2(q);
+        v_up_2(q) = gi12 * v_cov_1(q) + gi22 * v_cov_2(q);
+    }
+    return {std::move(v_up_1), std::move(v_up_2)};
+}
+
+/// In-surface unit tangent perpendicular to the outward normal n, oriented
+/// CCW in the surface:  s = a_3 × n.  Both a_3 and n are unit and mutually
+/// perpendicular, so |s| = 1.
+template <std::floating_point T>
+inline ColMatrix<T, 3>
+surface_tangent(const ColMatrix<T, 3>& n,
+                const ColMatrix<T, 3>& a_3)
+{
+    const Index Q = n.rows();
+    ColMatrix<T, 3> s(Q, 3);
+    for (Index q = 0; q < Q; ++q) {
+        const Eigen::Matrix<T, 3, 1> a3q = a_3.row(q).transpose();
+        const Eigen::Matrix<T, 3, 1> nq  = n.row(q).transpose();
+        s.row(q) = a3q.cross(nq).transpose();
+    }
+    return s;
+}
+
+} // namespace detail
 
 /**
  * @brief Basis-DOF value field: extracts the spline value of a single DOF
@@ -56,12 +125,14 @@ public:
         const Element<T, 2>& element,
         const PatchBoundary<T, 2>& /*boundary*/,
         Index /*boundary_span*/,
-        const std::vector<Matrix<T>>& /*boundary_derivs*/,
+        const BasisDerivs<T, 1>& /*boundary_basis*/,
+        const LocalFrame<T, 1>& /*boundary_local*/,
         Index /*parent_flat_span*/,
-        const std::vector<Matrix<T>>& parent_derivs) const override
+        const BasisDerivs<T, 2>& parent_basis,
+        const LocalFrame<T, 2>& /*parent_local*/) const override
     {
         const Index ndof = static_cast<Index>(element.num_node_dofs());
-        const Matrix<T>& N = parent_derivs[0];   // shape values
+        const Matrix<T>& N = parent_basis.N;
         const Index Q = N.rows();
         const Index n = N.cols();
 
@@ -78,7 +149,12 @@ private:
 };
 
 /**
- * @brief Basis-DOF normal-slope field: `n · grad N` of a single DOF slot.
+ * @brief Basis-DOF normal-slope field: `n · ∇N` of a single DOF slot.
+ *
+ *        Computed intrinsically as `n^α N_{,α}` where n^α are the contravariant
+ *        components of the boundary outward in-surface normal (built from the
+ *        parent patch's inverse metric).  Reduces to `n_x N_x + n_y N_y` on
+ *        flat axis-aligned plates.
  *
  *        `C^1` building block. With opposing outward normals across the
  *        interface this field carries `sign_b = -1` (one application of
@@ -93,27 +169,30 @@ public:
     Matrix<T> evaluate(
         const Element<T, 2>& element,
         const PatchBoundary<T, 2>& boundary,
-        Index boundary_span,
-        const std::vector<Matrix<T>>& boundary_derivs,
-        Index parent_flat_span,
-        const std::vector<Matrix<T>>& parent_derivs) const override
+        Index /*boundary_span*/,
+        const BasisDerivs<T, 1>& /*boundary_basis*/,
+        const LocalFrame<T, 1>& boundary_local,
+        Index /*parent_flat_span*/,
+        const BasisDerivs<T, 2>& parent_basis,
+        const LocalFrame<T, 2>& parent_local) const override
     {
         const Index ndof = static_cast<Index>(element.num_node_dofs());
-        const Matrix<T>& Nx = parent_derivs[1];  // dN/dx
-        const Matrix<T>& Ny = parent_derivs[2];  // dN/dy
-        const Index Q = Nx.rows();
-        const Index n = Nx.cols();
+        const Matrix<T>& N_u = parent_basis.N_u;
+        const Matrix<T>& N_v = parent_basis.N_v;
+        const Index Q = N_u.rows();
+        const Index n = N_u.cols();
 
-        const ColMatrix<T, 3> normal = boundary.eval_outward_normal(
-            boundary_span, boundary_derivs, parent_flat_span, parent_derivs);
+        const ColMatrix<T, 3> normal =
+            boundary.eval_outward_normal(boundary_local, parent_local);
+        const auto [n_up_1, n_up_2] =
+            detail::contravariant_components(normal, parent_local);
 
         Matrix<T> C = Matrix<T>::Zero(Q, n * ndof);
         const Index slot = static_cast<Index>(dof_index_);
         for (Index q = 0; q < Q; ++q) {
-            const T n_x = normal(q, 0);
-            const T n_y = normal(q, 1);
             for (Index i = 0; i < n; ++i) {
-                C(q, i * ndof + slot) = n_x * Nx(q, i) + n_y * Ny(q, i);
+                C(q, i * ndof + slot) =
+                    n_up_1(q) * N_u(q, i) + n_up_2(q) * N_v(q, i);
             }
         }
         return C;
@@ -124,9 +203,12 @@ private:
 };
 
 /**
- * @brief Basis-DOF normal-curvature field:
- *        `n^T H_N n = n_x^2 N,xx + 2 n_x n_y N,xy + n_y^2 N,yy` of a
- *        single DOF slot.
+ * @brief Basis-DOF normal-curvature field: `n^α n^β N_{|αβ}` of a single
+ *        DOF slot, where N_{|αβ} = N_{,αβ} − Γ^γ_{αβ} N_{,γ} is the covariant
+ *        Hessian and n^α the contravariant normal components.
+ *
+ *        Reduces to `n_x² N,xx + 2 n_x n_y N,xy + n_y² N,yy` on flat
+ *        axis-aligned plates where Γ ≡ 0 and a_α coincide with (ê_x, ê_y).
  *
  *        `C^2` building block. With opposing outward normals across the
  *        interface this field carries `sign_b = +1` (two applications of
@@ -141,32 +223,45 @@ public:
     Matrix<T> evaluate(
         const Element<T, 2>& element,
         const PatchBoundary<T, 2>& boundary,
-        Index boundary_span,
-        const std::vector<Matrix<T>>& boundary_derivs,
-        Index parent_flat_span,
-        const std::vector<Matrix<T>>& parent_derivs) const override
+        Index /*boundary_span*/,
+        const BasisDerivs<T, 1>& /*boundary_basis*/,
+        const LocalFrame<T, 1>& boundary_local,
+        Index /*parent_flat_span*/,
+        const BasisDerivs<T, 2>& parent_basis,
+        const LocalFrame<T, 2>& parent_local) const override
     {
         const Index ndof = static_cast<Index>(element.num_node_dofs());
-        const Matrix<T>& Nxx = parent_derivs[3];  // d^2N/dx^2
-        const Matrix<T>& Nxy = parent_derivs[4];  // d^2N/dxdy
-        const Matrix<T>& Nyy = parent_derivs[5];  // d^2N/dy^2
-        const Index Q = Nxx.rows();
-        const Index n = Nxx.cols();
+        const Matrix<T>& N_u  = parent_basis.N_u;
+        const Matrix<T>& N_v  = parent_basis.N_v;
+        const Matrix<T>& N_uu = parent_basis.N_uu;
+        const Matrix<T>& N_uv = parent_basis.N_uv;
+        const Matrix<T>& N_vv = parent_basis.N_vv;
+        const Index Q = N_uu.rows();
+        const Index n = N_uu.cols();
 
-        const ColMatrix<T, 3> normal = boundary.eval_outward_normal(
-            boundary_span, boundary_derivs, parent_flat_span, parent_derivs);
+        const ColMatrix<T, 3> normal =
+            boundary.eval_outward_normal(boundary_local, parent_local);
+        const auto [n_up_1, n_up_2] =
+            detail::contravariant_components(normal, parent_local);
+        const ChristoffelSymbols<T, 2> chr =
+            boundary.parent()->eval_christoffel(parent_local);
 
         Matrix<T> C = Matrix<T>::Zero(Q, n * ndof);
         const Index slot = static_cast<Index>(dof_index_);
         for (Index q = 0; q < Q; ++q) {
-            const T n_x = normal(q, 0);
-            const T n_y = normal(q, 1);
-            const T n_x2 = n_x * n_x;
-            const T n_y2 = n_y * n_y;
-            const T two_nxny = T(2) * n_x * n_y;
+            const T G1_11 = chr.G1_11(q), G1_12 = chr.G1_12(q), G1_22 = chr.G1_22(q);
+            const T G2_11 = chr.G2_11(q), G2_12 = chr.G2_12(q), G2_22 = chr.G2_22(q);
+            const T n1 = n_up_1(q);
+            const T n2 = n_up_2(q);
+            const T n1n1 = n1 * n1;
+            const T n2n2 = n2 * n2;
+            const T two_n1n2 = T(2) * n1 * n2;
             for (Index i = 0; i < n; ++i) {
-                C(q, i * ndof + slot) =
-                    n_x2 * Nxx(q, i) + two_nxny * Nxy(q, i) + n_y2 * Nyy(q, i);
+                // Covariant Hessian rows: N_{|αβ} = N_{,αβ} − Γ^γ_{αβ} N_{,γ}.
+                const T H11 = N_uu(q, i) - G1_11 * N_u(q, i) - G2_11 * N_v(q, i);
+                const T H12 = N_uv(q, i) - G1_12 * N_u(q, i) - G2_12 * N_v(q, i);
+                const T H22 = N_vv(q, i) - G1_22 * N_u(q, i) - G2_22 * N_v(q, i);
+                C(q, i * ndof + slot) = n1n1 * H11 + two_n1n2 * H12 + n2n2 * H22;
             }
         }
         return C;
@@ -185,18 +280,26 @@ class TransverseDisplacement : public BoundaryField<T>
 public:
     Matrix<T> evaluate(
         const Element<T, 2>& element,
-        const PatchBoundary<T, 2>& /*boundary*/,
+        const PatchBoundary<T, 2>& boundary,
         Index /*boundary_span*/,
-        const std::vector<Matrix<T>>& /*boundary_derivs*/,
+        const BasisDerivs<T, 1>& /*boundary_basis*/,
+        const LocalFrame<T, 1>& /*boundary_local*/,
         Index /*parent_flat_span*/,
-        const std::vector<Matrix<T>>& parent_derivs) const override
+        const BasisDerivs<T, 2>& parent_basis,
+        const LocalFrame<T, 2>& parent_local) const override
     {
-        return element.displacement_shape_matrix(parent_derivs);
+        return element.displacement_shape_matrix(*boundary.parent(),
+                                                 parent_basis, parent_local);
     }
 };
 
 /**
- * @brief Rotation projected onto the outward boundary normal: θ_n = n·θ.
+ * @brief Rotation projected onto the outward boundary normal: θ_n = n · θ.
+ *
+ * Computed intrinsically as `n^α θ_α` where θ_α are the element's covariant
+ * rotation components (returned by `rotation_shape_matrix` with row 2q = θ_1,
+ * row 2q+1 = θ_2) and n^α are the contravariant components of the boundary
+ * outward in-surface normal.
  */
 template <std::floating_point T>
 class NormalRotation : public BoundaryField<T>
@@ -205,30 +308,36 @@ public:
     Matrix<T> evaluate(
         const Element<T, 2>& element,
         const PatchBoundary<T, 2>& boundary,
-        Index boundary_span,
-        const std::vector<Matrix<T>>& boundary_derivs,
-        Index parent_flat_span,
-        const std::vector<Matrix<T>>& parent_derivs) const override
+        Index /*boundary_span*/,
+        const BasisDerivs<T, 1>& /*boundary_basis*/,
+        const LocalFrame<T, 1>& boundary_local,
+        Index /*parent_flat_span*/,
+        const BasisDerivs<T, 2>& parent_basis,
+        const LocalFrame<T, 2>& parent_local) const override
     {
-        const Matrix<T> Nrot = element.rotation_shape_matrix(parent_derivs);
-        const ColMatrix<T, 3> n = boundary.eval_outward_normal(
-            boundary_span, boundary_derivs, parent_flat_span, parent_derivs);
+        const Matrix<T> Nrot = element.rotation_shape_matrix(
+            *boundary.parent(), parent_basis, parent_local);
+        const ColMatrix<T, 3> n =
+            boundary.eval_outward_normal(boundary_local, parent_local);
+        const auto [n_up_1, n_up_2] =
+            detail::contravariant_components(n, parent_local);
         const Index Q = static_cast<Index>(n.rows());
         Matrix<T> C(Q, Nrot.cols());
         for (Index q = 0; q < Q; ++q) {
-            const T n_x = n(q, 0);
-            const T n_y = n(q, 1);
-            // Nrot stores [θ_x; θ_y] shape rows interleaved per quadrature point,
-            // so row 2q = N_θx and row 2q+1 = N_θy. θ_n = n_x·θ_x + n_y·θ_y.
-            C.row(q) = n_x * Nrot.row(2 * q) + n_y * Nrot.row(2 * q + 1);
+            C.row(q) = n_up_1(q) * Nrot.row(2 * q)
+                     + n_up_2(q) * Nrot.row(2 * q + 1);
         }
         return C;
     }
 };
 
 /**
- * @brief Rotation projected onto the boundary tangent: θ_s = s·θ, with
- *        s = (-n_y, n_x) the in-plane 90° rotation of the outward normal.
+ * @brief Rotation projected onto the boundary tangent: θ_s = s · θ, with
+ *        s = a_3 × n the in-surface unit tangent 90° CCW from the outward
+ *        normal.  Reduces to `(-n_y, n_x, 0)` on flat plates.
+ *
+ * Computed intrinsically as `s^α θ_α` (contravariant tangent × covariant
+ * rotation).
  */
 template <std::floating_point T>
 class TangentialRotation : public BoundaryField<T>
@@ -237,31 +346,38 @@ public:
     Matrix<T> evaluate(
         const Element<T, 2>& element,
         const PatchBoundary<T, 2>& boundary,
-        Index boundary_span,
-        const std::vector<Matrix<T>>& boundary_derivs,
-        Index parent_flat_span,
-        const std::vector<Matrix<T>>& parent_derivs) const override
+        Index /*boundary_span*/,
+        const BasisDerivs<T, 1>& /*boundary_basis*/,
+        const LocalFrame<T, 1>& boundary_local,
+        Index /*parent_flat_span*/,
+        const BasisDerivs<T, 2>& parent_basis,
+        const LocalFrame<T, 2>& parent_local) const override
     {
-        const Matrix<T> Nrot = element.rotation_shape_matrix(parent_derivs);
-        const ColMatrix<T, 3> n = boundary.eval_outward_normal(
-            boundary_span, boundary_derivs, parent_flat_span, parent_derivs);
+        const Matrix<T> Nrot = element.rotation_shape_matrix(
+            *boundary.parent(), parent_basis, parent_local);
+        const ColMatrix<T, 3> n =
+            boundary.eval_outward_normal(boundary_local, parent_local);
+        const ColMatrix<T, 3> a_3 = boundary.parent()->eval_normal(parent_local);
+        const ColMatrix<T, 3> s = detail::surface_tangent(n, a_3);
+        const auto [s_up_1, s_up_2] =
+            detail::contravariant_components(s, parent_local);
         const Index Q = static_cast<Index>(n.rows());
         Matrix<T> C(Q, Nrot.cols());
         for (Index q = 0; q < Q; ++q) {
-            const T n_x = n(q, 0);
-            const T n_y = n(q, 1);
-            // Tangent s = (-n_y, n_x) is the outward normal rotated 90° CCW.
-            // θ_s = -n_y·θ_x + n_x·θ_y, with rows interleaved as in NormalRotation.
-            C.row(q) = -n_y * Nrot.row(2 * q) + n_x * Nrot.row(2 * q + 1);
+            C.row(q) = s_up_1(q) * Nrot.row(2 * q)
+                     + s_up_2(q) * Nrot.row(2 * q + 1);
         }
         return C;
     }
 };
 
 /**
- * @brief Normal transverse shear force: q_n = n · q.
+ * @brief Normal transverse shear force: Q_n = n · Q.
  *
- * Projects the transverse shear force vector onto the outward boundary normal.
+ * Computed intrinsically as `n_α Q^α` where Q^α are the element's
+ * contravariant shear-force components (returned by `transverse_shear_matrix`
+ * with row 2q = Q^1, row 2q+1 = Q^2) and n_α are the covariant components of
+ * the boundary outward in-surface normal.
  */
 template <std::floating_point T>
 class NormalTransverseShear : public BoundaryField<T>
@@ -270,32 +386,36 @@ public:
     Matrix<T> evaluate(
         const Element<T, 2>& element,
         const PatchBoundary<T, 2>& boundary,
-        Index boundary_span,
-        const std::vector<Matrix<T>>& boundary_derivs,
-        Index parent_flat_span,
-        const std::vector<Matrix<T>>& parent_derivs) const override
+        Index /*boundary_span*/,
+        const BasisDerivs<T, 1>& /*boundary_basis*/,
+        const LocalFrame<T, 1>& boundary_local,
+        Index /*parent_flat_span*/,
+        const BasisDerivs<T, 2>& parent_basis,
+        const LocalFrame<T, 2>& parent_local) const override
     {
-        const Matrix<T> Nq = element.transverse_shear_matrix(parent_derivs);
-        const ColMatrix<T, 3> n = boundary.eval_outward_normal(
-            boundary_span, boundary_derivs, parent_flat_span, parent_derivs);
+        const Matrix<T> Nq = element.transverse_shear_matrix(
+            *boundary.parent(), parent_basis, parent_local);
+        const ColMatrix<T, 3> n =
+            boundary.eval_outward_normal(boundary_local, parent_local);
+        const auto [n_cov_1, n_cov_2] =
+            detail::covariant_components(n, parent_local);
         const Index Q = static_cast<Index>(n.rows());
         Matrix<T> C(Q, Nq.cols());
         for (Index q = 0; q < Q; ++q) {
-            const T n_x = n(q, 0);
-            const T n_y = n(q, 1);
-            // Nq stores [q_x; q_y] shape rows interleaved. q_n = n·q = n_x·q_x + n_y·q_y.
-            C.row(q) = n_x * Nq.row(2 * q) + n_y * Nq.row(2 * q + 1);
+            C.row(q) = n_cov_1(q) * Nq.row(2 * q)
+                     + n_cov_2(q) * Nq.row(2 * q + 1);
         }
         return C;
     }
 };
 
 /**
- * @brief Normal bending moment: m_n = n^T · M · n.
+ * @brief Normal bending moment: M_nn = n_α n_β M^{αβ}.
  *
- * Projects the moment tensor onto the outward boundary normal.
- * For a moment tensor M = [m_x, m_xy; m_xy, m_y] (with m_xy as twisting),
- * m_n = m_x·n_x² + 2·m_xy·n_x·n_y + m_y·n_y²
+ * Expects `moment_matrix` rows per qp in symmetric-Voigt contravariant order
+ * (M^11, M^22, M^12).  The factor of 2 on the off-diagonal accounts for both
+ * symmetric contributions M^12 = M^21.  Reduces to
+ * `m_x n_x² + m_y n_y² + 2 m_xy n_x n_y` on flat plates.
  */
 template <std::floating_point T>
 class NormalBendingMoment : public BoundaryField<T>
@@ -304,39 +424,40 @@ public:
     Matrix<T> evaluate(
         const Element<T, 2>& element,
         const PatchBoundary<T, 2>& boundary,
-        Index boundary_span,
-        const std::vector<Matrix<T>>& boundary_derivs,
-        Index parent_flat_span,
-        const std::vector<Matrix<T>>& parent_derivs) const override
+        Index /*boundary_span*/,
+        const BasisDerivs<T, 1>& /*boundary_basis*/,
+        const LocalFrame<T, 1>& boundary_local,
+        Index /*parent_flat_span*/,
+        const BasisDerivs<T, 2>& parent_basis,
+        const LocalFrame<T, 2>& parent_local) const override
     {
-        const Matrix<T> Nm = element.moment_matrix(parent_derivs);
-        const ColMatrix<T, 3> n = boundary.eval_outward_normal(
-            boundary_span, boundary_derivs, parent_flat_span, parent_derivs);
+        const Matrix<T> Nm = element.moment_matrix(
+            *boundary.parent(), parent_basis, parent_local);
+        const ColMatrix<T, 3> n =
+            boundary.eval_outward_normal(boundary_local, parent_local);
+        const auto [n_cov_1, n_cov_2] =
+            detail::covariant_components(n, parent_local);
         const Index Q = static_cast<Index>(n.rows());
         Matrix<T> C(Q, Nm.cols());
         for (Index q = 0; q < Q; ++q) {
-            const T n_x = n(q, 0);
-            const T n_y = n(q, 1);
-            const T n_x2 = n_x * n_x;
-            const T n_y2 = n_y * n_y;
-            // Nm rows per quadrature point follow Voigt order: [m_x, m_y, m_xy].
-            // m_n = n^T M n = m_x·n_x² + m_y·n_y² + 2·m_xy·n_x·n_y.
-            // Factor of 2 on m_xy accounts for both off-diagonal contributions of the symmetric tensor.
-            C.row(q) = n_x2 * Nm.row(3 * q) + T(2) * n_x * n_y * Nm.row(3 * q + 2) + n_y2 * Nm.row(3 * q + 1);
+            const T n1 = n_cov_1(q);
+            const T n2 = n_cov_2(q);
+            C.row(q) = (n1 * n1)      * Nm.row(3 * q)
+                     + (n2 * n2)      * Nm.row(3 * q + 1)
+                     + T(2) * n1 * n2 * Nm.row(3 * q + 2);
         }
         return C;
     }
 };
 
 /**
- * @brief Twisting (cross) moment: m_{ns} = n^T · M · s, where
- *        s = (-n_y, n_x) is the boundary tangent (90° CCW of outward normal).
+ * @brief Twisting (cross) moment: M_{ns} = n_α s_β M^{αβ}, with s = a_3 × n.
  *
- * For a moment tensor M = [m_x, m_xy; m_xy, m_y]:
- *   m_{ns} = n_x·n_y·(m_y - m_x) + (n_x² - n_y²)·m_xy.
- *
- * Work-conjugate to the tangential rotation φ_s on a Reissner–Mindlin
- * boundary; used as the traction in Nitsche enforcement of φ_s = φ̄_s.
+ * Work-conjugate to the tangential rotation θ_s on a Reissner–Mindlin
+ * boundary; used as the traction in Nitsche enforcement of θ_s = θ̄_s.
+ * Expects `moment_matrix` rows per qp in symmetric-Voigt contravariant order
+ * (M^11, M^22, M^12) and uses the symmetric form
+ *   M_{ns} = n_1 s_1 M^11 + n_2 s_2 M^22 + (n_1 s_2 + n_2 s_1) M^12.
  */
 template <std::floating_point T>
 class TwistingMoment : public BoundaryField<T>
@@ -345,24 +466,31 @@ public:
     Matrix<T> evaluate(
         const Element<T, 2>& element,
         const PatchBoundary<T, 2>& boundary,
-        Index boundary_span,
-        const std::vector<Matrix<T>>& boundary_derivs,
-        Index parent_flat_span,
-        const std::vector<Matrix<T>>& parent_derivs) const override
+        Index /*boundary_span*/,
+        const BasisDerivs<T, 1>& /*boundary_basis*/,
+        const LocalFrame<T, 1>& boundary_local,
+        Index /*parent_flat_span*/,
+        const BasisDerivs<T, 2>& parent_basis,
+        const LocalFrame<T, 2>& parent_local) const override
     {
-        const Matrix<T> Nm = element.moment_matrix(parent_derivs);
-        const ColMatrix<T, 3> n = boundary.eval_outward_normal(
-            boundary_span, boundary_derivs, parent_flat_span, parent_derivs);
+        const Matrix<T> Nm = element.moment_matrix(
+            *boundary.parent(), parent_basis, parent_local);
+        const ColMatrix<T, 3> n =
+            boundary.eval_outward_normal(boundary_local, parent_local);
+        const ColMatrix<T, 3> a_3 = boundary.parent()->eval_normal(parent_local);
+        const ColMatrix<T, 3> s = detail::surface_tangent(n, a_3);
+        const auto [n_cov_1, n_cov_2] =
+            detail::covariant_components(n, parent_local);
+        const auto [s_cov_1, s_cov_2] =
+            detail::covariant_components(s, parent_local);
         const Index Q = static_cast<Index>(n.rows());
         Matrix<T> C(Q, Nm.cols());
         for (Index q = 0; q < Q; ++q) {
-            const T n_x = n(q, 0);
-            const T n_y = n(q, 1);
-            const T nx_ny = n_x * n_y;
-            const T diff_sq = n_x * n_x - n_y * n_y;
-            // Nm rows: 3q = m_x, 3q+1 = m_y, 3q+2 = m_xy.
-            C.row(q) = nx_ny * (Nm.row(3 * q + 1) - Nm.row(3 * q))
-                     + diff_sq * Nm.row(3 * q + 2);
+            const T n1 = n_cov_1(q), n2 = n_cov_2(q);
+            const T s1 = s_cov_1(q), s2 = s_cov_2(q);
+            C.row(q) = (n1 * s1)            * Nm.row(3 * q)
+                     + (n2 * s2)            * Nm.row(3 * q + 1)
+                     + (n1 * s2 + n2 * s1)  * Nm.row(3 * q + 2);
         }
         return C;
     }

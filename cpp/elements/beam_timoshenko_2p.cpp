@@ -1,4 +1,5 @@
 #include "beam_timoshenko_2p.hpp"
+#include "patch.hpp"
 
 namespace pyck
 {
@@ -12,68 +13,93 @@ BeamTimoshenko2p<T>::BeamTimoshenko2p(Ptr<SlenderBeam1d<T>> material)
     }
 }
 
-template <std::floating_point T>
-Matrix<T> BeamTimoshenko2p<T>::displacement_shape_matrix(
-    const std::vector<Matrix<T>>& shape_derivs) const
+template <std::floating_point T> Matrix<T> 
+BeamTimoshenko2p<T>::displacement_shape_matrix(const Patch<T, 1>& /*patch*/,
+                                               const BasisDerivs<T, 1>& basis,
+                                               const LocalFrame<T, 1>& /*local*/) const
 {
-    // Ni_w = [ Ni 0 ]    (slot 0 = w, slot 1 = θ)
-    const auto& N = shape_derivs;
-    const Index Q = N[idx::val].rows();
-    const Index n = N[idx::val].cols();
+    const Index Q = basis.N.rows();
+    const Index n = basis.N.cols();
     Matrix<T> Nw = Matrix<T>::Zero(Q, 2 * n);
-    for (Index i = 0; i < n; ++i) {
-        Nw.col(2*i) = N[idx::val].col(i);
+
+    // N_w = [ N_i  0 ]
+    for (Index i = 0; i < n; ++i)
+    {
+        Nw.col(2*i) = basis.N.col(i);
     }
     return Nw;
 }
 
-template <std::floating_point T>
-Matrix<T> BeamTimoshenko2p<T>::rotation_shape_matrix(
-    const std::vector<Matrix<T>>& shape_derivs) const
+template <std::floating_point T> Matrix<T> 
+BeamTimoshenko2p<T>::rotation_shape_matrix(const Patch<T, 1>& /*patch*/,
+                                           const BasisDerivs<T, 1>& basis,
+                                           const LocalFrame<T, 1>& /*local*/) const
 {
-    // Ni_theta = [ 0 Ni ]
-    const auto& N = shape_derivs;
-    const Index Q = N[idx::val].rows();
-    const Index n = N[idx::val].cols();
+    const Index Q = basis.N.rows();
+    const Index n = basis.N.cols();
     Matrix<T> Nth = Matrix<T>::Zero(Q, 2 * n);
-    for (Index i = 0; i < n; ++i) {
-        Nth.col(2*i + 1) = N[idx::val].col(i);
+
+    // N_rot = [ 0  N_i ]
+    for (Index i = 0; i < n; ++i)
+    {
+        Nth.col(2*i + 1) = basis.N.col(i);
     }
     return Nth;
 }
 
-template <std::floating_point T>
-Matrix<T> BeamTimoshenko2p<T>::bending_strain_matrix(
-    const std::vector<Matrix<T>>& shape_derivs) const
+template <std::floating_point T> T 
+BeamTimoshenko2p<T>::bending_constitutive(const LocalFrame<T, 1>& local, 
+                                          Index q) const
 {
-    const auto& N = shape_derivs;
-    const Index Q = N[idx::val].rows();
-    const Index n = N[idx::val].cols();
+    // D_b = EI g^{11}
+    return material_->bending_stiffness() * local.g_inv_11(q);
+}
 
-    // Bb_i = [ 0   Ni,x ]   (kappa = theta,x with theta on slot 1)
+template <std::floating_point T> T 
+BeamTimoshenko2p<T>::shear_constitutive(const LocalFrame<T, 1>& local,
+                                        Index q) const
+{
+    // D_s = kGA g^{11}
+    return material_->shear_stiffness() * local.g_inv_11(q);
+}
+
+template <std::floating_point T> Matrix<T> 
+BeamTimoshenko2p<T>::bending_strain_matrix(const Patch<T, 1>& patch,
+                                           const BasisDerivs<T, 1>& basis,
+                                           const LocalFrame<T, 1>& local) const
+{
+    auto chr = patch.eval_christoffel(local);
+    const Index Q = basis.N.rows();
+    const Index n = basis.N.cols();
     Matrix<T> Bb = Matrix<T>::Zero(Q, 2 * n);
-    for (Index q = 0; q < Q; ++q) {
-        for (Index i = 0; i < n; ++i) {
-            Bb(q, 2*i + 1) = N[idx::d1](q, i);
+
+    // B_b = [ 0  N_{i|1} ]
+    for (Index q = 0; q < Q; ++q)
+    {
+        for (Index i = 0; i < n; ++i) 
+        {
+            Bb(q, 2*i + 1) = basis.N_u(q, i) - chr.G1_11(q) * basis.N(q, i);
         }
     }
     return Bb;
 }
 
-template <std::floating_point T>
-Matrix<T> BeamTimoshenko2p<T>::shear_strain_matrix(
-    const std::vector<Matrix<T>>& shape_derivs) const
+template <std::floating_point T> Matrix<T> 
+BeamTimoshenko2p<T>::shear_strain_matrix(const Patch<T, 1>& /*patch*/,
+                                         const BasisDerivs<T, 1>& basis,
+                                         const LocalFrame<T, 1>& /*local*/) const
 {
-    const auto& N = shape_derivs;
-    const Index Q = N[idx::val].rows();
-    const Index n = N[idx::val].cols();
-
-    // Bs_i = [ Ni,x  Ni ]   (gamma = w,x + theta)
+    const Index Q = basis.N.rows();
+    const Index n = basis.N.cols();
     Matrix<T> Bs = Matrix<T>::Zero(Q, 2 * n);
-    for (Index q = 0; q < Q; ++q) {
-        for (Index i = 0; i < n; ++i) {
-            Bs(q, 2*i    ) = N[idx::d1](q, i);
-            Bs(q, 2*i + 1) = N[idx::val](q, i);
+
+    // B_s = [ N_{i|1}  N_i ]
+    for (Index q = 0; q < Q; ++q)
+    {
+        for (Index i = 0; i < n; ++i) 
+        {
+            Bs(q, 2*i    ) = basis.N_u(q, i);
+            Bs(q, 2*i + 1) = basis.N(q, i);
         }
     }
     return Bs;

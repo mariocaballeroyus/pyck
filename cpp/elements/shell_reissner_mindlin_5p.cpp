@@ -9,25 +9,27 @@ ShellReissnerMindlin5p<T>::ShellReissnerMindlin5p(Ptr<PlaneStressShell<T>> mater
     : material_(material)
 {
     if (!material_) {
-        throw std::invalid_argument("ShellReissnerMindlin5p: material is null.");
+        throw std::invalid_argument("ShellReissnerMindlin5p: "
+                                    "material is null.");
     }
 }
 
-template <std::floating_point T>
-void ShellReissnerMindlin5p<T>::compute_local_stiffness(
-    const Patch<T, 2>& patch,
-    Index elem_idx,
-    const ColMatrix<T, 2>& mapped_pts,
-    const Vector<T>& q_weights,
-    Matrix<T>& stiffness) const
+template <std::floating_point T> void 
+ShellReissnerMindlin5p<T>::compute_local_stiffness(const Patch<T, 2>& patch, 
+                                                   Index elem_idx, 
+                                                   const ColMatrix<T, 2>& mapped_pts,
+                                                   const Vector<T>& q_weights, 
+                                                   Matrix<T>& stiffness) const
 {
-    // ---- Single-pass surface kinematics: basis derivatives at order 2 plus
-    //      tangents, director, metric, Christoffels.
-    SurfaceKinematics<T> sk = patch.eval_surface_kinematics(mapped_pts, elem_idx, 2);
+    auto basis        = patch.eval_basis(mapped_pts, elem_idx, 2);
+    auto act_pts      = patch.active_control_pts(elem_idx);
+    auto local        = patch.eval_local_frame(basis, act_pts);
+    auto christoffel  = patch.eval_christoffel(local);
+    auto a_3          = patch.eval_normal(local);
 
-    const Matrix<T>& N    = sk.basis_derivs[0 * 3 + 0];
-    const Matrix<T>& N_u  = sk.basis_derivs[1 * 3 + 0];
-    const Matrix<T>& N_v  = sk.basis_derivs[0 * 3 + 1];
+    const Matrix<T>& N    = basis.N;
+    const Matrix<T>& N_u  = basis.N_u;
+    const Matrix<T>& N_v  = basis.N_v;
 
     const Index Q     = mapped_pts.rows();
     const Index n     = N.cols();
@@ -45,44 +47,48 @@ void ShellReissnerMindlin5p<T>::compute_local_stiffness(
         Bb.setZero();
         Bs.setZero();
 
-        const auto a1_q = sk.a1.row(q);
-        const auto a2_q = sk.a2.row(q);
-        const auto a3_q = sk.a3.row(q);
-        Eigen::Matrix<T, 3, 1> g_inv_q = sk.g_inv.row(q).transpose();
+        const auto a1_q = local.a1.row(q);
+        const auto a2_q = local.a2.row(q);
+        const auto a3_q = a_3.row(q);
+        Eigen::Matrix<T, 3, 1> g_inv_q = local.g_inv.row(q).transpose();
 
-        // Christoffels Γ^δ_{αβ} from kinematics. Packing:
-        // (Γ¹₁₁, Γ¹₁₂, Γ¹₂₂, Γ²₁₁, Γ²₁₂, Γ²₂₂).
-        const T G1_11 = sk.christoffel(q, 0);
-        const T G1_12 = sk.christoffel(q, 1);
-        const T G1_22 = sk.christoffel(q, 2);
-        const T G2_11 = sk.christoffel(q, 3);
-        const T G2_12 = sk.christoffel(q, 4);
-        const T G2_22 = sk.christoffel(q, 5);
+        const T Gam1_11 = christoffel.G1_11(q);
+        const T Gam1_12 = christoffel.G1_12(q);
+        const T Gam1_22 = christoffel.G1_22(q);
+        const T Gam2_11 = christoffel.G2_11(q);
+        const T Gam2_12 = christoffel.G2_12(q);
+        const T Gam2_22 = christoffel.G2_22(q);
 
-        // Per-node B-matrix contributions.
         for (Index i = 0; i < n; ++i)
         {
             const T Ni   = N  (q, i);
             const T Ni_u = N_u(q, i);
             const T Ni_v = N_v(q, i);
 
-            // Membrane B_m: rows (ε_{11}, ε_{22}, 2ε_{12}); only displacement DOFs.
-            for (Index k = 0; k < 3; ++k) {
+            // B_m = [ N_{i|1} (a_1)_x   N_{i|1} (a_1)_y   N_{i|1} (a_1)_z   0   0 ]
+            //       [ N_{i|2} (a_2)_x   N_{i|2} (a_2)_y   N_{i|2} (a_2)_z   0   0 ]
+            //       [ N_{i|1} (a_2)_x + N_{i|2} (a_1)_x   ...               0   0 ]
+            for (Index k = 0; k < 3; ++k) 
+            {
                 Bm(0, 5 * i + k) = Ni_u * a1_q(k);
                 Bm(1, 5 * i + k) = Ni_v * a2_q(k);
                 Bm(2, 5 * i + k) = Ni_u * a2_q(k) + Ni_v * a1_q(k);
             }
 
-            // Bending B_b: rows (χ_{11}, χ_{22}, 2χ_{12}); only rotation DOFs.
-            Bb(0, 5 * i + 3) =  Ni_u - G1_11 * Ni;
-            Bb(0, 5 * i + 4) =       - G2_11 * Ni;
-            Bb(1, 5 * i + 3) =       - G1_22 * Ni;
-            Bb(1, 5 * i + 4) =  Ni_v - G2_22 * Ni;
-            Bb(2, 5 * i + 3) =  Ni_v - T(2) * G1_12 * Ni;
-            Bb(2, 5 * i + 4) =  Ni_u - T(2) * G2_12 * Ni;
+            // B_b = [ 0  0  0   N_{i|1} − Γ¹_{11} N_i      −Γ²_{11} N_i            ]
+            //       [ 0  0  0   −Γ¹_{22} N_i               N_{i|2} − Γ²_{22} N_i   ]
+            //       [ 0  0  0   N_{i|2} − 2 Γ¹_{12} N_i    N_{i|1} − 2 Γ²_{12} N_i ]
+            Bb(0, 5 * i + 3) =  Ni_u - Gam1_11 * Ni;
+            Bb(0, 5 * i + 4) =       - Gam2_11 * Ni;
+            Bb(1, 5 * i + 3) =       - Gam1_22 * Ni;
+            Bb(1, 5 * i + 4) =  Ni_v - Gam2_22 * Ni;
+            Bb(2, 5 * i + 3) =  Ni_v - T(2) * Gam1_12 * Ni;
+            Bb(2, 5 * i + 4) =  Ni_u - T(2) * Gam2_12 * Ni;
 
-            // Shear B_s: rows (γ_1, γ_2); displacements via a_3, plus θ_α.
-            for (Index k = 0; k < 3; ++k) {
+            // B_s = [ N_{i|1} (a_3)_x   N_{i|1} (a_3)_y   N_{i|1} (a_3)_z   N_i  0  ]
+            //       [ N_{i|2} (a_3)_x   N_{i|2} (a_3)_y   N_{i|2} (a_3)_z   0   N_i ]
+            for (Index k = 0; k < 3; ++k) 
+            {
                 Bs(0, 5 * i + k) = Ni_u * a3_q(k);
                 Bs(1, 5 * i + k) = Ni_v * a3_q(k);
             }
@@ -90,61 +96,61 @@ void ShellReissnerMindlin5p<T>::compute_local_stiffness(
             Bs(1, 5 * i + 4) = Ni;
         }
 
-        // Constitutive matrices (vary across the patch on curved surfaces).
-        const Matrix<T> Dm = material_->membrane_voigt(g_inv_q);
-        const Matrix<T> Db = material_->bending_voigt (g_inv_q);
-        const Matrix<T> Ds = material_->shear_voigt   (g_inv_q);
+        // D_m = t·H, D_b = (t³/12)·H, D_s = shear_voigt; all per-qp.
+        const Eigen::Matrix<T, 3, 3> H  = material_->surface_H_voigt(g_inv_q);
+        const Eigen::Matrix<T, 3, 3> Dm = material_->thickness() * H;
+        const Eigen::Matrix<T, 3, 3> Db = (material_->thickness() *
+                                           material_->thickness() *
+                                           material_->thickness() / T(12)) * H;
+        const Eigen::Matrix<T, 2, 2> Ds = material_->shear_voigt(g_inv_q);
 
-        const T dV = q_weights(q) * sk.jac(q);
+        const T dV = q_weights(q) * local.jac(q);
         stiffness.noalias() += dV * (Bm.transpose() * Dm * Bm
                                    + Bb.transpose() * Db * Bb
                                    + Bs.transpose() * Ds * Bs);
     }
 }
 
-// ---- Plate-style virtuals: stubs returning zero matrices of the right shape.
-// These exist only so existing flat-plate boundary conditions don't crash if
-// applied to a shell. They do NOT reflect the shell's true strain measures.
-
 template <std::floating_point T>
 Matrix<T> ShellReissnerMindlin5p<T>::bending_strain_matrix(
-    const std::vector<Matrix<T>>& shape_derivs) const
+    const Patch<T, 2>& /*patch*/, const BasisDerivs<T, 2>& basis, const LocalFrame<T, 2>& /*local*/) const
 {
-    const Index Q = shape_derivs[idx::val].rows();
-    const Index n = shape_derivs[idx::val].cols();
+    const Index Q = basis.N.rows();
+    const Index n = basis.N.cols();
     return Matrix<T>::Zero(3 * Q, 5 * n);
 }
 
 template <std::floating_point T>
 Matrix<T> ShellReissnerMindlin5p<T>::shear_strain_matrix(
-    const std::vector<Matrix<T>>& shape_derivs) const
+    const Patch<T, 2>& /*patch*/, const BasisDerivs<T, 2>& basis, const LocalFrame<T, 2>& /*local*/) const
 {
-    const Index Q = shape_derivs[idx::val].rows();
-    const Index n = shape_derivs[idx::val].cols();
+    const Index Q = basis.N.rows();
+    const Index n = basis.N.cols();
     return Matrix<T>::Zero(2 * Q, 5 * n);
 }
 
 template <std::floating_point T>
-Matrix<T> ShellReissnerMindlin5p<T>::bending_constitutive_matrix() const
+Matrix<T> ShellReissnerMindlin5p<T>::bending_constitutive_matrix(
+    const LocalFrame<T, 2>& /*local*/, Index /*q*/) const
 {
     return Matrix<T>::Zero(3, 3);
 }
 
 template <std::floating_point T>
 Matrix<T> ShellReissnerMindlin5p<T>::displacement_shape_matrix(
-    const std::vector<Matrix<T>>& shape_derivs) const
+    const Patch<T, 2>& /*patch*/, const BasisDerivs<T, 2>& basis, const LocalFrame<T, 2>& /*local*/) const
 {
-    const Index Q = shape_derivs[idx::val].rows();
-    const Index n = shape_derivs[idx::val].cols();
+    const Index Q = basis.N.rows();
+    const Index n = basis.N.cols();
     return Matrix<T>::Zero(Q, 5 * n);
 }
 
 template <std::floating_point T>
 Matrix<T> ShellReissnerMindlin5p<T>::rotation_shape_matrix(
-    const std::vector<Matrix<T>>& shape_derivs) const
+    const Patch<T, 2>& /*patch*/, const BasisDerivs<T, 2>& basis, const LocalFrame<T, 2>& /*local*/) const
 {
-    const Index Q = shape_derivs[idx::val].rows();
-    const Index n = shape_derivs[idx::val].cols();
+    const Index Q = basis.N.rows();
+    const Index n = basis.N.cols();
     return Matrix<T>::Zero(2 * Q, 5 * n);
 }
 

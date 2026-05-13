@@ -43,30 +43,6 @@ PatchBoundary<T, d>::PatchBoundary(const Ptr<Patch<T, d>>& parent,
 }
 
 template <std::floating_point T, std::size_t d> requires (d > 1)
-ColMatrix<T, 3> PatchBoundary<T, d>::eval_normal(
-    const std::array<ColMatrix<T, 3>, d - 1>& tangents,
-    const std::array<ColMatrix<T, 3>, d>& parent_tangents) const requires(d == 2)
-{
-    const Index Q = tangents[0].rows();
-    ColMatrix<T, 3> n_mat(Q, 3);
-    for (Index q = 0; q < Q; ++q) {
-        Eigen::Matrix<T, 3, 1> a1_q = parent_tangents[0].row(q).transpose();
-        Eigen::Matrix<T, 3, 1> a2_q = parent_tangents[1].row(q).transpose();
-        Eigen::Matrix<T, 3, 1> a3_q = a1_q.cross(a2_q);
-        const T a3_norm = a3_q.norm();
-        if (a3_norm > T(1e-14)) a3_q /= a3_norm;
-        else a3_q = Eigen::Matrix<T, 3, 1>(T(0), T(0), T(1));
-
-        Eigen::Matrix<T, 3, 1> t_q = tangents[0].row(q).transpose();
-        Eigen::Matrix<T, 3, 1> n_vec = sign_n_ * t_q.cross(a3_q);
-        const T n_norm = n_vec.norm();
-        if (n_norm > T(1e-14)) n_vec /= n_norm;
-        n_mat.row(q) = n_vec.transpose();
-    }
-    return n_mat;
-}
-
-template <std::floating_point T, std::size_t d> requires (d > 1)
 Index PatchBoundary<T, d>::parent_flat_span(Index boundary_span) const
 {
     return parent_span_offset_ + boundary_span * parent_span_stride_;
@@ -84,20 +60,28 @@ ColMatrix<T, d> PatchBoundary<T, d>::lift_to_parent(const Vector<T>& boundary_pt
 
 template <std::floating_point T, std::size_t d> requires (d > 1)
 ColMatrix<T, 3> PatchBoundary<T, d>::eval_outward_normal(
-    Index boundary_span,
-    const std::vector<Matrix<T>>& boundary_derivs,
-    Index parent_flat_span,
-    const std::vector<Matrix<T>>& parent_derivs) const
+    const LocalFrame<T, d - 1>& boundary_local,
+    const LocalFrame<T, d>& parent_local) const requires(d == 2)
 {
-    auto boundary_spans = this->decode_span(boundary_span);
-    auto boundary_ctrl_pts = this->active_control_pts(boundary_spans);
-    auto boundary_tangents = this->eval_tangent(boundary_derivs, boundary_ctrl_pts);
+    const Index Q = boundary_local.a1.rows();
+    ColMatrix<T, 3> n_mat(Q, 3);
+    for (Index q = 0; q < Q; ++q) {
+        // Parent surface normal a_3 = (a_1 × a_2) / ||a_1 × a_2||.
+        Eigen::Matrix<T, 3, 1> pa1 = parent_local.a1.row(q).transpose();
+        Eigen::Matrix<T, 3, 1> pa2 = parent_local.a2.row(q).transpose();
+        Eigen::Matrix<T, 3, 1> a3 = pa1.cross(pa2);
+        const T jac_p = parent_local.jac(q);
+        if (jac_p > T(1e-14)) a3 /= jac_p;
+        else a3 = Eigen::Matrix<T, 3, 1>(T(0), T(0), T(1));
 
-    auto parent_spans = parent_->decode_span(parent_flat_span);
-    auto parent_ctrl_pts = parent_->active_control_pts(parent_spans);
-    auto parent_tangents = parent_->eval_tangent(parent_derivs, parent_ctrl_pts);
-
-    return eval_normal(boundary_tangents, parent_tangents);
+        // Outward in-surface normal n = sign_n · (a_1^bdy × a_3) / ||...||.
+        Eigen::Matrix<T, 3, 1> t = boundary_local.a1.row(q).transpose();
+        Eigen::Matrix<T, 3, 1> n_vec = sign_n_ * t.cross(a3);
+        const T n_norm = n_vec.norm();
+        if (n_norm > T(1e-14)) n_vec /= n_norm;
+        n_mat.row(q) = n_vec.transpose();
+    }
+    return n_mat;
 }
 
 template <std::floating_point T, std::size_t d> requires (d > 1)
@@ -106,35 +90,26 @@ PatchBoundary<T, d>::eval_local_frame(
     const Vector<T>& boundary_pts,
     Index boundary_span) const requires(d == 2)
 {
-    const Index Q = boundary_pts.size();
+    // Boundary frame (a_1^bdy, jac) via the composable primitives.
+    // Qualify the inherited Patch<T,1> methods to bypass name hiding.
+    auto boundary_basis  = this->Patch<T, 1>::eval_basis(
+        boundary_pts, boundary_span, Index(1));
+    auto boundary_act_pts = this->Patch<T, 1>::active_control_pts(boundary_span);
+    auto bdy_local       = this->Patch<T, 1>::eval_local_frame(
+        boundary_basis, boundary_act_pts);
 
-    // Boundary's own tangent a1_b = ∂x/∂s (raw covariant) via the boundary's
-    // 1D basis derivatives.
-    auto boundary_basis_derivs = this->eval_basis_functions(boundary_pts, boundary_span, Index(1));
-    auto boundary_spans = this->decode_span(boundary_span);
-    auto boundary_ctrl_pts = this->active_control_pts(boundary_spans);
-    ColMatrix<T, 3> a1 = boundary_basis_derivs[1] * boundary_ctrl_pts;
-
-    // Delegate a3 to the parent patch at the lifted points.
+    // Parent frame at the lifted points, used for the surface normal a_3.
+    const Patch<T, 2>& parent = *parent_;
     const Index parent_flat = parent_flat_span(boundary_span);
     const ColMatrix<T, 2> parent_pts = lift_to_parent(boundary_pts);
-    auto [pa1, pa2, pa3, pjac] = parent_->eval_local_frame(parent_pts, parent_flat);
-    (void)pa1; (void)pa2; (void)pjac;
-    ColMatrix<T, 3> a3 = std::move(pa3);
+    auto parent_basis   = parent.eval_basis(parent_pts, parent_flat, Index(1));
+    auto parent_act_pts = parent.active_control_pts(parent_flat);
+    auto par_local      = parent.eval_local_frame(parent_basis, parent_act_pts);
 
-    // Outward in-surface normal a2 = sign_n · (a1 × a3), normalised.
-    ColMatrix<T, 3> a2(Q, 3);
-    Vector<T> jac(Q);
-    for (Index q = 0; q < Q; ++q) {
-        Eigen::Matrix<T, 3, 1> a1_q = a1.row(q).transpose();
-        Eigen::Matrix<T, 3, 1> a3_q = a3.row(q).transpose();
-        jac(q) = a1_q.norm();
-        Eigen::Matrix<T, 3, 1> a2_q = sign_n_ * a1_q.cross(a3_q);
-        const T n = a2_q.norm();
-        if (n > T(1e-14)) a2_q /= n;
-        a2.row(q) = a2_q.transpose();
-    }
-    return {std::move(a1), std::move(a2), std::move(a3), std::move(jac)};
+    ColMatrix<T, 3> a3 = parent.eval_normal(par_local);
+    ColMatrix<T, 3> a2 = this->eval_outward_normal(bdy_local, par_local);
+    return {std::move(bdy_local.a1), std::move(a2), std::move(a3),
+            std::move(bdy_local.jac)};
 }
 
 // === Template Instantiations ========================================================

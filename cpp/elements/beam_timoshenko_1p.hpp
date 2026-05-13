@@ -13,45 +13,103 @@ namespace pyck
 /**
  * @brief Single-Variable Timoshenko beam element.
  *
- * Uses the 1-parameter formulation where rotations are eliminated
- * at the cost of C2 continuity requirements.
- *
- * DOF per node (1):
- *   - w: Transverse displacement
- *
- * Sign convention: gamma = w,x - theta = ratio * w,xxx
- *
  * @tparam T Scalar type.
  */
 template <std::floating_point T>
 class BeamTimoshenko1p : public Element<T, 1>
 {
-protected:
-    using idx = typename Element<T, 1>::idx;
-
 public:
+
+    // === Constructors ===============================================================
+
+    /**
+     * @brief Constructor.
+     *
+     * @param material Material properties.
+     */
     BeamTimoshenko1p(Ptr<SlenderBeam1d<T>> material);
 
-    Matrix<T> bending_strain_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
-    Matrix<T> shear_strain_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
+    // === Matrix Operators ===========================================================
 
-    T bending_stiffness() const override { return material_->bending_stiffness(); }
-    T shear_stiffness() const override { return material_->shear_stiffness(); }
+    /**
+     * @brief Bending B-matrix.
+     *
+     * @param patch Patch.
+     * @param basis Basis derivatives.
+     * @param local Local frame.
+     * @return Bending B-matrix.
+     */
+    Matrix<T> bending_strain_matrix(const Patch<T, 1>& patch,
+                                    const BasisDerivs<T, 1>& basis,
+                                    const LocalFrame<T, 1>& local) const override;
 
-    /// @brief Effective transverse displacement shape functions Ñ_w (Q × n).
-    ///
-    /// Accounts for the Laplacian correction w = w_b - (K_b/K_s) w_b,xx, so
-    /// this is: Ñ_i = N_i - (K_b/K_s) N_i,xx.
-    Matrix<T> displacement_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
+    /**
+     * @brief Shear B-matrix.
+     *
+     * @param patch Patch.
+     * @param basis Basis derivatives.
+     * @param local Local frame.
+     * @return Shear B-matrix.
+     */
+    Matrix<T> shear_strain_matrix(const Patch<T, 1>& patch,
+                                  const BasisDerivs<T, 1>& basis,
+                                  const LocalFrame<T, 1>& local) const override;
 
-    /// @brief Rotation shape matrix N_θ = -N,x (θ = -dw_b/dx).
-    Matrix<T> rotation_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
+    /**
+     * @brief Bending D-matrix.
+     *
+     * @param local Local frame.
+     * @param q Quadrature point.
+     * @return Bending D-matrix.
+     */
+    T bending_constitutive(const LocalFrame<T, 1>& local, Index q) const override;
 
-    std::size_t num_node_dofs() const override { return 1; }
+    /**
+     * @brief Shear D-matrix.
+     * 
+     * @param local Local frame.
+     * @param q Quadrature point.
+     * @return Shear D-matrix.
+     */
+    T shear_constitutive(const LocalFrame<T, 1>& local, Index q) const override;
 
-    std::size_t min_order() const override { return 3; }
+    /**
+     * @brief Displacement N-matrix.
+     *
+     * @param patch Patch.
+     * @param basis Basis derivatives.
+     * @param local Local frame.
+     * @return Displacement N-matrix.
+     */
+    Matrix<T> displacement_shape_matrix(const Patch<T, 1>& patch,
+                                        const BasisDerivs<T, 1>& basis,
+                                        const LocalFrame<T, 1>& local) const override;
+
+    /**
+     * @brief Rotation N-matrix.
+     *
+     * @param patch Patch.
+     * @param basis Basis derivatives.
+     * @param local Local frame.
+     * @return Rotation N-matrix.
+     */
+    Matrix<T> rotation_shape_matrix(const Patch<T, 1>& patch,
+                                    const BasisDerivs<T, 1>& basis,
+                                    const LocalFrame<T, 1>& local) const override;
+
+    // === Getters ====================================================================
+
+    /// @brief Number of node degrees of freedom (displacement + rotation).
+    std::size_t num_node_dofs() const override 
+    { return 1; }
+
+    /// @brief Minimum order of basis functions.
+    std::size_t min_order() const override 
+    { return 3; }
 
 private:
+
+    /// @brief Material properties.
     Ptr<SlenderBeam1d<T>> material_;
 
 };

@@ -19,8 +19,6 @@ from pyck.geometry import (
     SurfacePatch,
     create_surface_patch,
     create_rectangle,
-    eval_shape_at,
-    eval_geometry_at,
 )
 from pyck.elements import (
     BeamEulerBernoulli1p,
@@ -110,7 +108,13 @@ from pyck.io import (
 )
 from pyck.solver import solve
 import pyck.solver as solver
-from pyck.postprocessing import integrate_on_patch
+from pyck import postprocessing
+from pyck.postprocessing import (
+    eval_geometry_at,
+    eval_shape_at,
+    evaluate_field,
+    integrate_on_patch,
+)
 
 __all__ = [
     "assembly",
@@ -212,5 +216,9 @@ __all__ = [
     "export_field_vtk",
     "solve",
     "solver",
+    "postprocessing",
+    "eval_geometry_at",
+    "eval_shape_at",
+    "evaluate_field",
     "integrate_on_patch",
 ]

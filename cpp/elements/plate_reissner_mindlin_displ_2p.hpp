@@ -16,21 +16,9 @@ namespace pyck
  *
  * Primary variables per node:
  *   - w_b : bending contribution to the transverse displacement
- *   - psi : scalar Helmholtz potential for the curl part of the rotation
+ *   - ψ   : scalar Helmholtz potential for the curl part of the rotation
  *
- * Recovered fields (with K_b = bending stiffness, K_s = shear stiffness):
- *   w     = w_b - (K_b/K_s) * Laplacian(w_b)
- *   phi_x = -w_b,x + psi,y
- *   phi_y = -w_b,y - psi,x
- *   gamma = [ -(K_b/K_s)(w_b,xxx + w_b,xyy) + psi,y,
- *             -(K_b/K_s)(w_b,xxy + w_b,yyy) - psi,x ]^T
- *   kappa = L phi
- *         = [ -w_b,xx + psi,xy,
- *             -w_b,yy - psi,xy,
- *             -2 w_b,xy + psi,yy - psi,xx ]^T
- *   m     = Db * kappa  (recovered directly from (w_b, psi); see moment_matrix)
- *
- * Requires at least C^2 continuity (cubic B-splines or higher) due to the
+ * Requires at least C² continuity (cubic B-splines or higher) due to the
  * third-order derivatives of w_b in the shear strain.
  *
  * @tparam T Scalar type.
@@ -38,30 +26,104 @@ namespace pyck
 template <std::floating_point T>
 class PlateReissnerMindlinDispl2p : public Element<T, 2>
 {
-    using idx = typename Element<T, 2>::idx;
-
 public:
+
+    // === Constructor ============================================================
+
+    /**
+     * @brief Constructor.
+     *
+     * @param material Material properties.
+     */
     explicit PlateReissnerMindlinDispl2p(Ptr<PlaneStress2d<T>> material);
 
-    Matrix<T> bending_constitutive_matrix() const override { return material_->bending_matrix(); }
-    Matrix<T> shear_constitutive_matrix() const override { return material_->shear_matrix(); }
+    // === Matrix Operators =======================================================
 
-    Matrix<T> displacement_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
-    Matrix<T> rotation_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
+    /**
+     * @brief Bending strain matrix.
+     *
+     * @param patch Patch.
+     * @param basis Basis derivatives.
+     * @param local Local frame.
+     * @return Bending strain matrix.
+     */
+    Matrix<T> bending_strain_matrix(const Patch<T, 2>& patch,
+                                    const BasisDerivs<T, 2>& basis,
+                                    const LocalFrame<T, 2>& local) const override;
 
-    Matrix<T> bending_strain_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
-    Matrix<T> shear_strain_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
+    /**
+     * @brief Shear strain matrix.
+     *
+     * @param patch Patch.
+     * @param basis Basis derivatives.
+     * @param local Local frame.
+     * @return Shear strain matrix.
+     */
+    Matrix<T> shear_strain_matrix(const Patch<T, 2>& patch,
+                                  const BasisDerivs<T, 2>& basis,
+                                  const LocalFrame<T, 2>& local) const override;
 
-    /// @brief Direct moment recovery m = Db * kappa from primary DOFs (w_b, psi).
-    Matrix<T> moment_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
+    /**
+     * @brief Bending constitutive matrix.
+     *
+     * @param local Local frame.
+     * @param q Quadrature point.
+     * @return Bending constitutive matrix.
+     */
+    Matrix<T> bending_constitutive_matrix(const LocalFrame<T, 2>& local,
+                                          Index q) const override;
 
-    std::size_t num_node_dofs() const override { return 2; }
+    /**
+     * @brief Shear constitutive matrix.
+     *
+     * @param local Local frame.
+     * @param q Quadrature point.
+     * @return Shear constitutive matrix.
+     */
+    Matrix<T> shear_constitutive_matrix(const LocalFrame<T, 2>& local,
+                                        Index q) const override;
 
-    std::size_t min_order() const override { return 3; }
+    /**
+     * @brief Displacement shape matrix.
+     *
+     * @param patch Patch.
+     * @param basis Basis derivatives.
+     * @param local Local frame.
+     * @return Displacement shape matrix.
+     */
+    Matrix<T> displacement_shape_matrix(const Patch<T, 2>& patch,
+                                        const BasisDerivs<T, 2>& basis,
+                                        const LocalFrame<T, 2>& local) const override;
 
-    std::array<std::size_t, 2> rotation_dof_indices() const override { return {0, 0}; }
+    /**
+     * @brief Rotation shape matrix.
+     *
+     * @param patch Patch.
+     * @param basis Basis derivatives.
+     * @param local Local frame.
+     * @return Rotation shape matrix.
+     */
+    Matrix<T> rotation_shape_matrix(const Patch<T, 2>& patch,
+                                    const BasisDerivs<T, 2>& basis,
+                                    const LocalFrame<T, 2>& local) const override;
+
+    // === Getters ================================================================
+
+    /// @brief Number of node degrees of freedom (w_b + ψ).
+    std::size_t num_node_dofs() const override
+    { return 2; }
+
+    /// @brief Minimum order of basis functions.
+    std::size_t min_order() const override
+    { return 3; }
+
+    /// @brief Rotation degree of freedom indices.
+    std::array<std::size_t, 2> rotation_dof_indices() const override
+    { return {0, 0}; }
 
 private:
+
+    /// @brief Material properties.
     Ptr<PlaneStress2d<T>> material_;
 };
 

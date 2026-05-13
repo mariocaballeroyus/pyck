@@ -82,7 +82,7 @@ TEST_CASE("Patch<double, 2>: Flat Rectangular Plate", "[geometry][surface]") {
         pts << 0.4, 0.6;
 
         auto [result, jac] = surf.eval_shape_functions(pts, elem_idx, 2);
-        auto basis_derivs = surf.eval_basis_functions(pts, elem_idx, 2);
+        auto basis_derivs = surf.eval_basis(pts, elem_idx, 2);
 
         // Stride for flat index
         const int S = 3;  // order+1
@@ -546,7 +546,7 @@ TEST_CASE("PatchBoundary<double, 2>: flat-plate regression vs eval_outward_norma
     auto [b_a1, b_a2, b_a3, b_jac] = bdy->eval_local_frame(bdy_pts, boundary_span);
 
     // Legacy eval_outward_normal needs derivative matrices at the same points.
-    auto bdy_derivs = bdy->eval_basis_functions(bdy_pts, boundary_span, 1);
+    auto bdy_derivs = bdy->eval_basis(bdy_pts, boundary_span, 1);
     auto parent_pts_lifted = bdy->lift_to_parent(bdy_pts);
     Index parent_span = bdy->parent_flat_span(boundary_span);
     auto [parent_res, parent_jac] = surf->eval_shape_functions(parent_pts_lifted, parent_span, 1);
@@ -566,103 +566,16 @@ TEST_CASE("PatchBoundary<double, 2>: flat-plate regression vs eval_outward_norma
 }
 
 
-// ===========================================================================
-// Test 10: Patch<T,2>::eval_surface_geometry on a flat rectangle
-// ===========================================================================
-
-TEST_CASE("Patch<double, 2>::eval_surface_geometry: flat rectangle",
-          "[geometry][surface][shell-kernel]") {
-
-    auto kv = KnotVector<double>({0, 0, 1, 1});
-    auto basis_u = std::make_shared<BSpline<double>>(1, kv);
-    auto basis_v = std::make_shared<BSpline<double>>(1, kv);
-
-    double Lx = 3.0, Ly = 5.0;
-    Eigen::MatrixXd cp(4, 3);
-    cp.row(0) <<  0.0,  0.0, 0.0;
-    cp.row(1) <<   Lx,  0.0, 0.0;
-    cp.row(2) <<  0.0,   Ly, 0.0;
-    cp.row(3) <<   Lx,   Ly, 0.0;
-    Patch<double, 2> surf(basis_u, basis_v, cp);
-    Index elem_idx = 4;
-
-    Eigen::MatrixXd pts(1, 2);
-    pts << 0.3, 0.7;
-    auto [a1, a2, a3, g_inv, jac] = surf.eval_surface_geometry(pts, elem_idx);
-
-    // Tangents and director
-    CHECK(a1(0, 0) == Approx(Lx).margin(1e-14));
-    CHECK(a1(0, 1) == Approx(0.0).margin(1e-14));
-    CHECK(a2(0, 0) == Approx(0.0).margin(1e-14));
-    CHECK(a2(0, 1) == Approx(Ly).margin(1e-14));
-    CHECK(a3(0, 2) == Approx(1.0).margin(1e-14));
-    CHECK(jac(0) == Approx(Lx * Ly).margin(1e-12));
-
-    // g_inv = diag(1/Lx², 1/Ly²)
-    CHECK(g_inv(0, 0) == Approx(1.0 / (Lx * Lx)).margin(1e-12));
-    CHECK(g_inv(0, 1) == Approx(0.0).margin(1e-14));
-    CHECK(g_inv(0, 2) == Approx(1.0 / (Ly * Ly)).margin(1e-12));
-}
-
 
 // ===========================================================================
-// Test 11: Patch<T,2>::eval_surface_geometry on twisted z=u*v patch
+// Composable geometric primitives — analytical checks on the twisted z=u*v
+// patch. Verifies eval_local_frame, eval_christoffel, eval_normal,
+// eval_normal_deriv against closed-form expressions.
 // ===========================================================================
 
-TEST_CASE("Patch<double, 2>::eval_surface_geometry: twisted z=u*v patch",
-          "[geometry][surface][shell-kernel]") {
-
-    auto kv = KnotVector<double>({0, 0, 1, 1});
-    auto basis_u = std::make_shared<BSpline<double>>(1, kv);
-    auto basis_v = std::make_shared<BSpline<double>>(1, kv);
-
-    Eigen::MatrixXd cp(4, 3);
-    cp.row(0) << 0.0, 0.0, 0.0;
-    cp.row(1) << 1.0, 0.0, 0.0;
-    cp.row(2) << 0.0, 1.0, 0.0;
-    cp.row(3) << 1.0, 1.0, 1.0;
-    Patch<double, 2> surf(basis_u, basis_v, cp);
-    Index elem_idx = 4;
-
-    std::vector<std::pair<double, double>> test_pts = {
-        {0.3, 0.4}, {0.5, 0.5}, {0.8, 0.2}};
-
-    for (auto [u, v] : test_pts) {
-        SECTION("at u=" + std::to_string(u) + ", v=" + std::to_string(v)) {
-            Eigen::MatrixXd pts(1, 2);
-            pts << u, v;
-            auto [a1, a2, a3, g_inv, jac] = surf.eval_surface_geometry(pts, elem_idx);
-
-            const double D = 1.0 + u * u + v * v;
-            const double sqrtD = std::sqrt(D);
-
-            // a_1 = (1, 0, v), a_2 = (0, 1, u)
-            CHECK(a1(0, 2) == Approx(v).margin(1e-14));
-            CHECK(a2(0, 2) == Approx(u).margin(1e-14));
-
-            // a_3 = (-v, -u, 1)/sqrt(1+u²+v²)
-            CHECK(a3(0, 0) == Approx(-v / sqrtD).margin(1e-12));
-            CHECK(a3(0, 1) == Approx(-u / sqrtD).margin(1e-12));
-            CHECK(a3(0, 2) == Approx( 1.0 / sqrtD).margin(1e-12));
-            CHECK(jac(0)   == Approx(sqrtD).margin(1e-12));
-
-            // Inverse metric
-            CHECK(g_inv(0, 0) == Approx((1.0 + u * u) / D).margin(1e-12));
-            CHECK(g_inv(0, 1) == Approx(-u * v / D).margin(1e-12));
-            CHECK(g_inv(0, 2) == Approx((1.0 + v * v) / D).margin(1e-12));
-        }
-    }
-}
-
-
-// ===========================================================================
-// Test 11b: Patch<T,2>::eval_surface_kinematics returns Christoffels matching
-//           an analytic z=u*v reference, and matches the legacy inline
-//           shell-element formula at every quadrature point.
-// ===========================================================================
-
-TEST_CASE("Patch<double, 2>::eval_surface_kinematics: Christoffels on twisted z=u*v patch",
-          "[geometry][surface][shell-kernel]") {
+TEST_CASE("Patch<double, 2>::eval_local_frame + eval_christoffel + eval_normal "
+          "+ eval_normal_deriv: twisted z=u*v patch",
+          "[geometry][surface][primitives]") {
 
     auto kv = KnotVector<double>({0, 0, 1, 1});
     auto basis_u = std::make_shared<BSpline<double>>(1, kv);
@@ -681,420 +594,77 @@ TEST_CASE("Patch<double, 2>::eval_surface_kinematics: Christoffels on twisted z=
            0.5, 0.5,
            0.8, 0.2;
 
-    auto sk = surf.eval_surface_kinematics(pts, elem_idx, 2);
+    auto basis  = surf.eval_basis(pts, elem_idx, 2);
+    auto actpts = surf.active_control_pts(elem_idx);
+    auto local  = surf.eval_local_frame(basis, actpts);
+    auto chr    = surf.eval_christoffel(local);
+    auto a3     = surf.eval_normal(local);
+    auto [nd_a31, nd_a32] = surf.eval_normal_deriv(local, a3);
 
-    REQUIRE(sk.christoffel.rows() == 3);
-    REQUIRE(sk.christoffel.cols() == 6);
-
-    for (Eigen::Index q = 0; q < pts.rows(); ++q) {
-        const double u = pts(q, 0);
-        const double v = pts(q, 1);
-        const double D = 1.0 + u * u + v * v;
-
-        // For z = u*v: a_{11} = a_{22} = 0, a_{12} = (0,0,1).
-        // Γ^δ_{αβ} = a^δ · a_{αβ}, so Γ^δ_{11} = Γ^δ_{22} = 0 and
-        // Γ^1_{12} = a^1·(0,0,1), Γ^2_{12} = a^2·(0,0,1).
-        // a^1 = (g^11, g^12, ?)·(a_1, a_2) gives z-component = g^12·u + g^11·v
-        //     = (-uv·u + (1+u²)·v)/D = v/D.
-        // Symmetrically Γ^2_{12} = u/D.
-        const double G1_11 = sk.christoffel(q, 0);
-        const double G1_12 = sk.christoffel(q, 1);
-        const double G1_22 = sk.christoffel(q, 2);
-        const double G2_11 = sk.christoffel(q, 3);
-        const double G2_12 = sk.christoffel(q, 4);
-        const double G2_22 = sk.christoffel(q, 5);
-
-        CHECK(G1_11 == Approx(0.0).margin(1e-14));
-        CHECK(G1_22 == Approx(0.0).margin(1e-14));
-        CHECK(G2_11 == Approx(0.0).margin(1e-14));
-        CHECK(G2_22 == Approx(0.0).margin(1e-14));
-        CHECK(G1_12 == Approx(v / D).margin(1e-12));
-        CHECK(G2_12 == Approx(u / D).margin(1e-12));
-
-        // Cross-check that Christoffels equal the legacy shell formula
-        // Γ^δ_{αβ} = (g^{δσ} a_σ) · a_{αβ}, computed inline from the bundle's
-        // own primitives: this guards against drift between the kinematics
-        // helper and any future inline duplicate.
-        Eigen::Vector3d a1q   = sk.a1.row(q).transpose();
-        Eigen::Vector3d a2q   = sk.a2.row(q).transpose();
-        Eigen::Vector3d a11q  = sk.a11.row(q).transpose();
-        Eigen::Vector3d a12q  = sk.a12.row(q).transpose();
-        Eigen::Vector3d a22q  = sk.a22.row(q).transpose();
-        const double gi11 = sk.g_inv(q, 0);
-        const double gi12 = sk.g_inv(q, 1);
-        const double gi22 = sk.g_inv(q, 2);
-        Eigen::Vector3d aup1 = gi11 * a1q + gi12 * a2q;
-        Eigen::Vector3d aup2 = gi12 * a1q + gi22 * a2q;
-        CHECK(G1_11 == Approx(aup1.dot(a11q)).margin(1e-13));
-        CHECK(G1_12 == Approx(aup1.dot(a12q)).margin(1e-13));
-        CHECK(G1_22 == Approx(aup1.dot(a22q)).margin(1e-13));
-        CHECK(G2_11 == Approx(aup2.dot(a11q)).margin(1e-13));
-        CHECK(G2_12 == Approx(aup2.dot(a12q)).margin(1e-13));
-        CHECK(G2_22 == Approx(aup2.dot(a22q)).margin(1e-13));
-    }
-}
-
-
-// ===========================================================================
-// Test 11c: Patch<T,2>::eval_surface_kinematics returns director derivatives
-//           a_{3,β} matching (i) the closed-form ∂a_3/∂ξ^β on the z=u*v patch
-//           and (ii) the Weingarten identity a_γ·a_{3,β} = -b_{γβ}.
-// ===========================================================================
-
-TEST_CASE("Patch<double, 2>::eval_surface_kinematics: director derivatives on twisted z=u*v patch",
-          "[geometry][surface][shell-kernel]") {
-
-    auto kv = KnotVector<double>({0, 0, 1, 1});
-    auto basis_u = std::make_shared<BSpline<double>>(1, kv);
-    auto basis_v = std::make_shared<BSpline<double>>(1, kv);
-
-    Eigen::MatrixXd cp(4, 3);
-    cp.row(0) << 0.0, 0.0, 0.0;
-    cp.row(1) << 1.0, 0.0, 0.0;
-    cp.row(2) << 0.0, 1.0, 0.0;
-    cp.row(3) << 1.0, 1.0, 1.0;
-    Patch<double, 2> surf(basis_u, basis_v, cp);
-    Index elem_idx = 4;
-
-    Eigen::MatrixXd pts(3, 2);
-    pts << 0.3, 0.4,
-           0.5, 0.5,
-           0.8, 0.2;
-
-    auto sk = surf.eval_surface_kinematics(pts, elem_idx, 2);
-
-    REQUIRE(sk.a3_1.rows() == 3);
-    REQUIRE(sk.a3_2.rows() == 3);
-    REQUIRE(sk.a3_1.cols() == 3);
-    REQUIRE(sk.a3_2.cols() == 3);
+    REQUIRE(local.a1.rows() == 3);
+    REQUIRE(local.a2.rows() == 3);
+    REQUIRE(local.g.rows() == 3);
+    REQUIRE(local.g_inv.rows() == 3);
+    REQUIRE(local.jac.size() == 3);
+    REQUIRE(chr.G1_11.size() == 3);
+    REQUIRE(chr.G2_22.size() == 3);
 
     for (Eigen::Index q = 0; q < pts.rows(); ++q) {
         const double u = pts(q, 0);
         const double v = pts(q, 1);
         const double D = 1.0 + u * u + v * v;
-        const double D32 = D * std::sqrt(D);
+        const double sqrtD = std::sqrt(D);
+        const double D32 = D * sqrtD;
 
-        // Closed-form ∂a_3/∂ξ^β on z = u*v, with a_3 = (-v, -u, 1)/√D:
-        //   a_{3,1} = ( u v,         -(1+v²),   -u ) / D^{3/2}
-        //   a_{3,2} = (-(1+u²),       u v,      -v ) / D^{3/2}
-        Eigen::Vector3d a3_1_exact = Eigen::Vector3d(u * v, -(1.0 + v * v), -u) / D32;
-        Eigen::Vector3d a3_2_exact = Eigen::Vector3d(-(1.0 + u * u), u * v, -v) / D32;
+        // Tangents:  a_1 = (1, 0, v),  a_2 = (0, 1, u).
+        CHECK(local.a1(q, 0) == Approx(1.0).margin(1e-14));
+        CHECK(local.a1(q, 1) == Approx(0.0).margin(1e-14));
+        CHECK(local.a1(q, 2) == Approx(v).margin(1e-14));
+        CHECK(local.a2(q, 0) == Approx(0.0).margin(1e-14));
+        CHECK(local.a2(q, 1) == Approx(1.0).margin(1e-14));
+        CHECK(local.a2(q, 2) == Approx(u).margin(1e-14));
 
-        Eigen::Vector3d a3_1 = sk.a3_1.row(q).transpose();
-        Eigen::Vector3d a3_2 = sk.a3_2.row(q).transpose();
+        // Metric and jacobian.
+        CHECK(local.g(q, 0)     == Approx(1.0 + v * v).margin(1e-12));
+        CHECK(local.g(q, 1)     == Approx(u * v).margin(1e-12));
+        CHECK(local.g(q, 2)     == Approx(1.0 + u * u).margin(1e-12));
+        CHECK(local.g_inv(q, 0) == Approx((1.0 + u * u) / D).margin(1e-12));
+        CHECK(local.g_inv(q, 1) == Approx(-u * v / D).margin(1e-12));
+        CHECK(local.g_inv(q, 2) == Approx((1.0 + v * v) / D).margin(1e-12));
+        CHECK(local.jac(q)      == Approx(sqrtD).margin(1e-12));
 
-        for (int k = 0; k < 3; ++k) {
-            CHECK(a3_1(k) == Approx(a3_1_exact(k)).margin(1e-12));
-            CHECK(a3_2(k) == Approx(a3_2_exact(k)).margin(1e-12));
-        }
+        // Christoffels: only Γ^1_{12} = v/D and Γ^2_{12} = u/D non-zero.
+        CHECK(chr.G1_11(q) == Approx(0.0  ).margin(1e-14));
+        CHECK(chr.G1_12(q) == Approx(v / D).margin(1e-12));
+        CHECK(chr.G1_22(q) == Approx(0.0  ).margin(1e-14));
+        CHECK(chr.G2_11(q) == Approx(0.0  ).margin(1e-14));
+        CHECK(chr.G2_12(q) == Approx(u / D).margin(1e-12));
+        CHECK(chr.G2_22(q) == Approx(0.0  ).margin(1e-14));
 
-        // Identity 1: a_3 is unit ⇒ a_3 · a_{3,β} = 0.
-        Eigen::Vector3d a3 = sk.a3.row(q).transpose();
-        CHECK(a3.dot(a3_1) == Approx(0.0).margin(1e-13));
-        CHECK(a3.dot(a3_2) == Approx(0.0).margin(1e-13));
+        // Normal a_3 = (-v, -u, 1) / sqrt(D).
+        CHECK(a3(q, 0) == Approx(-v / sqrtD).margin(1e-12));
+        CHECK(a3(q, 1) == Approx(-u / sqrtD).margin(1e-12));
+        CHECK(a3(q, 2) == Approx( 1.0 / sqrtD).margin(1e-12));
 
-        // Identity 2: Weingarten ⇒ a_γ · a_{3,β} = -b_{γβ}.
-        // For z = u*v: a_{11} = a_{22} = 0, a_{12} = (0,0,1) ⇒ b_11 = b_22 = 0,
-        // b_12 = a_{12}·a_3 = 1/√D.
-        Eigen::Vector3d a1 = sk.a1.row(q).transpose();
-        Eigen::Vector3d a2 = sk.a2.row(q).transpose();
-        const double b11 = 0.0;
-        const double b12 = 1.0 / std::sqrt(D);
-        const double b22 = 0.0;
-        CHECK(a1.dot(a3_1) == Approx(-b11).margin(1e-13));
-        CHECK(a1.dot(a3_2) == Approx(-b12).margin(1e-13));
-        CHECK(a2.dot(a3_1) == Approx(-b12).margin(1e-13));
-        CHECK(a2.dot(a3_2) == Approx(-b22).margin(1e-13));
+        // Director derivatives (closed form on z = u*v):
+        //   a_{3,1} = ( u v,        -(1+v²),  -u ) / D^{3/2}
+        //   a_{3,2} = (-(1+u²),       u v,    -v ) / D^{3/2}
+        CHECK(nd_a31(q, 0) == Approx(u * v / D32).margin(1e-12));
+        CHECK(nd_a31(q, 1) == Approx(-(1.0 + v * v) / D32).margin(1e-12));
+        CHECK(nd_a31(q, 2) == Approx(-u / D32).margin(1e-12));
+        CHECK(nd_a32(q, 0) == Approx(-(1.0 + u * u) / D32).margin(1e-12));
+        CHECK(nd_a32(q, 1) == Approx(u * v / D32).margin(1e-12));
+        CHECK(nd_a32(q, 2) == Approx(-v / D32).margin(1e-12));
+
+        // Identity check: a_γ · a_{3,β} = -b_{γβ}, with closed-form
+        // b_{11}=b_{22}=0, b_{12}=1/√D on this patch.
+        Eigen::Vector3d a1 = local.a1.row(q).transpose();
+        Eigen::Vector3d a2 = local.a2.row(q).transpose();
+        Eigen::Vector3d a31 = nd_a31.row(q).transpose();
+        Eigen::Vector3d a32 = nd_a32.row(q).transpose();
+        CHECK(a1.dot(a31) == Approx( 0.0).margin(1e-13));         // -b_{11}=0
+        CHECK(a1.dot(a32) == Approx(-1.0 / sqrtD).margin(1e-12)); // -b_{12}
+        CHECK(a2.dot(a31) == Approx(-1.0 / sqrtD).margin(1e-12)); // -b_{12}
+        CHECK(a2.dot(a32) == Approx( 0.0).margin(1e-13));         // -b_{22}=0
     }
-}
-
-
-// ===========================================================================
-// Test 12: eval_covariant_derivatives on flat unit square (Christoffels=0)
-// ===========================================================================
-
-TEST_CASE("Patch<double, 2>::eval_covariant_derivatives: flat unit square",
-          "[geometry][surface][shell-kernel]") {
-
-    auto kv = KnotVector<double>({0, 0, 1, 1});
-    auto basis_u = std::make_shared<BSpline<double>>(1, kv);
-    auto basis_v = std::make_shared<BSpline<double>>(1, kv);
-
-    Eigen::MatrixXd cp(4, 3);
-    cp.row(0) << 0.0, 0.0, 0.0;
-    cp.row(1) << 1.0, 0.0, 0.0;
-    cp.row(2) << 0.0, 1.0, 0.0;
-    cp.row(3) << 1.0, 1.0, 0.0;
-    Patch<double, 2> surf(basis_u, basis_v, cp);
-    Index elem_idx = 4;
-
-    Eigen::MatrixXd pts(1, 2);
-    pts << 0.4, 0.6;
-
-    auto r = surf.eval_covariant_derivatives(pts, elem_idx, 2);
-    REQUIRE(r.size() == 6);
-    const auto& N    = r[0];
-    const auto& N_d1 = r[1];
-    const auto& N_d2 = r[2];
-    const auto& N_d11 = r[3];
-    const auto& N_d12 = r[4];
-    const auto& N_d22 = r[5];
-
-    // Partition of unity
-    CHECK(N.row(0).sum()     == Approx(1.0).margin(1e-14));
-    CHECK(N_d1.row(0).sum()  == Approx(0.0).margin(1e-14));
-    CHECK(N_d2.row(0).sum()  == Approx(0.0).margin(1e-14));
-    CHECK(N_d11.row(0).sum() == Approx(0.0).margin(1e-14));
-    CHECK(N_d12.row(0).sum() == Approx(0.0).margin(1e-14));
-    CHECK(N_d22.row(0).sum() == Approx(0.0).margin(1e-14));
-
-    // Bilinear: parametric N_{,uu} and N_{,vv} are zero, and Christoffels
-    // vanish on a flat axis-aligned patch → covariant 2nd derivs are zero.
-    for (int a = 0; a < 4; ++a) {
-        CHECK(N_d11(0, a) == Approx(0.0).margin(1e-14));
-        CHECK(N_d22(0, a) == Approx(0.0).margin(1e-14));
-    }
-}
-
-
-// ===========================================================================
-// Test 13: eval_covariant_derivatives on twisted z=u*v patch
-// ===========================================================================
-
-TEST_CASE("Patch<double, 2>::eval_covariant_derivatives: twisted z=u*v patch",
-          "[geometry][surface][shell-kernel]") {
-
-    auto kv = KnotVector<double>({0, 0, 1, 1});
-    auto basis_u = std::make_shared<BSpline<double>>(1, kv);
-    auto basis_v = std::make_shared<BSpline<double>>(1, kv);
-
-    Eigen::MatrixXd cp(4, 3);
-    cp.row(0) << 0.0, 0.0, 0.0;
-    cp.row(1) << 1.0, 0.0, 0.0;
-    cp.row(2) << 0.0, 1.0, 0.0;
-    cp.row(3) << 1.0, 1.0, 1.0;
-    Patch<double, 2> surf(basis_u, basis_v, cp);
-    Index elem_idx = 4;
-
-    const double u = 0.5, v = 0.5;
-    Eigen::MatrixXd pts(1, 2);
-    pts << u, v;
-
-    auto r = surf.eval_covariant_derivatives(pts, elem_idx, 2);
-    REQUIRE(r.size() == 6);
-    const auto& N    = r[0];
-    const auto& N_d1 = r[1];
-    const auto& N_d2 = r[2];
-    const auto& N_d11 = r[3];
-    const auto& N_d12 = r[4];
-    const auto& N_d22 = r[5];
-
-    // Partition of unity (also true for covariant derivatives).
-    CHECK(N.row(0).sum()     == Approx(1.0).margin(1e-14));
-    CHECK(N_d1.row(0).sum()  == Approx(0.0).margin(1e-14));
-    CHECK(N_d2.row(0).sum()  == Approx(0.0).margin(1e-14));
-    CHECK(N_d11.row(0).sum() == Approx(0.0).margin(1e-12));
-    CHECK(N_d12.row(0).sum() == Approx(0.0).margin(1e-12));
-    CHECK(N_d22.row(0).sum() == Approx(0.0).margin(1e-12));
-
-    // For z=u·v the only non-zero geometry second derivative is a_12 = (0,0,1),
-    // so Γ^γ_11 = Γ^γ_22 = 0 (both Christoffels at αβ=11,22 vanish). Combined
-    // with bilinear shape functions (parametric N_{,uu} = N_{,vv} = 0):
-    //   N_{|11} = N_{|22} = 0 identically.
-    for (int a = 0; a < 4; ++a) {
-        CHECK(N_d11(0, a) == Approx(0.0).margin(1e-12));
-        CHECK(N_d22(0, a) == Approx(0.0).margin(1e-12));
-    }
-
-    // Spot-check N_{|12} for the (1-u)(1-v) shape (column index 0 per existing
-    // test convention) at u=v=0.5, where D = 1.5, Γ^1_12 = v/D = 1/3,
-    // Γ^2_12 = u/D = 1/3, N_{,uv} = +1, N_{,u} = -(1-v) = -0.5,
-    // N_{,v} = -(1-u) = -0.5:
-    //   N_{|12} = 1 - (1/3)(-0.5) - (1/3)(-0.5) = 1 + 1/3 = 4/3.
-    CHECK(N_d12(0, 0) == Approx(4.0 / 3.0).margin(1e-12));
-}
-
-
-// ===========================================================================
-// Test 14: 3rd-order covariant derivatives on flat bilinear patch
-// ===========================================================================
-
-TEST_CASE("Patch<double, 2>::eval_covariant_derivatives order=3: flat bilinear",
-          "[geometry][surface][shell-kernel]") {
-
-    auto kv = KnotVector<double>({0, 0, 1, 1});
-    auto basis_u = std::make_shared<BSpline<double>>(1, kv);
-    auto basis_v = std::make_shared<BSpline<double>>(1, kv);
-
-    Eigen::MatrixXd cp(4, 3);
-    cp.row(0) << 0.0, 0.0, 0.0;
-    cp.row(1) << 1.0, 0.0, 0.0;
-    cp.row(2) << 0.0, 1.0, 0.0;
-    cp.row(3) << 1.0, 1.0, 0.0;
-    Patch<double, 2> surf(basis_u, basis_v, cp);
-    Index elem_idx = 4;
-
-    Eigen::MatrixXd pts(1, 2);
-    pts << 0.4, 0.6;
-
-    auto r = surf.eval_covariant_derivatives(pts, elem_idx, 3);
-    REQUIRE(r.size() == 12);
-
-    // Bilinear → all parametric 3rd derivs zero. Flat axis-aligned →
-    // Christoffels and their derivatives all vanish. So all six third-order
-    // covariant components are identically zero.
-    for (int idx = 6; idx < 12; ++idx) {
-        for (int a = 0; a < 4; ++a) {
-            CHECK(r[idx](0, a) == Approx(0.0).margin(1e-14));
-        }
-    }
-}
-
-
-// ===========================================================================
-// Test 15: 3rd-order covariant derivatives on flat quadratic identity patch
-// (Christoffels=0 → covariant 3rd reduces to parametric 3rd; layout sanity)
-// ===========================================================================
-
-TEST_CASE("Patch<double, 2>::eval_covariant_derivatives order=3: flat p=2 identity patch",
-          "[geometry][surface][shell-kernel]") {
-
-    auto kv = KnotVector<double>({0, 0, 0, 1, 1, 1});
-    auto basis_u = std::make_shared<BSpline<double>>(2, kv);
-    auto basis_v = std::make_shared<BSpline<double>>(2, kv);
-
-    // Identity map: x = u, y = v, z = 0. Greville-interpolating control net.
-    Eigen::MatrixXd cp(9, 3);
-    int row = 0;
-    for (double v : {0.0, 0.5, 1.0}) {
-        for (double u : {0.0, 0.5, 1.0}) {
-            cp.row(row++) << u, v, 0.0;
-        }
-    }
-    Patch<double, 2> surf(basis_u, basis_v, cp);
-
-    // Single non-zero element for p=2 with knots {0,0,0,1,1,1}: span_u = span_v = 2,
-    // intervals = 5 in each direction → flat = 2*5 + 2 = 12 (decoded as u-inner).
-    Index elem_idx = 12;
-
-    Eigen::MatrixXd pts(1, 2);
-    pts << 0.3, 0.7;
-
-    auto r = surf.eval_covariant_derivatives(pts, elem_idx, 3);
-    REQUIRE(r.size() == 12);
-
-    const Index K = r[0].cols();
-    REQUIRE(K == 9);
-
-    // Partition of unity at every order.
-    CHECK(r[0].row(0).sum() == Approx(1.0).margin(1e-12));
-    for (int idx = 1; idx < 12; ++idx) {
-        CHECK(r[idx].row(0).sum() == Approx(0.0).margin(1e-10));
-    }
-
-    // p=2 → ∂³/∂u³ ≡ 0 and ∂³/∂v³ ≡ 0 for any tensor-product shape. With
-    // Christoffels = 0 these collapse to result[6] (N_{|11,1}) = 0 and
-    // result[11] (N_{|22,2}) = 0.
-    for (Index a = 0; a < K; ++a) {
-        CHECK(r[6](0, a)  == Approx(0.0).margin(1e-12));
-        CHECK(r[11](0, a) == Approx(0.0).margin(1e-12));
-    }
-
-    // On a flat axis-aligned identity patch, parametric derivatives commute,
-    // so result[7] (N_{|11,2} = N_{,uuv}) and result[8] (N_{|12,1} = N_{,uuv})
-    // must be equal — the layout is internally consistent on flat patches.
-    for (Index a = 0; a < K; ++a) {
-        CHECK(r[7](0, a) == Approx(r[8](0, a)).margin(1e-12));
-        CHECK(r[9](0, a) == Approx(r[10](0, a)).margin(1e-12));
-    }
-}
-
-
-// ===========================================================================
-// Test 16: 3rd-order covariant derivatives on twisted z=u*v patch
-// (curved geometry — Riemann curvature breaks (γ,α) symmetry)
-// ===========================================================================
-
-TEST_CASE("Patch<double, 2>::eval_covariant_derivatives order=3: twisted z=u*v patch",
-          "[geometry][surface][shell-kernel]") {
-
-    auto kv = KnotVector<double>({0, 0, 1, 1});
-    auto basis_u = std::make_shared<BSpline<double>>(1, kv);
-    auto basis_v = std::make_shared<BSpline<double>>(1, kv);
-
-    Eigen::MatrixXd cp(4, 3);
-    cp.row(0) << 0.0, 0.0, 0.0;
-    cp.row(1) << 1.0, 0.0, 0.0;
-    cp.row(2) << 0.0, 1.0, 0.0;
-    cp.row(3) << 1.0, 1.0, 1.0;
-    Patch<double, 2> surf(basis_u, basis_v, cp);
-    Index elem_idx = 4;
-
-    Eigen::MatrixXd pts(1, 2);
-    pts << 0.5, 0.5;
-
-    auto r = surf.eval_covariant_derivatives(pts, elem_idx, 3);
-    REQUIRE(r.size() == 12);
-
-    // Partition of unity for all 6 third-order components.
-    for (int idx = 6; idx < 12; ++idx) {
-        CHECK(r[idx].row(0).sum() == Approx(0.0).margin(1e-12));
-    }
-
-    // For z=u·v, only a_{12} = (0,0,1) is non-zero among 2nd geometry derivs;
-    // all 3rd geometry derivs vanish. Consequently Γ^δ_{11} = Γ^δ_{22} = 0
-    // and Γ^δ_{αβ,γ} for αβ ∈ {11,22} all vanish. Combined with bilinear N
-    // (parametric 3rd derivs = 0) this gives:
-    //   N_{|11,1} = 0   and   N_{|22,2} = 0
-    // for every shape function.
-    for (int a = 0; a < 4; ++a) {
-        CHECK(r[6](0, a)  == Approx(0.0).margin(1e-12));
-        CHECK(r[11](0, a) == Approx(0.0).margin(1e-12));
-    }
-
-    // Spot checks for shape 0 = (1-u)(1-v) at u=v=0.5 (analytical from
-    // hand-derivation):
-    //   N_{|12}   = +4/3
-    //   N_{|11,2} = -2 · Γ^2_{12} · N_{|12} = -2·(1/3)·(4/3) = -8/9
-    //   N_{|22,1} = -2 · Γ^1_{12} · N_{|12} = -8/9 (u↔v symmetric)
-    //   N_{|12,1} = N_{|12,2} = -2/3
-    // Note N_{|11,2} ≠ N_{|12,1} on this curved patch — Riemann curvature
-    // breaks the full symmetry that holds on flat patches.
-    CHECK(r[7](0, 0)  == Approx(-8.0 / 9.0).margin(1e-12));
-    CHECK(r[10](0, 0) == Approx(-8.0 / 9.0).margin(1e-12));
-    CHECK(r[8](0, 0)  == Approx(-2.0 / 3.0).margin(1e-12));
-    CHECK(r[9](0, 0)  == Approx(-2.0 / 3.0).margin(1e-12));
-
-    // The asymmetry: r[7] (N_{|11,2}) ≠ r[8] (N_{|12,1}) on this curved patch.
-    CHECK(std::abs(r[7](0, 0) - r[8](0, 0)) > 0.1);
-}
-
-
-// ===========================================================================
-// Test 17: order parameter dispatch — sizes match expected layout
-// ===========================================================================
-
-TEST_CASE("Patch<double, 2>::eval_covariant_derivatives: order parameter sizes",
-          "[geometry][surface][shell-kernel]") {
-
-    auto kv = KnotVector<double>({0, 0, 1, 1});
-    auto basis_u = std::make_shared<BSpline<double>>(1, kv);
-    auto basis_v = std::make_shared<BSpline<double>>(1, kv);
-
-    Eigen::MatrixXd cp(4, 3);
-    cp.row(0) << 0.0, 0.0, 0.0;
-    cp.row(1) << 1.0, 0.0, 0.0;
-    cp.row(2) << 0.0, 1.0, 0.0;
-    cp.row(3) << 1.0, 1.0, 0.0;
-    Patch<double, 2> surf(basis_u, basis_v, cp);
-    Index elem_idx = 4;
-
-    Eigen::MatrixXd pts(1, 2);
-    pts << 0.4, 0.6;
-
-    CHECK(surf.eval_covariant_derivatives(pts, elem_idx, 1).size() == 3);
-    CHECK(surf.eval_covariant_derivatives(pts, elem_idx, 2).size() == 6);
-    CHECK(surf.eval_covariant_derivatives(pts, elem_idx, 3).size() == 12);
-    // Default = 2.
-    CHECK(surf.eval_covariant_derivatives(pts, elem_idx).size() == 6);
 }

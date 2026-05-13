@@ -108,19 +108,21 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
         // Simplify: Map quadrature points using the rule's built-in multi-dimensional logic
         auto [mapped_pts, mapped_weights] = quadrature.map_to_domain(u_a, u_b);
         
-        // Evaluate span-local basis functions and Jacobian
+        // Composable geometric primitives.
         std::size_t req_order = element.min_order();
-        auto [shape_derivs, jacobian] = patch.eval_shape_functions(mapped_pts, elem_idx, req_order);
-        
+        auto basis   = patch.eval_basis(mapped_pts, elem_idx, req_order);
+        auto act_pts = patch.active_control_pts(elem_idx);
+        auto local   = patch.eval_local_frame(basis, act_pts);
+
         // N_w is the transverse-displacement shape matrix (Q × K_elem) with
         // nonzero columns only at each node's w-slot.  Because the distributed
         // load q is conjugate to w only, N_w^T · (q·|J|·w) already scatters
         // the load into the correct slots with zeros elsewhere.
-        Matrix<T> N_w = element.displacement_shape_matrix(shape_derivs);
+        Matrix<T> N_w = element.displacement_shape_matrix(patch, basis, local);
 
         Vector<T> W_J_T(Q);
         for (std::size_t k = 0; k < Q; ++k) {
-            T scale = mapped_weights(k) * jacobian(k);
+            T scale = mapped_weights(k) * local.jac(k);
             W_J_T(k) = broadcasted_values((qp_offset + k) * ndof) * scale;
         }
         qp_offset += Q;

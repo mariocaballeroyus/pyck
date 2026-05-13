@@ -91,7 +91,9 @@ class CurvePatch(Patch):
     def eval_geometry(self, u: np.ndarray) -> np.ndarray:
         """Evaluate curve coordinates at given parametric values.
 
-        Uses De Boor's algorithm for pure geometric evaluation.
+        Composed in numpy: for each point, find the containing span, evaluate
+        the basis values N (order 0), and matrix-multiply by the active
+        control points.
 
         Parameters
         ----------
@@ -111,7 +113,9 @@ class CurvePatch(Patch):
         for i, ui in enumerate(u):
             span = kv_cpp.find_span(degree, float(ui))
             pt = np.array([[ui]], dtype=np.float64)
-            coords[i, :] = self._cpp_object.eval_geometry(pt, span)[0, :]
+            basis = self._cpp_object.eval_basis(pt, span, 0)
+            act_pts = self._cpp_object.active_control_pts(span)
+            coords[i, :] = (np.asarray(basis.N) @ np.asarray(act_pts))[0, :]
 
         return coords
 

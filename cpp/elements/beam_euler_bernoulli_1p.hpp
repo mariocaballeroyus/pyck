@@ -11,38 +11,92 @@ namespace pyck
 {
 
 /**
- * @brief Euler-Bernoulli beam element.
- *
- * Pure bending formulation for thin beams.
+ * @brief Standard Euler-Bernoulli beam element.
  *
  * @tparam T Scalar type.
  */
 template <std::floating_point T>
 class BeamEulerBernoulli1p : public Element<T, 1>
 {
-protected:
-    using idx = typename Element<T, 1>::idx;
-
 public:
+
+    // === Constructors ===============================================================
+
     BeamEulerBernoulli1p(Ptr<SlenderBeam1d<T>> material);
 
-    Matrix<T> bending_strain_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
+    // === Matrix Operators ===========================================================
 
-    /// @brief No transverse shear strain in Euler-Bernoulli: returns a zero matrix.
-    Matrix<T> shear_strain_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
+    /**
+     * @brief Bending B-matrix.
+     *
+     * @param patch Patch.
+     * @param basis Basis derivatives.
+     * @param local Local frame.
+     * @return Bending B-matrix.
+     */
+    Matrix<T> bending_strain_matrix(const Patch<T, 1>& patch,
+                                    const BasisDerivs<T, 1>& basis,
+                                    const LocalFrame<T, 1>& local) const override;
 
-    T bending_stiffness() const override { return material_->bending_stiffness(); }
+    /**
+     * @brief Shear B-matrix (zero for Euler-Bernoulli beams).
+     *
+     * @param patch Patch.
+     * @param basis Basis derivatives.
+     * @param local Local frame.
+     * @return Shear B-matrix.
+     */
+    Matrix<T> shear_strain_matrix(const Patch<T, 1>& patch,
+                                  const BasisDerivs<T, 1>& basis,
+                                  const LocalFrame<T, 1>& local) const override;
 
-    Matrix<T> displacement_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
+    /**
+     * @brief Bending D-matrix.
+     *
+     * @param local Local frame.
+     * @param q Quadrature point.
+     * @return Bending D-matrix.
+     */
+    T bending_constitutive(const LocalFrame<T, 1>& local, Index q) const override;
 
-    /// @brief Rotation shape matrix N_θ = -N,x (θ = -dw/dx for EB kinematics).
-    Matrix<T> rotation_shape_matrix(const std::vector<Matrix<T>>& shape_derivs) const override;
+    /**
+     * @brief Displacement N-matrix.
+     *
+     * @param patch Patch.
+     * @param basis Basis derivatives.
+     * @param local Local frame.
+     * @return Displacement N-matrix.
+     */
+    Matrix<T> displacement_shape_matrix(const Patch<T, 1>& patch,
+                                        const BasisDerivs<T, 1>& basis,
+                                        const LocalFrame<T, 1>& local) const override;
 
-    std::size_t num_node_dofs() const override { return 1; }
+    /**
+     * @brief Rotation N-matrix.
+     *
+     * @param patch Patch.
+     * @param basis Basis derivatives.
+     * @param local Local frame.
+     * @return Rotation N-matrix.
+     */
+    Matrix<T> rotation_shape_matrix(const Patch<T, 1>& patch,
+                                    const BasisDerivs<T, 1>& basis,
+                                    const LocalFrame<T, 1>& local) const override;
 
-    std::size_t min_order() const override { return 2; }
+
+    // === Getters ====================================================================
+    
+    /// @brief Number of node degrees of freedom (displacement + rotation).
+    std::size_t num_node_dofs() const override 
+    { return 1; }
+
+    /// @brief Minimum order of basis functions.
+    std::size_t min_order() const override 
+    { return 2; }
 
 private:
+
+    /// @brief Material properties.
     Ptr<SlenderBeam1d<T>> material_;
 
 };
