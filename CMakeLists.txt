@@ -36,7 +36,7 @@ target_link_libraries(pyck_basis PUBLIC eigen)
 add_library(pyck_geometry
     cpp/geometry/dof_mapper.cpp
     cpp/geometry/patch.cpp
-    cpp/geometry/patch_2d_boundary.cpp
+    cpp/geometry/patch_boundary.cpp
     cpp/geometry/basis_derivs.cpp
     cpp/geometry/local_frame.cpp
     cpp/geometry/christoffels.cpp

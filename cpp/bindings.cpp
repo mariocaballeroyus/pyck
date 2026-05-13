@@ -23,7 +23,6 @@
 #include "nitsche_boundary_condition.hpp"
 #include "penalty_coupling_condition.hpp"
 #include "lagrange_coupling_condition.hpp"
-#include "assert_conforming.hpp"
 #include "penalty_boundary_condition.hpp"
 #include "linear_constraint.hpp"
 #include "beam_timoshenko_1p.hpp"
@@ -197,7 +196,6 @@ PYBIND11_MODULE(_pyck, m) {
 
     using PatchBoundary2D = pyck::PatchBoundary<double, 2>;
     py::class_<PatchBoundary2D, Patch3D1D, pyck::Ptr<PatchBoundary2D>>(m, "PatchBoundary2d")
-        .def("parent_dofs", &PatchBoundary2D::parent_dofs)
         .def("param_dim", &PatchBoundary2D::param_dim)
         .def("at_start", &PatchBoundary2D::at_start);
 
@@ -671,17 +669,6 @@ PYBIND11_MODULE(_pyck, m) {
         .def("patch_a_idx", &LCplCond2D::patch_a_idx)
         .def("patch_b_idx", &LCplCond2D::patch_b_idx)
         .def("reverse", &LCplCond2D::reverse);
-
-    m.def("assert_conforming_2d",
-          [](const PatchBoundary2D& side_a,
-             const PatchBoundary2D& side_b,
-             bool reverse, double tol) {
-              pyck::assert_conforming<double, 2>(side_a, side_b, reverse, tol);
-          },
-          py::arg("side_a"), py::arg("side_b"),
-          py::arg("reverse") = false, py::arg("tol") = 1e-12,
-          "Verify two boundaries are conforming (matching knots, "
-          "coincident control points). Raises ValueError on mismatch.");
 
     // === Constraints ================================================================
 
