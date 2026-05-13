@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "element.hpp"
-#include "../materials/slender_beam_1d.hpp"
+#include "../materials/uniaxial_stress_1d.hpp"
 #include "../types.hpp"
 
 namespace pyck
@@ -27,54 +27,35 @@ public:
 
     // === Constructors ===============================================================
 
-    BeamTimoshenko2p(Ptr<SlenderBeam1d<T>> material);
+    BeamTimoshenko2p(Ptr<UniaxialStress1d<T>> material);
 
     // === Matrix Operators ===========================================================
 
     /**
-     * @brief Computes the bending strain matrix.
-     * 
+     * @brief Strain-displacement B-matrix.
+     *
      * @param patch         The patch.
      * @param basis         The basis derivatives.
      * @param local         The local frame.
-     * @return Matrix<T>    The bending strain matrix.
+     * @return Matrix<T>    The strain-displacement matrix.
      */
-    Matrix<T> bending_strain_matrix(const Patch<T, 1>& patch,
-                                    const BasisDerivs<T, 1>& basis,
-                                    const LocalFrame<T, 1>& local) const override;
+    Matrix<T> strain_matrix(const Patch<T, 1>& patch,
+                            const BasisDerivs<T, 1>& basis,
+                            const LocalFrame<T, 1>& local) const override;
 
     /**
-     * @brief Computes the shear strain matrix.
-     * 
-     * @param patch         The patch.
-     * @param basis         The basis derivatives.
-     * @param local         The local frame.
-     * @return Matrix<T>    The shear strain matrix.
-     */
-    Matrix<T> shear_strain_matrix(const Patch<T, 1>& patch,
-                                  const BasisDerivs<T, 1>& basis,
-                                  const LocalFrame<T, 1>& local) const override;
-
-    /**
-     * @brief Computes the bending constitutive matrix.
-     * 
+     * @brief Constitutive D-matrix.
+     *
      * @param local         The local frame.
      * @param q             The quadrature point index.
-     * @return T            The bending constitutive matrix.
+     * @return Matrix<T>    Constitutive matrix.
      */
-    T bending_constitutive(const LocalFrame<T, 1>& local, Index q) const override;
+    Matrix<T> constitutive_matrix(const LocalFrame<T, 1>& local, Index q) const override;
+
+    // === Shape Matrices =============================================================
 
     /**
-     * @brief Computes the shear constitutive matrix.
-     * 
-     * @param local         The local frame.
-     * @param q             The quadrature point index.
-     * @return T            The shear constitutive matrix.
-     */
-    T shear_constitutive(const LocalFrame<T, 1>& local, Index q) const override;
-
-    /**
-     * @brief Computes the displacement shape matrix.
+     * @brief Displacement shape matrix.
      * 
      * @param patch         The patch.
      * @param basis         The basis derivatives.
@@ -86,7 +67,7 @@ public:
                                         const LocalFrame<T, 1>& local) const override;
 
     /**
-     * @brief Computes the rotation shape matrix.
+     * @brief Rotation shape matrix.
      * 
      * @param patch         The patch.
      * @param basis         The basis derivatives.
@@ -104,17 +85,13 @@ public:
     { return 2; }
 
     /// @brief Minimum order of basis functions.
-    std::size_t min_order() const override 
+    std::size_t min_order() const override
     { return 2; }
-
-    /// @brief Index of the rotation degree of freedom.
-    std::size_t rotation_dof_index() const override 
-    { return 1; }
 
 private:
 
     /// @brief Material properties.
-    Ptr<SlenderBeam1d<T>> material_;
+    Ptr<UniaxialStress1d<T>> material_;
 
 };
 

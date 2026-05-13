@@ -12,14 +12,8 @@ namespace pyck
 {
 
 /**
- * @brief Two-parameter rotation-free Reissner-Mindlin plate element.
- *
- * Primary variables per node:
- *   - w_b : bending contribution to the transverse displacement
- *   - ψ   : scalar Helmholtz potential for the curl part of the rotation
- *
- * Requires at least C² continuity (cubic B-splines or higher) due to the
- * third-order derivatives of w_b in the shear strain.
+ * @brief Two-parameter rotation-free Reissner-Mindlin plate element via Helmholtz 
+ *        decomposition.
  *
  * @tparam T Scalar type.
  */
@@ -28,7 +22,7 @@ class PlateReissnerMindlinDispl2p : public Element<T, 2>
 {
 public:
 
-    // === Constructor ============================================================
+    // === Constructors ===========================================================
 
     /**
      * @brief Constructor.
@@ -40,48 +34,30 @@ public:
     // === Matrix Operators =======================================================
 
     /**
-     * @brief Bending strain matrix.
+     * @brief Strain-displacement matrix B (5Q × 2n). Five strain rows per qp:
+     *   rows 5q..5q+2 : curvatures κ_{11}, κ_{22}, 2κ_{12}
+     *   rows 5q+3..5q+4 : transverse shears γ_1, γ_2
      *
      * @param patch Patch.
      * @param basis Basis derivatives.
      * @param local Local frame.
-     * @return Bending strain matrix.
+     * @return Strain-displacement matrix.
      */
-    Matrix<T> bending_strain_matrix(const Patch<T, 2>& patch,
-                                    const BasisDerivs<T, 2>& basis,
-                                    const LocalFrame<T, 2>& local) const override;
+    Matrix<T> strain_matrix(const Patch<T, 2>& patch,
+                            const BasisDerivs<T, 2>& basis,
+                            const LocalFrame<T, 2>& local) const override;
 
     /**
-     * @brief Shear strain matrix.
-     *
-     * @param patch Patch.
-     * @param basis Basis derivatives.
-     * @param local Local frame.
-     * @return Shear strain matrix.
-     */
-    Matrix<T> shear_strain_matrix(const Patch<T, 2>& patch,
-                                  const BasisDerivs<T, 2>& basis,
-                                  const LocalFrame<T, 2>& local) const override;
-
-    /**
-     * @brief Bending constitutive matrix.
+     * @brief Constitutive D-matrix (5×5 block-diag [Db; Ds]).
      *
      * @param local Local frame.
      * @param q Quadrature point.
-     * @return Bending constitutive matrix.
+     * @return Constitutive matrix.
      */
-    Matrix<T> bending_constitutive_matrix(const LocalFrame<T, 2>& local,
-                                          Index q) const override;
+    Matrix<T> constitutive_matrix(const LocalFrame<T, 2>& local,
+                                  Index q) const override;
 
-    /**
-     * @brief Shear constitutive matrix.
-     *
-     * @param local Local frame.
-     * @param q Quadrature point.
-     * @return Shear constitutive matrix.
-     */
-    Matrix<T> shear_constitutive_matrix(const LocalFrame<T, 2>& local,
-                                        Index q) const override;
+    // === Shape Matrices =============================================================
 
     /**
      * @brief Displacement shape matrix.
@@ -116,10 +92,6 @@ public:
     /// @brief Minimum order of basis functions.
     std::size_t min_order() const override
     { return 3; }
-
-    /// @brief Rotation degree of freedom indices.
-    std::array<std::size_t, 2> rotation_dof_indices() const override
-    { return {0, 0}; }
 
 private:
 

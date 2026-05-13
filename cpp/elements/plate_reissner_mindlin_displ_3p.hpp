@@ -38,48 +38,29 @@ public:
     // === Matrix Operators =======================================================
 
     /**
-     * @brief Bending strain matrix.
+     * @brief Strain-displacement B-matrix.
      *
      * @param patch Patch.
      * @param basis Basis derivatives.
      * @param local Local frame.
-     * @return Bending strain matrix.
+     * @return Strain-displacement matrix.
      */
-    Matrix<T> bending_strain_matrix(const Patch<T, 2>& patch,
-                                    const BasisDerivs<T, 2>& basis,
-                                    const LocalFrame<T, 2>& local) const override;
+    Matrix<T> strain_matrix(const Patch<T, 2>& patch,
+                            const BasisDerivs<T, 2>& basis,
+                            const LocalFrame<T, 2>& local) const override;
 
     /**
-     * @brief Shear strain matrix.
-     *
-     * @param patch Patch.
-     * @param basis Basis derivatives.
-     * @param local Local frame.
-     * @return Shear strain matrix.
-     */
-    Matrix<T> shear_strain_matrix(const Patch<T, 2>& patch,
-                                  const BasisDerivs<T, 2>& basis,
-                                  const LocalFrame<T, 2>& local) const override;
-
-    /**
-     * @brief Bending constitutive matrix.
+     * @brief Constitutive D-matrix.
      *
      * @param local Local frame.
      * @param q Quadrature point.
-     * @return Bending constitutive matrix.
+     * @return Constitutive matrix.
      */
-    Matrix<T> bending_constitutive_matrix(const LocalFrame<T, 2>& local,
-                                          Index q) const override;
+    Matrix<T> constitutive_matrix(const LocalFrame<T, 2>& local,
+                                  Index q) const override;
 
-    /**
-     * @brief Shear constitutive matrix.
-     *
-     * @param local Local frame.
-     * @param q Quadrature point.
-     * @return Shear constitutive matrix.
-     */
-    Matrix<T> shear_constitutive_matrix(const LocalFrame<T, 2>& local,
-                                        Index q) const override;
+    // === Shape Matrices =============================================================
+
 
     /**
      * @brief Displacement shape matrix.
@@ -107,17 +88,13 @@ public:
 
     // === Getters ================================================================
 
-    /// @brief Number of node degrees of freedom (w_b + w_s1 + w_s2).
+    /// @brief Number of node degrees of freedom.
     std::size_t num_node_dofs() const override
     { return 3; }
 
     /// @brief Minimum order of basis functions.
     std::size_t min_order() const override
     { return 2; }
-
-    /// @brief Rotation degree of freedom indices.
-    std::array<std::size_t, 2> rotation_dof_indices() const override
-    { return {0, 0}; }
 
 private:
 

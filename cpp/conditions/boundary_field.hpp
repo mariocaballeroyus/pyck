@@ -376,10 +376,13 @@ public:
 /**
  * @brief Normal transverse shear force: Q_n = n · Q.
  *
- * Computed intrinsically as `n_α Q^α` where Q^α are the element's
- * contravariant shear-force components (returned by `transverse_shear_matrix`
- * with row 2q = Q^1, row 2q+1 = Q^2) and n_α are the covariant components of
- * the boundary outward in-surface normal.
+ * Reads the transverse-shear rows from `stress_matrix`. Plate-style elements
+ * expose 5 strain rows per qp ordered (M^11, M^22, M^12, Q^1, Q^2); the
+ * shear rows are 5q+3 (Q^1) and 5q+4 (Q^2). Then Q_n = n_α Q^α with n_α the
+ * covariant components of the boundary outward in-surface normal.
+ *
+ * Not applicable to shear-rigid elements (Kirchhoff–Love), whose stress
+ * vector has no shear rows.
  */
 template <std::floating_point T>
 class NormalTransverseShear : public BoundaryField<T>
@@ -395,17 +398,17 @@ public:
         const BasisDerivs<T, 2>& parent_basis,
         const LocalFrame<T, 2>& parent_local) const override
     {
-        const Matrix<T> Nq = element.transverse_shear_matrix(
+        const Matrix<T> Nsigma = element.stress_matrix(
             *boundary.parent(), parent_basis, parent_local);
         const ColMatrix<T, 3> n =
             boundary.eval_outward_normal(boundary_local, parent_local);
         const auto [n_cov_1, n_cov_2] =
             detail::covariant_components(n, parent_local);
         const Index Q = static_cast<Index>(n.rows());
-        Matrix<T> C(Q, Nq.cols());
+        Matrix<T> C(Q, Nsigma.cols());
         for (Index q = 0; q < Q; ++q) {
-            C.row(q) = n_cov_1(q) * Nq.row(2 * q)
-                     + n_cov_2(q) * Nq.row(2 * q + 1);
+            C.row(q) = n_cov_1(q) * Nsigma.row(5 * q + 3)
+                     + n_cov_2(q) * Nsigma.row(5 * q + 4);
         }
         return C;
     }
@@ -414,10 +417,10 @@ public:
 /**
  * @brief Normal bending moment: M_nn = n_α n_β M^{αβ}.
  *
- * Expects `moment_matrix` rows per qp in symmetric-Voigt contravariant order
- * (M^11, M^22, M^12).  The factor of 2 on the off-diagonal accounts for both
- * symmetric contributions M^12 = M^21.  Reduces to
- * `m_x n_x² + m_y n_y² + 2 m_xy n_x n_y` on flat plates.
+ * Reads the bending rows from `stress_matrix` in symmetric-Voigt contravariant
+ * order (M^11, M^22, M^12), at rows 5q, 5q+1, 5q+2. The factor of 2 on the
+ * off-diagonal accounts for the symmetric contribution M^12 = M^21. Reduces
+ * to `m_x n_x² + m_y n_y² + 2 m_xy n_x n_y` on flat plates.
  */
 template <std::floating_point T>
 class NormalBendingMoment : public BoundaryField<T>
@@ -433,20 +436,21 @@ public:
         const BasisDerivs<T, 2>& parent_basis,
         const LocalFrame<T, 2>& parent_local) const override
     {
-        const Matrix<T> Nm = element.moment_matrix(
+        const Matrix<T> Nsigma = element.stress_matrix(
             *boundary.parent(), parent_basis, parent_local);
         const ColMatrix<T, 3> n =
             boundary.eval_outward_normal(boundary_local, parent_local);
         const auto [n_cov_1, n_cov_2] =
             detail::covariant_components(n, parent_local);
         const Index Q = static_cast<Index>(n.rows());
-        Matrix<T> C(Q, Nm.cols());
+        const Index n_strain = Nsigma.rows() / Q;
+        Matrix<T> C(Q, Nsigma.cols());
         for (Index q = 0; q < Q; ++q) {
             const T n1 = n_cov_1(q);
             const T n2 = n_cov_2(q);
-            C.row(q) = (n1 * n1)      * Nm.row(3 * q)
-                     + (n2 * n2)      * Nm.row(3 * q + 1)
-                     + T(2) * n1 * n2 * Nm.row(3 * q + 2);
+            C.row(q) = (n1 * n1)      * Nsigma.row(n_strain * q)
+                     + (n2 * n2)      * Nsigma.row(n_strain * q + 1)
+                     + T(2) * n1 * n2 * Nsigma.row(n_strain * q + 2);
         }
         return C;
     }
@@ -457,8 +461,9 @@ public:
  *
  * Work-conjugate to the tangential rotation θ_s on a Reissner–Mindlin
  * boundary; used as the traction in Nitsche enforcement of θ_s = θ̄_s.
- * Expects `moment_matrix` rows per qp in symmetric-Voigt contravariant order
- * (M^11, M^22, M^12) and uses the symmetric form
+ * Reads the bending rows from `stress_matrix` in symmetric-Voigt
+ * contravariant order (M^11, M^22, M^12) at rows 5q, 5q+1, 5q+2 (or 3q for
+ * pure-bending KL plates) and uses the symmetric form
  *   M_{ns} = n_1 s_1 M^11 + n_2 s_2 M^22 + (n_1 s_2 + n_2 s_1) M^12.
  */
 template <std::floating_point T>
@@ -475,7 +480,7 @@ public:
         const BasisDerivs<T, 2>& parent_basis,
         const LocalFrame<T, 2>& parent_local) const override
     {
-        const Matrix<T> Nm = element.moment_matrix(
+        const Matrix<T> Nsigma = element.stress_matrix(
             *boundary.parent(), parent_basis, parent_local);
         const ColMatrix<T, 3> n =
             boundary.eval_outward_normal(boundary_local, parent_local);
@@ -486,13 +491,14 @@ public:
         const auto [s_cov_1, s_cov_2] =
             detail::covariant_components(s, parent_local);
         const Index Q = static_cast<Index>(n.rows());
-        Matrix<T> C(Q, Nm.cols());
+        const Index n_strain = Nsigma.rows() / Q;
+        Matrix<T> C(Q, Nsigma.cols());
         for (Index q = 0; q < Q; ++q) {
             const T n1 = n_cov_1(q), n2 = n_cov_2(q);
             const T s1 = s_cov_1(q), s2 = s_cov_2(q);
-            C.row(q) = (n1 * s1)            * Nm.row(3 * q)
-                     + (n2 * s2)            * Nm.row(3 * q + 1)
-                     + (n1 * s2 + n2 * s1)  * Nm.row(3 * q + 2);
+            C.row(q) = (n1 * s1)            * Nsigma.row(n_strain * q)
+                     + (n2 * s2)            * Nsigma.row(n_strain * q + 1)
+                     + (n1 * s2 + n2 * s1)  * Nsigma.row(n_strain * q + 2);
         }
         return C;
     }

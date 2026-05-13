@@ -36,9 +36,8 @@
 #include "dof_layout.hpp"
 #include "linear_elastic_problem.hpp"
 #include "material.hpp"
-#include "slender_beam_1d.hpp"
+#include "uniaxial_stress_1d.hpp"
 #include "plane_stress_2d.hpp"
-#include "plane_stress_shell.hpp"
 #include "integrate.hpp"
 #include "physical_points.hpp"
 
@@ -346,17 +345,25 @@ PYBIND11_MODULE(_pyck, m) {
         .def("youngs_modulus", &Material1D::youngs_modulus)
         .def("poisson_ratio", &Material1D::poisson_ratio)
         .def("shear_modulus", &Material1D::shear_modulus)
+        .def("density", &Material1D::density)
         .def("bending_stiffness", &Material1D::bending_stiffness)
-        .def("shear_stiffness", &Material1D::shear_stiffness)
-        .def("constitutive_matrix", &Material1D::constitutive_matrix);
+        .def("shear_stiffness", &Material1D::shear_stiffness);
 
-    using SB1D = pyck::SlenderBeam1d<double>;
-    py::class_<SB1D, Material1D, pyck::Ptr<SB1D>>(m, "SlenderBeam1d")
-        .def(py::init<double, double, double, double, double>(),
-             py::arg("E"), py::arg("nu"), py::arg("A"), py::arg("I"), py::arg("k") = 5.0 / 6.0)
-        .def("section_area", &SB1D::section_area)
-        .def("moment_inertia", &SB1D::moment_inertia)
-        .def("shear_coefficient", &SB1D::shear_coefficient);
+    using US1D = pyck::UniaxialStress1d<double>;
+    py::class_<US1D, Material1D, pyck::Ptr<US1D>>(m, "UniaxialStress1d")
+        .def(py::init<double, double, double, double, double, double, double, double, double>(),
+             py::arg("E"), py::arg("nu"), py::arg("A"), py::arg("I22"),
+             py::arg("k22") = 5.0 / 6.0,
+             py::arg("rho") = 0.0,
+             py::arg("I33") = 0.0,
+             py::arg("k33") = 0.0,
+             py::arg("J")   = 0.0)
+        .def("section_area",         &US1D::section_area)
+        .def("moment_inertia_22",    &US1D::moment_inertia_22)
+        .def("moment_inertia_33",    &US1D::moment_inertia_33)
+        .def("shear_coefficient_22", &US1D::shear_coefficient_22)
+        .def("shear_coefficient_33", &US1D::shear_coefficient_33)
+        .def("torsion_constant",     &US1D::torsion_constant);
 
     using Material2D = pyck::Material<double, 2>;
     py::class_<Material2D, pyck::Ptr<Material2D>>(m, "Material2d")
@@ -364,25 +371,19 @@ PYBIND11_MODULE(_pyck, m) {
         .def("youngs_modulus", &Material2D::youngs_modulus)
         .def("poisson_ratio", &Material2D::poisson_ratio)
         .def("shear_modulus", &Material2D::shear_modulus)
+        .def("density", &Material2D::density)
         .def("bending_stiffness", &Material2D::bending_stiffness)
-        .def("shear_stiffness", &Material2D::shear_stiffness)
-        .def("constitutive_matrix", &Material2D::constitutive_matrix);
+        .def("shear_stiffness", &Material2D::shear_stiffness);
 
     using PS2D = pyck::PlaneStress2d<double>;
     py::class_<PS2D, Material2D, pyck::Ptr<PS2D>>(m, "PlaneStress2d")
-        .def(py::init<double, double, double, double>(),
-             py::arg("E"), py::arg("nu") = 0.3, py::arg("h") = 1.0, py::arg("k") = 5.0 / 6.0)
+        .def(py::init<double, double, double, double, double>(),
+             py::arg("E"), py::arg("nu"), py::arg("t"),
+             py::arg("k") = 5.0 / 6.0,
+             py::arg("rho") = 0.0)
         .def("thickness", &PS2D::thickness)
         .def("shear_correction_factor", &PS2D::shear_correction_factor)
-        .def("bending_matrix", &PS2D::bending_matrix)
-        .def("shear_matrix", &PS2D::shear_matrix);
-
-    using PSSH = pyck::PlaneStressShell<double>;
-    py::class_<PSSH, Material2D, pyck::Ptr<PSSH>>(m, "PlaneStressShell")
-        .def(py::init<double, double, double, double>(),
-             py::arg("E"), py::arg("nu") = 0.3, py::arg("t") = 1.0, py::arg("k_s") = 5.0 / 6.0)
-        .def("thickness", &PSSH::thickness)
-        .def("shear_correction_factor", &PSSH::shear_correction_factor);
+        .def("constitutive_matrix", &PS2D::constitutive_matrix);
 
     // === Elements ===================================================================
 
@@ -394,24 +395,26 @@ PYBIND11_MODULE(_pyck, m) {
              py::arg("patch"), py::arg("basis"), py::arg("local"))
         .def("rotation_shape_matrix", &Elem1D::rotation_shape_matrix,
              py::arg("patch"), py::arg("basis"), py::arg("local"))
-        .def("displacement_dof_index", &Elem1D::displacement_dof_index)
-        .def("rotation_dof_index", &Elem1D::rotation_dof_index)
-        .def("strain_displacement_matrix", &Elem1D::strain_displacement_matrix,
+        .def("strain_matrix", &Elem1D::strain_matrix,
+             py::arg("patch"), py::arg("basis"), py::arg("local"))
+        .def("constitutive_matrix", &Elem1D::constitutive_matrix,
+             py::arg("local"), py::arg("q"))
+        .def("stress_matrix", &Elem1D::stress_matrix,
              py::arg("patch"), py::arg("basis"), py::arg("local"));
 
     using EBB = pyck::BeamEulerBernoulli1p<double>;
     py::class_<EBB, Elem1D, pyck::Ptr<EBB>>(m, "BeamEulerBernoulli1p")
-        .def(py::init<pyck::Ptr<pyck::SlenderBeam1d<double>>>(),
+        .def(py::init<pyck::Ptr<pyck::UniaxialStress1d<double>>>(),
              py::arg("material"));
 
     using TBB1p = pyck::BeamTimoshenko1p<double>;
     py::class_<TBB1p, Elem1D, pyck::Ptr<TBB1p>>(m, "BeamTimoshenko1p")
-        .def(py::init<pyck::Ptr<pyck::SlenderBeam1d<double>>>(),
+        .def(py::init<pyck::Ptr<pyck::UniaxialStress1d<double>>>(),
              py::arg("material"));
 
     using TBB2p = pyck::BeamTimoshenko2p<double>;
     py::class_<TBB2p, Elem1D, pyck::Ptr<TBB2p>>(m, "BeamTimoshenko2p")
-        .def(py::init<pyck::Ptr<pyck::SlenderBeam1d<double>>>(),
+        .def(py::init<pyck::Ptr<pyck::UniaxialStress1d<double>>>(),
              py::arg("material"));
 
     // --- 2D Elements ---
@@ -424,21 +427,11 @@ PYBIND11_MODULE(_pyck, m) {
              py::arg("patch"), py::arg("basis"), py::arg("local"))
         .def("rotation_shape_matrix", &Elem2D::rotation_shape_matrix,
              py::arg("patch"), py::arg("basis"), py::arg("local"))
-        .def("bending_strain_matrix", &Elem2D::bending_strain_matrix,
+        .def("strain_matrix", &Elem2D::strain_matrix,
              py::arg("patch"), py::arg("basis"), py::arg("local"))
-        .def("shear_strain_matrix", &Elem2D::shear_strain_matrix,
-             py::arg("patch"), py::arg("basis"), py::arg("local"))
-        .def("moment_matrix", &Elem2D::moment_matrix,
-             py::arg("patch"), py::arg("basis"), py::arg("local"))
-        .def("transverse_shear_matrix", &Elem2D::transverse_shear_matrix,
-             py::arg("patch"), py::arg("basis"), py::arg("local"))
-        .def("bending_constitutive_matrix", &Elem2D::bending_constitutive_matrix,
+        .def("constitutive_matrix", &Elem2D::constitutive_matrix,
              py::arg("local"), py::arg("q"))
-        .def("shear_constitutive_matrix", &Elem2D::shear_constitutive_matrix,
-             py::arg("local"), py::arg("q"))
-        .def("displacement_dof_index", &Elem2D::displacement_dof_index)
-        .def("rotation_dof_indices", &Elem2D::rotation_dof_indices)
-        .def("strain_displacement_matrix", &Elem2D::strain_displacement_matrix,
+        .def("stress_matrix", &Elem2D::stress_matrix,
              py::arg("patch"), py::arg("basis"), py::arg("local"));
 
     using KLP = pyck::PlateKirchhoffLove1p<double>;
@@ -468,7 +461,7 @@ PYBIND11_MODULE(_pyck, m) {
 
     using SHRM5P = pyck::ShellReissnerMindlin5p<double>;
     py::class_<SHRM5P, Elem2D, pyck::Ptr<SHRM5P>>(m, "ShellReissnerMindlin5p")
-        .def(py::init<pyck::Ptr<pyck::PlaneStressShell<double>>>(),
+        .def(py::init<pyck::Ptr<pyck::PlaneStress2d<double>>>(),
              py::arg("material"));
 
     // === Conditions =================================================================

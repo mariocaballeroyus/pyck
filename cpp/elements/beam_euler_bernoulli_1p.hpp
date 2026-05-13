@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "element.hpp"
-#include "../materials/slender_beam_1d.hpp"
+#include "../materials/uniaxial_stress_1d.hpp"
 #include "../types.hpp"
 
 namespace pyck
@@ -22,42 +22,32 @@ public:
 
     // === Constructors ===============================================================
 
-    BeamEulerBernoulli1p(Ptr<SlenderBeam1d<T>> material);
+    BeamEulerBernoulli1p(Ptr<UniaxialStress1d<T>> material);
 
     // === Matrix Operators ===========================================================
 
     /**
-     * @brief Bending B-matrix.
+     * @brief Strain-displacement B-matrix.
      *
      * @param patch Patch.
      * @param basis Basis derivatives.
      * @param local Local frame.
-     * @return Bending B-matrix.
+     * @return B-matrix.
      */
-    Matrix<T> bending_strain_matrix(const Patch<T, 1>& patch,
-                                    const BasisDerivs<T, 1>& basis,
-                                    const LocalFrame<T, 1>& local) const override;
+    Matrix<T> strain_matrix(const Patch<T, 1>& patch,
+                            const BasisDerivs<T, 1>& basis,
+                            const LocalFrame<T, 1>& local) const override;
 
     /**
-     * @brief Shear B-matrix (zero for Euler-Bernoulli beams).
-     *
-     * @param patch Patch.
-     * @param basis Basis derivatives.
-     * @param local Local frame.
-     * @return Shear B-matrix.
-     */
-    Matrix<T> shear_strain_matrix(const Patch<T, 1>& patch,
-                                  const BasisDerivs<T, 1>& basis,
-                                  const LocalFrame<T, 1>& local) const override;
-
-    /**
-     * @brief Bending D-matrix.
+     * @brief Constitutive D-matrix.
      *
      * @param local Local frame.
      * @param q Quadrature point.
-     * @return Bending D-matrix.
+     * @return D-matrix.
      */
-    T bending_constitutive(const LocalFrame<T, 1>& local, Index q) const override;
+    Matrix<T> constitutive_matrix(const LocalFrame<T, 1>& local, Index q) const override;
+
+    // Shape Matrices =================================================================
 
     /**
      * @brief Displacement N-matrix.
@@ -91,13 +81,13 @@ public:
     { return 1; }
 
     /// @brief Minimum order of basis functions.
-    std::size_t min_order() const override 
+    std::size_t min_order() const override
     { return 2; }
 
 private:
 
     /// @brief Material properties.
-    Ptr<SlenderBeam1d<T>> material_;
+    Ptr<UniaxialStress1d<T>> material_;
 
 };
 

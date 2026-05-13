@@ -5,8 +5,10 @@
 namespace pyck
 {
 
+// === Constructors ===================================================================
+
 template <std::floating_point T>
-BeamEulerBernoulli1p<T>::BeamEulerBernoulli1p(Ptr<SlenderBeam1d<T>> material)
+BeamEulerBernoulli1p<T>::BeamEulerBernoulli1p(Ptr<UniaxialStress1d<T>> material)
     : material_(material)
 {
     if (!material_) {
@@ -15,7 +17,48 @@ BeamEulerBernoulli1p<T>::BeamEulerBernoulli1p(Ptr<SlenderBeam1d<T>> material)
     }
 }
 
-template <std::floating_point T> Matrix<T>
+// === Matrix Operators =============================================================??
+
+template <std::floating_point T> 
+Matrix<T>
+BeamEulerBernoulli1p<T>::strain_matrix(const Patch<T, 1>& /*patch*/,
+                                       const BasisDerivs<T, 1>& basis,
+                                       const LocalFrame<T, 1>& local) const
+{
+    auto chr = eval_christoffel(local);
+
+    const Index Q = basis.N_u.rows();
+    const Index n = basis.N_u.cols();
+    Matrix<T> B(Q, n);
+
+    for (Index q = 0; q < Q; ++q)
+    {
+        // Bending
+        // B_b = [ -N_{i|11} ]
+        B.row(q) = -(basis.N_uu.row(q) - chr.G1_11(q) * basis.N_u.row(q));
+
+        // B_s = 0 (normality assumption)
+    }
+    return B;
+}
+
+template <std::floating_point T>
+Matrix<T> 
+BeamEulerBernoulli1p<T>::constitutive_matrix(const LocalFrame<T, 1>& local,
+                                             Index q) const
+{
+    const T gi = local.g_inv_11(q);
+    Matrix<T> D(1, 1);
+
+    // D_b = [ EI (g^{11})^2 ]
+    D(0, 0) = material_->bending_stiffness() * gi * gi;
+    return D;
+}
+
+// === Shape Matrices =================================================================
+
+template <std::floating_point T> 
+Matrix<T>
 BeamEulerBernoulli1p<T>::displacement_shape_matrix(const Patch<T, 1>& /*patch*/,
                                                    const BasisDerivs<T, 1>& basis,
                                                    const LocalFrame<T, 1>& /*local*/) const
@@ -24,50 +67,14 @@ BeamEulerBernoulli1p<T>::displacement_shape_matrix(const Patch<T, 1>& /*patch*/,
     return basis.N;
 }
 
-template <std::floating_point T> Matrix<T>
+template <std::floating_point T> 
+Matrix<T>
 BeamEulerBernoulli1p<T>::rotation_shape_matrix(const Patch<T, 1>& /*patch*/,
                                                const BasisDerivs<T, 1>& basis,
                                                const LocalFrame<T, 1>& /*local*/) const
 {
     // N_rot = [ -N_{i|1} ]
     return -basis.N_u;
-}
-
-template <std::floating_point T>
-T BeamEulerBernoulli1p<T>::bending_constitutive(const LocalFrame<T, 1>& local,
-                                                Index q) const
-{
-    const T gi = local.g_inv_11(q);
-
-    // D_b = EI (g^{11})^2
-    return material_->bending_stiffness() * gi * gi;
-}
-
-template <std::floating_point T> Matrix<T>
-BeamEulerBernoulli1p<T>::bending_strain_matrix(const Patch<T, 1>& patch,
-                                               const BasisDerivs<T, 1>& basis,
-                                               const LocalFrame<T, 1>& local) const
-{
-    auto chr = eval_christoffel(local);
-    const Index Q = basis.N_u.rows();
-    const Index n = basis.N_u.cols();
-    Matrix<T> Bb(Q, n);
-
-    // B_b = [ -N_{i|11} ]
-    for (Index q = 0; q < Q; ++q)
-    {
-        Bb.row(q) = -(basis.N_uu.row(q) - chr.G1_11(q) * basis.N_u.row(q));
-    }
-    return Bb;
-}
-
-template <std::floating_point T> Matrix<T>
-BeamEulerBernoulli1p<T>::shear_strain_matrix(const Patch<T, 1>& /*patch*/,
-                                             const BasisDerivs<T, 1>& basis,
-                                             const LocalFrame<T, 1>& /*local*/) const
-{
-    // Normality assumption (zero transverse shear strain)
-    return Matrix<T>::Zero(0, basis.N.cols());
 }
 
 // === Template Instantiations ========================================================

@@ -128,25 +128,25 @@ add_executable(pyck_tests
     tests/basis/test_bspline.cpp
     tests/basis/test_nurbs.cpp
     tests/basis/test_tensor_product.cpp
-    # tests/geometry/test_curve.cpp           # TODO: migrate to eval_basis / eval_local_frame
-    # tests/geometry/test_surface.cpp         # TODO: migrate; primitives tests partially intact
+    tests/geometry/test_curve.cpp
+    tests/geometry/test_surface.cpp
     tests/geometry/test_dof_mapper.cpp
     tests/quadrature/test_quadrature.cpp
-    # tests/elements/test_euler_bernoulli.cpp  # TODO: migrate (uses eval_shape_functions)
-    # tests/elements/test_kirchhoff_love_1p.cpp
-    # tests/elements/test_reissner_mindlin.cpp
-    # tests/elements/test_reissner_mindlin_1p.cpp
+    tests/elements/test_euler_bernoulli.cpp
+    tests/elements/test_kirchhoff_love_1p.cpp
+    tests/elements/test_reissner_mindlin.cpp
+    tests/elements/test_reissner_mindlin_1p.cpp
     tests/elements/test_shell_reissner_mindlin_5p.cpp
     tests/assembly/test_constraints.cpp
     tests/assembly/test_load_condition.cpp
-    # tests/assembly/test_load_boundary_condition.cpp     # TODO: migrate
+    tests/assembly/test_load_boundary_condition.cpp
     tests/assembly/test_materials.cpp
-    # tests/assembly/test_penalty_boundary_condition.cpp  # TODO: migrate
+    tests/assembly/test_penalty_boundary_condition.cpp
     tests/assembly/test_lagrange_boundary_condition.cpp
     tests/assembly/test_lagrange_domain_condition.cpp
     tests/assembly/test_multi_patch_problem.cpp
-    # tests/assembly/test_penalty_coupling_condition.cpp  # TODO: migrate
-    # tests/assembly/test_lagrange_coupling_condition.cpp # TODO: migrate
+    tests/assembly/test_penalty_coupling_condition.cpp
+    tests/assembly/test_lagrange_coupling_condition.cpp
 )
 target_include_directories(pyck_tests PRIVATE tests/support)
 target_link_libraries(pyck_tests PRIVATE

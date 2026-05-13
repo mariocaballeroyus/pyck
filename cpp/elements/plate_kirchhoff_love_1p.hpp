@@ -29,42 +29,32 @@ public:
      */
     PlateKirchhoffLove1p(Ptr<PlaneStress2d<T>> material);
 
-    // === Matrix Operators =======================================================
+    // === Matrix Operators ===========================================================
 
     /**
-     * @brief Bending B-matrix.
-     * 
+     * @brief Strain-displacement matrix B (3Q × K).
+     *
      * @param patch Patch.
      * @param basis Basis derivatives.
      * @param local Local frame.
-     * @return Bending B-matrix.
+     * @return B-matrix.
      */
-    Matrix<T> bending_strain_matrix(const Patch<T, 2>& patch,
-                                    const BasisDerivs<T, 2>& basis,
-                                    const LocalFrame<T, 2>& local) const override;
+    Matrix<T> strain_matrix(const Patch<T, 2>& patch,
+                            const BasisDerivs<T, 2>& basis,
+                            const LocalFrame<T, 2>& local) const override;
 
     /**
-     * @brief Shear B-matrix.
-     * 
-     * @param patch Patch.
-     * @param basis Basis derivatives.
-     * @param local Local frame.
-     * @return Shear B-matrix.
-     */
-    Matrix<T> shear_strain_matrix(const Patch<T, 2>& patch,
-                                  const BasisDerivs<T, 2>& basis,
-                                  const LocalFrame<T, 2>& local) const override;
-
-    /**
-     * @brief Bending constitutive D-matrix.
-     * 
+     * @brief Constitutive D-matrix.
+     *
      * @param local Local frame.
      * @param q Quadrature point.
-     * @return Bending D-matrix.
+     * @return D-matrix.
      */
-    Matrix<T> bending_constitutive_matrix(const LocalFrame<T, 2>& local,
-                                          Index q) const override;
-    
+    Matrix<T> constitutive_matrix(const LocalFrame<T, 2>& local,
+                                  Index q) const override;
+
+    // === Shape Matrices =============================================================
+
     /**
      * @brief Displacement shape matrix.
      * 
@@ -89,18 +79,6 @@ public:
                                     const BasisDerivs<T, 2>& basis,
                                     const LocalFrame<T, 2>& local) const override;
 
-    /**
-     * @brief Transverse shear shape matrix.
-     * 
-     * @param patch Patch.
-     * @param basis Basis derivatives.
-     * @param local Local frame.
-     * @return Transverse shear shape matrix.
-     */
-    Matrix<T> transverse_shear_matrix(const Patch<T, 2>& patch,
-                                      const BasisDerivs<T, 2>& basis,
-                                      const LocalFrame<T, 2>& local) const override;
-
     // === Getters ================================================================
 
     /// @brief Number of node degrees of freedom (displacement + rotation).
@@ -108,12 +86,8 @@ public:
     { return 1; }
 
     /// @brief Minimum order of basis functions.
-    std::size_t min_order() const override 
+    std::size_t min_order() const override
     { return 2; }
-
-    /// @brief Rotation degree of freedom indices.
-    std::array<std::size_t, 2> rotation_dof_indices() const override 
-    { return {0, 0}; }
 
 private:
 

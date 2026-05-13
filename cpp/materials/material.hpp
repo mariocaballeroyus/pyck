@@ -41,6 +41,11 @@ public:
     virtual T shear_modulus() const = 0;
 
     /**
+     * @brief Get the mass density ρ (kg/m³). Zero for static-only problems.
+     */
+    virtual T density() const = 0;
+
+    /**
      * @brief Get the bending stiffness (EI for beams, D for plates).
      */
     virtual T bending_stiffness() const = 0;
@@ -49,13 +54,6 @@ public:
      * @brief Get the shear stiffness (kGA for beams, kGh for plates).
      */
     virtual T shear_stiffness() const = 0;
-
-    /**
-     * @brief Get the constitutive matrix for the given dimension.
-     */
-    virtual Matrix<T> constitutive_matrix() const {
-        throw std::runtime_error("This material does not support a constitutive matrix.");
-    }
 };
 
 } // namespace pyck
