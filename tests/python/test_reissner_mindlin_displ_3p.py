@@ -61,7 +61,7 @@ def test_rm_displ_3p_kinematic_consistency():
     shape = ck.eval_shape_at(surface, pts, order=2)
     Nw = np.asarray(element._cpp_object.displacement_shape_matrix(shape))
     Nphi = np.asarray(element._cpp_object.rotation_shape_matrix(shape))
-    B = np.asarray(element._cpp_object.strain_displacement_matrix(shape))
+    B = np.asarray(element._cpp_object.strain_matrix(shape))
 
     q_count = pts.shape[0]
     n_basis = shape[0].shape[1]

@@ -114,13 +114,13 @@ def _make_navier_integrand(element, amps):
     def integrand(phys_pts, shape_derivs, u_local):
         Nw = np.asarray(cpp.displacement_shape_matrix(shape_derivs))
         Nphi = np.asarray(cpp.rotation_shape_matrix(shape_derivs))
-        Nm = np.asarray(cpp.moment_matrix(shape_derivs))
-        Nq = np.asarray(cpp.transverse_shear_matrix(shape_derivs))
+        Nsigma = np.asarray(cpp.stress_matrix(shape_derivs))
 
         w_h = (Nw @ u_local).ravel()
         phi_h = (Nphi @ u_local).reshape(-1, 2)
-        M_h = (Nm @ u_local).reshape(-1, 3)
-        Q_h = (Nq @ u_local).reshape(-1, 2)
+        sigma = (Nsigma @ u_local).reshape(-1, 5)
+        M_h = sigma[:, :3]
+        Q_h = sigma[:, 3:]
 
         x, y = phys_pts[:, 0], phys_pts[:, 1]
         sx, sy = np.sin(np.pi * x / L), np.sin(np.pi * y / W)
@@ -189,7 +189,7 @@ def _python_reference_squared_errors(patch, element, u_phys, gauss, geom, amps):
         shape = ck.eval_shape_at(patch, pts_param, order=3)
         Nw = np.asarray(cpp.displacement_shape_matrix(shape))
         Nphi = np.asarray(cpp.rotation_shape_matrix(shape))
-        B = np.asarray(cpp.strain_displacement_matrix(shape))
+        B = np.asarray(cpp.strain_matrix(shape))
         w_num = (Nw @ u).ravel()
         phi_num = (Nphi @ u).reshape(-1, 2)
         strain = (B @ u).reshape(-1, 5)

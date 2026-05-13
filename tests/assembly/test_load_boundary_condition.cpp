@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "patch.hpp"
+#include "basis_derivs.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
 #include "knots.hpp"
@@ -141,13 +142,13 @@ TEST_CASE("LoadBoundaryCondition: cantilever tip deflection matches closed form"
     Index ni_u = surface->tensor_product().num_intervals()[0];
     Index flat = su + sv * ni_u;
 
-    auto [sf, jac] = surface->eval_shape_functions(pt, flat, 0);
+    const auto b = eval_basis(*surface, pt, flat, 0);
     auto active = surface->dof_mapper().get_element_dofs(flat);
     Vector<double> w_active(active.size());
     for (std::size_t i = 0; i < active.size(); ++i) {
         w_active(i) = u(active[i] * 3 + 0);
     }
-    const double w_num = (sf[0] * w_active)(0, 0);
+    const double w_num = (b.N * w_active)(0, 0);
 
     // Free-edge plate strip cantilever: EI = E W h^3 / 12.
     //   total tip force = Q * W, w_tip = (Q W) L^3 / (3 E I) = 4 Q L^3 / (E h^3).

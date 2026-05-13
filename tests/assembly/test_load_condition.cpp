@@ -14,7 +14,7 @@
 #include "load_condition.hpp"
 #include "dof_layout.hpp"
 
-#include "slender_beam_1d.hpp"
+#include "uniaxial_stress_1d.hpp"
 
 using namespace pyck;
 
@@ -37,7 +37,7 @@ TEST_CASE("LoadCondition 1D", "[conditions][load_condition]") {
     GaussLegendre<double, 1> gauss_rule(2);
     
     // 2.5 Element to provide N matrix (EulerBernoulli dummy parameters)
-    auto material = std::make_shared<SlenderBeam1d<double>>(1.0, 0.3, 1.0, 1.0);
+    auto material = std::make_shared<UniaxialStress1d<double>>(1.0, 0.3, 1.0, 1.0);
     BeamEulerBernoulli1p<double> element(material);
 
     SECTION("Constant Body Force") {

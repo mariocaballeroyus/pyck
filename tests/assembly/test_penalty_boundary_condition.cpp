@@ -7,6 +7,8 @@
 #include <algorithm>
 
 #include "patch.hpp"
+#include "basis_derivs.hpp"
+#include "physical_points.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
 #include "knots.hpp"
@@ -105,16 +107,16 @@ static double eval_w_centre(const Ptr<Patch<double,2>>& surf,
     pt << 0.5, 0.5;
     Index su = bsp_u->find_span(0.5);
     Index sv = bsp_v->find_span(0.5);
-    Index num_sv = surf->tensor_product().num_intervals()[1];
-    Index flat   = su * num_sv + sv;
+    Index num_su = surf->tensor_product().num_intervals()[0];
+    Index flat   = su + sv * num_su;   // u-fastest
 
-    auto [sf, jac] = surf->eval_shape_functions(pt, flat, 0);
-    auto active    = surf->dof_mapper().get_element_dofs(flat);
+    const auto b = eval_basis(*surf, pt, flat, 0);
+    auto active  = surf->dof_mapper().get_element_dofs(flat);
 
     Vector<double> w_active(active.size());
     for (std::size_t i = 0; i < active.size(); ++i)
         w_active(i) = u(active[i] * ndof + 0);
-    return (sf[0] * w_active)(0, 0);
+    return (b.N * w_active)(0, 0);
 }
 
 // ===========================================================================
@@ -234,7 +236,7 @@ TEST_CASE("PenaltyBoundaryCondition KL plate: SS via penalty matches Navier", "[
     LinearElasticProblem<double, 2> problem(surface, element, gauss2d);
 
     // Variable load q(x,y) = f0 * sin(πx/L) sin(πy/W)
-    auto phys_pts = surface->eval_physical_points(*gauss2d);
+    auto phys_pts = eval_physical_points<double, 2>(*surface, *gauss2d);
     Vector<double> load_vals(phys_pts.rows());
     for (Index i = 0; i < phys_pts.rows(); ++i)
         load_vals(i) = f0 * std::sin(M_PI * phys_pts(i,0) / L)
@@ -270,13 +272,13 @@ TEST_CASE("PenaltyBoundaryCondition KL plate: SS via penalty matches Navier", "[
             Index ni_u = surface->tensor_product().num_intervals()[0];
             Index flat = su + sv * ni_u;
 
-            auto [sf, jac] = surface->eval_shape_functions(pt, flat, 0);
+            const auto b = eval_basis(*surface, pt, flat, 0);
             auto active = surface->dof_mapper().get_element_dofs(flat);
             Vector<double> u_a(active.size());
             for (std::size_t i = 0; i < active.size(); ++i)
                 u_a(i) = u(active[i]);
 
-            double w_num   = (sf[0] * u_a)(0, 0);
+            double w_num   = (b.N * u_a)(0, 0);
             double w_exact = navier_bisin(pu * L, pv * W, L, W, f0, D);
             double rel_err = std::abs(w_num - w_exact) / std::abs(w_exact);
 

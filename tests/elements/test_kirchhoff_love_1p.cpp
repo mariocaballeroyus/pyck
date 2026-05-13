@@ -6,6 +6,8 @@
 #include <numeric>
 
 #include "patch.hpp"
+#include "basis_derivs.hpp"
+#include "physical_points.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
 #include "knots.hpp"
@@ -56,7 +58,7 @@ TEST_CASE("Kirchhoff-Love 1P Plate: Navier Bi-Sinusoidal Load",
     LinearElasticProblem<double, 2> problem(surface, element, gauss);
 
     // Evaluate physical points to apply the variable load
-    auto phys_pts = surface->eval_physical_points(*gauss);
+    auto phys_pts = eval_physical_points<double, 2>(*surface, *gauss);
     Index num_eval_pts = phys_pts.rows();
     
     Vector<double> load_vals(num_eval_pts);
@@ -115,13 +117,13 @@ TEST_CASE("Kirchhoff-Love 1P Plate: Navier Bi-Sinusoidal Load",
             auto intervals = surface->tensor_product().num_intervals();
             Index flat = span_u + span_v * intervals[0];
 
-            auto [sf, jac] = surface->eval_shape_functions(pt, flat, 0);
+            const auto b = eval_basis(*surface, pt, flat, 0);
             auto active = surface->dof_mapper().get_element_dofs(flat);
             Vector<double> u_active(active.size());
             for (std::size_t i = 0; i < active.size(); ++i)
                 u_active(i) = u(active[i]);
 
-            double w_num = (sf[0] * u_active)(0, 0);
+            double w_num = (b.N * u_active)(0, 0);
             
             // Map parametric to physical for exact solution
             double x = pu * L;

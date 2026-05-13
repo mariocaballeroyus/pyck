@@ -11,7 +11,7 @@
 #include "knots.hpp"
 #include "gauss_legendre.hpp"
 #include "plane_stress_2d.hpp"
-#include "plane_stress_shell.hpp"
+#include "plane_stress_2d.hpp"
 #include "plate_reissner_mindlin_3p.hpp"
 #include "shell_reissner_mindlin_5p.hpp"
 
@@ -77,7 +77,7 @@ TEST_CASE("ShellRM5p: K is symmetric and has 6 rigid-body modes (flat patch)",
     auto surf  = rectangle<double>(basis, basis, 1.0, 1.0);
     auto patch = std::make_shared<Patch<double, 2>>(surf);
 
-    auto material = std::make_shared<PlaneStressShell<double>>(1.0e6, 0.3, 0.05);
+    auto material = std::make_shared<PlaneStress2d<double>>(1.0e6, 0.3, 0.05);
     ShellReissnerMindlin5p<double> element(material);
 
     Matrix<double> K = assemble_global_K(*patch, element, 3);
@@ -113,7 +113,7 @@ TEST_CASE("ShellRM5p: K has exactly 6 near-zero eigenvalues (flat patch)",
     auto surf  = rectangle<double>(basis, basis, 1.0, 1.0);
     auto patch = std::make_shared<Patch<double, 2>>(surf);
 
-    auto material = std::make_shared<PlaneStressShell<double>>(1.0e6, 0.3, 0.05);
+    auto material = std::make_shared<PlaneStress2d<double>>(1.0e6, 0.3, 0.05);
     ShellReissnerMindlin5p<double> element(material);
 
     Matrix<double> K = assemble_global_K(*patch, element, 3);
@@ -157,7 +157,7 @@ TEST_CASE("ShellRM5p reduces to PlateRM3p on a flat axis-aligned patch",
     PlateReissnerMindlin3p<double> plate_el(plate_mat);
 
     // Shell-side material/element
-    auto shell_mat = std::make_shared<PlaneStressShell<double>>(E, nu, t, k_s);
+    auto shell_mat = std::make_shared<PlaneStress2d<double>>(E, nu, t, k_s);
     ShellReissnerMindlin5p<double> shell_el(shell_mat);
 
     Matrix<double> Kp = assemble_global_K(*patch, plate_el,  3);  // (3·N) × (3·N)
@@ -264,7 +264,7 @@ TEST_CASE("ShellRM5p: curved twisted patch K is SPSD; translations are exact RBM
 
     auto patch = std::make_shared<Patch<double, 2>>(basis, basis, cp);
 
-    auto material = std::make_shared<PlaneStressShell<double>>(1.0e6, 0.3, 0.05);
+    auto material = std::make_shared<PlaneStress2d<double>>(1.0e6, 0.3, 0.05);
     ShellReissnerMindlin5p<double> element(material);
 
     Matrix<double> K = assemble_global_K(*patch, element, 3);

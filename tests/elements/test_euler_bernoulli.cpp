@@ -5,6 +5,7 @@
 #include <vector>
 
 #include "patch.hpp"
+#include "basis_derivs.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
 #include "knots.hpp"
@@ -14,7 +15,7 @@
 #include "linear_elastic_problem.hpp"
 #include "load_condition.hpp"
 #include "direct_constraint.hpp"
-#include "slender_beam_1d.hpp"
+#include "uniaxial_stress_1d.hpp"
 #include "plane_stress_2d.hpp"
 #include <Eigen/Dense>
 
@@ -46,7 +47,7 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load", "[assembly][eul
 
     auto curve = std::make_shared<Patch<double, 1>>(basis, control_pts);
 
-    auto material = std::make_shared<SlenderBeam1d<double>>(E, 0.3, A, I);
+    auto material = std::make_shared<UniaxialStress1d<double>>(E, 0.3, A, I);
 
     // 2. Element & Quadrature
     auto beam_elem = std::make_shared<BeamEulerBernoulli1p<double>>(material);
@@ -90,13 +91,16 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load", "[assembly][eul
     double v_exact = (5.0 * q * std::pow(L, 4)) / (384.0 * E * I);
     
     // Evaluate the numerical displacement at mid-span (ξ = 0.5)
-    ColMatrix<double, 1> param(1);
-    param(0) = 0.5;
+    ColMatrix<double, 1> param(1, 1);
+    param(0, 0) = 0.5;
     Index span = basis->find_span(0.5);
-    auto [sf, jac_eval] = curve->eval_shape_functions(param, span, 0);
-    auto& shape_funcs = sf[0];
-    
-    double v_num = (shape_funcs * u)(0, 0);
+    const auto b = eval_basis(*curve, param, span, 0);
+
+    auto active = curve->dof_mapper().get_element_dofs(span);
+    Vector<double> u_active(active.size());
+    for (std::size_t i = 0; i < active.size(); ++i)
+        u_active(i) = u(active[i]);
+    double v_num = (b.N * u_active)(0, 0);
 
     // Strain energy
     // U = 1/2 * u^T * K * u
@@ -139,7 +143,7 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load (Cubic Approximat
     auto curve = std::make_shared<Patch<double, 1>>(basis, control_pts);
 
     // Element & Quadrature
-    auto material = std::make_shared<SlenderBeam1d<double>>(E, 0.3, A, I);
+    auto material = std::make_shared<UniaxialStress1d<double>>(E, 0.3, A, I);
     auto element = std::make_shared<BeamEulerBernoulli1p<double>>(material);
     // Cubic basis requires 4 points for exact bending integral (order 2p-2 = 4)
     auto gauss_rule = std::make_shared<GaussLegendre<double, 1>>(4);
@@ -174,18 +178,16 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load (Cubic Approximat
     // 8. Validation
     double v_exact = (5.0 * q * std::pow(L, 4)) / (384.0 * E * I);
     
-    ColMatrix<double, 1> param(1);
-    param(0) = 0.5;
+    ColMatrix<double, 1> param(1, 1);
+    param(0, 0) = 0.5;
     Index span2 = basis->find_span(0.5);
-    auto [sf2, jac_eval2] = curve->eval_shape_functions(param, span2, 0);
-    auto& shape_funcs = sf2[0];
-    
-    // Extract active DOFs for this span
+    const auto b = eval_basis(*curve, param, span2, 0);
+
     auto active = curve->dof_mapper().get_element_dofs(span2);
     Vector<double> u_active(active.size());
     for (std::size_t i = 0; i < active.size(); ++i)
         u_active(i) = u(active[i]);
-    double v_num = (shape_funcs * u_active)(0, 0);
+    double v_num = (b.N * u_active)(0, 0);
 
     // Strain energy
     double U_num = 0.5 * u.dot(K * u);

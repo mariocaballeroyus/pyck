@@ -1,10 +1,10 @@
 #include "catch.hpp"
-#include "slender_beam_1d.hpp"
+#include "uniaxial_stress_1d.hpp"
 #include "plane_stress_2d.hpp"
 
 using namespace pyck;
 
-TEST_CASE("SlenderBeam1d", "[materials]") {
+TEST_CASE("UniaxialStress1d", "[materials]") {
     double E = 210e9;
     double A = 0.01;
     double I = 0.0001;
@@ -12,14 +12,14 @@ TEST_CASE("SlenderBeam1d", "[materials]") {
     double G = E / (2.0 * (1.0 + nu));
     double k = 5.0 / 6.0;
 
-    SlenderBeam1d<double> mat(E, nu, A, I, k);
+    UniaxialStress1d<double> mat(E, nu, A, I, k);
 
     REQUIRE(mat.youngs_modulus() == Approx(E));
     REQUIRE(mat.shear_modulus() == Approx(G));
     REQUIRE(mat.section_area() == Approx(A));
-    REQUIRE(mat.moment_inertia() == Approx(I));
-    REQUIRE(mat.shear_coefficient() == Approx(k));
-    CHECK(mat.name() == "SlenderBeam1d");
+    REQUIRE(mat.moment_inertia_22() == Approx(I));
+    REQUIRE(mat.shear_coefficient_22() == Approx(k));
+    CHECK(mat.name() == "UniaxialStress1d");
 }
 
 TEST_CASE("PlaneStress2d", "[materials]") {

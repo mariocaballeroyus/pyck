@@ -7,6 +7,7 @@
 #include <Eigen/Dense>
 
 #include "patch.hpp"
+#include "basis_derivs.hpp"
 #include "patch_boundary.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
@@ -76,12 +77,12 @@ static double eval_w_at(const Ptr<Patch<double, 2>>& patch,
     Index ni_u = patch->tensor_product().num_intervals()[0];
     Index flat = su + sv * ni_u;
 
-    auto [sf, jac] = patch->eval_shape_functions(pt, flat, 0);
+    const auto b = eval_basis(*patch, pt, flat, 0);
     auto active = patch->dof_mapper().get_element_dofs(flat);
     Vector<double> w_active(active.size());
     for (std::size_t i = 0; i < active.size(); ++i)
         w_active(i) = u_full(dof_offset + active[i] * ndof + 0);
-    return (sf[0] * w_active)(0, 0);
+    return (b.N * w_active)(0, 0);
 }
 
 // ===========================================================================

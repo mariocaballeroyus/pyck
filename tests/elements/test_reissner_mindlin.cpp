@@ -6,7 +6,7 @@
 #include <numeric>
 
 #include "patch.hpp"
-#include "factories.hpp"
+#include "basis_derivs.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
 #include "knots.hpp"
@@ -123,7 +123,7 @@ TEST_CASE("Reissner-Mindlin Plate element properties", "[RMPlate]")
 
     SECTION("Basic properties") {
         REQUIRE(element.num_node_dofs() == 3);
-        REQUIRE(element.min_order() == 1);
+        REQUIRE(element.min_order() == 2);
     }
 
     SECTION("Constitutive matrices") {
@@ -207,10 +207,10 @@ TEST_CASE("RM Plate: SS uniform load — thin plate convergence", "[RMPlate]")
     pt << 0.5, 0.5;
     Index span_u = bsp->knot_vector().find_span(p, 0.5);
     Index span_v = bsp->knot_vector().find_span(p, 0.5);
-    Index num_sp  = bsp->knot_vector().num_spans();
-    Index flat    = span_u * num_sp + span_v;
+    auto intervals = surf->tensor_product().num_intervals();
+    Index flat = span_u + span_v * intervals[0];   // u-fastest
 
-    auto [sf, jac] = surf->eval_shape_functions(pt, flat, 0);
+    const auto b = eval_basis(*surf, pt, flat, 0);
     auto active = surf->dof_mapper().get_element_dofs(flat);
 
     const Index ndof = 3;
@@ -218,7 +218,7 @@ TEST_CASE("RM Plate: SS uniform load — thin plate convergence", "[RMPlate]")
     for (std::size_t i = 0; i < active.size(); ++i)
         w_active(i) = u(active[i] * ndof + 0);  // w-DOF
 
-    double w_num = (sf[0] * w_active)(0, 0);
+    double w_num = (b.N * w_active)(0, 0);
     double rel_err = std::abs(w_num - w_exact) / std::abs(w_exact);
 
     INFO("w_exact = " << w_exact);
@@ -257,10 +257,10 @@ TEST_CASE("RM Plate: thick plate — RM > KL deflection coefficient", "[RMPlate]
     pt << 0.5, 0.5;
     Index span_u = bsp->knot_vector().find_span(p, 0.5);
     Index span_v = bsp->knot_vector().find_span(p, 0.5);
-    Index num_sp  = bsp->knot_vector().num_spans();
-    Index flat    = span_u * num_sp + span_v;
+    auto intervals = surf->tensor_product().num_intervals();
+    Index flat = span_u + span_v * intervals[0];   // u-fastest
 
-    auto [sf, jac] = surf->eval_shape_functions(pt, flat, 0);
+    const auto b = eval_basis(*surf, pt, flat, 0);
     auto active = surf->dof_mapper().get_element_dofs(flat);
 
     const Index ndof = 3;
@@ -268,7 +268,7 @@ TEST_CASE("RM Plate: thick plate — RM > KL deflection coefficient", "[RMPlate]
         Vector<double> wa(active.size());
         for (std::size_t i = 0; i < active.size(); ++i)
             wa(i) = u(active[i] * ndof + 0);
-        return (sf[0] * wa)(0, 0);
+        return (b.N * wa)(0, 0);
     };
 
     double w_thin  = get_w(u_thin);

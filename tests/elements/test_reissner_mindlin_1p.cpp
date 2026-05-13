@@ -6,7 +6,8 @@
 #include <numeric>
 
 #include "patch.hpp"
-#include "factories.hpp"
+#include "basis_derivs.hpp"
+#include "local_frame.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
 #include "knots.hpp"
@@ -242,11 +243,13 @@ TEST_CASE("RM 1P Plate: thin plate matches KL", "[RM1P]")
     pt << 0.5, 0.5;
     Index span_u = bsp->knot_vector().find_span(p, 0.5);
     Index span_v = bsp->knot_vector().find_span(p, 0.5);
-    Index num_sp = bsp->knot_vector().num_spans();
-    Index flat   = span_u * num_sp + span_v;
+    auto intervals = surf->tensor_product().num_intervals();
+    Index flat = span_u + span_v * intervals[0];   // u-fastest
 
-    auto [sf, jac] = surf->eval_shape_functions(pt, flat, element.min_order());
-    auto N_eff = element.displacement_shape_matrix(sf);  // effective shape function
+    const auto basis_d = eval_basis(*surf, pt, flat, element.min_order());
+    const auto act_pts = surf->active_control_pts(flat);
+    const auto local   = eval_local_frame(basis_d, act_pts);
+    auto N_eff = element.displacement_shape_matrix(*surf, basis_d, local);
     auto active = surf->dof_mapper().get_element_dofs(flat);
 
     Vector<double> u_active(active.size());
@@ -298,11 +301,13 @@ TEST_CASE("RM 1P Plate: thick plate — captures shear deformation", "[RM1P]")
         pt << 0.5, 0.5;
         Index span_u = bsp->knot_vector().find_span(p, 0.5);
         Index span_v = bsp->knot_vector().find_span(p, 0.5);
-        Index num_sp = bsp->knot_vector().num_spans();
-        Index flat   = span_u * num_sp + span_v;
+        auto intervals = surf->tensor_product().num_intervals();
+        Index flat = span_u + span_v * intervals[0];   // u-fastest
 
-        auto [sf, jac] = surf->eval_shape_functions(pt, flat, element.min_order());
-        auto N_eff = element.displacement_shape_matrix(sf);
+        const auto basis_d = eval_basis(*surf, pt, flat, element.min_order());
+        const auto act_pts = surf->active_control_pts(flat);
+        const auto local   = eval_local_frame(basis_d, act_pts);
+        auto N_eff = element.displacement_shape_matrix(*surf, basis_d, local);
         auto active = surf->dof_mapper().get_element_dofs(flat);
 
         Vector<double> u_active(active.size());
