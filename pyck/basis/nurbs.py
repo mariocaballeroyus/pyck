@@ -2,29 +2,17 @@
 
 from __future__ import annotations
 
-from typing import Sequence
-
 import numpy as np
+import numpy.typing as npt
 
 import pyck._pyck as _pyck
-
-from pyck.basis.basis import Basis
 from pyck.basis.knot_vector import KnotVector
+from pyck.basis.basis import Basis
+from pyck.basis.bspline import BSpline
 
 
 class NURBS(Basis):
     """NURBS (Non-Uniform Rational B-Spline) basis function.
-
-    The rational shape functions are
-
-    .. math::
-
-        R_{i,p}(u) = \\frac{w_i\\, N_{i,p}(u)}{\\sum_j w_j\\, N_{j,p}(u)}
-
-    where :math:`N_{i,p}` are the underlying B-spline functions of degree
-    :math:`p` on the given knot vector and :math:`w_i > 0` are user-supplied
-    weights (one per basis function). NURBS can represent conics (circles,
-    ellipses, parabolas, hyperbolas) exactly.
 
     Parameters
     ----------
@@ -39,23 +27,18 @@ class NURBS(Basis):
 
     _cpp_object: _pyck.NURBS
 
-    def __init__(self, deg: int, kv: KnotVector, weights: Sequence[float]) -> None:
-        super().__init__(kv)
-        w = list(float(x) for x in weights)
-        self._cpp_object = _pyck.NURBS(int(deg), kv._cpp_object, w)
-
-    @classmethod
-    def _from_cpp(cls, cpp_obj: _pyck.NURBS) -> NURBS:
-        """Wrap an existing C++ `NURBS`."""
-        obj = object.__new__(cls)
-        obj._cpp_object = cpp_obj
-        obj._knot_vector = KnotVector._from_cpp(cpp_obj.knot_vector())
-        return obj
+    def __init__(self, deg: int, kv: KnotVector, weights: npt.ArrayLike) -> None:
+        super().__init__(kv=kv)
+        self._cpp_object = _pyck.NURBS(
+            deg, kv._cpp_object, np.asarray(weights, dtype=np.float64)
+        )
 
     @property
     def weights(self) -> np.ndarray:
         """Read-only access to the basis weights."""
-        return np.asarray(self._cpp_object.weights())
+        weights_arr = np.asarray(self._cpp_object.weights())
+        weights_arr.flags.writeable = False
+        return weights_arr
 
     def __repr__(self) -> str:
         return (
@@ -63,27 +46,10 @@ class NURBS(Basis):
             f"knot_vector={self.knot_vector}, weights={self.weights})"
         )
 
+    # === Class Methods ===============================================================
 
-def create_nurbs(
-    degree: int,
-    knots: KnotVector | Sequence[float],
-    weights: Sequence[float],
-) -> NURBS:
-    """Create a :class:`NURBS` basis.
-
-    Parameters
-    ----------
-    degree : int
-        The polynomial degree.
-    knots : KnotVector or ArrayLike
-        Either a :class:`KnotVector` instance or a sequence of knot values.
-    weights : Sequence[float]
-        Per-basis-function weights, all strictly positive.
-
-    Returns
-    -------
-    The :class:`NURBS` basis instance.
-    """
-    if not isinstance(knots, KnotVector):
-        knots = KnotVector(knots)
-    return NURBS(degree, knots, weights)
+    @classmethod
+    def clamped_uniform(cls, deg: int, num_basis: int, weights: npt.ArrayLike) -> NURBS:
+        """Create a clamped uniform B-spline basis with given weights."""
+        kv = KnotVector.clamped_uniform(deg, num_basis)
+        return cls(deg, kv, weights)

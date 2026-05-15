@@ -117,6 +117,42 @@ Patch<T, d>::assembly_dofs() const
     return indices;
 }
 
+template <std::floating_point T, std::size_t d>
+ColMatrix<T, 3>
+Patch<T, d>::eval_physical(const Vector<T>& pts) const requires(d == 1)
+{
+    const Matrix<T> N = tensor_product_.basis(0).eval_all(pts, 0)[0];
+    ColMatrix<T, 3> result(pts.size(), 3);
+    result.noalias() = N * control_pts_;
+    return result;
+}
+
+template <std::floating_point T, std::size_t d>
+ColMatrix<T, 3>
+Patch<T, d>::eval_physical(const Matrix<T>& pts) const requires(d == 2)
+{
+    const Index n_pts = pts.rows();
+    const Index n_u = tensor_product_.basis(0).num_basis();
+    const Index n_v = tensor_product_.basis(1).num_basis();
+
+    const Vector<T> u_pts = pts.col(0);
+    const Vector<T> v_pts = pts.col(1);
+
+    const Matrix<T> N = tensor_product_.basis(0).eval_all(u_pts, 0)[0];  // (n_pts, n_u)
+    const Matrix<T> M = tensor_product_.basis(1).eval_all(v_pts, 0)[0];  // (n_pts, n_v)
+
+    ColMatrix<T, 3> result(n_pts, 3);
+
+    for (Index k = 0; k < 3; ++k)
+    {
+        Eigen::Map<const Matrix<T>> CP_k(control_pts_.col(k).data(), n_u, n_v);
+        for (Index p = 0; p < n_pts; ++p)
+            result(p, k) = (N.row(p) * CP_k * M.row(p).transpose())(0, 0);
+    }
+
+    return result;
+}
+
 // === Template Specializations =======================================================
 
 template class Patch<double, 1>;

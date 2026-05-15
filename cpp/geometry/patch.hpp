@@ -126,6 +126,24 @@ public:
      */
     std::array<Index, d> decode_span(Index flat_idx) const;
 
+    // === Physical Evaluation ========================================================
+
+    /**
+     * @brief Evaluate physical coordinates at parametric sample points.
+     *
+     * @param pts Parametric sample points, shape (n_pts,).
+     * @return Physical coordinates, shape (n_pts, 3).
+     */
+    ColMatrix<T, 3> eval_physical(const Vector<T>& pts) const requires(d == 1);
+
+    /**
+     * @brief Evaluate physical coordinates at parametric sample points.
+     *
+     * @param pts Parametric sample points, shape (n_pts, 2): column 0 = u, column 1 = v.
+     * @return Physical coordinates, shape (n_pts, 3).
+     */
+    ColMatrix<T, 3> eval_physical(const Matrix<T>& pts) const requires(d == 2);
+
 protected:
 
     /// @brief Patch control point coordinates in the 3-dimensional Euclidean space.
