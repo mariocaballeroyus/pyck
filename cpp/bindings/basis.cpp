@@ -25,13 +25,20 @@ void bind_basis(py::module_& m)
                py::return_value_policy::reference_internal)
 
           .def("insert", &KnotVector<double>::insert,
-               py::arg("u"), py::arg("count") = 1);
+               py::arg("u"), py::arg("count") = 1)
+
+          .def("elevate", &KnotVector<double>::elevate,
+               py::arg("count") = 1);
 
      // === Basis =====================================================================
 
      py::class_<KnotInsertion<double>>(m, "KnotInsertion")
           .def_readonly("basis",     &KnotInsertion<double>::basis)
           .def_readonly("transform", &KnotInsertion<double>::transform);
+
+     py::class_<DegreeElevation<double>>(m, "DegreeElevation")
+          .def_readonly("basis",     &DegreeElevation<double>::basis)
+          .def_readonly("transform", &DegreeElevation<double>::transform);
 
      py::class_<Basis<double>, Ptr<Basis<double>>>(m, "Basis")
           // Abstract base class (no constructor)
@@ -47,7 +54,10 @@ void bind_basis(py::module_& m)
                py::arg("order"))
 
           .def("insert_knot", &Basis<double>::insert_knot,
-               py::arg("u"), py::arg("count") = 1);
+               py::arg("u"), py::arg("count") = 1)
+
+          .def("elevate_degree", &Basis<double>::elevate_degree,
+               py::arg("count") = 1);
 
      // === BSpline(Basis) ============================================================
 

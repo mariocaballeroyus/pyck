@@ -75,6 +75,15 @@ public:
      */
     KnotInsertion<T> insert_knot(T u, Index count = 1) const override;
 
+    /**
+     * @brief Degree elevation (rational variant).
+     *
+     * Runs the underlying B-spline elevation on the homogeneous CPs; new
+     * weights are baked into the returned NURBS basis so the transform
+     * applies directly to unweighted control points.
+     */
+    DegreeElevation<T> elevate_degree(Index count = 1) const override;
+
     // === Properties =================================================================
 
     /// @brief Per-basis-function weights.

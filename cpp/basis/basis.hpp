@@ -29,6 +29,20 @@ struct KnotInsertion
 };
 
 /**
+ * @brief Result of a degree-elevation refinement.
+ *
+ * @c basis is the elevated basis (degree p + count); @c transform is the
+ * dense (n_new x n_old) CP transform with the same semantics as
+ * @c KnotInsertion::transform.
+ */
+template <std::floating_point T = double>
+struct DegreeElevation
+{
+    Ptr<Basis<T>> basis;
+    Matrix<T> transform;
+};
+
+/**
  * @brief Abstract base class for basis functions defined on a one-dimensional
  *        parametric space
  * @tparam T Scalar type
@@ -109,6 +123,17 @@ public:
      *         transform matrix such that new_cps = transform * old_cps.
      */
     virtual KnotInsertion<T> insert_knot(T u, Index count = 1) const = 0;
+
+    /**
+     * @brief Refine the basis by elevating the polynomial degree @p count times.
+     *
+     * Continuity at every existing internal knot is preserved (the defining
+     * property of p-refinement): each unique knot's multiplicity is
+     * incremented by @p count. Combine with @c insert_knot (elevate first,
+     * then insert) for k-refinement: maximally smooth refinement at the new
+     * knots.
+     */
+    virtual DegreeElevation<T> elevate_degree(Index count = 1) const = 0;
 
     // === Properties =================================================================
 

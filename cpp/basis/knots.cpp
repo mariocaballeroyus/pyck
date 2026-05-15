@@ -60,6 +60,36 @@ KnotVector<T> KnotVector<T>::insert(T u, Index count) const
     return KnotVector<T>(std::move(new_knots));
 }
 
+template <std::floating_point T>
+KnotVector<T> KnotVector<T>::elevate(Index count) const
+{
+    if (count == 0) {
+        return *this;
+    }
+
+    // Each run of equal knots has its length (multiplicity) increased by `count`.
+    std::vector<T> elevated;
+    elevated.reserve(knots_.size() + count * 2);
+
+    Index i = 0;
+    const Index n = knots_.size();
+    while (i < n) {
+        Index j = i;
+        while (j < n && knots_(j) == knots_(i)) ++j;
+        const Index mult = (j - i) + count;
+        for (Index k = 0; k < mult; ++k) {
+            elevated.push_back(knots_(i));
+        }
+        i = j;
+    }
+
+    Vector<T> out(static_cast<Eigen::Index>(elevated.size()));
+    for (std::size_t k = 0; k < elevated.size(); ++k) {
+        out(static_cast<Eigen::Index>(k)) = elevated[k];
+    }
+    return KnotVector<T>(std::move(out));
+}
+
 // === Factory Methods ================================================================
 
 template <std::floating_point T>

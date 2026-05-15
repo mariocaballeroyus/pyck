@@ -165,6 +165,19 @@ public:
     Patch<T, d> insert_knot(T u, Index count = 1) const requires(d == 1)
     { return this->insert_knot(0, u, count); }
 
+    /**
+     * @brief Refine the patch by degree-elevating in direction @p dir.
+     *
+     * Returns a new patch with the elevated basis (degree increased by
+     * @p count) and updated control points. Continuity at every existing
+     * internal knot is preserved.
+     */
+    Patch<T, d> elevate_degree(std::size_t dir, Index count = 1) const;
+
+    /// @brief Convenience overload for 1D patches: direction is always 0.
+    Patch<T, d> elevate_degree(Index count = 1) const requires(d == 1)
+    { return this->elevate_degree(0, count); }
+
 protected:
 
     /// @brief Patch control point coordinates in the 3-dimensional Euclidean space.

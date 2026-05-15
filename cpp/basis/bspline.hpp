@@ -78,6 +78,15 @@ public:
      *         matrix mapping old control points to new control points.
      */
     KnotInsertion<T> insert_knot(T u, Index count = 1) const override;
+
+    /**
+     * @brief Degree elevation (p-refinement).
+     *
+     * Implements the textbook Bezier-extraction / Bezier-elevation /
+     * knot-removal composition (Piegl-Tiller §5.5). Continuity at each
+     * existing internal knot is preserved.
+     */
+    DegreeElevation<T> elevate_degree(Index count = 1) const override;
 };
 
 } // namespace pyck

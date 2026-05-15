@@ -91,6 +91,17 @@ public:
      */
     KnotVector<T> insert(T u, Index count = 1) const;
 
+    // === Degree Elevation ===========================================================
+
+    /**
+     * @brief Degree-elevate the knot vector @p count times.
+     *
+     * Each unique knot's multiplicity is incremented by @p count. Pure
+     * splice operation; the basis-level @c Basis::elevate_degree pairs
+     * this with the corresponding control-point transform.
+     */
+    KnotVector<T> elevate(Index count = 1) const;
+
 private:
 
     /// @brief Non-decreasing sequence of knot values.

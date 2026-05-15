@@ -228,6 +228,50 @@ KnotInsertion<T> NURBS<T>::insert_knot(T u, Index count) const
     };
 }
 
+// === Degree Elevation ===============================================================
+
+template <std::floating_point T>
+DegreeElevation<T> NURBS<T>::elevate_degree(Index count) const
+{
+    const Index p = this->degree_;
+    const Index n_old = this->num_basis();
+
+    if (count == 0)
+    {
+        return DegreeElevation<T>{
+            std::make_shared<NURBS<T>>(p, this->knots_, weights_),
+            Matrix<T>::Identity(n_old, n_old)
+        };
+    }
+
+    // Run elevation on the underlying B-spline; it operates on the
+    // homogeneous CPs through the basis transform.
+    DegreeElevation<T> bs_step = bspline_.elevate_degree(count);
+    const Matrix<T>& M_bs = bs_step.transform;
+    const Index n_new = M_bs.rows();
+
+    // New weights: w'_i = sum_j M_bs[i,j] * w_j.
+    Vector<T> w_new = M_bs * weights_;
+
+    // Rational CP transform: M_rat[i,j] = M_bs[i,j] * w_j / w'_i.
+    Matrix<T> M_rat(n_new, n_old);
+    const T eps = T(1e-14);
+    for (Index i = 0; i < n_new; ++i)
+    {
+        const T inv_w = (std::abs(w_new(i)) > eps) ? T(1) / w_new(i) : T(0);
+        for (Index j = 0; j < n_old; ++j)
+        {
+            M_rat(i, j) = M_bs(i, j) * weights_(j) * inv_w;
+        }
+    }
+
+    auto new_bspline = std::dynamic_pointer_cast<BSpline<T>>(bs_step.basis);
+    auto new_basis = std::make_shared<NURBS<T>>(
+        p + count, new_bspline->knot_vector(), std::move(w_new));
+
+    return DegreeElevation<T>{new_basis, std::move(M_rat)};
+}
+
 // === Template Instantiations ========================================================
 
 template class NURBS<double>;

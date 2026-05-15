@@ -197,6 +197,50 @@ Patch<T, d>::insert_knot(std::size_t dir, T u, Index count) const
     }
 }
 
+template <std::floating_point T, std::size_t d>
+Patch<T, d>
+Patch<T, d>::elevate_degree(std::size_t dir, Index count) const
+{
+    if (dir >= d) {
+        throw std::invalid_argument("Patch::elevate_degree: direction out of range.");
+    }
+
+    const DegreeElevation<T> step = tensor_product_.basis(dir).elevate_degree(count);
+    const Matrix<T>& Top = step.transform;
+
+    if constexpr (d == 1)
+    {
+        ColMatrix<T, 3> new_cps(Top.rows(), 3);
+        new_cps.noalias() = Top * control_pts_;
+        return Patch<T, d>(step.basis, new_cps);
+    }
+    else
+    {
+        const Index n_u = tensor_product_.basis(0).num_basis();
+        const Index n_v = tensor_product_.basis(1).num_basis();
+        const Index n_u_new = (dir == 0) ? Top.rows() : n_u;
+        const Index n_v_new = (dir == 1) ? Top.rows() : n_v;
+
+        ColMatrix<T, 3> new_cps(n_u_new * n_v_new, 3);
+
+        for (Index k = 0; k < 3; ++k)
+        {
+            Eigen::Map<const Matrix<T>> CP_k(control_pts_.col(k).data(), n_u, n_v);
+            Eigen::Map<Matrix<T>> new_k(new_cps.col(k).data(), n_u_new, n_v_new);
+
+            if (dir == 0) {
+                new_k.noalias() = Top * CP_k;
+            } else {
+                new_k.noalias() = CP_k * Top.transpose();
+            }
+        }
+
+        Ptr<const Basis<T>> basis_u = (dir == 0) ? step.basis : tensor_product_.basis_ptr(0);
+        Ptr<const Basis<T>> basis_v = (dir == 1) ? step.basis : tensor_product_.basis_ptr(1);
+        return Patch<T, d>(basis_u, basis_v, new_cps);
+    }
+}
+
 // === Template Specializations =======================================================
 
 template class Patch<double, 1>;
