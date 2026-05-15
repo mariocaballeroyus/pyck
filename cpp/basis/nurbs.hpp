@@ -14,20 +14,6 @@ namespace pyck
 /**
  * @brief NURBS (Non-Uniform Rational B-Spline) basis on a 1D parametric space.
  *
- * The rational shape functions are
- *
- *      R_{i,p}(u) = w_i N_{i,p}(u) / W(u),     W(u) = Σ_j w_j N_{j,p}(u),
- *
- * where N_{i,p} are the underlying B-spline functions of degree p on the
- * given knot vector and {w_i} are user-supplied positive weights (one per
- * basis function).
- *
- * Evaluation returns the rational functions R_{i,p} and their parametric
- * derivatives, computed from the B-spline derivatives via the standard
- * quotient-rule recurrence (see Piegl & Tiller, "The NURBS Book", §4.2).
- * This means a Patch using a NURBS basis can compute geometry as
- * x(u) = R(u) · P with ordinary (un-weighted) 3D control points.
- *
  * @tparam T Scalar type
  */
 template <std::floating_point T = double>
@@ -36,6 +22,8 @@ class NURBS : public Basis<T>
 public:
 
     using BasisType = Basis<T>;
+
+    // === Constructors ===============================================================
 
     /// @brief Default constructor
     NURBS() = default;
@@ -52,6 +40,8 @@ public:
      *         number of basis functions, or if any weight is non-positive.
      */
     NURBS(Index degree, KnotVector<T> knots, Vector<T> weights);
+
+    // === Evaluation =================================================================
 
     /**
      * @brief Evaluate the (p+1) non-zero rational basis functions and their
@@ -73,6 +63,19 @@ public:
      *        to the underlying B-spline, independent of the weights).
      */
     Vector<T> greville_abscissae() const override;
+
+    // === Refinement =================================================================
+
+    /**
+     * @brief Knot insertion (Piegl-Tiller §5.3 rational variant).
+     *
+     * The transform applies directly to unweighted 3D control points; the
+     * refined weights are baked into the returned NURBS basis so the patch
+     * invariant (unweighted control points) is preserved.
+     */
+    KnotInsertion<T> insert_knot(T u, Index count = 1) const override;
+
+    // === Properties =================================================================
 
     /// @brief Per-basis-function weights.
     const Vector<T>& weights() const { return weights_; }

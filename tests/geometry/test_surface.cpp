@@ -385,3 +385,48 @@ TEST_CASE("Patch<double, 2>: composable primitives on twisted z=u·v patch",
         CHECK(a2.dot(a32) == Approx( 0.0        ).margin(1e-13));
     }
 }
+
+TEST_CASE("Patch<double, 2>: insert_knot preserves geometry", "[geometry][surface]") {
+    // 3x3 B-spline surface with a curved interior to make all spatial columns active.
+    const Index p = 2;
+    const Index n = 4;
+    auto basis_u = std::make_shared<BSpline<double>>(p, clamped_uniform_knots<double>(p, n));
+    auto basis_v = std::make_shared<BSpline<double>>(p, clamped_uniform_knots<double>(p, n));
+
+    Eigen::MatrixXd cps(n * n, 3);
+    for (Index j = 0; j < n; ++j) {
+        for (Index i = 0; i < n; ++i) {
+            const double x = static_cast<double>(i);
+            const double y = static_cast<double>(j);
+            cps.row(j * n + i) << x, y, std::sin(x) * std::cos(y);
+        }
+    }
+    Patch<double, 2> surf(basis_u, basis_v, cps);
+
+    Eigen::MatrixXd sample(5, 2);
+    sample << 0.1, 0.2,
+              0.3, 0.7,
+              0.5, 0.5,
+              0.8, 0.25,
+              0.95, 0.9;
+
+    const auto phys_ref = surf.eval_physical(sample);
+
+    SECTION("insert in u (dir=0)") {
+        auto refined = surf.insert_knot(0, 0.4, 1);
+        const auto phys = refined.eval_physical(sample);
+        REQUIRE((phys - phys_ref).cwiseAbs().maxCoeff() < 1e-12);
+    }
+
+    SECTION("insert in v (dir=1)") {
+        auto refined = surf.insert_knot(1, 0.6, 1);
+        const auto phys = refined.eval_physical(sample);
+        REQUIRE((phys - phys_ref).cwiseAbs().maxCoeff() < 1e-12);
+    }
+
+    SECTION("chained insertions in both directions") {
+        auto refined = surf.insert_knot(0, 0.4, 1).insert_knot(1, 0.6, 2);
+        const auto phys = refined.eval_physical(sample);
+        REQUIRE((phys - phys_ref).cwiseAbs().maxCoeff() < 1e-12);
+    }
+}

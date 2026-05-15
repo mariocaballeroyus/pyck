@@ -145,3 +145,44 @@ TEST_CASE("NURBS: derivatives match finite differences", "[basis][nurbs]") {
         }
     }
 }
+
+/**
+ * NURBS knot insertion preserves the curve geometry exactly (including
+ * the rational weighting). The transform is built so it applies directly
+ * to unweighted control points; the new weights are baked into the basis.
+ */
+TEST_CASE("NURBS: insert_knot preserves geometry", "[basis][nurbs]") {
+    // Quarter-circle NURBS: degree 2, knot vector [0,0,0, 1,1,1], weights [1, sqrt(2)/2, 1]
+    const Index p = 2;
+    KnotVector<double> kv(
+        (Vector<double>(6) << 0.0, 0.0, 0.0, 1.0, 1.0, 1.0).finished());
+    Vector<double> w(3);
+    w << 1.0, std::sqrt(2.0) / 2.0, 1.0;
+    NURBS<double> nb(p, kv, w);
+
+    // Control points for a unit quarter circle in the xy-plane.
+    Eigen::MatrixX3d cps(3, 3);
+    cps << 1.0, 0.0, 0.0,
+           1.0, 1.0, 0.0,
+           0.0, 1.0, 0.0;
+
+    Eigen::VectorXd samples(6);
+    samples << 0.05, 0.2, 0.4, 0.55, 0.78, 0.95;
+
+    auto step = nb.insert_knot(0.5, 1);
+    REQUIRE(step.transform.rows() == 4);
+    REQUIRE(step.transform.cols() == 3);
+
+    Eigen::MatrixX3d new_cps = step.transform * cps;
+    auto R_old = nb.eval_all(samples, 0)[0];
+    auto R_new = step.basis->eval_all(samples, 0)[0];
+    Eigen::MatrixX3d c_old = R_old * cps;
+    Eigen::MatrixX3d c_new = R_new * new_cps;
+    REQUIRE((c_old - c_new).cwiseAbs().maxCoeff() < 1e-12);
+
+    // The refined curve is still a unit circle (radius = 1) at each sample.
+    for (Index i = 0; i < c_new.rows(); ++i) {
+        const double r = c_new.row(i).head<2>().norm();
+        REQUIRE(r == Approx(1.0).margin(1e-12));
+    }
+}

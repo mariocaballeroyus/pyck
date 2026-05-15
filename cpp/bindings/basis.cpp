@@ -22,9 +22,16 @@ void bind_basis(py::module_& m)
 
           // Zero-copy view over knots with lifetime tied to KnotVector
           .def("knots", &KnotVector<double>::data,
-               py::return_value_policy::reference_internal);
+               py::return_value_policy::reference_internal)
+
+          .def("insert", &KnotVector<double>::insert,
+               py::arg("u"), py::arg("count") = 1);
 
      // === Basis =====================================================================
+
+     py::class_<KnotInsertion<double>>(m, "KnotInsertion")
+          .def_readonly("basis",     &KnotInsertion<double>::basis)
+          .def_readonly("transform", &KnotInsertion<double>::transform);
 
      py::class_<Basis<double>, Ptr<Basis<double>>>(m, "Basis")
           // Abstract base class (no constructor)
@@ -33,11 +40,14 @@ void bind_basis(py::module_& m)
           .def("degree", &Basis<double>::degree)
           .def("num_basis", &Basis<double>::num_basis)
           .def("greville_abscissae", &Basis<double>::greville_abscissae)
-          
+
           // Methods
           .def("eval_all", &Basis<double>::eval_all,
                py::arg("u"),
-               py::arg("order"));
+               py::arg("order"))
+
+          .def("insert_knot", &Basis<double>::insert_knot,
+               py::arg("u"), py::arg("count") = 1);
 
      // === BSpline(Basis) ============================================================
 

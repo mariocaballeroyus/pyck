@@ -17,6 +17,8 @@ class KnotVector
 {
 public:
 
+    // === Constructors ===============================================================
+
     /**
      * @brief Construct a knot vector from a sequence of knot values.
      *
@@ -24,6 +26,8 @@ public:
      * @throws std::invalid_argument if the sequence is empty or not non-decreasing.
      */
     explicit KnotVector(Vector<T> knots);
+
+    // === Utility Methods ============================================================
 
     /**
      * @brief Find the knot span index for a given parameter value.
@@ -36,6 +40,8 @@ public:
      * @return Span index.
      */
     Index find_span(Index degree, T point) const;
+
+    // === Properties =================================================================
 
     /**
      * @brief Get the parametric bounds of a knot span.
@@ -73,6 +79,17 @@ public:
     /// @brief Read-only reference to the underlying Eigen vector.
     const Vector<T>& data() const
     { return knots_; }
+
+    // === Knot Insertion =============================================================
+
+    /**
+     * @brief Insert a knot value @p u into the knot vector @p count times.
+     *
+     * @param u     Knot value to insert. Must lie in [front(), back()].
+     * @param count Number of times to insert (default 1).
+     * @return A new KnotVector with @p u inserted @p count times.
+     */
+    KnotVector<T> insert(T u, Index count = 1) const;
 
 private:
 

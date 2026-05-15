@@ -143,6 +143,91 @@ Vector<T> NURBS<T>::greville_abscissae() const
     return bspline_.greville_abscissae();
 }
 
+// === Knot Insertion =================================================================
+
+/**
+ * One step of rational knot insertion: returns the transform mapping old
+ * unweighted CPs to refined unweighted CPs, and the refined weight vector.
+ */
+template <std::floating_point T>
+static std::pair<Matrix<T>, Vector<T>>
+single_nurbs_insertion(Index p,
+                       const KnotVector<T>& kv,
+                       const Vector<T>& w_old,
+                       T u)
+{
+    const T eps = T(1e-14);
+    const Index n_old = kv.num_basis(p);
+    const Index n_new = n_old + 1;
+    const Index k = kv.find_span(p, u);
+
+    Matrix<T> M = Matrix<T>::Zero(n_new, n_old);
+    Vector<T> w_new(n_new);
+
+    for (Index i = 0; i < n_new; ++i)
+    {
+        if (i + p <= k)
+        {
+            M(i, i)  = T(1);
+            w_new(i) = w_old(i);
+        }
+        else if (i <= k)
+        {
+            const T denom = kv[i + p] - kv[i];
+            const T alpha = (std::abs(denom) > eps)
+                          ? (u - kv[i]) / denom : T(0);
+            const T wn = alpha * w_old(i) + (T(1) - alpha) * w_old(i - 1);
+            w_new(i) = wn;
+
+            const T inv_wn = (std::abs(wn) > eps) ? T(1) / wn : T(0);
+            const T beta   = alpha * w_old(i) * inv_wn;
+            M(i, i - 1) = T(1) - beta;
+            M(i, i)     = beta;
+        }
+        else
+        {
+            M(i, i - 1) = T(1);
+            w_new(i)    = w_old(i - 1);
+        }
+    }
+
+    return {std::move(M), std::move(w_new)};
+}
+
+template <std::floating_point T>
+KnotInsertion<T> NURBS<T>::insert_knot(T u, Index count) const
+{
+    const Index p = this->degree_;
+
+    if (count == 0)
+    {
+        return KnotInsertion<T>{
+            std::make_shared<NURBS<T>>(p, this->knots_, weights_),
+            Matrix<T>::Identity(this->num_basis(), this->num_basis())
+        };
+    }
+
+    KnotVector<T> kv = this->knots_;
+    Vector<T> w = weights_;
+
+    auto [transform, w_next] = single_nurbs_insertion<T>(p, kv, w, u);
+    kv = kv.insert(u, 1);
+    w  = std::move(w_next);
+
+    for (Index step = 1; step < count; ++step)
+    {
+        auto [step_transform, w_step] = single_nurbs_insertion<T>(p, kv, w, u);
+        transform = step_transform * transform;
+        kv = kv.insert(u, 1);
+        w  = std::move(w_step);
+    }
+
+    return KnotInsertion<T>{
+        std::make_shared<NURBS<T>>(p, std::move(kv), std::move(w)),
+        std::move(transform)
+    };
+}
+
 // === Template Instantiations ========================================================
 
 template class NURBS<double>;

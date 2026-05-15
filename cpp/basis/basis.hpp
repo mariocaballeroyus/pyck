@@ -11,8 +11,25 @@
 namespace pyck
 {
 
+template <std::floating_point T> class Basis;
+
 /**
- * @brief Abstract base class for basis functions defined on a one-dimensional 
+ * @brief Result of a knot-insertion refinement.
+ *
+ * @c basis is the refined basis; @c transform is a dense (n_new x n_old)
+ * matrix such that the refined control points are @c transform * old_cps.
+ * For NURBS, the new weights are baked into @c basis and the transform
+ * applies directly to unweighted control points.
+ */
+template <std::floating_point T = double>
+struct KnotInsertion
+{
+    Ptr<Basis<T>> basis;
+    Matrix<T> transform;
+};
+
+/**
+ * @brief Abstract base class for basis functions defined on a one-dimensional
  *        parametric space
  * @tparam T Scalar type
  */
@@ -61,19 +78,7 @@ public:
     virtual std::vector<Matrix<T>> eval_all(const Vector<T>& points,
                                             Index order = 0) const = 0;
 
-    // === Properties =================================================================
-
-    /// @brief Get the degree of the basis functions
-    Index degree() const 
-    { return degree_; }
-
-    /// @brief Get the number of basis functions
-    virtual Index num_basis() const 
-    { return knots_.num_basis(degree_); }
-
-    /// @brief Get the number of parametric intervals (elements) for this basis
-    virtual Index num_intervals() const 
-    { return knots_.num_spans(); }
+    // === Utility Methods ============================================================
 
     /**
      * @brief Find the knot span containing the given parameter value.
@@ -88,10 +93,24 @@ public:
 
     /**
      * @brief Compute the Greville abscissae for this basis.
-     * 
+     *
      * @return A vector of parameter values corresponding to the Greville points.
      */
     virtual Vector<T> greville_abscissae() const = 0;
+
+    // === Refinement =================================================================
+
+    /**
+     * @brief Refine the basis by inserting a knot value @p u with multiplicity @p count.
+     *
+     * @param u     Knot value to insert. Must lie in [knots.front(), knots.back()].
+     * @param count Number of times to insert (default 1).
+     * @return A KnotInsertion holding the refined basis and the (n_new x n_old)
+     *         transform matrix such that new_cps = transform * old_cps.
+     */
+    virtual KnotInsertion<T> insert_knot(T u, Index count = 1) const = 0;
+
+    // === Properties =================================================================
 
     /// @brief Get the knot vector object
     const KnotVector<T>& knot_vector() const 
@@ -100,6 +119,18 @@ public:
     /// @brief Get the raw knot values
     const Vector<T>& knots() const
     { return knots_.data(); }
+
+    /// @brief Get the degree of the basis functions
+    Index degree() const 
+    { return degree_; }
+
+    /// @brief Get the number of basis functions
+    virtual Index num_basis() const 
+    { return knots_.num_basis(degree_); }
+
+    /// @brief Get the number of parametric intervals (elements) for this basis
+    virtual Index num_intervals() const 
+    { return knots_.num_spans(); }
 
 protected:
 

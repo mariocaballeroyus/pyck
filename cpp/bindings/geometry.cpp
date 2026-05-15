@@ -31,7 +31,12 @@ void bind_geometry(py::module_& m)
 
         .def("eval_physical",
             static_cast<ColMatrix<double, 3> (Patch1d::*)(const Vector<double>&) const>(&Patch1d::eval_physical),
-            py::arg("pts"));
+            py::arg("pts"))
+
+        .def("insert_knot",
+            static_cast<Patch1d (Patch1d::*)(double, Index) const>(&Patch1d::insert_knot),
+            py::arg("u"), 
+            py::arg("count") = 1);
 
     using Patch2d = Patch<double, 2>;
 
@@ -49,7 +54,11 @@ void bind_geometry(py::module_& m)
 
         .def("eval_physical",
             static_cast<ColMatrix<double, 3> (Patch2d::*)(const Matrix<double>&) const>(&Patch2d::eval_physical),
-            py::arg("pts"));
+            py::arg("pts"))
+
+        .def("insert_knot",
+            static_cast<Patch2d (Patch2d::*)(std::size_t, double, Index) const>(&Patch2d::insert_knot),
+            py::arg("dir"), py::arg("u"), py::arg("count") = 1);
 
     // === Patch Boundary =============================================================
 

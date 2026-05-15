@@ -504,3 +504,56 @@ TEST_CASE("BSpline: compare eval_on_span with naive", "[basis][bspline][deriv]")
         }
     }
 }
+
+/**
+ * BSpline knot insertion preserves the curve geometry.
+ *
+ * For arbitrary control points P, the curve c(u) = N(u) · P must equal
+ * the refined c'(u) = N_new(u) · (T · P) at every parameter sample.
+ */
+TEST_CASE("BSpline: insert_knot preserves geometry", "[basis][bspline]") {
+    const Index p = 3;
+    const Index n = 6;
+    BSpline<double> bs(p, clamped_uniform_knots<double>(p, n));
+
+    // Arbitrary 3D control polygon
+    Eigen::MatrixX3d cps(n, 3);
+    for (Index i = 0; i < n; ++i) {
+        cps(i, 0) = static_cast<double>(i);
+        cps(i, 1) = 0.5 * static_cast<double>(i * i);
+        cps(i, 2) = std::sin(static_cast<double>(i));
+    }
+
+    Eigen::VectorXd samples(5);
+    samples << 0.05, 0.27, 0.5, 0.72, 0.93;
+
+    SECTION("single insertion") {
+        auto step = bs.insert_knot(0.3, 1);
+        REQUIRE(step.transform.rows() == n + 1);
+        REQUIRE(step.transform.cols() == n);
+        // Partition of unity in the row-sums (Boehm preserves it).
+        for (Index i = 0; i < step.transform.rows(); ++i)
+            REQUIRE(step.transform.row(i).sum() == Approx(1.0));
+
+        Eigen::MatrixX3d new_cps = step.transform * cps;
+        auto N_old = bs.eval_all(samples, 0)[0];
+        auto N_new = step.basis->eval_all(samples, 0)[0];
+
+        Eigen::MatrixX3d c_old = N_old * cps;
+        Eigen::MatrixX3d c_new = N_new * new_cps;
+        REQUIRE((c_old - c_new).cwiseAbs().maxCoeff() < 1e-12);
+    }
+
+    SECTION("multi-insertion (count = 2)") {
+        auto step = bs.insert_knot(0.4, 2);
+        REQUIRE(step.transform.rows() == n + 2);
+        REQUIRE(step.transform.cols() == n);
+
+        Eigen::MatrixX3d new_cps = step.transform * cps;
+        auto N_old = bs.eval_all(samples, 0)[0];
+        auto N_new = step.basis->eval_all(samples, 0)[0];
+        Eigen::MatrixX3d c_old = N_old * cps;
+        Eigen::MatrixX3d c_new = N_new * new_cps;
+        REQUIRE((c_old - c_new).cwiseAbs().maxCoeff() < 1e-12);
+    }
+}

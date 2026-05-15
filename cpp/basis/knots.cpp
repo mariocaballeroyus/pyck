@@ -37,6 +37,29 @@ Index KnotVector<T>::find_span(Index degree, T point) const
     return static_cast<Index>(std::distance(knots_.begin(), it) - 1);
 }
 
+template <std::floating_point T>
+KnotVector<T> KnotVector<T>::insert(T u, Index count) const
+{
+    if (u < knots_(0) || u > knots_(knots_.size() - 1)) {
+        throw std::invalid_argument("KnotVector::insert: "
+                                    "u is outside the knot range.");
+    }
+    if (count == 0) {
+        return *this;
+    }
+
+    // Locate the insertion point (last position where knots_[pos-1] <= u).
+    auto it = std::upper_bound(knots_.begin(), knots_.end(), u);
+    const Index pos = static_cast<Index>(std::distance(knots_.begin(), it));
+
+    Vector<T> new_knots(knots_.size() + count);
+    new_knots.head(pos) = knots_.head(pos);
+    new_knots.segment(pos, count).setConstant(u);
+    new_knots.tail(knots_.size() - pos) = knots_.tail(knots_.size() - pos);
+
+    return KnotVector<T>(std::move(new_knots));
+}
+
 // === Factory Methods ================================================================
 
 template <std::floating_point T>

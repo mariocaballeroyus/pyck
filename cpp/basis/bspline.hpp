@@ -22,6 +22,8 @@ public:
 
     using BasisType = Basis<T>;
 
+    // === Constructors ===============================================================
+
     /// @brief Default constructor
     BSpline() = default;
 
@@ -33,6 +35,8 @@ public:
      */
     BSpline(Index degree, KnotVector<T> knots)
         : BasisType(degree, std::move(knots)) {}
+
+    // === Evaluation =================================================================
 
     /**
      * @brief Evaluate the (p+1) non-zero B-spline basis functions and their
@@ -62,6 +66,18 @@ public:
      * @brief Compute the Greville abscissae for the B-spline basis.
      */
     Vector<T> greville_abscissae() const override;
+
+    // === Refinement =================================================================
+
+    /**
+     * @brief Boehm knot insertion.
+     *
+     * @param u     Knot value to insert.
+     * @param count Number of times to insert.
+     * @return Refined BSpline basis (wrapped in @c basis) and the transform
+     *         matrix mapping old control points to new control points.
+     */
+    KnotInsertion<T> insert_knot(T u, Index count = 1) const override;
 };
 
 } // namespace pyck

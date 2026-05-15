@@ -85,3 +85,37 @@ TEST_CASE("KnotVector: Greville abscissae", "[basis][knots]") {
         REQUIRE(sum / p == Approx(expected[i]));
     }
 }
+
+/**
+ * Knot insertion: splices values, preserves sortedness.
+ */
+TEST_CASE("KnotVector: insert", "[basis][knots]") {
+    auto kv = clamped_uniform_knots<double>(2, 5); // [0,0,0, 1/3, 2/3, 1,1,1]
+
+    SECTION("single insertion grows the vector by one") {
+        auto kv2 = kv.insert(0.5, 1);
+        REQUIRE(kv2.size() == kv.size() + 1);
+        for (std::size_t i = 0; i + 1 < kv2.size(); ++i)
+            REQUIRE(kv2[i] <= kv2[i + 1]);
+    }
+
+    SECTION("count > 1 inserts repeated knots in place") {
+        auto kv3 = kv.insert(0.5, 3);
+        REQUIRE(kv3.size() == kv.size() + 3);
+        // Three consecutive 0.5 values must appear.
+        std::size_t run = 0;
+        for (std::size_t i = 0; i < kv3.size(); ++i)
+            if (kv3[i] == Approx(0.5)) ++run;
+        REQUIRE(run == 3);
+    }
+
+    SECTION("count = 0 returns a copy") {
+        auto kv0 = kv.insert(0.5, 0);
+        REQUIRE(kv0.size() == kv.size());
+    }
+
+    SECTION("u outside knot range throws") {
+        REQUIRE_THROWS_AS(kv.insert(-0.1), std::invalid_argument);
+        REQUIRE_THROWS_AS(kv.insert(1.5), std::invalid_argument);
+    }
+}

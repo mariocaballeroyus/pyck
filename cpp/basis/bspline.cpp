@@ -271,6 +271,79 @@ Vector<T> BSpline<T>::greville_abscissae() const
     return greville;
 }
 
+// === Knot Insertion =================================================================
+
+/**
+ * Build the (n+1, n) Boehm transform that maps control points of a degree-p
+ * basis with knot vector @p kv to the refined basis obtained by inserting a
+ * single copy of @p u.
+ */
+template <std::floating_point T>
+static Matrix<T> single_boehm_transform(Index p,
+                                        const KnotVector<T>& kv,
+                                        T u)
+{
+    const T eps = T(1e-14);
+    const Index n_old = kv.num_basis(p);
+    const Index n_new = n_old + 1;
+    const Index k = kv.find_span(p, u);
+
+    Matrix<T> M = Matrix<T>::Zero(n_new, n_old);
+
+    for (Index i = 0; i < n_new; ++i)
+    {
+        if (i + p <= k)
+        {
+            M(i, i) = T(1);
+        }
+        else if (i <= k)
+        {
+            const T denom = kv[i + p] - kv[i];
+            const T alpha = (std::abs(denom) > eps)
+                          ? (u - kv[i]) / denom : T(0);
+            M(i, i - 1) = T(1) - alpha;
+            M(i, i)     = alpha;
+        }
+        else
+        {
+            M(i, i - 1) = T(1);
+        }
+    }
+
+    return M;
+}
+
+template <std::floating_point T>
+KnotInsertion<T> BSpline<T>::insert_knot(T u, Index count) const
+{
+    const Index p = this->degree_;
+    const KnotVector<T>& kv0 = this->knots_;
+
+    if (count == 0)
+    {
+        return KnotInsertion<T>{
+            std::make_shared<BSpline<T>>(p, kv0),
+            Matrix<T>::Identity(this->num_basis(), this->num_basis())
+        };
+    }
+
+    KnotVector<T> kv = kv0;
+    Matrix<T> transform = single_boehm_transform<T>(p, kv, u);
+    kv = kv.insert(u, 1);
+
+    for (Index step = 1; step < count; ++step)
+    {
+        Matrix<T> step_transform = single_boehm_transform<T>(p, kv, u);
+        transform = step_transform * transform;
+        kv = kv.insert(u, 1);
+    }
+
+    return KnotInsertion<T>{
+        std::make_shared<BSpline<T>>(p, std::move(kv)),
+        std::move(transform)
+    };
+}
+
 // === Template Instantiations ========================================================
 
 template class BSpline<double>;
