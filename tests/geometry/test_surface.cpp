@@ -25,7 +25,7 @@ using namespace pyck;
 
 TEST_CASE("Patch<double, 2>: Flat Rectangular Plate", "[geometry][surface]") {
 
-    auto kv = KnotVector<double>({0, 0, 1, 1});
+    auto kv = KnotVector<double>((Vector<double>(4) << 0, 0, 1, 1).finished());
     auto basis_u = std::make_shared<BSpline<double>>(1, kv);
     auto basis_v = std::make_shared<BSpline<double>>(1, kv);
 
@@ -163,7 +163,7 @@ TEST_CASE("Patch<double, 2>: Rectangle factory area integral", "[geometry][surfa
 TEST_CASE("Patch<double, 2>: eval_physical_points on a flat rectangle",
           "[geometry][surface]") {
 
-    auto kv = KnotVector<double>({0, 0, 1, 1});
+    auto kv = KnotVector<double>((Vector<double>(4) << 0, 0, 1, 1).finished());
     auto basis_u = std::make_shared<BSpline<double>>(1, kv);
     auto basis_v = std::make_shared<BSpline<double>>(1, kv);
 
@@ -192,7 +192,7 @@ TEST_CASE("Patch<double, 2>: eval_physical_points on a flat rectangle",
 TEST_CASE("Patch<double, 2>: Quadratic Basis — Partition of Unity",
           "[geometry][surface]") {
 
-    auto kv = KnotVector<double>({0, 0, 0, 1, 1, 1});
+    auto kv = KnotVector<double>((Vector<double>(6) << 0, 0, 0, 1, 1, 1).finished());
     auto basis_u = std::make_shared<BSpline<double>>(2, kv);
     auto basis_v = std::make_shared<BSpline<double>>(2, kv);
 
@@ -245,7 +245,7 @@ TEST_CASE("Patch<double, 2>: Quadratic Basis — Partition of Unity",
 TEST_CASE("PatchBoundary<double, 2>::eval_outward_normal: flat rectangle",
           "[geometry][surface][boundary]") {
 
-    auto kv = KnotVector<double>({0, 0, 1, 1});
+    auto kv = KnotVector<double>((Vector<double>(4) << 0, 0, 1, 1).finished());
     auto basis_u = std::make_shared<BSpline<double>>(1, kv);
     auto basis_v = std::make_shared<BSpline<double>>(1, kv);
 
@@ -294,7 +294,7 @@ TEST_CASE("PatchBoundary<double, 2>::eval_outward_normal: flat rectangle",
 TEST_CASE("Patch<double, 2>: composable primitives on twisted z=u·v patch",
           "[geometry][surface][primitives]") {
 
-    auto kv = KnotVector<double>({0, 0, 1, 1});
+    auto kv = KnotVector<double>((Vector<double>(4) << 0, 0, 1, 1).finished());
     auto basis_u = std::make_shared<BSpline<double>>(1, kv);
     auto basis_v = std::make_shared<BSpline<double>>(1, kv);
 

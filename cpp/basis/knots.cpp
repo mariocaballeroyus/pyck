@@ -1,5 +1,6 @@
 #include "knots.hpp"
 
+#include <algorithm>
 #include <stdexcept>
 #include <string>
 
@@ -7,10 +8,10 @@ namespace pyck
 {
 
 template <std::floating_point T>
-KnotVector<T>::KnotVector(std::vector<T> knots)
+KnotVector<T>::KnotVector(Vector<T> knots)
     : knots_(std::move(knots))
 {
-    if (knots_.empty()) {
+    if (knots_.size() == 0) {
         throw std::invalid_argument("KnotVector: "
                                     "knot sequence must not be empty.");
     }
@@ -39,7 +40,7 @@ Index KnotVector<T>::find_span(Index degree, T point) const
 // === Factory Methods ================================================================
 
 template <std::floating_point T>
-KnotVector<T> clamped_uniform_knots(Index degree, 
+KnotVector<T> clamped_uniform_knots(Index degree,
                                     Index num_basis)
 {
     // Check: num_knots = num_basis + degree + 1
@@ -47,30 +48,26 @@ KnotVector<T> clamped_uniform_knots(Index degree,
         throw std::invalid_argument("KnotVector: "
                                     "Number of basis functions must be at least degree + 1.");
     }
-    if (degree < 0) {
-        throw std::invalid_argument("KnotVector: "
-                                    "Degree must be non-negative.");
-    }
 
     Index num_knots = num_basis + degree + 1;
-    std::vector<T> knots(num_knots);
+    Vector<T> knots(num_knots);
 
     // Number of unique spans in the internal part of the vector
     const Index num_spans = num_basis - degree;
 
-    for (Index i = 0; i < num_knots; ++i) 
+    for (Index i = 0; i < num_knots; ++i)
     {
         if (i <= degree) {
             // Clamped start: first p+1 knots are 0.0
-            knots[i] = static_cast<T>(0.0);
-        }  
+            knots(i) = static_cast<T>(0.0);
+        }
         else if (i >= num_knots - degree - 1) {
             // Clamped end: last p+1 knots are 1.0
-            knots[i] = static_cast<T>(1.0);
-        }  
+            knots(i) = static_cast<T>(1.0);
+        }
         else {
             // Uniformly spaced internal knots
-            knots[i] = (static_cast<T>(i - degree) / static_cast<T>(num_spans));
+            knots(i) = (static_cast<T>(i - degree) / static_cast<T>(num_spans));
         }
     }
 

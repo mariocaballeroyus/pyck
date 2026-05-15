@@ -20,8 +20,8 @@ def test_lagrange_multiplier_condition_augments_system():
 
     K, f = problem.assemble()
 
-    n_phys = surface.num_control_pts * element._cpp_object.num_node_dofs()
-    n_lambda = boundary._cpp_object.num_control_pts() * 2
+    n_phys = surface.num_control_pts * element.num_node_dofs
+    n_lambda = boundary._cpp_object.control_pts().shape[0] * 2
 
     assert K.shape == (n_phys + n_lambda, n_phys + n_lambda)
     assert f.shape == (n_phys + n_lambda,)

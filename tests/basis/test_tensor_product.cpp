@@ -56,7 +56,8 @@ TEST_CASE("TensorProduct: partition of unity", "[basis][tensor]") {
  * Lexicographical ordering of eval_on_span.
  */
 TEST_CASE("TensorProduct: lexicographical ordering", "[basis][tensor]") {
-    std::vector<double> knots = {0, 0, 0, 1, 1, 1};
+    Vector<double> knots(6);
+    knots << 0, 0, 0, 1, 1, 1;
     KnotVector<double> kv(knots);
     auto bu = std::make_shared<BSpline<double>>(2, kv);
     auto bv = std::make_shared<BSpline<double>>(2, kv);
@@ -107,7 +108,7 @@ TEST_CASE("TensorProduct: lexicographical ordering", "[basis][tensor]") {
  * Linear consistency (bilinear patch).
  */
 TEST_CASE("TensorProduct: bilinear consistency", "[basis][tensor]") {
-    KnotVector<double> kv({0, 0, 1, 1});
+    KnotVector<double> kv((Vector<double>(4) << 0, 0, 1, 1).finished());
     auto bu = std::make_shared<BSpline<double>>(1, kv);
     auto bv = std::make_shared<BSpline<double>>(1, kv);
     TensorProduct<double, 2> tp(std::array<Ptr<const Basis<double>>, 2>{bu, bv});
@@ -138,7 +139,8 @@ TEST_CASE("TensorProduct: bilinear consistency", "[basis][tensor]") {
  * Derivative Kronecker product check.
  */
 TEST_CASE("TensorProduct: derivative Kronecker check", "[basis][tensor]") {
-    std::vector<double> knots = {0, 0, 0, 1, 1, 1};
+    Vector<double> knots(6);
+    knots << 0, 0, 0, 1, 1, 1;
     KnotVector<double> kv(knots);
     auto bu = std::make_shared<BSpline<double>>(2, kv);
     auto bv = std::make_shared<BSpline<double>>(2, kv);

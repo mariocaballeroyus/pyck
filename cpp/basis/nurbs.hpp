@@ -51,7 +51,7 @@ public:
      * @throws std::invalid_argument if the weight count does not match the
      *         number of basis functions, or if any weight is non-positive.
      */
-    NURBS(Index degree, KnotVector<T> knots, std::vector<T> weights);
+    NURBS(Index degree, KnotVector<T> knots, Vector<T> weights);
 
     /**
      * @brief Evaluate the (p+1) non-zero rational basis functions and their
@@ -75,7 +75,7 @@ public:
     Vector<T> greville_abscissae() const override;
 
     /// @brief Per-basis-function weights.
-    const std::vector<T>& weights() const { return weights_; }
+    const Vector<T>& weights() const { return weights_; }
 
     /// @brief Underlying B-spline basis (without rational weighting).
     const BSpline<T>& bspline() const { return bspline_; }
@@ -86,7 +86,7 @@ private:
     BSpline<T> bspline_;
 
     /// @brief Per-basis-function weights, indexed 0 .. num_basis - 1.
-    std::vector<T> weights_;
+    Vector<T> weights_;
 };
 
 } // namespace pyck

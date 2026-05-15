@@ -502,8 +502,9 @@ TEST_CASE("PenaltyBoundaryCondition RM-3p plate: clamped BCs agree with DirectCo
         std::sort(fixed_dofs.begin(), fixed_dofs.end());
         fixed_dofs.erase(std::unique(fixed_dofs.begin(), fixed_dofs.end()), fixed_dofs.end());
 
-        DirectConstraint<double>(fixed_dofs,
-            std::vector<double>(fixed_dofs.size(), 0.0)).apply(K, F);
+        DirectConstraint<double>(
+            IndexVector(Eigen::Map<const IndexVector>(fixed_dofs.data(), fixed_dofs.size())),
+            Vector<double>::Zero(fixed_dofs.size())).apply(K, F);
 
         Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
         solver.compute(K.sparseView());

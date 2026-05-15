@@ -253,7 +253,7 @@ TEST_CASE("ShellRM5p reduces to PlateRM3p on a flat axis-aligned patch",
 TEST_CASE("ShellRM5p: curved twisted patch K is SPSD; translations are exact RBMs",
           "[elements][shell-rm5p]") {
 
-    auto kv = KnotVector<double>({0, 0, 1, 1});
+    auto kv = KnotVector<double>((Vector<double>(4) << 0, 0, 1, 1).finished());
     auto basis = std::make_shared<BSpline<double>>(1, kv);
 
     Eigen::MatrixXd cp(4, 3);

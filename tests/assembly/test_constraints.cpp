@@ -18,7 +18,9 @@ TEST_CASE("DirectConstraint enforces prescribed DOF values", "[constraints]")
     Vector<double> F(3);
     F << 1, 2, 3;
 
-    DirectConstraint<double> dirichlet_cond({0, 2}, std::vector<double>{10.0, -5.0});
+    DirectConstraint<double> dirichlet_cond(
+        (IndexVector(2) << 0, 2).finished(),
+        (Vector<double>(2) << 10.0, -5.0).finished());
     dirichlet_cond.apply(K, F);
 
     // Verify diagonal entries and RHS values for constrained DOFs
@@ -50,7 +52,9 @@ TEST_CASE("LinearConstraint enforces identity relationships between DOFs", "[con
 
     IndexMatrix ms_masters(1, 1);
     ms_masters << 0;
-    LinearConstraint<double> ms_cond({2}, ms_masters, {1.0}); // slave 2, master 0
+    LinearConstraint<double> ms_cond(
+        (IndexVector(1) << 2).finished(), ms_masters,
+        (Vector<double>(1) << 1.0).finished()); // slave 2, master 0
     ms_cond.apply(K, F);
 
     // Verify symmetry of condensed stiffness matrix
@@ -83,7 +87,9 @@ TEST_CASE("LinearConstraint enforces linear combinations of DOFs", "[constraints
     // slave = 3, masters = (0, 0.5), (1, -0.3), c = 2.0
     IndexMatrix masters(1, 2);
     masters << 0, 1;
-    LinearConstraint<double> mpc_cond({3}, masters, {0.5, -0.3}, 2.0);
+    LinearConstraint<double> mpc_cond(
+        (IndexVector(1) << 3).finished(), masters,
+        (Vector<double>(2) << 0.5, -0.3).finished(), 2.0);
     mpc_cond.apply(K, F);
 
     // Verify symmetry of condensed stiffness matrix

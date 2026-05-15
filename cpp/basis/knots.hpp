@@ -1,9 +1,7 @@
 #ifndef PYCK_KNOT_VECTOR_HPP
 #define PYCK_KNOT_VECTOR_HPP
 
-#include <algorithm>
 #include <cstddef>
-#include <vector>
 
 #include "../types.hpp"
 
@@ -16,16 +14,16 @@ namespace pyck
  */
 template <std::floating_point T = double>
 class KnotVector
-{   
+{
 public:
 
     /**
      * @brief Construct a knot vector from a sequence of knot values.
-     * 
+     *
      * @param knots Non-decreasing sequence of knot values.
      * @throws std::invalid_argument if the sequence is empty or not non-decreasing.
      */
-    explicit KnotVector(std::vector<T> knots);
+    explicit KnotVector(Vector<T> knots);
 
     /**
      * @brief Find the knot span index for a given parameter value.
@@ -49,11 +47,11 @@ public:
     { return {knots_[span], knots_[span + 1]}; }
 
     /// @brief Number of basis functions of given degree supported by this vector.
-    Index num_basis(Index degree) const 
+    Index num_basis(Index degree) const
     { return knots_.size() - degree - 1; }
 
     /// @brief Number of knots in the vector.
-    Index size() const 
+    Index size() const
     { return knots_.size(); }
 
     /// @brief Total number of knot spans (including zero-length clamped ones).
@@ -61,33 +59,25 @@ public:
     { return knots_.size() - 1; }
 
     /// @brief Access the i-th knot value.
-    T operator[](Index i) const 
+    T operator[](Index i) const
     { return knots_[i]; }
 
     /// @brief First knot value.
-    T front() const 
-    { return knots_.front(); }
+    T front() const
+    { return knots_(0); }
 
     /// @brief Last knot value.
-    T back() const 
-    { return knots_.back(); }
+    T back() const
+    { return knots_(knots_.size() - 1); }
 
-    /// @brief Read-only reference to the underlying std::vector.
-    const std::vector<T>& data() const 
+    /// @brief Read-only reference to the underlying Eigen vector.
+    const Vector<T>& data() const
     { return knots_; }
-
-    /// @brief Iterator to the first knot.
-    auto begin() const 
-    { return knots_.begin(); }
-
-    /// @brief Iterator to the past-the-end knot.
-    auto end() const 
-    { return knots_.end(); }
 
 private:
 
     /// @brief Non-decreasing sequence of knot values.
-    std::vector<T> knots_;
+    Vector<T> knots_;
 
 };
 
@@ -100,7 +90,7 @@ private:
  * @param num_basis Number of basis functions (n).  Must satisfy n >= p + 1.
  * @return A knot vector with (p+1) repeated knots at each end and
  *         uniformly spaced internal knots.
- * 
+ *
  * @throws std::invalid_argument if num_basis < degree + 1 or negative.
  */
 template <std::floating_point T = double>

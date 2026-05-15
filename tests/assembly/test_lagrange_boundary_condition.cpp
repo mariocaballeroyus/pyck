@@ -66,7 +66,9 @@ static void add_clamped_direct_rm3(
     std::sort(fixed.begin(), fixed.end());
     fixed.erase(std::unique(fixed.begin(), fixed.end()), fixed.end());
     problem.add_direct_constraint(
-        std::make_shared<DirectConstraint<T>>(fixed, T(0))
+        std::make_shared<DirectConstraint<T>>(
+            IndexVector(Eigen::Map<const IndexVector>(fixed.data(), fixed.size())),
+            T(0))
     );
 }
 

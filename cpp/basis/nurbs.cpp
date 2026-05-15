@@ -42,7 +42,7 @@ inline std::size_t binomial(std::size_t n, std::size_t k)
 template <std::floating_point T>
 std::vector<Matrix<T>> apply_rational_quotient(
     const std::vector<Matrix<T>>& bspline_derivs,
-    const std::vector<T>& active_weights)
+    const Vector<T>& active_weights)
 {
     const Index order = static_cast<Index>(bspline_derivs.size()) - 1;
     const Index Q = bspline_derivs[0].rows();
@@ -53,7 +53,7 @@ std::vector<Matrix<T>> apply_rational_quotient(
     for (Index k = 0; k <= order; ++k) {
         A[k] = bspline_derivs[k];
         for (Index j = 0; j < K; ++j) {
-            A[k].col(j) *= active_weights[static_cast<std::size_t>(j)];
+            A[k].col(j) *= active_weights(j);
         }
     }
 
@@ -97,7 +97,7 @@ std::vector<Matrix<T>> apply_rational_quotient(
 } // namespace
 
 template <std::floating_point T>
-NURBS<T>::NURBS(Index degree, KnotVector<T> knots, std::vector<T> weights)
+NURBS<T>::NURBS(Index degree, KnotVector<T> knots, Vector<T> weights)
     : BasisType(degree, knots),
       bspline_(degree, std::move(knots)),
       weights_(std::move(weights))
@@ -109,11 +109,9 @@ NURBS<T>::NURBS(Index degree, KnotVector<T> knots, std::vector<T> weights)
             + ") must match the number of basis functions ("
             + std::to_string(n) + ").");
     }
-    for (const T& w : weights_) {
-        if (!(w > T(0))) {
-            throw std::invalid_argument(
-                "NURBS: all weights must be strictly positive.");
-        }
+    if ((weights_.array() <= T(0)).any()) {
+        throw std::invalid_argument(
+            "NURBS: all weights must be strictly positive.");
     }
 }
 
@@ -126,10 +124,7 @@ std::vector<Matrix<T>> NURBS<T>::eval_on_span(const Vector<T>& points,
 
     // The (p+1) active basis indices on this span are span-p .. span.
     const Index p = this->degree_;
-    std::vector<T> active(static_cast<std::size_t>(p) + 1);
-    for (Index j = 0; j <= p; ++j) {
-        active[static_cast<std::size_t>(j)] = weights_[span - p + j];
-    }
+    Vector<T> active = weights_.segment(span - p, p + 1);
 
     return apply_rational_quotient<T>(bspline_derivs, active);
 }

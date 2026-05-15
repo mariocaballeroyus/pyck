@@ -1,7 +1,6 @@
 #ifndef PYCK_DIRECT_CONSTRAINT_HPP
 #define PYCK_DIRECT_CONSTRAINT_HPP
 
-#include <vector>
 #include <concepts>
 #include <stdexcept>
 
@@ -24,46 +23,36 @@ class DirectConstraint : public Constraint<T>
 {
 public:
     /**
-     * @brief Construct a `DirectConstraint` from lists of DOF indices and 
-     * values.
-     *
-     * @param dofs   Global DOF indices to constrain.
-     * @param values Prescribed values.
+     * @brief Construct a DirectConstraint from per-DOF indices and values.
      */
-    DirectConstraint(std::vector<Index> dofs, 
-                        std::vector<T> values);
+    DirectConstraint(IndexVector dofs,
+                     Vector<T>   values);
 
     /**
-     * @brief Construct a `DirectConstraint` from a list of DOF indices and a 
-     * single value.
-     *
-     * @param dofs  Global DOF indices to constrain.
-     * @param value Prescribed value for all DOFs.
+     * @brief Construct a DirectConstraint from DOF indices and a single
+     * value applied to all of them.
      */
-    DirectConstraint(std::vector<Index> dofs, 
-                        T value = T(0));
+    DirectConstraint(IndexVector dofs,
+                     T value = T(0));
 
     /**
      * @brief Apply the Dirichlet constraint to a stiffness matrix and load vector.
-     *
-     * @param stiffness Stiffness matrix
-     * @param load      Load vector
      */
-    void apply(Matrix<T>& stiffness, 
+    void apply(Matrix<T>& stiffness,
                Vector<T>& load) const override;
 
     /// @brief Get the constrained DOF indices
-    const std::vector<Index>& dofs() const { return dofs_; }
+    const IndexVector& dofs() const { return dofs_; }
 
     /// @brief Get the constrained DOF values
-    const std::vector<T>& values() const { return values_; }
+    const Vector<T>& values() const { return values_; }
 
 private:
     /// @brief Constrained DOF indices
-    std::vector<Index> dofs_;
+    IndexVector dofs_;
 
     /// @brief Constrained DOF values
-    std::vector<T> values_;
+    Vector<T> values_;
 };
 
 } // namespace pyck

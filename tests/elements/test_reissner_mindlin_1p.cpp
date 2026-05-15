@@ -152,7 +152,9 @@ static Eigen::VectorXd solve_ss_rm1p_plate(
     std::sort(ss_dofs.begin(), ss_dofs.end());
     ss_dofs.erase(std::unique(ss_dofs.begin(), ss_dofs.end()), ss_dofs.end());
 
-    DirectConstraint<double>(ss_dofs, std::vector<double>(ss_dofs.size(), 0.0)).apply(K, F);
+    DirectConstraint<double>(
+        IndexVector(Eigen::Map<const IndexVector>(ss_dofs.data(), ss_dofs.size())),
+        Vector<double>::Zero(ss_dofs.size())).apply(K, F);
 
     Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
     Eigen::SparseMatrix<double> Ks = K.sparseView();

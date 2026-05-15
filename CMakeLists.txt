@@ -89,7 +89,6 @@ target_link_libraries(pyck_conditions PUBLIC pyck_geometry pyck_assembly)
 
 # Postprocessing library
 add_library(pyck_postprocessing
-    cpp/postprocessing/integrate.cpp
     cpp/postprocessing/physical_points.cpp
 )
 target_include_directories(pyck_postprocessing PUBLIC cpp/postprocessing)
@@ -115,7 +114,18 @@ target_link_libraries(pyck_elements PUBLIC pyck_geometry pyck_assembly pyck_mate
 add_subdirectory(external/pybind11)
 
 # Python module
-pybind11_add_module(_pyck cpp/bindings.cpp)
+pybind11_add_module(_pyck
+    cpp/bindings/module.cpp
+    cpp/bindings/basis.cpp
+    cpp/bindings/geometry.cpp
+    cpp/bindings/quadrature.cpp
+    cpp/bindings/materials.cpp
+    cpp/bindings/elements.cpp
+    cpp/bindings/conditions.cpp
+    cpp/bindings/constraints.cpp
+    cpp/bindings/assembly.cpp
+    cpp/bindings/postprocessing.cpp
+)
 target_link_libraries(_pyck PRIVATE pyck_basis pyck_geometry pyck_elements pyck_conditions pyck_constraints pyck_assembly pyck_materials pyck_postprocessing)
 set_target_properties(_pyck PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/pyck")
 install(TARGETS _pyck DESTINATION pyck)

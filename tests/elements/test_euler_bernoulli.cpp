@@ -33,7 +33,8 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load", "[assembly][eul
     // 1. Geometry: Single patch line from x=0 to x=L
     // A simply supported Euler-Bernoulli beam under uniform load has a quartic O(x^4) deflection profile.
     // For exact representation, we need at least p=4 (Quartic BSplines).
-    std::vector<double> knots_vec = {0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0};
+    Vector<double> knots_vec(10);
+    knots_vec << 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0;
     auto basis = std::make_shared<BSpline<double>>(4, KnotVector<double>(knots_vec));
     
     Index num_pts = basis->num_basis(); // 5 control points
@@ -70,10 +71,10 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load", "[assembly][eul
     // - Left end (x=0) constrained vertically (v = 0). For 1p beam, DOFs represent transversal disp.
     // - Right end (x=L) constrained vertically (v = 0).
     // In our single patch scalar mapping, DOF 0 is at x=0, and DOF 4 is at x=L.
-    std::vector<Index> constrained_dofs = {0, 4}; 
-    std::vector<double> constrained_vals = {0.0, 0.0};
-    
-    DirectConstraint<double> dirichlet(constrained_dofs, constrained_vals);
+    IndexVector constrained_dofs(2);
+    constrained_dofs << 0, 4;
+
+    DirectConstraint<double> dirichlet(constrained_dofs, Vector<double>::Zero(2));
     dirichlet.apply(K, F);
 
     // 7. Solve Ku = F
@@ -128,7 +129,8 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load (Cubic Approximat
     // By providing a cubic basis (p=3), we force the system to approximate the solution.
     // However, by inserting an intermediate knot at ξ=0.5, we split the domain into two 
     // cubic elements, significantly improving the approximation accuracy.
-    std::vector<double> knots_vec = {0.0, 0.0, 0.0, 0.0, 0.5, 1.0, 1.0, 1.0, 1.0};
+    Vector<double> knots_vec(9);
+    knots_vec << 0.0, 0.0, 0.0, 0.0, 0.5, 1.0, 1.0, 1.0, 1.0;
     auto basis = std::make_shared<BSpline<double>>(3, KnotVector<double>(knots_vec));
     
     Index num_pts = basis->num_basis(); // 5 control points
@@ -161,10 +163,10 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load (Cubic Approximat
     problem.assemble(K, F);
 
     // Apply Essential Boundary Conditions (Simply Supported)
-    std::vector<Index> constrained_dofs = {0, 4}; 
-    std::vector<double> constrained_vals = {0.0, 0.0};
-    
-    DirectConstraint<double> dirichlet(constrained_dofs, constrained_vals);
+    IndexVector constrained_dofs(2);
+    constrained_dofs << 0, 4;
+
+    DirectConstraint<double> dirichlet(constrained_dofs, Vector<double>::Zero(2));
     dirichlet.apply(K, F);
 
     // 7. Solve Ku = F

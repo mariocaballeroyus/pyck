@@ -89,8 +89,9 @@ TEST_CASE("Kirchhoff-Love 1P Plate: Navier Bi-Sinusoidal Load",
     std::sort(ss_dofs.begin(), ss_dofs.end());
     ss_dofs.erase(std::unique(ss_dofs.begin(), ss_dofs.end()), ss_dofs.end());
 
-    std::vector<double> ss_vals(ss_dofs.size(), 0.0);
-    DirectConstraint<double> dirichlet(ss_dofs, ss_vals);
+    DirectConstraint<double> dirichlet(
+        IndexVector(Eigen::Map<const IndexVector>(ss_dofs.data(), ss_dofs.size())),
+        Vector<double>::Zero(ss_dofs.size()));
     dirichlet.apply(K, F);
 
     // Solve using a dense matrix solver as requested

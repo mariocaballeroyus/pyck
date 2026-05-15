@@ -21,7 +21,8 @@ using namespace pyck;
 TEST_CASE("LoadCondition 1D", "[conditions][load_condition]") {
     
     // 1. Create a simple 1D curve (line segment from x=0 to x=2)
-    std::vector<double> knots_vec = {0.0, 0.0, 1.0, 2.0, 2.0};
+    Vector<double> knots_vec(5);
+    knots_vec << 0.0, 0.0, 1.0, 2.0, 2.0;
     auto basis = std::make_shared<BSpline<double>>(1, KnotVector<double>(knots_vec));
     
     Index num_pts = basis->num_basis(); // 3 control points

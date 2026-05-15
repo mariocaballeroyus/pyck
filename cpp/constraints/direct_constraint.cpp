@@ -4,9 +4,9 @@ namespace pyck
 {
 
 template <std::floating_point T>
-DirectConstraint<T>::DirectConstraint(std::vector<Index> dofs, 
-                                            std::vector<T> values)
-    : dofs_(std::move(dofs)), 
+DirectConstraint<T>::DirectConstraint(IndexVector dofs,
+                                      Vector<T>   values)
+    : dofs_(std::move(dofs)),
       values_(std::move(values))
 {
     if (dofs_.size() != values_.size()) {
@@ -16,20 +16,21 @@ DirectConstraint<T>::DirectConstraint(std::vector<Index> dofs,
 }
 
 template <std::floating_point T>
-DirectConstraint<T>::DirectConstraint(std::vector<Index> dofs, 
+DirectConstraint<T>::DirectConstraint(IndexVector dofs,
                                       T value)
     : dofs_(std::move(dofs)),
-      values_(dofs_.size(), value) {}
+      values_(Vector<T>::Constant(dofs_.size(), value)) {}
 
 template <std::floating_point T>
-void DirectConstraint<T>::apply(Matrix<T>& stiffness, 
-                                   Vector<T>& load) const
+void DirectConstraint<T>::apply(Matrix<T>& stiffness,
+                                Vector<T>& load) const
 {
-    for (std::size_t i = 0; i < dofs_.size(); ++i)
+    const Index n = dofs_.size();
+    for (Index i = 0; i < n; ++i)
     {
-        Index dof = dofs_[i];
-        T value = values_[i];
-        
+        Index dof = dofs_(i);
+        T value = values_(i);
+
         // Move the influence from the LHS to the RHS load vector
         if (value != T(0.0)) {
             // f_i = f_i - K_ij * u_j
@@ -37,10 +38,10 @@ void DirectConstraint<T>::apply(Matrix<T>& stiffness,
         }
     }
 
-    for (std::size_t i = 0; i < dofs_.size(); ++i)
+    for (Index i = 0; i < n; ++i)
     {
-        Index dof = dofs_[i];
-        T value = values_[i];
+        Index dof = dofs_(i);
+        T value = values_(i);
 
         // Zero out the row and column for the constrained DOF
         stiffness.row(dof).setZero();

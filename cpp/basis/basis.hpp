@@ -98,7 +98,7 @@ public:
     { return knots_; }
 
     /// @brief Get the raw knot values
-    const std::vector<T>& knots() const 
+    const Vector<T>& knots() const
     { return knots_.data(); }
 
 protected:

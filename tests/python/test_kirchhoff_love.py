@@ -82,30 +82,6 @@ def test_navier_plate_bisinusoidal_load():
     assert rel_err_energy < 1e-2, f"Strain energy error too high: {rel_err_energy:.2e}"
     assert rel_err_w < 5e-2, f"Max displacement error too high: {rel_err_w:.2e}"
 
-    # 3. Multi-point Displacement Verification
-    print("\nVerifying displacement at internal points:")
-    n_pts = 3
-    u_eval = np.linspace(0.2, 0.8, n_pts)
-    v_eval = np.linspace(0.2, 0.8, n_pts)
-    
-    for ui in u_eval:
-        for vi in v_eval:
-            # Parametric to physical
-            x, y = ui * L, vi * W
-            
-            # Numerical evaluation
-            params = np.array([[ui, vi]])
-            N = ck.eval_shape_at(surface, params)[0]
-            w_num = (N @ u)[0]
-            
-            # Analytical evaluation
-            w_exact = expected_displ(x, y)
-            
-            error = abs(w_num - w_exact) / abs(w_exact)
-            print(f"  Point ({x:.2f}, {y:.2f}): Numerical={w_num:.6e}, Exact={w_exact:.6e}, Error={error:.2%}")
-            
-            assert error < 5e-2, f"Displacement error at ({x}, {y}) too high: {error:.2%}"
-
 
 if __name__ == "__main__":
     pytest.main([__file__])

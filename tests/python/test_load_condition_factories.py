@@ -39,7 +39,7 @@ def test_create_shear_load_assembles_to_expected_F_norm():
     problem.add_condition(cond)
     K, f = problem.assemble()
 
-    n_node_dofs = element._cpp_object.num_node_dofs()
+    n_node_dofs = element.num_node_dofs
     f_w = f[0::n_node_dofs]
     # Total integrated transverse load = Q * edge_length.
     assert np.isclose(f_w.sum(), Q * 1.0, atol=1e-12)

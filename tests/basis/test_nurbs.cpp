@@ -18,7 +18,8 @@ using namespace pyck;
  */
 TEST_CASE("NURBS: partition of unity", "[basis][nurbs]") {
     auto kv = clamped_uniform_knots<double>(3, 7);
-    NURBS<double> nb(3, kv, {1.0, 0.5, 2.0, 1.5, 0.8, 1.2, 1.0});
+    NURBS<double> nb(3, kv,
+        (Vector<double>(7) << 1.0, 0.5, 2.0, 1.5, 0.8, 1.2, 1.0).finished());
 
     Eigen::VectorXd u = Eigen::VectorXd::LinSpaced(30, 0.0, 1.0);
     for (int i = 0; i < u.size(); ++i) {
@@ -39,7 +40,7 @@ TEST_CASE("NURBS: partition of unity", "[basis][nurbs]") {
 TEST_CASE("NURBS: equal weights ⇒ B-spline", "[basis][nurbs]") {
     auto kv = clamped_uniform_knots<double>(2, 5);
     BSpline<double> bs(2, kv);
-    NURBS<double> nb(2, kv, std::vector<double>(5, 2.7));
+    NURBS<double> nb(2, kv, Vector<double>::Constant(5, 2.7));
 
     Eigen::VectorXd u = Eigen::VectorXd::LinSpaced(20, 0.0, 1.0);
     for (int i = 0; i < u.size(); ++i) {
@@ -75,8 +76,10 @@ TEST_CASE("NURBS: equal weights ⇒ B-spline", "[basis][nurbs]") {
  */
 TEST_CASE("NURBS: exact unit circle", "[basis][nurbs]") {
     const double s = std::sqrt(2.0) / 2.0;
-    KnotVector<double> kv({0, 0, 0, 0.25, 0.25, 0.5, 0.5, 0.75, 0.75, 1, 1, 1});
-    NURBS<double> nb(2, kv, {1, s, 1, s, 1, s, 1, s, 1});
+    KnotVector<double> kv(
+        (Vector<double>(12) << 0, 0, 0, 0.25, 0.25, 0.5, 0.5, 0.75, 0.75, 1, 1, 1).finished());
+    NURBS<double> nb(2, kv,
+        (Vector<double>(9) << 1, s, 1, s, 1, s, 1, s, 1).finished());
 
     // Control points (x, y); each row is one CP.
     std::vector<std::pair<double, double>> cps = {
@@ -112,7 +115,8 @@ TEST_CASE("NURBS: exact unit circle", "[basis][nurbs]") {
  */
 TEST_CASE("NURBS: derivatives match finite differences", "[basis][nurbs]") {
     auto kv = clamped_uniform_knots<double>(3, 7);
-    std::vector<double> w = {1.0, 0.5, 2.0, 1.5, 0.8, 1.2, 1.0};
+    Vector<double> w(7);
+    w << 1.0, 0.5, 2.0, 1.5, 0.8, 1.2, 1.0;
     NURBS<double> nb(3, kv, w);
 
     const double h = 1e-6;

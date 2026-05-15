@@ -31,6 +31,9 @@ using Matrix = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
 /// @brief Dynamic-sized dense matrix of integers (typically for DOFs)
 using IndexMatrix = Eigen::Matrix<Index, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
 
+/// @brief Dynamic-sized column vector of integers (typically for DOF indices)
+using IndexVector = Eigen::Vector<Index, Eigen::Dynamic>;
+
 /// @brief Dense matrix of type T with dynamic number of rows and fixed number of columns
 template <std::floating_point T, std::size_t Cols>
 using ColMatrix = Eigen::Matrix<T, Eigen::Dynamic, Cols>;
