@@ -75,18 +75,64 @@ Patch<T, 2> rectangle(Ptr<const Basis<T>> basis_u,
     return Patch<T, 2>(basis_u, basis_v, P);
 }
 
+template <std::floating_point T>
+Patch<T, 3> box(Ptr<const Basis<T>> basis_u,
+                Ptr<const Basis<T>> basis_v,
+                Ptr<const Basis<T>> basis_w,
+                T length_x,
+                T length_y,
+                T length_z)
+{
+    auto xi_u = greville_abscissae(basis_u);
+    auto xi_v = greville_abscissae(basis_v);
+    auto xi_w = greville_abscissae(basis_w);
+
+    const Index nu = basis_u->num_basis();
+    const Index nv = basis_v->num_basis();
+    const Index nw = basis_w->num_basis();
+
+    T u_min = xi_u.front(), u_max = xi_u.back();
+    T v_min = xi_v.front(), v_max = xi_v.back();
+    T w_min = xi_w.front(), w_max = xi_w.back();
+    T u_range = (std::abs(u_max - u_min) > T(1e-14)) ? (u_max - u_min) : T(1);
+    T v_range = (std::abs(v_max - v_min) > T(1e-14)) ? (v_max - v_min) : T(1);
+    T w_range = (std::abs(w_max - w_min) > T(1e-14)) ? (w_max - w_min) : T(1);
+
+    ColMatrix<T, 3> P = ColMatrix<T, 3>::Zero(nu * nv * nw, 3);
+    for (Index iw = 0; iw < nw; ++iw) {
+        T z = length_z * (xi_w[iw] - w_min) / w_range;
+        for (Index iv = 0; iv < nv; ++iv) {
+            T y = length_y * (xi_v[iv] - v_min) / v_range;
+            for (Index iu = 0; iu < nu; ++iu) {
+                T x = length_x * (xi_u[iu] - u_min) / u_range;
+                P.row(iu + iv * nu + iw * nu * nv) << x, y, z;
+            }
+        }
+    }
+
+    return Patch<T, 3>(basis_u, basis_v, basis_w, P);
+}
+
 // === Template Instantiations ========================================================
 
 template Patch<double, 1> line_segment<double>(Ptr<const Basis<double>>, double);
 template Patch<double, 2> rectangle<double>(Ptr<const Basis<double>>,
                                                  Ptr<const Basis<double>>,
                                                  double, double);
+template Patch<double, 3> box<double>(Ptr<const Basis<double>>,
+                                      Ptr<const Basis<double>>,
+                                      Ptr<const Basis<double>>,
+                                      double, double, double);
 
 #ifdef PYCK_BUILD_SINGLE_PRECISION
 template Patch<float, 1> line_segment<float>(Ptr<const Basis<float>>, float);
 template Patch<float, 2> rectangle<float>(Ptr<const Basis<float>>,
                                                Ptr<const Basis<float>>,
                                                float, float);
+template Patch<float, 3> box<float>(Ptr<const Basis<float>>,
+                                    Ptr<const Basis<float>>,
+                                    Ptr<const Basis<float>>,
+                                    float, float, float);
 #endif
 
 } // namespace pyck

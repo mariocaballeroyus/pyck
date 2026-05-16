@@ -70,23 +70,32 @@ public:
     // === Utility Methods ============================================================
 
     /// @brief Convert a boundary span index to the flat span index of the parent patch.
-    Index parent_flat_span(Index boundary_span) const
-    { return parent_span_offset_ + boundary_span * parent_span_stride_; }
+    Index parent_flat_span(Index boundary_span) const;
 
     /**
      * @brief Lift Q boundary parameter values into Q parent parametric coordinates.
      *
-     * @param boundary_pts Vector of parameter values in the boundary patch
-     * @return Matrix of parametric coordinates in the parent patch
+     * @param boundary_pts Boundary parameter values, shape (Q,) for d=2 or (Q, 2) for d=3.
+     * @return Matrix of parametric coordinates in the parent patch, shape (Q, d).
      */
     ColMatrix<T, d> lift_to_parent(const Vector<T>& boundary_pts) const requires(d == 2);
+    ColMatrix<T, d> lift_to_parent(const ColMatrix<T, 2>& boundary_pts) const requires(d == 3);
 
     /**
      * @brief Outward in-surface unit normal at the boundary quadrature points
      *        from precomputed local frames.
+     *
+     * For d=2 the boundary is a 1D curve in the parent surface; the outward
+     * normal lies in the surface and is computed from the boundary tangent
+     * crossed with the parent surface normal a_3.
+     *
+     * For d=3 the boundary is itself a 2D surface in 3D physical space; the
+     * outward normal is the boundary's own a_3 = a_1^bd × a_2^bd / ‖…‖,
+     * signed by `sign_n_`. The parent local frame is unused.
      */
     ColMatrix<T, 3> eval_outward_normal(const LocalFrame<T, d - 1>& boundary_local,
                                         const LocalFrame<T, d>& parent_local) const requires(d == 2);
+    ColMatrix<T, 3> eval_outward_normal(const LocalFrame<T, d - 1>& boundary_local) const requires(d == 3);
 
 private:
 
@@ -104,15 +113,12 @@ private:
 
     /// @brief Parameter value at which to evaluate the parent along the fixed direction
     T u_eval_fixed_;
-    
+
     /// @brief Sign of the outward normal (+1 or -1) consistent with parametric orientation
     T sign_n_;
 
-    /// @brief Offset for flat span indexing
-    Index parent_span_offset_;
-    
-    /// @brief Stride for flat span indexing
-    Index parent_span_stride_;
+    /// @brief Parent's span index in the fixed direction (used by parent_flat_span()).
+    Index span_fixed_;
 };
 
 /**

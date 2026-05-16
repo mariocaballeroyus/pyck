@@ -44,6 +44,14 @@ public:
           const ColMatrix<T, 3>& control_pts) requires(d == 2);
 
     /**
+     * @brief 3d constructor (volume patch).
+     */
+    Patch(Ptr<const Basis<T>> basis_u,
+          Ptr<const Basis<T>> basis_v,
+          Ptr<const Basis<T>> basis_w,
+          const ColMatrix<T, 3>& control_pts) requires(d == 3);
+
+    /**
      * @brief Virtual destructor.
      */
     virtual ~Patch() = default;
@@ -143,6 +151,14 @@ public:
      * @return Physical coordinates, shape (n_pts, 3).
      */
     ColMatrix<T, 3> eval_physical(const Matrix<T>& pts) const requires(d == 2);
+
+    /**
+     * @brief Evaluate physical coordinates at parametric sample points.
+     *
+     * @param pts Parametric sample points, shape (n_pts, 3): columns u, v, w.
+     * @return Physical coordinates, shape (n_pts, 3).
+     */
+    ColMatrix<T, 3> eval_physical(const Matrix<T>& pts) const requires(d == 3);
 
     // === Refinement =================================================================
 

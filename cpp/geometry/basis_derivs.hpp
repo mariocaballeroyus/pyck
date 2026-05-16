@@ -44,6 +44,20 @@ struct BasisDerivs<T, 2>
 };
 
 /**
+ * @brief Basis derivatives defined on 3-dimensional patches.
+ */
+template <std::floating_point T>
+struct BasisDerivs<T, 3>
+{
+    Matrix<T> N;                                                ///< values                       (Q×K)
+    Matrix<T> N_u,   N_v,   N_w;                                ///< 1st derivs  (order ≥ 1)      (Q×K)
+    Matrix<T> N_uu,  N_uv,  N_uw,  N_vv,  N_vw,  N_ww;          ///< 2nd derivs  (order ≥ 2)      (Q×K)
+    Matrix<T> N_uuu, N_uuv, N_uuw, N_uvv, N_uvw, N_uww,
+              N_vvv, N_vvw, N_vww, N_www;                       ///< 3rd derivs  (order ≥ 3)      (Q×K)
+    Index     order = 0;
+};
+
+/**
  * @brief Evaluate shape functions and their derivatives at the given coordinates
  *        in the parametric domain.
  *
@@ -64,6 +78,13 @@ template <std::floating_point T>
 BasisDerivs<T, 2>
 eval_basis(const Patch<T, 2>& patch,
            const ColMatrix<T, 2>& eval_coords,
+           Index span_idx,
+           std::size_t derivs_order = 0);
+
+template <std::floating_point T>
+BasisDerivs<T, 3>
+eval_basis(const Patch<T, 3>& patch,
+           const ColMatrix<T, 3>& eval_coords,
            Index span_idx,
            std::size_t derivs_order = 0);
 

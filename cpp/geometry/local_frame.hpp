@@ -45,6 +45,24 @@ struct LocalFrame<T, 2>
 };
 
 /**
+ * @brief 3D local geometric frame (volume in 3D physical space).
+ *
+ * The 6-column metric layout uses the upper-triangular ordering
+ * (g_11, g_12, g_13, g_22, g_23, g_33); g_inv follows the same convention.
+ */
+template <std::floating_point T>
+struct LocalFrame<T, 3>
+{
+    ColMatrix<T, 3> a1, a2, a3;                              ///< covariant tangents a_α          (Q×3)
+    ColMatrix<T, 3> a11, a12, a13, a22, a23, a33;            ///< 1st derivs a_{αβ}    (order ≥ 2) (Q×3)
+    ColMatrix<T, 3> a111, a112, a113, a122, a123, a133,
+                    a222, a223, a233, a333;                  ///< 2nd derivs a_{αβγ}   (order ≥ 3) (Q×3)
+    ColMatrix<T, 6> g;                                       ///< metric, upper-tri ordering      (Q×6)
+    ColMatrix<T, 6> g_inv;                                   ///< inverse metric, upper-tri       (Q×6)
+    Vector<T>       jac;                                     ///< √det g                          (Q)
+};
+
+/**
  * @brief Evaluate the local geometric frame at the given coordinates in the
  *        parametric domain.
  *
@@ -60,6 +78,11 @@ eval_local_frame(const BasisDerivs<T, 1>& basis,
 template <std::floating_point T>
 LocalFrame<T, 2>
 eval_local_frame(const BasisDerivs<T, 2>& basis,
+                 const ColMatrix<T, 3>& act_pts);
+
+template <std::floating_point T>
+LocalFrame<T, 3>
+eval_local_frame(const BasisDerivs<T, 3>& basis,
                  const ColMatrix<T, 3>& act_pts);
 
 } // namespace pyck

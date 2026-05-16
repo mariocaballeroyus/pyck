@@ -36,7 +36,7 @@ Patch<T, d>::Patch(Ptr<const Basis<T>> basis_u,
       dof_mapper_({tensor_product_.basis(0).num_basis(), tensor_product_.basis(1).num_basis()},
                   {tensor_product_.basis(0).degree(),    tensor_product_.basis(1).degree()})
 {
-    if (control_pts.cols() != 3) 
+    if (control_pts.cols() != 3)
     {
         throw std::invalid_argument("Patch<T, 2>: "
                                     "Control points must be embedded in 3D space.");
@@ -46,9 +46,41 @@ Patch<T, d>::Patch(Ptr<const Basis<T>> basis_u,
                            * this->tensor_product_.basis(1).num_basis();
     const Index actual_n = static_cast<Index>(control_pts.rows());
 
-    if (actual_n != expected_n) 
+    if (actual_n != expected_n)
     {
         throw std::invalid_argument("Patch<T, 2>: "
+                                    "Dimension mismatch.");
+    }
+}
+
+template <std::floating_point T, std::size_t d>
+Patch<T, d>::Patch(Ptr<const Basis<T>> basis_u,
+                   Ptr<const Basis<T>> basis_v,
+                   Ptr<const Basis<T>> basis_w,
+                   const ColMatrix<T, 3>& control_pts) requires(d == 3)
+    : control_pts_(control_pts),
+      tensor_product_(std::move(basis_u), std::move(basis_v), std::move(basis_w)),
+      dof_mapper_({tensor_product_.basis(0).num_basis(),
+                   tensor_product_.basis(1).num_basis(),
+                   tensor_product_.basis(2).num_basis()},
+                  {tensor_product_.basis(0).degree(),
+                   tensor_product_.basis(1).degree(),
+                   tensor_product_.basis(2).degree()})
+{
+    if (control_pts.cols() != 3)
+    {
+        throw std::invalid_argument("Patch<T, 3>: "
+                                    "Control points must be embedded in 3D space.");
+    }
+
+    const Index expected_n = this->tensor_product_.basis(0).num_basis()
+                           * this->tensor_product_.basis(1).num_basis()
+                           * this->tensor_product_.basis(2).num_basis();
+    const Index actual_n = static_cast<Index>(control_pts.rows());
+
+    if (actual_n != expected_n)
+    {
+        throw std::invalid_argument("Patch<T, 3>: "
                                     "Dimension mismatch.");
     }
 }
@@ -154,6 +186,41 @@ Patch<T, d>::eval_physical(const Matrix<T>& pts) const requires(d == 2)
 }
 
 template <std::floating_point T, std::size_t d>
+ColMatrix<T, 3>
+Patch<T, d>::eval_physical(const Matrix<T>& pts) const requires(d == 3)
+{
+    const Index n_pts = pts.rows();
+    const Index n_u = tensor_product_.basis(0).num_basis();
+    const Index n_v = tensor_product_.basis(1).num_basis();
+    const Index n_w = tensor_product_.basis(2).num_basis();
+
+    const Vector<T> u_pts = pts.col(0);
+    const Vector<T> v_pts = pts.col(1);
+    const Vector<T> w_pts = pts.col(2);
+
+    const Matrix<T> Nu = tensor_product_.basis(0).eval_all(u_pts, 0)[0]; // (n_pts, n_u)
+    const Matrix<T> Nv = tensor_product_.basis(1).eval_all(v_pts, 0)[0]; // (n_pts, n_v)
+    const Matrix<T> Nw = tensor_product_.basis(2).eval_all(w_pts, 0)[0]; // (n_pts, n_w)
+
+    ColMatrix<T, 3> result(n_pts, 3);
+
+    for (Index dim = 0; dim < 3; ++dim)
+    {
+        Eigen::Map<const Matrix<T>> CP(control_pts_.col(dim).data(), n_u * n_v, n_w);
+        for (Index p = 0; p < n_pts; ++p)
+        {
+            // Contract over w to get a (n_u·n_v)×1 vector, reshape as (n_u, n_v),
+            // then contract over u and v.
+            Vector<T> tmp = CP * Nw.row(p).transpose();
+            Eigen::Map<const Matrix<T>> tmp_uv(tmp.data(), n_u, n_v);
+            result(p, dim) = (Nu.row(p) * tmp_uv * Nv.row(p).transpose())(0, 0);
+        }
+    }
+
+    return result;
+}
+
+template <std::floating_point T, std::size_t d>
 Patch<T, d>
 Patch<T, d>::insert_knot(std::size_t dir, T u, Index count) const
 {
@@ -170,7 +237,7 @@ Patch<T, d>::insert_knot(std::size_t dir, T u, Index count) const
         new_cps.noalias() = Top * control_pts_;
         return Patch<T, d>(step.basis, new_cps);
     }
-    else
+    else if constexpr (d == 2)
     {
         const Index n_u = tensor_product_.basis(0).num_basis();
         const Index n_v = tensor_product_.basis(1).num_basis();
@@ -194,6 +261,46 @@ Patch<T, d>::insert_knot(std::size_t dir, T u, Index count) const
         Ptr<const Basis<T>> basis_u = (dir == 0) ? step.basis : tensor_product_.basis_ptr(0);
         Ptr<const Basis<T>> basis_v = (dir == 1) ? step.basis : tensor_product_.basis_ptr(1);
         return Patch<T, d>(basis_u, basis_v, new_cps);
+    }
+    else  // d == 3
+    {
+        const Index n_u = tensor_product_.basis(0).num_basis();
+        const Index n_v = tensor_product_.basis(1).num_basis();
+        const Index n_w = tensor_product_.basis(2).num_basis();
+        const Index n_u_new = (dir == 0) ? Top.rows() : n_u;
+        const Index n_v_new = (dir == 1) ? Top.rows() : n_v;
+        const Index n_w_new = (dir == 2) ? Top.rows() : n_w;
+
+        ColMatrix<T, 3> new_cps(n_u_new * n_v_new * n_w_new, 3);
+
+        for (Index k_coord = 0; k_coord < 3; ++k_coord)
+        {
+            if (dir == 0) {
+                // CP viewed as (n_u, n_v*n_w); transform multiplies on the left.
+                Eigen::Map<const Matrix<T>> CP(control_pts_.col(k_coord).data(), n_u, n_v * n_w);
+                Eigen::Map<Matrix<T>> NEW(new_cps.col(k_coord).data(), n_u_new, n_v_new * n_w_new);
+                NEW.noalias() = Top * CP;
+            } else if (dir == 2) {
+                // CP viewed as (n_u*n_v, n_w); transform multiplies on the right (transposed).
+                Eigen::Map<const Matrix<T>> CP(control_pts_.col(k_coord).data(), n_u * n_v, n_w);
+                Eigen::Map<Matrix<T>> NEW(new_cps.col(k_coord).data(), n_u_new * n_v_new, n_w_new);
+                NEW.noalias() = CP * Top.transpose();
+            } else {
+                // dir == 1: per w-slice, view (n_u, n_v) and transform on the right.
+                for (Index k_slice = 0; k_slice < n_w; ++k_slice) {
+                    Eigen::Map<const Matrix<T>> CP_s(
+                        control_pts_.col(k_coord).data() + k_slice * n_u * n_v, n_u, n_v);
+                    Eigen::Map<Matrix<T>> NEW_s(
+                        new_cps.col(k_coord).data() + k_slice * n_u_new * n_v_new, n_u_new, n_v_new);
+                    NEW_s.noalias() = CP_s * Top.transpose();
+                }
+            }
+        }
+
+        Ptr<const Basis<T>> basis_u = (dir == 0) ? step.basis : tensor_product_.basis_ptr(0);
+        Ptr<const Basis<T>> basis_v = (dir == 1) ? step.basis : tensor_product_.basis_ptr(1);
+        Ptr<const Basis<T>> basis_w = (dir == 2) ? step.basis : tensor_product_.basis_ptr(2);
+        return Patch<T, d>(basis_u, basis_v, basis_w, new_cps);
     }
 }
 
@@ -214,7 +321,7 @@ Patch<T, d>::elevate_degree(std::size_t dir, Index count) const
         new_cps.noalias() = Top * control_pts_;
         return Patch<T, d>(step.basis, new_cps);
     }
-    else
+    else if constexpr (d == 2)
     {
         const Index n_u = tensor_product_.basis(0).num_basis();
         const Index n_v = tensor_product_.basis(1).num_basis();
@@ -239,16 +346,55 @@ Patch<T, d>::elevate_degree(std::size_t dir, Index count) const
         Ptr<const Basis<T>> basis_v = (dir == 1) ? step.basis : tensor_product_.basis_ptr(1);
         return Patch<T, d>(basis_u, basis_v, new_cps);
     }
+    else  // d == 3
+    {
+        const Index n_u = tensor_product_.basis(0).num_basis();
+        const Index n_v = tensor_product_.basis(1).num_basis();
+        const Index n_w = tensor_product_.basis(2).num_basis();
+        const Index n_u_new = (dir == 0) ? Top.rows() : n_u;
+        const Index n_v_new = (dir == 1) ? Top.rows() : n_v;
+        const Index n_w_new = (dir == 2) ? Top.rows() : n_w;
+
+        ColMatrix<T, 3> new_cps(n_u_new * n_v_new * n_w_new, 3);
+
+        for (Index k_coord = 0; k_coord < 3; ++k_coord)
+        {
+            if (dir == 0) {
+                Eigen::Map<const Matrix<T>> CP(control_pts_.col(k_coord).data(), n_u, n_v * n_w);
+                Eigen::Map<Matrix<T>> NEW(new_cps.col(k_coord).data(), n_u_new, n_v_new * n_w_new);
+                NEW.noalias() = Top * CP;
+            } else if (dir == 2) {
+                Eigen::Map<const Matrix<T>> CP(control_pts_.col(k_coord).data(), n_u * n_v, n_w);
+                Eigen::Map<Matrix<T>> NEW(new_cps.col(k_coord).data(), n_u_new * n_v_new, n_w_new);
+                NEW.noalias() = CP * Top.transpose();
+            } else {
+                for (Index k_slice = 0; k_slice < n_w; ++k_slice) {
+                    Eigen::Map<const Matrix<T>> CP_s(
+                        control_pts_.col(k_coord).data() + k_slice * n_u * n_v, n_u, n_v);
+                    Eigen::Map<Matrix<T>> NEW_s(
+                        new_cps.col(k_coord).data() + k_slice * n_u_new * n_v_new, n_u_new, n_v_new);
+                    NEW_s.noalias() = CP_s * Top.transpose();
+                }
+            }
+        }
+
+        Ptr<const Basis<T>> basis_u = (dir == 0) ? step.basis : tensor_product_.basis_ptr(0);
+        Ptr<const Basis<T>> basis_v = (dir == 1) ? step.basis : tensor_product_.basis_ptr(1);
+        Ptr<const Basis<T>> basis_w = (dir == 2) ? step.basis : tensor_product_.basis_ptr(2);
+        return Patch<T, d>(basis_u, basis_v, basis_w, new_cps);
+    }
 }
 
 // === Template Specializations =======================================================
 
 template class Patch<double, 1>;
 template class Patch<double, 2>;
+template class Patch<double, 3>;
 
 #ifdef PYCK_BUILD_SINGLE_PRECISION
 template class Patch<float, 1>;
 template class Patch<float, 2>;
+template class Patch<float, 3>;
 #endif
 
 } // namespace pyck
