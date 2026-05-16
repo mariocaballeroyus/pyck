@@ -23,42 +23,26 @@ add_library(catch INTERFACE)
 target_include_directories(catch INTERFACE ${CMAKE_SOURCE_DIR}/external/catch)
 
 # BSpline library
-add_library(pyck_basis
-    cpp/basis/knots.cpp
-    cpp/basis/bspline.cpp
-    cpp/basis/nurbs.cpp
-    cpp/basis/tensor.cpp
-)
+file(GLOB PYCK_BASIS_SOURCES cpp/basis/*.cpp)
+add_library(pyck_basis ${PYCK_BASIS_SOURCES})
 target_include_directories(pyck_basis PUBLIC cpp/basis)
 target_link_libraries(pyck_basis PUBLIC eigen)
 
 # Geometry library
-add_library(pyck_geometry
-    cpp/geometry/dof_mapper.cpp
-    cpp/geometry/patch.cpp
-    cpp/geometry/patch_boundary.cpp
-    cpp/geometry/basis_derivs.cpp
-    cpp/geometry/local_frame.cpp
-    cpp/geometry/christoffels.cpp
-    cpp/geometry/directors.cpp
-    cpp/geometry/laplace_beltrami.cpp
-)
+file(GLOB PYCK_GEOMETRY_SOURCES cpp/geometry/*.cpp)
+add_library(pyck_geometry ${PYCK_GEOMETRY_SOURCES})
 target_include_directories(pyck_geometry PUBLIC cpp/geometry)
 target_link_libraries(pyck_geometry PUBLIC pyck_basis pyck_quadrature)
 
 # Constraints library
-add_library(pyck_constraints
-    cpp/constraints/direct_constraint.cpp
-    cpp/constraints/linear_constraint.cpp
-)
+file(GLOB PYCK_CONSTRAINTS_SOURCES cpp/constraints/*.cpp)
+add_library(pyck_constraints ${PYCK_CONSTRAINTS_SOURCES})
 target_include_directories(pyck_constraints PUBLIC cpp/constraints)
 target_link_libraries(pyck_constraints PUBLIC eigen)
 
 # Quadrature library
-add_library(pyck_quadrature
-    cpp/quadrature/quadrature.cpp
-    cpp/quadrature/gauss_legendre.cpp
-)
+file(GLOB PYCK_QUADRATURE_SOURCES cpp/quadrature/*.cpp)
+add_library(pyck_quadrature ${PYCK_QUADRATURE_SOURCES})
 target_include_directories(pyck_quadrature PUBLIC cpp/quadrature)
 target_link_libraries(pyck_quadrature PUBLIC eigen)
 
@@ -67,45 +51,26 @@ add_library(pyck_materials INTERFACE)
 target_include_directories(pyck_materials INTERFACE ${CMAKE_SOURCE_DIR}/cpp/materials)
 
 # Assembler library
-add_library(pyck_assembly
-    cpp/assembly/linear_elastic_problem.cpp
-)
+file(GLOB PYCK_ASSEMBLY_SOURCES cpp/assembly/*.cpp)
+add_library(pyck_assembly ${PYCK_ASSEMBLY_SOURCES})
 target_include_directories(pyck_assembly PUBLIC cpp/assembly)
 target_link_libraries(pyck_assembly PUBLIC eigen pyck_elements pyck_conditions pyck_constraints pyck_quadrature pyck_materials)
 
 # Conditions library
-add_library(pyck_conditions
-    cpp/conditions/load_condition.cpp
-    cpp/conditions/load_boundary_condition.cpp
-    cpp/conditions/penalty_boundary_condition.cpp
-    cpp/conditions/lagrange_boundary_condition.cpp
-    cpp/conditions/lagrange_domain_condition.cpp
-    cpp/conditions/nitsche_boundary_condition.cpp
-    cpp/conditions/penalty_coupling_condition.cpp
-    cpp/conditions/lagrange_coupling_condition.cpp
-)
+file(GLOB PYCK_CONDITIONS_SOURCES cpp/conditions/*.cpp)
+add_library(pyck_conditions ${PYCK_CONDITIONS_SOURCES})
 target_include_directories(pyck_conditions PUBLIC cpp/conditions)
 target_link_libraries(pyck_conditions PUBLIC pyck_geometry pyck_assembly)
 
 # Postprocessing library
-add_library(pyck_postprocessing
-    cpp/postprocessing/physical_points.cpp
-)
+file(GLOB PYCK_POSTPROCESSING_SOURCES cpp/postprocessing/*.cpp)
+add_library(pyck_postprocessing ${PYCK_POSTPROCESSING_SOURCES})
 target_include_directories(pyck_postprocessing PUBLIC cpp/postprocessing)
 target_link_libraries(pyck_postprocessing PUBLIC pyck_geometry pyck_quadrature)
 
 # Elements library
-add_library(pyck_elements
-    cpp/elements/beam_euler_bernoulli_1p.cpp
-    cpp/elements/beam_timoshenko_1p.cpp
-    cpp/elements/beam_timoshenko_2p.cpp
-    cpp/elements/plate_kirchhoff_love_1p.cpp
-    cpp/elements/plate_reissner_mindlin_3p.cpp
-    cpp/elements/plate_reissner_mindlin_1p.cpp
-    cpp/elements/plate_reissner_mindlin_displ_2p.cpp
-    cpp/elements/plate_reissner_mindlin_displ_3p.cpp
-    cpp/elements/shell_reissner_mindlin_5p.cpp
-)
+file(GLOB PYCK_ELEMENTS_SOURCES cpp/elements/*.cpp)
+add_library(pyck_elements ${PYCK_ELEMENTS_SOURCES})
 target_include_directories(pyck_elements PUBLIC cpp/elements)
 target_link_libraries(pyck_elements PUBLIC pyck_geometry pyck_assembly pyck_materials)
 
@@ -114,51 +79,20 @@ target_link_libraries(pyck_elements PUBLIC pyck_geometry pyck_assembly pyck_mate
 add_subdirectory(external/pybind11)
 
 # Python module
-pybind11_add_module(_pyck
-    cpp/bindings/module.cpp
-    cpp/bindings/basis.cpp
-    cpp/bindings/geometry.cpp
-    cpp/bindings/quadrature.cpp
-    cpp/bindings/materials.cpp
-    cpp/bindings/elements.cpp
-    cpp/bindings/conditions.cpp
-    cpp/bindings/constraints.cpp
-    cpp/bindings/assembly.cpp
-    cpp/bindings/postprocessing.cpp
-)
+file(GLOB PYCK_BINDINGS_SOURCES cpp/bindings/*.cpp)
+pybind11_add_module(_pyck ${PYCK_BINDINGS_SOURCES})
 target_link_libraries(_pyck PRIVATE pyck_basis pyck_geometry pyck_elements pyck_conditions pyck_constraints pyck_assembly pyck_materials pyck_postprocessing)
 set_target_properties(_pyck PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/pyck")
 install(TARGETS _pyck DESTINATION pyck)
 
 # Test executable (unified runner)
+file(GLOB_RECURSE TEST_SOURCES tests/cpp/*/test_*.cpp)
 add_executable(pyck_tests
-    tests/test_main.cpp
-    tests/support/factories.cpp
-    tests/basis/test_knot_vector.cpp
-    tests/basis/test_bspline.cpp
-    tests/basis/test_nurbs.cpp
-    tests/basis/test_tensor_product.cpp
-    tests/geometry/test_curve.cpp
-    tests/geometry/test_surface.cpp
-    tests/geometry/test_dof_mapper.cpp
-    tests/quadrature/test_quadrature.cpp
-    tests/elements/test_euler_bernoulli.cpp
-    tests/elements/test_kirchhoff_love_1p.cpp
-    tests/elements/test_reissner_mindlin.cpp
-    tests/elements/test_reissner_mindlin_1p.cpp
-    tests/elements/test_shell_reissner_mindlin_5p.cpp
-    tests/assembly/test_constraints.cpp
-    tests/assembly/test_load_condition.cpp
-    tests/assembly/test_load_boundary_condition.cpp
-    tests/assembly/test_materials.cpp
-    tests/assembly/test_penalty_boundary_condition.cpp
-    tests/assembly/test_lagrange_boundary_condition.cpp
-    tests/assembly/test_lagrange_domain_condition.cpp
-    tests/assembly/test_multi_patch_problem.cpp
-    tests/assembly/test_penalty_coupling_condition.cpp
-    tests/assembly/test_lagrange_coupling_condition.cpp
+    tests/cpp/test_main.cpp
+    tests/cpp/support/factories.cpp
+    ${TEST_SOURCES}
 )
-target_include_directories(pyck_tests PRIVATE tests/support)
+target_include_directories(pyck_tests PRIVATE tests/cpp/support)
 target_link_libraries(pyck_tests PRIVATE
     pyck_basis
     pyck_geometry
