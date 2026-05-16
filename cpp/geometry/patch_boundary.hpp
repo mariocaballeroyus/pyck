@@ -59,6 +59,14 @@ public:
     const Ptr<const Patch<T, d>>& parent() const
     { return parent_; }
 
+    /// @brief Parent DOFs on the outermost boundary layer (displacement layer).
+    std::vector<Index> displacement_dofs() const
+    { return parent_->dof_mapper().get_layer_dofs(param_dim_, at_start_, 0); }
+
+    /// @brief Parent DOFs on the adjacent boundary layer (rotation layer).
+    std::vector<Index> rotation_dofs() const
+    { return parent_->dof_mapper().get_layer_dofs(param_dim_, at_start_, 1); }
+
     // === Utility Methods ============================================================
 
     /// @brief Convert a boundary span index to the flat span index of the parent patch.

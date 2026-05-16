@@ -75,13 +75,17 @@ void bind_geometry(py::module_& m)
     py::class_<PatchBoundary2d, Patch1d, Ptr<PatchBoundary2d>>(m, "PatchBoundary2d")
         // Constructor
         .def(py::init<const Ptr<Patch2d>&, std::size_t, bool>(),
-            py::arg("parent"), 
-            py::arg("param_dim"), 
+            py::arg("parent"),
+            py::arg("param_dim"),
             py::arg("at_start"))
 
         // Public attributes
         .def("param_dim", &PatchBoundary2d::param_dim)
-        .def("at_start", &PatchBoundary2d::at_start);
+        .def("at_start", &PatchBoundary2d::at_start)
+
+        // DOF accessors
+        .def("displacement_dofs", &PatchBoundary2d::displacement_dofs)
+        .def("rotation_dofs", &PatchBoundary2d::rotation_dofs);
 
 }
 
