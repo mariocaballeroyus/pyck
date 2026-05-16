@@ -19,14 +19,13 @@ BeamEulerBernoulli1p<T>::BeamEulerBernoulli1p(Ptr<UniaxialStress1d<T>> material)
 
 // === Matrix Operators =============================================================??
 
-template <std::floating_point T> 
+template <std::floating_point T>
 Matrix<T>
 BeamEulerBernoulli1p<T>::strain_matrix(const Patch<T, 1>& /*patch*/,
                                        const BasisDerivs<T, 1>& basis,
-                                       const LocalFrame<T, 1>& local) const
+                                       const LocalFrame<T, 1>& local,
+                                       const ChristoffelSymbols<T, 1>& chr) const
 {
-    auto chr = eval_christoffel(local);
-
     const Index Q = basis.N_u.rows();
     const Index n = basis.N_u.cols();
     Matrix<T> B(Q, n);
@@ -57,21 +56,23 @@ BeamEulerBernoulli1p<T>::constitutive_matrix(const LocalFrame<T, 1>& local,
 
 // === Shape Matrices =================================================================
 
-template <std::floating_point T> 
+template <std::floating_point T>
 Matrix<T>
 BeamEulerBernoulli1p<T>::displacement_shape_matrix(const Patch<T, 1>& /*patch*/,
                                                    const BasisDerivs<T, 1>& basis,
-                                                   const LocalFrame<T, 1>& /*local*/) const
+                                                   const LocalFrame<T, 1>& /*local*/,
+                                                   const ChristoffelSymbols<T, 1>& /*chr*/) const
 {
     // N_w = [ N_i ]
     return basis.N;
 }
 
-template <std::floating_point T> 
+template <std::floating_point T>
 Matrix<T>
 BeamEulerBernoulli1p<T>::rotation_shape_matrix(const Patch<T, 1>& /*patch*/,
                                                const BasisDerivs<T, 1>& basis,
-                                               const LocalFrame<T, 1>& /*local*/) const
+                                               const LocalFrame<T, 1>& /*local*/,
+                                               const ChristoffelSymbols<T, 1>& /*chr*/) const
 {
     // N_rot = [ -N_{i|1} ]
     return -basis.N_u;

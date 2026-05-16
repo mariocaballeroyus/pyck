@@ -23,12 +23,12 @@ ShellReissnerMindlin5p<T>::ShellReissnerMindlin5p(Ptr<PlaneStress2d<T>> material
 // === Matrix Operators ===============================================================
 
 template <std::floating_point T>
-Matrix<T> 
-ShellReissnerMindlin5p<T>::strain_matrix(const Patch<T, 2>& /*patch*/, 
-                                         const BasisDerivs<T, 2>& basis, 
-                                         const LocalFrame<T, 2>& local) const
+Matrix<T>
+ShellReissnerMindlin5p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
+                                         const BasisDerivs<T, 2>& basis,
+                                         const LocalFrame<T, 2>& local,
+                                         const ChristoffelSymbols<T, 2>& chr) const
 {
-    auto chr  = eval_christoffel(local);
     auto a_3  = eval_normal(local);
 
     const Matrix<T>& N    = basis.N;
@@ -119,10 +119,11 @@ Matrix<T> ShellReissnerMindlin5p<T>::constitutive_matrix(
 // === Shape Matrices =================================================================
 
 template <std::floating_point T>
-Matrix<T> 
-ShellReissnerMindlin5p<T>::displacement_shape_matrix(const Patch<T, 2>& /*patch*/, 
-                                                     const BasisDerivs<T, 2>& basis, 
-                                                     const LocalFrame<T, 2>& /*local*/) const
+Matrix<T>
+ShellReissnerMindlin5p<T>::displacement_shape_matrix(const Patch<T, 2>& /*patch*/,
+                                                     const BasisDerivs<T, 2>& basis,
+                                                     const LocalFrame<T, 2>& /*local*/,
+                                                     const ChristoffelSymbols<T, 2>& /*chr*/) const
 {
     const Index Q = basis.N.rows();
     const Index n = basis.N.cols();
@@ -134,8 +135,11 @@ ShellReissnerMindlin5p<T>::displacement_shape_matrix(const Patch<T, 2>& /*patch*
 }
 
 template <std::floating_point T>
-Matrix<T> ShellReissnerMindlin5p<T>::rotation_shape_matrix(
-    const Patch<T, 2>& /*patch*/, const BasisDerivs<T, 2>& basis, const LocalFrame<T, 2>& /*local*/) const
+Matrix<T> 
+ShellReissnerMindlin5p<T>::rotation_shape_matrix(const Patch<T, 2>& /*patch*/, 
+                                                 const BasisDerivs<T, 2>& basis, 
+                                                 const LocalFrame<T, 2>& /*local*/,
+                                                 const ChristoffelSymbols<T, 2>& /*chr*/) const
 {
     const Index Q = basis.N.rows();
     const Index n = basis.N.cols();

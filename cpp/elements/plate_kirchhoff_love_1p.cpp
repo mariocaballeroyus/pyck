@@ -16,13 +16,13 @@ PlateKirchhoffLove1p<T>::PlateKirchhoffLove1p(Ptr<PlaneStress2d<T>> material)
 
 // === Matrix Operators ===============================================================
 
-template <std::floating_point T> 
+template <std::floating_point T>
 Matrix<T>
 PlateKirchhoffLove1p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
                                        const BasisDerivs<T, 2>& basis,
-                                       const LocalFrame<T, 2>& local) const
+                                       const LocalFrame<T, 2>& local,
+                                       const ChristoffelSymbols<T, 2>& chr) const
 {
-    auto chr = eval_christoffel(local);
     const Matrix<T>& N_u  = basis.N_u;
     const Matrix<T>& N_v  = basis.N_v;
     const Matrix<T>& N_uu = basis.N_uu;
@@ -65,17 +65,19 @@ PlateKirchhoffLove1p<T>::constitutive_matrix(const LocalFrame<T, 2>& local,
 template <std::floating_point T>
 Matrix<T> PlateKirchhoffLove1p<T>::displacement_shape_matrix(const Patch<T, 2>& /*patch*/,
                                                              const BasisDerivs<T, 2>& basis,
-                                                             const LocalFrame<T, 2>& /*local*/) const
+                                                             const LocalFrame<T, 2>& /*local*/,
+                                                             const ChristoffelSymbols<T, 2>& /*chr*/) const
 {
     // N_w = [ N_i ]
     return basis.N;
 }
 
-template <std::floating_point T> 
+template <std::floating_point T>
 Matrix<T>
 PlateKirchhoffLove1p<T>::rotation_shape_matrix(const Patch<T, 2>& /*patch*/,
                                                const BasisDerivs<T, 2>& basis,
-                                               const LocalFrame<T, 2>& /*local*/) const
+                                               const LocalFrame<T, 2>& /*local*/,
+                                               const ChristoffelSymbols<T, 2>& /*chr*/) const
 {
     const Matrix<T>& N_u = basis.N_u;
     const Matrix<T>& N_v = basis.N_v;

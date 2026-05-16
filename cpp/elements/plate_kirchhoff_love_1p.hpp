@@ -37,11 +37,13 @@ public:
      * @param patch Patch.
      * @param basis Basis derivatives.
      * @param local Local frame.
+     * @param chr Christoffel symbols.
      * @return B-matrix.
      */
     Matrix<T> strain_matrix(const Patch<T, 2>& patch,
                             const BasisDerivs<T, 2>& basis,
-                            const LocalFrame<T, 2>& local) const override;
+                            const LocalFrame<T, 2>& local,
+                            const ChristoffelSymbols<T, 2>& chr) const override;
 
     /**
      * @brief Constitutive D-matrix.
@@ -57,27 +59,31 @@ public:
 
     /**
      * @brief Displacement shape matrix.
-     * 
+     *
      * @param patch Patch.
      * @param basis Basis derivatives.
      * @param local Local frame.
+     * @param chr Christoffel symbols.
      * @return Displacement shape matrix.
      */
     Matrix<T> displacement_shape_matrix(const Patch<T, 2>& patch,
                                         const BasisDerivs<T, 2>& basis,
-                                        const LocalFrame<T, 2>& local) const override;
+                                        const LocalFrame<T, 2>& local,
+                                        const ChristoffelSymbols<T, 2>& chr) const override;
 
     /**
      * @brief Rotation shape matrix.
-     * 
+     *
      * @param patch Patch.
      * @param basis Basis derivatives.
      * @param local Local frame.
+     * @param chr Christoffel symbols.
      * @return Rotation shape matrix.
      */
     Matrix<T> rotation_shape_matrix(const Patch<T, 2>& patch,
                                     const BasisDerivs<T, 2>& basis,
-                                    const LocalFrame<T, 2>& local) const override;
+                                    const LocalFrame<T, 2>& local,
+                                    const ChristoffelSymbols<T, 2>& chr) const override;
 
     // === Getters ================================================================
 

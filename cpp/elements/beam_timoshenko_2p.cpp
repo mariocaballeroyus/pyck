@@ -36,9 +36,9 @@ BeamTimoshenko2p<T>::constitutive_matrix(const LocalFrame<T, 1>& local,
 template <std::floating_point T> Matrix<T>
 BeamTimoshenko2p<T>::strain_matrix(const Patch<T, 1>& /*patch*/,
                                    const BasisDerivs<T, 1>& basis,
-                                   const LocalFrame<T, 1>& local) const
+                                   const LocalFrame<T, 1>& local,
+                                   const ChristoffelSymbols<T, 1>& chr) const
 {
-    auto chr = eval_christoffel(local);
     const Index Q = basis.N.rows();
     const Index n = basis.N.cols();
     Matrix<T> B = Matrix<T>::Zero(2 * Q, 2 * n);
@@ -65,10 +65,11 @@ BeamTimoshenko2p<T>::strain_matrix(const Patch<T, 1>& /*patch*/,
 // === Shape Matrices =================================================================
 
 
-template <std::floating_point T> Matrix<T> 
+template <std::floating_point T> Matrix<T>
 BeamTimoshenko2p<T>::displacement_shape_matrix(const Patch<T, 1>& /*patch*/,
                                                const BasisDerivs<T, 1>& basis,
-                                               const LocalFrame<T, 1>& /*local*/) const
+                                               const LocalFrame<T, 1>& /*local*/,
+                                               const ChristoffelSymbols<T, 1>& /*chr*/) const
 {
     const Index Q = basis.N.rows();
     const Index n = basis.N.cols();
@@ -82,10 +83,11 @@ BeamTimoshenko2p<T>::displacement_shape_matrix(const Patch<T, 1>& /*patch*/,
     return Nw;
 }
 
-template <std::floating_point T> Matrix<T> 
+template <std::floating_point T> Matrix<T>
 BeamTimoshenko2p<T>::rotation_shape_matrix(const Patch<T, 1>& /*patch*/,
                                            const BasisDerivs<T, 1>& basis,
-                                           const LocalFrame<T, 1>& /*local*/) const
+                                           const LocalFrame<T, 1>& /*local*/,
+                                           const ChristoffelSymbols<T, 1>& /*chr*/) const
 {
     const Index Q = basis.N.rows();
     const Index n = basis.N.cols();

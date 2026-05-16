@@ -37,11 +37,13 @@ public:
      * @param patch         The patch.
      * @param basis         The basis derivatives.
      * @param local         The local frame.
+     * @param chr           The Christoffel symbols.
      * @return Matrix<T>    The strain-displacement matrix.
      */
     Matrix<T> strain_matrix(const Patch<T, 1>& patch,
                             const BasisDerivs<T, 1>& basis,
-                            const LocalFrame<T, 1>& local) const override;
+                            const LocalFrame<T, 1>& local,
+                            const ChristoffelSymbols<T, 1>& chr) const override;
 
     /**
      * @brief Constitutive D-matrix.
@@ -56,27 +58,31 @@ public:
 
     /**
      * @brief Displacement shape matrix.
-     * 
+     *
      * @param patch         The patch.
      * @param basis         The basis derivatives.
      * @param local         The local frame.
+     * @param chr           The Christoffel symbols.
      * @return Matrix<T>    The displacement shape matrix.
      */
     Matrix<T> displacement_shape_matrix(const Patch<T, 1>& patch,
                                         const BasisDerivs<T, 1>& basis,
-                                        const LocalFrame<T, 1>& local) const override;
+                                        const LocalFrame<T, 1>& local,
+                                        const ChristoffelSymbols<T, 1>& chr) const override;
 
     /**
      * @brief Rotation shape matrix.
-     * 
+     *
      * @param patch         The patch.
      * @param basis         The basis derivatives.
      * @param local         The local frame.
+     * @param chr           The Christoffel symbols.
      * @return Matrix<T>    The rotation shape matrix.
      */
     Matrix<T> rotation_shape_matrix(const Patch<T, 1>& patch,
                                     const BasisDerivs<T, 1>& basis,
-                                    const LocalFrame<T, 1>& local) const override;
+                                    const LocalFrame<T, 1>& local,
+                                    const ChristoffelSymbols<T, 1>& chr) const override;
 
     // === Getters ====================================================================
 

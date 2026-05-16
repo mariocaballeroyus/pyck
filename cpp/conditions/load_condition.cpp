@@ -2,6 +2,7 @@
 #include "patch.hpp"
 #include "basis_derivs.hpp"
 #include "local_frame.hpp"
+#include "christoffels.hpp"
 #include "bspline.hpp"
 #include <stdexcept>
 
@@ -114,12 +115,8 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
         auto basis   = eval_basis(patch, mapped_pts, elem_idx, req_order);
         auto act_pts = patch.active_control_pts(elem_idx);
         auto local   = eval_local_frame(basis, act_pts);
-
-        // N_w is the transverse-displacement shape matrix (Q × K_elem) with
-        // nonzero columns only at each node's w-slot.  Because the distributed
-        // load q is conjugate to w only, N_w^T · (q·|J|·w) already scatters
-        // the load into the correct slots with zeros elsewhere.
-        Matrix<T> N_w = element.displacement_shape_matrix(patch, basis, local);
+        auto chr     = eval_christoffel(local);
+        Matrix<T> N_w = element.displacement_shape_matrix(patch, basis, local, chr);
 
         Vector<T> W_J_T(Q);
         for (std::size_t k = 0; k < Q; ++k) {

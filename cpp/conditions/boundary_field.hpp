@@ -280,18 +280,19 @@ template <std::floating_point T>
 class TransverseDisplacement : public BoundaryField<T>
 {
 public:
-    Matrix<T> evaluate(
-        const Element<T, 2>& element,
-        const PatchBoundary<T, 2>& boundary,
-        Index /*boundary_span*/,
-        const BasisDerivs<T, 1>& /*boundary_basis*/,
-        const LocalFrame<T, 1>& /*boundary_local*/,
-        Index /*parent_flat_span*/,
-        const BasisDerivs<T, 2>& parent_basis,
-        const LocalFrame<T, 2>& parent_local) const override
+
+    Matrix<T> evaluate(const Element<T, 2>& element,
+                       const PatchBoundary<T, 2>& boundary,
+                       Index /*boundary_span*/,
+                       const BasisDerivs<T, 1>& /*boundary_basis*/,
+                       const LocalFrame<T, 1>& /*boundary_local*/,
+                       Index /*parent_flat_span*/,
+                       const BasisDerivs<T, 2>& parent_basis,
+                       const LocalFrame<T, 2>& parent_local) const override
     {
+        const ChristoffelSymbols<T, 2> chr = eval_christoffel(parent_local);
         return element.displacement_shape_matrix(*boundary.parent(),
-                                                 parent_basis, parent_local);
+                                                 parent_basis, parent_local, chr);
     }
 };
 
@@ -317,8 +318,9 @@ public:
         const BasisDerivs<T, 2>& parent_basis,
         const LocalFrame<T, 2>& parent_local) const override
     {
+        const ChristoffelSymbols<T, 2> chr = eval_christoffel(parent_local);
         const Matrix<T> Nrot = element.rotation_shape_matrix(
-            *boundary.parent(), parent_basis, parent_local);
+            *boundary.parent(), parent_basis, parent_local, chr);
         const ColMatrix<T, 3> n =
             boundary.eval_outward_normal(boundary_local, parent_local);
         const auto [n_up_1, n_up_2] =
@@ -355,8 +357,9 @@ public:
         const BasisDerivs<T, 2>& parent_basis,
         const LocalFrame<T, 2>& parent_local) const override
     {
+        const ChristoffelSymbols<T, 2> chr = eval_christoffel(parent_local);
         const Matrix<T> Nrot = element.rotation_shape_matrix(
-            *boundary.parent(), parent_basis, parent_local);
+            *boundary.parent(), parent_basis, parent_local, chr);
         const ColMatrix<T, 3> n =
             boundary.eval_outward_normal(boundary_local, parent_local);
         const ColMatrix<T, 3> a_3 = eval_normal(parent_local);

@@ -22,9 +22,9 @@ PlateReissnerMindlinDispl3p<T>::PlateReissnerMindlinDispl3p(Ptr<PlaneStress2d<T>
 template <std::floating_point T> Matrix<T>
 PlateReissnerMindlinDispl3p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
                                               const BasisDerivs<T, 2>& basis,
-                                              const LocalFrame<T, 2>& local) const
+                                              const LocalFrame<T, 2>& local,
+                                              const ChristoffelSymbols<T, 2>& chr) const
 {
-    auto chr = eval_christoffel(local);
     const Index Q = basis.N.rows();
     const Index n = basis.N.cols();
     Matrix<T> B = Matrix<T>::Zero(5 * Q, 3 * n);
@@ -74,10 +74,11 @@ PlateReissnerMindlinDispl3p<T>::constitutive_matrix(const LocalFrame<T, 2>& loca
 
 // === Shape Matrices =================================================================
 
-template <std::floating_point T> Matrix<T> 
-PlateReissnerMindlinDispl3p<T>::displacement_shape_matrix(const Patch<T, 2>& /*patch*/, 
-                                                          const BasisDerivs<T, 2>& basis, 
-                                                          const LocalFrame<T, 2>& /*local*/) const
+template <std::floating_point T> Matrix<T>
+PlateReissnerMindlinDispl3p<T>::displacement_shape_matrix(const Patch<T, 2>& /*patch*/,
+                                                          const BasisDerivs<T, 2>& basis,
+                                                          const LocalFrame<T, 2>& /*local*/,
+                                                          const ChristoffelSymbols<T, 2>& /*chr*/) const
 {
     const Index Q = basis.N.rows();
     const Index n = basis.N.cols();
@@ -95,7 +96,8 @@ PlateReissnerMindlinDispl3p<T>::displacement_shape_matrix(const Patch<T, 2>& /*p
 
 template <std::floating_point T>
 Matrix<T> PlateReissnerMindlinDispl3p<T>::rotation_shape_matrix(
-    const Patch<T, 2>& /*patch*/, const BasisDerivs<T, 2>& basis, const LocalFrame<T, 2>& /*local*/) const
+    const Patch<T, 2>& /*patch*/, const BasisDerivs<T, 2>& basis, const LocalFrame<T, 2>& /*local*/,
+    const ChristoffelSymbols<T, 2>& /*chr*/) const
 {
     const Index Q = basis.N.rows();
     const Index n = basis.N.cols();

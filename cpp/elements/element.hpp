@@ -7,6 +7,7 @@
 #include "patch.hpp"
 #include "basis_derivs.hpp"
 #include "local_frame.hpp"
+#include "christoffels.hpp"
 #include "../types.hpp"
 
 namespace pyck
@@ -71,11 +72,13 @@ public:
      * @param patch The patch.
      * @param basis The basis derivatives.
      * @param local The local frame.
+     * @param chr The Christoffel symbols.
      * @return The strain-displacement operator.
      */
     virtual Matrix<T> strain_matrix(const Patch<T, d>& patch,
                                     const BasisDerivs<T, d>& basis,
-                                    const LocalFrame<T, d>& local) const = 0;
+                                    const LocalFrame<T, d>& local,
+                                    const ChristoffelSymbols<T, d>& chr) const = 0;
 
     /**
      * @brief Constitutive operator D at quadrature point q.
@@ -91,27 +94,31 @@ public:
 
     /**
      * @brief Transverse-displacement shape matrix N_w (Q × K).
-     * 
+     *
      * @param patch The patch.
      * @param basis The basis derivatives.
      * @param local The local frame.
+     * @param chr The Christoffel symbols.
      * @return The transverse-displacement shape matrix.
      */
     virtual Matrix<T> displacement_shape_matrix(const Patch<T, d>& patch,
                                                 const BasisDerivs<T, d>& basis,
-                                                const LocalFrame<T, d>& local) const = 0;
+                                                const LocalFrame<T, d>& local,
+                                                const ChristoffelSymbols<T, d>& chr) const = 0;
 
     /**
      * @brief Rotation shape matrix.
-     * 
+     *
      * @param patch The patch.
      * @param basis The basis derivatives.
      * @param local The local frame.
+     * @param chr The Christoffel symbols.
      * @return The rotation shape matrix.
      */
     virtual Matrix<T> rotation_shape_matrix(const Patch<T, d>& patch,
                                             const BasisDerivs<T, d>& basis,
-                                            const LocalFrame<T, d>& local) const = 0;
+                                            const LocalFrame<T, d>& local,
+                                            const ChristoffelSymbols<T, d>& chr) const = 0;
 };
 
 
@@ -121,7 +128,8 @@ Element<T, d>::stress_matrix(const Patch<T, d>& patch,
                              const BasisDerivs<T, d>& basis,
                              const LocalFrame<T, d>& local) const
 {
-    const Matrix<T> B = strain_matrix(patch, basis, local);
+    auto chr = eval_christoffel(local);
+    const Matrix<T> B = strain_matrix(patch, basis, local, chr);
     const Index Q        = basis.N.rows();
     const Index n_strain = B.rows() / Q;
     const Index K        = B.cols();
@@ -146,8 +154,9 @@ Element<T, d>::compute_local_stiffness(const Patch<T, d>& patch,
     auto basis   = eval_basis(patch, mapped_pts, elem_idx, min_order());
     auto act_pts = patch.active_control_pts(elem_idx);
     auto local   = eval_local_frame(basis, act_pts);
+    auto chr     = eval_christoffel(local);
 
-    const Matrix<T> B    = strain_matrix(patch, basis, local);
+    const Matrix<T> B    = strain_matrix(patch, basis, local, chr);
     const Index Q        = q_weights.size();
     const Index n_strain = B.rows() / Q;
     const Index K        = B.cols();

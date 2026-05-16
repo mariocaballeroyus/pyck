@@ -38,11 +38,13 @@ public:
      * @param patch Patch.
      * @param basis Basis derivatives.
      * @param local Local frame.
+     * @param chr Christoffel symbols.
      * @return Strain-displacement matrix.
      */
     Matrix<T> strain_matrix(const Patch<T, 2>& patch,
                             const BasisDerivs<T, 2>& basis,
-                            const LocalFrame<T, 2>& local) const override;
+                            const LocalFrame<T, 2>& local,
+                            const ChristoffelSymbols<T, 2>& chr) const override;
 
     /**
      * @brief Constitutive D-matrix.
@@ -54,19 +56,21 @@ public:
     Matrix<T> constitutive_matrix(const LocalFrame<T, 2>& local,
                                   Index q) const override;
 
-    // Shape Matrices =================================================================                              
-    
+    // Shape Matrices =================================================================
+
     /**
      * @brief Displacement shape matrix stub (returns zero).
      *
      * @param patch Patch.
      * @param basis Basis derivatives.
      * @param local Local frame.
+     * @param chr Christoffel symbols.
      * @return Zero matrix of correct shape.
      */
     Matrix<T> displacement_shape_matrix(const Patch<T, 2>& patch,
                                         const BasisDerivs<T, 2>& basis,
-                                        const LocalFrame<T, 2>& local) const override;
+                                        const LocalFrame<T, 2>& local,
+                                        const ChristoffelSymbols<T, 2>& chr) const override;
 
     /**
      * @brief Rotation shape matrix stub (returns zero).
@@ -74,11 +78,13 @@ public:
      * @param patch Patch.
      * @param basis Basis derivatives.
      * @param local Local frame.
+     * @param chr Christoffel symbols.
      * @return Zero matrix of correct shape.
      */
     Matrix<T> rotation_shape_matrix(const Patch<T, 2>& patch,
                                     const BasisDerivs<T, 2>& basis,
-                                    const LocalFrame<T, 2>& local) const override;
+                                    const LocalFrame<T, 2>& local,
+                                    const ChristoffelSymbols<T, 2>& chr) const override;
 
     // === Getters ================================================================
 
