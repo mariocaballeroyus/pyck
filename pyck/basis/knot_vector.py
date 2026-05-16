@@ -31,6 +31,23 @@ class KnotVector:
             np.asarray(knots, dtype=np.float64).ravel()
         )
 
+    @classmethod
+    def _from_cpp(cls, cpp_obj: _pyck.KnotVector) -> KnotVector:
+        instance = cls.__new__(cls)
+        instance._cpp_object = cpp_obj
+        return instance
+
+    def insert(self, u: float, count: int = 1) -> KnotVector:
+        """Return a new knot vector with `u` inserted `count` times."""
+        return KnotVector._from_cpp(self._cpp_object.insert(float(u), int(count)))
+
+    def elevate(self, count: int = 1) -> KnotVector:
+        """Return the knot vector for a `count`-fold degree elevation.
+
+        Each unique knot's multiplicity is incremented by `count`.
+        """
+        return KnotVector._from_cpp(self._cpp_object.elevate(int(count)))
+
     @property
     def knots(self) -> npt.NDArray[np.float64]:
         """Read-only access to the raw knot values."""
@@ -46,7 +63,7 @@ class KnotVector:
     def __len__(self) -> int:
         return len(self.knots)
 
-    def __getitem__(self, i: int | slice) -> float | np.ndarray:
+    def __getitem__(self, i: int | slice) -> float | npt.NDArray[np.float64]:
         return self.knots[i]
     
     def __iter__(self) -> Iterator[float]:

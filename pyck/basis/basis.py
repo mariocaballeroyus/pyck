@@ -55,6 +55,20 @@ class Basis(ABC):
         """Number of knot intervals (including zero-width clamped spans)."""
         return len(self.knots) - 1
 
+    @abstractmethod
+    def insert_knot(
+        self, u: float, count: int = 1
+    ) -> tuple[Basis, npt.NDArray[np.float64]]:
+        """Return a refined basis and the (n_new, n_old) control-point transform."""
+        ...
+
+    @abstractmethod
+    def elevate_degree(
+        self, count: int = 1
+    ) -> tuple[Basis, npt.NDArray[np.float64]]:
+        """Return a degree-elevated basis and the (n_new, n_old) CP transform."""
+        ...
+
     def eval_all(
         self, pts: npt.ArrayLike, order: int = 0
     ) -> list[npt.NDArray[np.float64]]:
@@ -79,5 +93,5 @@ class Basis(ABC):
         if order < 0:
             raise ValueError(f"order must be non-negative, got {order}")
 
-        pts = np.asarray(np.atleast_1d(pts), dtype=np.float64)
+        pts = np.atleast_1d(np.asarray(pts, dtype=np.float64))
         return self._cpp_object.eval_all(pts, order)
