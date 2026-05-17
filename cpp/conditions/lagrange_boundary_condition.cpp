@@ -12,12 +12,13 @@
 namespace pyck
 {
 
+// === Constructors ===================================================================
+
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-LagrangeBoundaryCondition<T, d>::LagrangeBoundaryCondition(
-    const PatchBoundary<T, d>& boundary,
-    const Element<T, d>& element,
-    const QuadratureRule<T, d - 1>& quadrature)
+LagrangeBoundaryCondition<T, d>::LagrangeBoundaryCondition(const PatchBoundary<T, d>& boundary,
+                                                           const Element<T, d>& element,
+                                                           const QuadratureRule<T, d - 1>& quadrature)
     : boundary_(boundary),
       element_(element),
       quadrature_(quadrature),
@@ -29,24 +30,20 @@ LagrangeBoundaryCondition<T, d>::LagrangeBoundaryCondition(
     }
 }
 
+// === Utility Methods ================================================================
+
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-LagrangeBoundaryCondition<T, d>& LagrangeBoundaryCondition<T, d>::add(
-    Ptr<const BoundaryField<T>> field, T value)
+LagrangeBoundaryCondition<T, d>&
+LagrangeBoundaryCondition<T, d>::add(Ptr<const BoundaryField<T>> field, T value)
 {
-    if (!field) {
+    if (!field)
+    {
         throw std::invalid_argument("LagrangeBoundaryCondition::add: "
                                     "field must not be null.");
     }
     terms_.push_back({std::move(field), value, 0});
     return *this;
-}
-
-template <std::floating_point T, std::size_t d>
-requires (d > 1)
-std::size_t LagrangeBoundaryCondition<T, d>::num_dofs() const
-{
-    return static_cast<std::size_t>(multiplier_dof_count_) * terms_.size();
 }
 
 template <std::floating_point T, std::size_t d>
@@ -65,38 +62,37 @@ void LagrangeBoundaryCondition<T, d>::allocate_dofs(
 
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-void LagrangeBoundaryCondition<T, d>::apply(
-    Matrix<T>& stiffness, Vector<T>& load, const DofLayout& layout,
-    const std::vector<DofLayout::BlockId>& primal_blocks) const
+void
+LagrangeBoundaryCondition<T, d>::apply(Matrix<T>& stiffness, Vector<T>& load,
+                                       const DofLayout& layout,
+                                       const std::vector<DofLayout::BlockId>& primal_blocks) const
 {
     if (terms_.empty()) return;
+
+    const Patch<T, 2>& parent = *boundary_.parent();
     const DofLayout::BlockId primal_block = primal_blocks.at(this->patch_idx_);
 
-    const PatchBoundary<T, 2>& boundary = boundary_;
-    const auto& element = element_;
-    const auto& quadrature = quadrature_;
-    const Patch<T, 2>& parent = *boundary.parent();
-    const Index ndof = static_cast<Index>(element.num_node_dofs());
-    const std::size_t req_order = element.min_order();
-    const Index num_spans_bdy = boundary.basis(0).knot_vector().num_spans();
+    const Index ndof = static_cast<Index>(element_.num_node_dofs());
+    const std::size_t req_order = element_.min_order();
+    const Index num_spans_bdy = boundary_.basis(0).knot_vector().num_spans();
 
     for (Index s = 0; s < num_spans_bdy; ++s)
     {
-        auto [lo, hi] = boundary.basis(0).knot_vector().span_bounds(s);
+        auto [lo, hi] = boundary_.basis(0).knot_vector().span_bounds(s);
         if (std::abs(hi - lo) < T(1e-14)) continue;
 
         // Per-span scaffolding: shared across all fields.
-        auto [mapped_pts, mapped_weights] = quadrature.map_to_domain(lo, hi);
+        auto [mapped_pts, mapped_weights] = quadrature_.map_to_domain(lo, hi);
         const Index Q = static_cast<Index>(mapped_pts.rows());
 
-        auto boundary_basis  = eval_basis(boundary, mapped_pts, s, 1);
-        auto boundary_act    = boundary.active_control_pts(s);
+        auto boundary_basis  = eval_basis(boundary_, mapped_pts, s, 1);
+        auto boundary_act    = boundary_.active_control_pts(s);
         auto boundary_local  = eval_local_frame(boundary_basis, boundary_act);
 
-        auto multiplier_basis_ids = boundary.dof_mapper().get_element_dofs(s);
+        auto multiplier_basis_ids = boundary_.dof_mapper().get_element_dofs(s);
 
-        const Index flat_parent = boundary.parent_flat_span(s);
-        const ColMatrix<T, 2> parent_pts = boundary.lift_to_parent(mapped_pts);
+        const Index flat_parent = boundary_.parent_flat_span(s);
+        const ColMatrix<T, 2> parent_pts = boundary_.lift_to_parent(mapped_pts);
         auto parent_basis  = eval_basis(parent, parent_pts, flat_parent, req_order);
         auto parent_act    = parent.active_control_pts(flat_parent);
         auto parent_local  = eval_local_frame(parent_basis, parent_act);
@@ -115,7 +111,7 @@ void LagrangeBoundaryCondition<T, d>::apply(
         for (const auto& term : terms_)
         {
             Matrix<T> C = term.field->evaluate(
-                element, boundary, s, boundary_basis, boundary_local,
+                element_, boundary_, s, boundary_basis, boundary_local,
                 flat_parent, parent_basis, parent_local);
 
             Matrix<T> C_local = Matrix<T>::Zero(n_lambda, K_elem);

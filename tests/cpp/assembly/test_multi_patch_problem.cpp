@@ -34,7 +34,7 @@ static Ptr<Patch<double, 2>> make_square_plate(
     Index n_elem)
 {
     auto bsp = std::make_shared<BSpline<double>>(
-        p, clamped_uniform_knots<double>(p, n_elem));
+        p, KnotVector<double>::clamped_uniform(p, n_elem));
     return std::make_shared<Patch<double, 2>>(
         rectangle<double>(bsp, bsp, L, L));
 }

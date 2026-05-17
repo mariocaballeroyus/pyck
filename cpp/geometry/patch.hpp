@@ -163,36 +163,37 @@ public:
     // === Refinement =================================================================
 
     /**
-     * @brief Refine the patch by inserting a knot value @p u in direction @p dir.
+     * @brief Refine the patch by inserting a knot value `u` in direction `dir`.
      *
      * The returned patch is geometrically identical to this one (within rounding)
      * but has a refined basis and updated control points. The original patch is
      * unmodified. Derived objects (boundaries, assembler entries, conditions) must
      * be rebuilt against the returned patch.
      *
-     * @param dir   Parametric direction (0 for d=1; 0 or 1 for d=2).
-     * @param u     Knot value to insert.
-     * @param count Number of times to insert (default 1).
-     * @return A new Patch with the refined basis and control points.
+     * @param dir Parametric direction (0 for d=1; 0 or 1 for d=2).
+     * @param u   Knot value to insert.
+     * @return A new Patch with the refined basis and control points. Callers
+     *         wanting multiplicity > 1 chain the method.
      */
-    Patch<T, d> insert_knot(std::size_t dir, T u, Index count = 1) const;
+    Patch<T, d> insert_knot(std::size_t dir, T u) const;
 
     /// @brief Convenience overload for 1D patches: direction is always 0.
-    Patch<T, d> insert_knot(T u, Index count = 1) const requires(d == 1)
-    { return this->insert_knot(0, u, count); }
+    Patch<T, d> insert_knot(T u) const requires(d == 1)
+    { return this->insert_knot(0, u); }
 
     /**
-     * @brief Refine the patch by degree-elevating in direction @p dir.
+     * @brief Refine the patch by degree-elevating in direction `dir` by one.
      *
-     * Returns a new patch with the elevated basis (degree increased by
-     * @p count) and updated control points. Continuity at every existing
-     * internal knot is preserved.
+     * Returns a new patch with the elevated basis (degree increased by one)
+     * and updated control points. Continuity at every existing internal knot
+     * is preserved. Callers wanting to elevate by more than one chain the
+     * method.
      */
-    Patch<T, d> elevate_degree(std::size_t dir, Index count = 1) const;
+    Patch<T, d> elevate_degree(std::size_t dir) const;
 
     /// @brief Convenience overload for 1D patches: direction is always 0.
-    Patch<T, d> elevate_degree(Index count = 1) const requires(d == 1)
-    { return this->elevate_degree(0, count); }
+    Patch<T, d> elevate_degree() const requires(d == 1)
+    { return this->elevate_degree(0); }
 
 protected:
 

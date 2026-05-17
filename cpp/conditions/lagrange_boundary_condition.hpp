@@ -18,11 +18,6 @@ namespace pyck
 /**
  * @brief Boundary Lagrange-multiplier condition.
  *
- * The condition is bound to a single (boundary, element, quadrature) site.
- * Multiple physical fields enforced on that boundary are added via add(),
- * each receiving its own multiplier DOF block. Per-span boundary/parent
- * shape evaluation is performed once and reused across all added fields.
- *
  * @tparam T Scalar floating-point type.
  * @tparam d Parent patch / element parametric dimension.
  */
@@ -31,9 +26,14 @@ requires (d > 1)
 class LagrangeBoundaryCondition : public Condition<T>
 {
 public:
+
+    // === Constructors ===============================================================
+
     LagrangeBoundaryCondition(const PatchBoundary<T, d>& boundary,
                                         const Element<T, d>& element,
                                         const QuadratureRule<T, d - 1>& quadrature);
+
+    // === Utility Methods ============================================================
 
     /**
      * @brief Register a field to be enforced on this boundary.
@@ -44,8 +44,6 @@ public:
     LagrangeBoundaryCondition& add(Ptr<const BoundaryField<T>> field,
                                      T value = T(0));
 
-    std::size_t num_dofs() const override;
-
     void allocate_dofs(DofLayout& layout,
                        const std::vector<DofLayout::BlockId>& primal_blocks) override;
 
@@ -55,6 +53,7 @@ public:
                const std::vector<DofLayout::BlockId>& primal_blocks) const override;
 
 private:
+
     struct Term {
         Ptr<const BoundaryField<T>> field;
         T value;

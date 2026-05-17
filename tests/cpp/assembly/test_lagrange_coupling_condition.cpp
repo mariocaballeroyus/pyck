@@ -35,9 +35,9 @@ static Ptr<Patch<double, 2>> make_translated_square(
     double dx = 0.0, double dy = 0.0)
 {
     auto bsp_u = std::make_shared<BSpline<double>>(
-        p, clamped_uniform_knots<double>(p, n_basis_u));
+        p, KnotVector<double>::clamped_uniform(p, n_basis_u));
     auto bsp_v = std::make_shared<BSpline<double>>(
-        p, clamped_uniform_knots<double>(p, n_basis_v));
+        p, KnotVector<double>::clamped_uniform(p, n_basis_v));
     auto rect = rectangle<double>(bsp_u, bsp_v, L_x, L_y);
     if (dx != 0.0 || dy != 0.0) {
         rect.control_pts().col(0).array() += dx;
@@ -136,50 +136,7 @@ TEST_CASE("LagrangeCouplingCondition: stiffness is symmetric",
 }
 
 // ===========================================================================
-// TEST 2 — num_dofs() and allocated multiplier count
-// ===========================================================================
-TEST_CASE("LagrangeCouplingCondition: num_dofs reports total multipliers",
-          "[conditions][lagrange_coupling]")
-{
-    const double L = 1.0;
-    const Index  p = 2, n = 4;
-
-    auto patch_A = make_translated_square(L, L, p, n, n, 0.0);
-    auto patch_B = make_translated_square(L, L, p, n, n, L);
-
-    auto material = std::make_shared<PlaneStress2d<double>>(1e7, 0.3, 0.01);
-    auto element  = std::make_shared<PlateKirchhoffLove1p<double>>(material);
-    GaussLegendre<double, 1> g1d(p + 1);
-
-    auto side_a = create_patch_boundary<double, 2>(patch_A, 0, false);
-    auto side_b = create_patch_boundary<double, 2>(patch_B, 0, true);
-
-    LagrangeCouplingCondition<double, 2> cc(
-        *side_a, *side_b, 0, 1, *element, *element, g1d);
-
-    REQUIRE(cc.num_dofs() == 0);  // no terms → no multipliers
-
-    cc.add(std::make_shared<BasisValue<double>>(0),
-           std::make_shared<BasisValue<double>>(0));
-    REQUIRE(cc.num_dofs() == static_cast<std::size_t>(side_a->num_control_pts()));
-
-    cc.add(std::make_shared<BasisNormalSlope<double>>(0),
-           std::make_shared<BasisNormalSlope<double>>(0));
-    REQUIRE(cc.num_dofs() == 2 * static_cast<std::size_t>(side_a->num_control_pts()));
-
-    DofLayout layout;
-    const Index ndof = element->num_node_dofs();
-    layout.allocate(DofType::Primal, patch_A->num_control_pts() * ndof, ndof);
-    layout.allocate(DofType::Primal, patch_B->num_control_pts() * ndof, ndof);
-    const Index n_primal = layout.num_dofs();
-    std::vector<DofLayout::BlockId> blocks{0, 1};
-
-    cc.allocate_dofs(layout, blocks);
-    REQUIRE(layout.num_dofs() == n_primal + static_cast<Index>(cc.num_dofs()));
-}
-
-// ===========================================================================
-// TEST 3 — Construction throws for null fields and equal patch indices
+// TEST 2 — Construction throws for null fields and equal patch indices
 // ===========================================================================
 TEST_CASE("LagrangeCouplingCondition: invalid configurations throw",
           "[conditions][lagrange_coupling]")

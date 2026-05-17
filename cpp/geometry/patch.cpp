@@ -9,7 +9,7 @@ template <std::floating_point T, std::size_t d>
 Patch<T, d>::Patch(Ptr<const Basis<T>> basis_u,
                    const ColMatrix<T, 3>& control_pts) requires(d == 1)
     : control_pts_(control_pts),
-      tensor_product_(std::move(basis_u)),
+      tensor_product_({basis_u}),
       dof_mapper_({tensor_product_.basis(0).num_basis()},
                   {tensor_product_.basis(0).degree()})
 {
@@ -32,7 +32,7 @@ Patch<T, d>::Patch(Ptr<const Basis<T>> basis_u,
                    Ptr<const Basis<T>> basis_v,
                    const ColMatrix<T, 3>& control_pts) requires(d == 2)
     : control_pts_(control_pts),
-      tensor_product_(std::move(basis_u), std::move(basis_v)),
+      tensor_product_({basis_u, basis_v}),
       dof_mapper_({tensor_product_.basis(0).num_basis(), tensor_product_.basis(1).num_basis()},
                   {tensor_product_.basis(0).degree(),    tensor_product_.basis(1).degree()})
 {
@@ -59,7 +59,7 @@ Patch<T, d>::Patch(Ptr<const Basis<T>> basis_u,
                    Ptr<const Basis<T>> basis_w,
                    const ColMatrix<T, 3>& control_pts) requires(d == 3)
     : control_pts_(control_pts),
-      tensor_product_(std::move(basis_u), std::move(basis_v), std::move(basis_w)),
+      tensor_product_({basis_u, basis_v, basis_w}),
       dof_mapper_({tensor_product_.basis(0).num_basis(),
                    tensor_product_.basis(1).num_basis(),
                    tensor_product_.basis(2).num_basis()},
@@ -149,11 +149,31 @@ Patch<T, d>::assembly_dofs() const
     return indices;
 }
 
+// Helper: evaluate all n basis functions at m points via eval_on_span loop.
+// Returns (m × n) dense matrix by scattering span-local results.
+template <std::floating_point T>
+static Matrix<T> eval_dense_1d(const Basis<T>& basis, const Vector<T>& pts)
+{
+    const Index n_pts = pts.size();
+    const Index n = basis.num_basis();
+    const Index p = basis.degree();
+    Matrix<T> N = Matrix<T>::Zero(n_pts, n);
+    for (Index i = 0; i < n_pts; ++i) {
+        const Index span = basis.find_span(pts[i]);
+        Vector<T> pt(1);
+        pt << pts[i];
+        std::vector<Matrix<T>> local;
+        basis.eval_on_span(pt, span, 0, local);
+        N.row(i).segment(span - p, p + 1) = local[0].row(0);
+    }
+    return N;
+}
+
 template <std::floating_point T, std::size_t d>
 ColMatrix<T, 3>
 Patch<T, d>::eval_physical(const Vector<T>& pts) const requires(d == 1)
 {
-    const Matrix<T> N = tensor_product_.basis(0).eval_all(pts, 0)[0];
+    const Matrix<T> N = eval_dense_1d(tensor_product_.basis(0), pts);
     ColMatrix<T, 3> result(pts.size(), 3);
     result.noalias() = N * control_pts_;
     return result;
@@ -170,8 +190,8 @@ Patch<T, d>::eval_physical(const Matrix<T>& pts) const requires(d == 2)
     const Vector<T> u_pts = pts.col(0);
     const Vector<T> v_pts = pts.col(1);
 
-    const Matrix<T> N = tensor_product_.basis(0).eval_all(u_pts, 0)[0];  // (n_pts, n_u)
-    const Matrix<T> M = tensor_product_.basis(1).eval_all(v_pts, 0)[0];  // (n_pts, n_v)
+    const Matrix<T> N = eval_dense_1d(tensor_product_.basis(0), u_pts);  // (n_pts, n_u)
+    const Matrix<T> M = eval_dense_1d(tensor_product_.basis(1), v_pts);  // (n_pts, n_v)
 
     ColMatrix<T, 3> result(n_pts, 3);
 
@@ -198,9 +218,9 @@ Patch<T, d>::eval_physical(const Matrix<T>& pts) const requires(d == 3)
     const Vector<T> v_pts = pts.col(1);
     const Vector<T> w_pts = pts.col(2);
 
-    const Matrix<T> Nu = tensor_product_.basis(0).eval_all(u_pts, 0)[0]; // (n_pts, n_u)
-    const Matrix<T> Nv = tensor_product_.basis(1).eval_all(v_pts, 0)[0]; // (n_pts, n_v)
-    const Matrix<T> Nw = tensor_product_.basis(2).eval_all(w_pts, 0)[0]; // (n_pts, n_w)
+    const Matrix<T> Nu = eval_dense_1d(tensor_product_.basis(0), u_pts); // (n_pts, n_u)
+    const Matrix<T> Nv = eval_dense_1d(tensor_product_.basis(1), v_pts); // (n_pts, n_v)
+    const Matrix<T> Nw = eval_dense_1d(tensor_product_.basis(2), w_pts); // (n_pts, n_w)
 
     ColMatrix<T, 3> result(n_pts, 3);
 
@@ -222,20 +242,20 @@ Patch<T, d>::eval_physical(const Matrix<T>& pts) const requires(d == 3)
 
 template <std::floating_point T, std::size_t d>
 Patch<T, d>
-Patch<T, d>::insert_knot(std::size_t dir, T u, Index count) const
+Patch<T, d>::insert_knot(std::size_t dir, T u) const
 {
     if (dir >= d) {
         throw std::invalid_argument("Patch::insert_knot: direction out of range.");
     }
 
-    const KnotInsertion<T> step = tensor_product_.basis(dir).insert_knot(u, count);
-    const Matrix<T>& Top = step.transform;
+    auto [basis, transform] = tensor_product_.basis(dir).insert_knot(u);
+    const Matrix<T>& Top = transform;
 
     if constexpr (d == 1)
     {
         ColMatrix<T, 3> new_cps(Top.rows(), 3);
         new_cps.noalias() = Top * control_pts_;
-        return Patch<T, d>(step.basis, new_cps);
+        return Patch<T, d>(basis, new_cps);
     }
     else if constexpr (d == 2)
     {
@@ -258,8 +278,8 @@ Patch<T, d>::insert_knot(std::size_t dir, T u, Index count) const
             }
         }
 
-        Ptr<const Basis<T>> basis_u = (dir == 0) ? step.basis : tensor_product_.basis_ptr(0);
-        Ptr<const Basis<T>> basis_v = (dir == 1) ? step.basis : tensor_product_.basis_ptr(1);
+        Ptr<const Basis<T>> basis_u = (dir == 0) ? basis : tensor_product_.basis_ptr(0);
+        Ptr<const Basis<T>> basis_v = (dir == 1) ? basis : tensor_product_.basis_ptr(1);
         return Patch<T, d>(basis_u, basis_v, new_cps);
     }
     else  // d == 3
@@ -297,29 +317,29 @@ Patch<T, d>::insert_knot(std::size_t dir, T u, Index count) const
             }
         }
 
-        Ptr<const Basis<T>> basis_u = (dir == 0) ? step.basis : tensor_product_.basis_ptr(0);
-        Ptr<const Basis<T>> basis_v = (dir == 1) ? step.basis : tensor_product_.basis_ptr(1);
-        Ptr<const Basis<T>> basis_w = (dir == 2) ? step.basis : tensor_product_.basis_ptr(2);
+        Ptr<const Basis<T>> basis_u = (dir == 0) ? basis : tensor_product_.basis_ptr(0);
+        Ptr<const Basis<T>> basis_v = (dir == 1) ? basis : tensor_product_.basis_ptr(1);
+        Ptr<const Basis<T>> basis_w = (dir == 2) ? basis : tensor_product_.basis_ptr(2);
         return Patch<T, d>(basis_u, basis_v, basis_w, new_cps);
     }
 }
 
 template <std::floating_point T, std::size_t d>
 Patch<T, d>
-Patch<T, d>::elevate_degree(std::size_t dir, Index count) const
+Patch<T, d>::elevate_degree(std::size_t dir) const
 {
     if (dir >= d) {
         throw std::invalid_argument("Patch::elevate_degree: direction out of range.");
     }
 
-    const DegreeElevation<T> step = tensor_product_.basis(dir).elevate_degree(count);
-    const Matrix<T>& Top = step.transform;
+    auto [basis, transform] = tensor_product_.basis(dir).elevate_degree();
+    const Matrix<T>& Top = transform;
 
     if constexpr (d == 1)
     {
         ColMatrix<T, 3> new_cps(Top.rows(), 3);
         new_cps.noalias() = Top * control_pts_;
-        return Patch<T, d>(step.basis, new_cps);
+        return Patch<T, d>(basis, new_cps);
     }
     else if constexpr (d == 2)
     {
@@ -342,8 +362,8 @@ Patch<T, d>::elevate_degree(std::size_t dir, Index count) const
             }
         }
 
-        Ptr<const Basis<T>> basis_u = (dir == 0) ? step.basis : tensor_product_.basis_ptr(0);
-        Ptr<const Basis<T>> basis_v = (dir == 1) ? step.basis : tensor_product_.basis_ptr(1);
+        Ptr<const Basis<T>> basis_u = (dir == 0) ? basis : tensor_product_.basis_ptr(0);
+        Ptr<const Basis<T>> basis_v = (dir == 1) ? basis : tensor_product_.basis_ptr(1);
         return Patch<T, d>(basis_u, basis_v, new_cps);
     }
     else  // d == 3
@@ -378,9 +398,9 @@ Patch<T, d>::elevate_degree(std::size_t dir, Index count) const
             }
         }
 
-        Ptr<const Basis<T>> basis_u = (dir == 0) ? step.basis : tensor_product_.basis_ptr(0);
-        Ptr<const Basis<T>> basis_v = (dir == 1) ? step.basis : tensor_product_.basis_ptr(1);
-        Ptr<const Basis<T>> basis_w = (dir == 2) ? step.basis : tensor_product_.basis_ptr(2);
+        Ptr<const Basis<T>> basis_u = (dir == 0) ? basis : tensor_product_.basis_ptr(0);
+        Ptr<const Basis<T>> basis_v = (dir == 1) ? basis : tensor_product_.basis_ptr(1);
+        Ptr<const Basis<T>> basis_w = (dir == 2) ? basis : tensor_product_.basis_ptr(2);
         return Patch<T, d>(basis_u, basis_v, basis_w, new_cps);
     }
 }

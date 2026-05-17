@@ -88,7 +88,7 @@ TEST_CASE("LagrangeBoundaryCondition augments the system symmetrically", "[condi
     Index p = 2;
     Index n = 5;
     auto bsp = std::make_shared<BSpline<double>>(
-        p, clamped_uniform_knots<double>(p, n));
+        p, KnotVector<double>::clamped_uniform(p, n));
     auto surface = std::make_shared<Patch<double, 2>>(
         rectangle<double>(bsp, bsp, 1.0, 1.0));
 
@@ -130,7 +130,7 @@ TEST_CASE("LagrangeBoundaryCondition matches direct clamped RM3 solution", "[con
     const Index n = 9;
 
     auto bsp = std::make_shared<BSpline<double>>(
-        p, clamped_uniform_knots<double>(p, n));
+        p, KnotVector<double>::clamped_uniform(p, n));
     auto surface = std::make_shared<Patch<double, 2>>(
         rectangle<double>(bsp, bsp, 1.0, 1.0));
 
@@ -186,7 +186,7 @@ TEST_CASE("LagrangeBoundaryCondition solves an RM1 simply-supported plate", "[co
     const Index n = 8;
 
     auto bsp = std::make_shared<BSpline<double>>(
-        p, clamped_uniform_knots<double>(p, n));
+        p, KnotVector<double>::clamped_uniform(p, n));
     auto surface = std::make_shared<Patch<double, 2>>(
         rectangle<double>(bsp, bsp, L, W));
 

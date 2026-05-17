@@ -36,9 +36,9 @@ static Ptr<Patch<double, 2>> make_translated_square(
     double dx = 0.0, double dy = 0.0)
 {
     auto bsp_u = std::make_shared<BSpline<double>>(
-        p, clamped_uniform_knots<double>(p, n_basis_u));
+        p, KnotVector<double>::clamped_uniform(p, n_basis_u));
     auto bsp_v = std::make_shared<BSpline<double>>(
-        p, clamped_uniform_knots<double>(p, n_basis_v));
+        p, KnotVector<double>::clamped_uniform(p, n_basis_v));
     auto rect = rectangle<double>(bsp_u, bsp_v, L_x, L_y);
     if (dx != 0.0 || dy != 0.0) {
         rect.control_pts().col(0).array() += dx;

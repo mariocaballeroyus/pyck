@@ -4,9 +4,36 @@
 #include <vector>
 
 #include "nurbs.hpp"
+#include "bspline.hpp"
 #include "knots.hpp"
 
 using namespace pyck;
+
+// Helper: evaluate all n basis functions at m points via eval_on_span loop.
+// Returns a vector of (order+1) matrices for derivatives.
+static std::vector<Eigen::MatrixXd> eval_all_dense(const Basis<double>& basis,
+                                                    const Eigen::VectorXd& pts,
+                                                    Index order = 0)
+{
+    const int n = basis.num_basis();
+    const int p = basis.degree();
+    const int m = pts.size();
+
+    std::vector<Eigen::MatrixXd> results(order + 1);
+    for (Index k = 0; k <= order; ++k)
+        results[k] = Eigen::MatrixXd::Zero(m, n);
+
+    for (int i = 0; i < m; ++i) {
+        int span = basis.find_span(pts[i]);
+        Eigen::VectorXd pt(1); pt << pts[i];
+        std::vector<Eigen::MatrixXd> local;
+        basis.eval_on_span(pt, span, order, local);
+        for (Index k = 0; k <= order; ++k) {
+            results[k].row(i).segment(span - p, p + 1) = local[k].row(0);
+        }
+    }
+    return results;
+}
 
 /**
  * Partition of unity.
@@ -17,7 +44,7 @@ using namespace pyck;
  * This is independent of the (positive) weight choice.
  */
 TEST_CASE("NURBS: partition of unity", "[basis][nurbs]") {
-    auto kv = clamped_uniform_knots<double>(3, 7);
+    auto kv = KnotVector<double>::clamped_uniform(3, 7);
     NURBS<double> nb(3, kv,
         (Vector<double>(7) << 1.0, 0.5, 2.0, 1.5, 0.8, 1.2, 1.0).finished());
 
@@ -26,7 +53,7 @@ TEST_CASE("NURBS: partition of unity", "[basis][nurbs]") {
         Eigen::VectorXd pt(1);
         pt << u(i);
         auto span = nb.find_span(u(i));
-        auto R = nb.eval_on_span(pt, span, 0)[0];
+        std::vector<Eigen::MatrixXd> _bufR; nb.eval_on_span(pt, span, 0, _bufR); auto R = _bufR[0];
         REQUIRE(R.row(0).sum() == Approx(1.0).margin(1e-12));
     }
 }
@@ -38,7 +65,7 @@ TEST_CASE("NURBS: partition of unity", "[basis][nurbs]") {
  * basis collapses to the underlying B-spline.
  */
 TEST_CASE("NURBS: equal weights ⇒ B-spline", "[basis][nurbs]") {
-    auto kv = clamped_uniform_knots<double>(2, 5);
+    auto kv = KnotVector<double>::clamped_uniform(2, 5);
     BSpline<double> bs(2, kv);
     NURBS<double> nb(2, kv, Vector<double>::Constant(5, 2.7));
 
@@ -50,8 +77,8 @@ TEST_CASE("NURBS: equal weights ⇒ B-spline", "[basis][nurbs]") {
         auto span_n = nb.find_span(u(i));
         REQUIRE(span_b == span_n);
 
-        auto N = bs.eval_on_span(pt, span_b, 2);
-        auto R = nb.eval_on_span(pt, span_n, 2);
+        std::vector<Eigen::MatrixXd> N; bs.eval_on_span(pt, span_b, 2, N);
+        std::vector<Eigen::MatrixXd> R; nb.eval_on_span(pt, span_n, 2, R);
         for (std::size_t k = 0; k < 3; ++k) {
             for (int j = 0; j < N[k].cols(); ++j) {
                 REQUIRE(R[k](0, j) == Approx(N[k](0, j)).margin(1e-10));
@@ -92,7 +119,7 @@ TEST_CASE("NURBS: exact unit circle", "[basis][nurbs]") {
         Eigen::VectorXd pt(1);
         pt << u(i);
         auto span = nb.find_span(u(i));
-        auto R = nb.eval_on_span(pt, span, 0)[0]; // (1 × 3)
+        std::vector<Eigen::MatrixXd> _bufR; nb.eval_on_span(pt, span, 0, _bufR); auto R = _bufR[0]; // (1 × 3)
 
         double x = 0.0, y = 0.0;
         for (int j = 0; j <= 2; ++j) {
@@ -114,7 +141,7 @@ TEST_CASE("NURBS: exact unit circle", "[basis][nurbs]") {
  * differences across an internal knot still compare the same R_i.
  */
 TEST_CASE("NURBS: derivatives match finite differences", "[basis][nurbs]") {
-    auto kv = clamped_uniform_knots<double>(3, 7);
+    auto kv = KnotVector<double>::clamped_uniform(3, 7);
     Vector<double> w(7);
     w << 1.0, 0.5, 2.0, 1.5, 0.8, 1.2, 1.0;
     NURBS<double> nb(3, kv, w);
@@ -127,10 +154,10 @@ TEST_CASE("NURBS: derivatives match finite differences", "[basis][nurbs]") {
         Eigen::VectorXd p0(1), pm(1), pp(1);
         p0 << u0; pm << u0 - h; pp << u0 + h;
 
-        auto R0 = nb.eval_all(p0, 2);                   // [R, R', R''] (1 × n)
-        auto R_minus = nb.eval_all(pm, 0)[0];           // (1 × n)
-        auto R_plus  = nb.eval_all(pp, 0)[0];           // (1 × n)
-        auto R_pm2   = nb.eval_all(p0, 1);              // for 2nd-order FD on R'
+        auto R0 = eval_all_dense(nb, p0, 2);            // [R, R', R''] (1 × n)
+        auto R_minus = eval_all_dense(nb, pm, 0)[0];   // (1 × n)
+        auto R_plus  = eval_all_dense(nb, pp, 0)[0];   // (1 × n)
+        auto R_pm2   = eval_all_dense(nb, p0, 1);      // for 2nd-order FD on R'
 
         for (Eigen::Index j = 0; j < n; ++j) {
             const double fd1 = (R_plus(0, j) - R_minus(0, j)) / (2.0 * h);
@@ -169,13 +196,13 @@ TEST_CASE("NURBS: insert_knot preserves geometry", "[basis][nurbs]") {
     Eigen::VectorXd samples(6);
     samples << 0.05, 0.2, 0.4, 0.55, 0.78, 0.95;
 
-    auto step = nb.insert_knot(0.5, 1);
-    REQUIRE(step.transform.rows() == 4);
-    REQUIRE(step.transform.cols() == 3);
+    auto [basis, transform] = nb.insert_knot(0.5);
+    REQUIRE(transform.rows() == 4);
+    REQUIRE(transform.cols() == 3);
 
-    Eigen::MatrixX3d new_cps = step.transform * cps;
-    auto R_old = nb.eval_all(samples, 0)[0];
-    auto R_new = step.basis->eval_all(samples, 0)[0];
+    Eigen::MatrixX3d new_cps = transform * cps;
+    auto R_old = eval_all_dense(nb, samples, 0)[0];
+    auto R_new = eval_all_dense(*basis, samples, 0)[0];
     Eigen::MatrixX3d c_old = R_old * cps;
     Eigen::MatrixX3d c_new = R_new * new_cps;
     REQUIRE((c_old - c_new).cwiseAbs().maxCoeff() < 1e-12);

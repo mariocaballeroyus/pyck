@@ -6,10 +6,11 @@
 namespace pyck
 {
 
+// === Constructors ===================================================================
 
 template <std::floating_point T, std::size_t d>
 TensorProduct<T, d>::TensorProduct(std::array<Ptr<const Basis<T>>, d> bases)
-    : bases_(std::move(bases)) 
+    : bases_(std::move(bases))
 {
     for (std::size_t i = 0; i < d; ++i) {
         if (!bases_[i]) {
@@ -19,40 +20,7 @@ TensorProduct<T, d>::TensorProduct(std::array<Ptr<const Basis<T>>, d> bases)
     }
 }
 
-template <std::floating_point T, std::size_t d>
-TensorProduct<T, d>::TensorProduct(Ptr<const Basis<T>> b0)
-requires (d == 1)
-    : bases_{std::move(b0)} 
-{
-    if (!bases_[0]) {
-        throw std::invalid_argument("TensorProduct: "
-                                    "Basis pointer is null.");
-    }
-}
-
-template <std::floating_point T, std::size_t d>
-TensorProduct<T, d>::TensorProduct(Ptr<const Basis<T>> b0, 
-                                   Ptr<const Basis<T>> b1)
-requires (d == 2)
-    : bases_{std::move(b0), std::move(b1)} 
-{
-    if (!bases_[0] || !bases_[1]) {
-        throw std::invalid_argument("TensorProduct: "
-                                    "Basis pointer is null.");
-    }
-}
-
-template <std::floating_point T, std::size_t d>
-TensorProduct<T, d>::TensorProduct(Ptr<const Basis<T>> b0, 
-                                   Ptr<const Basis<T>> b1, 
-                                   Ptr<const Basis<T>> b2)
-requires (d == 3)
-    : bases_{std::move(b0), std::move(b1), std::move(b2)} 
-{
-    if (!bases_[0] || !bases_[1] || !bases_[2]) {
-        throw std::invalid_argument("TensorProduct: Basis pointer is null.");
-    }
-}
+// === Properties =====================================================================
 
 template <std::floating_point T, std::size_t d>
 Index TensorProduct<T, d>::num_basis() const
@@ -83,28 +51,33 @@ const Basis<T>& TensorProduct<T, d>::basis(Index dir) const
     return *bases_[dir]; 
 }
 
+// === Evaluation =====================================================================
+
 template <std::floating_point T, std::size_t d>
-std::vector<Matrix<T>> TensorProduct<T, d>::eval_on_span(const Matrix<T>& params,
-                                                        const std::array<Index, d>& spans,
-                                                        Index order) const
+void TensorProduct<T, d>::eval_on_span(const Matrix<T>& params,
+                                       const std::array<Index, d>& spans,
+                                       Index order,
+                                       std::vector<Matrix<T>>& results) const
 {
     if constexpr (d == 0) {
-        return {};
+        return;
     }
 
     std::size_t num_points = params.rows();
-    std::vector<Matrix<T>> acc_results = bases_[0]->eval_on_span(params.col(0), spans[0], order);
+    std::vector<Matrix<T>> acc_results;
+    bases_[0]->eval_on_span(params.col(0), spans[0], order, acc_results);
 
-    for (std::size_t i = 1; i < d; ++i) 
+    for (std::size_t i = 1; i < d; ++i)
     {
-        std::vector<Matrix<T>> mat_i_derivs = bases_[i]->eval_on_span(params.col(i), spans[i], order);
+        std::vector<Matrix<T>> mat_i_derivs;
+        bases_[i]->eval_on_span(params.col(i), spans[i], order, mat_i_derivs);
 
         std::vector<Matrix<T>> next_accumulated;
         next_accumulated.reserve(acc_results.size() * mat_i_derivs.size());
 
-        for (const auto& res_mat : acc_results) 
+        for (const auto& res_mat : acc_results)
         {
-            for (const auto& new_mat : mat_i_derivs) 
+            for (const auto& new_mat : mat_i_derivs)
             {
                 std::size_t cols_res = res_mat.cols();
                 std::size_t cols_mat = new_mat.cols();
@@ -113,7 +86,7 @@ std::vector<Matrix<T>> TensorProduct<T, d>::eval_on_span(const Matrix<T>& params
 
                 for (std::size_t c1 = 0; c1 < cols_res; ++c1) {
                     for (std::size_t c2 = 0; c2 < cols_mat; ++c2) {
-                        combined.col(c1 * cols_mat + c2) = 
+                        combined.col(c1 * cols_mat + c2) =
                             res_mat.col(c1).cwiseProduct(new_mat.col(c2));
                     }
                 }
@@ -123,7 +96,7 @@ std::vector<Matrix<T>> TensorProduct<T, d>::eval_on_span(const Matrix<T>& params
         acc_results = std::move(next_accumulated);
     }
 
-    return acc_results;
+    results = std::move(acc_results);
 }
 
 // === Template Instantiations ========================================================

@@ -32,7 +32,7 @@ TEST_CASE("LoadBoundaryCondition: K is unchanged and F sums to Q*L_edge",
 {
     Index p = 2, n = 5;
     auto bsp = std::make_shared<BSpline<double>>(
-        p, clamped_uniform_knots<double>(p, n));
+        p, KnotVector<double>::clamped_uniform(p, n));
     const double L = 1.0, W = 1.0;
     auto surface = std::make_shared<Patch<double, 2>>(
         rectangle<double>(bsp, bsp, L, W));
@@ -97,9 +97,9 @@ TEST_CASE("LoadBoundaryCondition: cantilever tip deflection matches closed form"
     int   nq = p + 1;
 
     auto bsp_u = std::make_shared<BSpline<double>>(
-        p, clamped_uniform_knots<double>(p, n_elem));
+        p, KnotVector<double>::clamped_uniform(p, n_elem));
     auto bsp_v = std::make_shared<BSpline<double>>(
-        p, clamped_uniform_knots<double>(p, 4));
+        p, KnotVector<double>::clamped_uniform(p, 4));
     auto surface = std::make_shared<Patch<double, 2>>(
         rectangle<double>(bsp_u, bsp_v, L, W));
 
@@ -169,7 +169,7 @@ TEST_CASE("LoadBoundaryCondition: scalar and per-qpt array overloads agree",
 {
     Index p = 2, n = 5;
     auto bsp = std::make_shared<BSpline<double>>(
-        p, clamped_uniform_knots<double>(p, n));
+        p, KnotVector<double>::clamped_uniform(p, n));
     auto surface = std::make_shared<Patch<double, 2>>(
         rectangle<double>(bsp, bsp, 1.0, 1.0));
 

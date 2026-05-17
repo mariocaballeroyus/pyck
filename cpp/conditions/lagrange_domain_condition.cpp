@@ -37,12 +37,6 @@ LagrangeDomainCondition<T, d>& LagrangeDomainCondition<T, d>::add(
 }
 
 template <std::floating_point T, std::size_t d>
-std::size_t LagrangeDomainCondition<T, d>::num_dofs() const
-{
-    return terms_.size();
-}
-
-template <std::floating_point T, std::size_t d>
 void LagrangeDomainCondition<T, d>::allocate_dofs(
     DofLayout& layout,
     const std::vector<DofLayout::BlockId>& primal_blocks)

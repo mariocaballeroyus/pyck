@@ -40,8 +40,10 @@ TEST_CASE("Patch<double, 3>: Flat Box", "[geometry][volume]")
 
     Patch<double, 3> vol(basis_u, basis_v, basis_w, cp);
 
-    // 2×2×2 patch has 1 non-degenerate element at flat span (1, 1, 1) = 1 + 2 + 4 = 7.
-    const Index elem_idx = 7;
+    // For degree=1, num_basis=2 → 3 spans per direction (incl. zero-width clamped).
+    // The single non-degenerate element is at (span_u, span_v, span_w) = (1, 1, 1),
+    // flat-encoded u-inner as 1 + 1*3 + 1*3*3 = 13.
+    const Index elem_idx = 13;
     auto act = vol.active_control_pts(elem_idx);
 
     SECTION("Topology / geometric dimensions") {
@@ -144,7 +146,7 @@ TEST_CASE("Patch<double, 3>: Flat Box", "[geometry][volume]")
 
 TEST_CASE("Patch<double, 3>: Box factory volume integral", "[geometry][volume]")
 {
-    auto kv = clamped_uniform_knots<double>(2, 4);
+    auto kv = KnotVector<double>::clamped_uniform(2, 4);
     auto basis_u = std::make_shared<BSpline<double>>(2, kv);
     auto basis_v = std::make_shared<BSpline<double>>(2, kv);
     auto basis_w = std::make_shared<BSpline<double>>(2, kv);
@@ -208,7 +210,7 @@ TEST_CASE("Patch<double, 3>: Box factory volume integral", "[geometry][volume]")
 TEST_CASE("Patch<double, 3>: Refinement preserves geometry",
           "[geometry][volume][refinement]")
 {
-    auto kv = clamped_uniform_knots<double>(2, 4);
+    auto kv = KnotVector<double>::clamped_uniform(2, 4);
     auto basis_u = std::make_shared<BSpline<double>>(2, kv);
     auto basis_v = std::make_shared<BSpline<double>>(2, kv);
     auto basis_w = std::make_shared<BSpline<double>>(2, kv);
@@ -255,9 +257,9 @@ TEST_CASE("Patch<double, 3>: Refinement preserves geometry",
 TEST_CASE("Patch<double, 3>: decode_span and active_control_pts",
           "[geometry][volume]")
 {
-    auto kv_u = clamped_uniform_knots<double>(2, 4);   // 2 spans
-    auto kv_v = clamped_uniform_knots<double>(2, 5);   // 3 spans
-    auto kv_w = clamped_uniform_knots<double>(2, 4);   // 2 spans
+    auto kv_u = KnotVector<double>::clamped_uniform(2, 4);   // 6 spans (4 zero-width, 2 non-deg)
+    auto kv_v = KnotVector<double>::clamped_uniform(2, 5);   // 7 spans (4 zero-width, 3 non-deg)
+    auto kv_w = KnotVector<double>::clamped_uniform(2, 4);   // 6 spans (4 zero-width, 2 non-deg)
 
     auto bu = std::make_shared<BSpline<double>>(2, kv_u);
     auto bv = std::make_shared<BSpline<double>>(2, kv_v);
@@ -265,10 +267,11 @@ TEST_CASE("Patch<double, 3>: decode_span and active_control_pts",
 
     auto vol = box<double>(bu, bv, bw, 1.0, 1.0, 1.0);
 
+    // num_intervals() reports all knot spans, including zero-width clamped ones.
     const auto intervals = vol.tensor_product().num_intervals();
-    REQUIRE(intervals[0] == 2);
-    REQUIRE(intervals[1] == 3);
-    REQUIRE(intervals[2] == 2);
+    REQUIRE(intervals[0] == 6);
+    REQUIRE(intervals[1] == 7);
+    REQUIRE(intervals[2] == 6);
 
     SECTION("decode_span round-trips lexicographic encoding") {
         const Index total = intervals[0] * intervals[1] * intervals[2];
@@ -283,9 +286,17 @@ TEST_CASE("Patch<double, 3>: decode_span and active_control_pts",
         }
     }
 
-    SECTION("active_control_pts returns (p+1)^3 = 27 points per element") {
+    SECTION("active_control_pts returns (p+1)^3 = 27 points per non-degenerate element") {
         for (Index e = 0; e < intervals[0] * intervals[1] * intervals[2]; ++e)
         {
+            auto spans = vol.decode_span(e);
+            bool zero_width = false;
+            for (std::size_t k = 0; k < 3; ++k) {
+                auto [lo, hi] = vol.basis(k).knot_vector().span_bounds(spans[k]);
+                if (std::abs(hi - lo) < 1e-14) { zero_width = true; break; }
+            }
+            if (zero_width) continue;
+
             const auto act = vol.active_control_pts(e);
             CHECK(act.rows() == 27);
             CHECK(act.cols() == 3);

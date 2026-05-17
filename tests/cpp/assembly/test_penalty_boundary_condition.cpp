@@ -126,7 +126,7 @@ TEST_CASE("PenaltyBoundaryCondition structural properties", "[conditions][penalt
 {
     Index p = 2, n = 4;
     auto bsp = std::make_shared<BSpline<double>>(
-        p, clamped_uniform_knots<double>(p, n));
+        p, KnotVector<double>::clamped_uniform(p, n));
     auto surface = std::make_shared<Patch<double, 2>>(
         rectangle<double>(bsp, bsp, 1.0, 1.0));
 
@@ -222,9 +222,9 @@ TEST_CASE("PenaltyBoundaryCondition KL plate: SS via penalty matches Navier", "[
     double D = E * h*h*h / (12.0 * (1.0 - nu*nu));
 
     auto bsp_u = std::make_shared<BSpline<double>>(
-        p, clamped_uniform_knots<double>(p, n_elem));
+        p, KnotVector<double>::clamped_uniform(p, n_elem));
     auto bsp_v = std::make_shared<BSpline<double>>(
-        p, clamped_uniform_knots<double>(p, n_elem));
+        p, KnotVector<double>::clamped_uniform(p, n_elem));
     auto surface = std::make_shared<Patch<double, 2>>(
         rectangle<double>(bsp_u, bsp_v, L, W));
 
@@ -305,7 +305,7 @@ TEST_CASE("PenaltyBoundaryCondition RM-1p plate: SS via penalty matches Navier",
     int   nq = p + 1;
 
     auto bsp = std::make_shared<BSpline<double>>(
-        p, clamped_uniform_knots<double>(p, n_elem));
+        p, KnotVector<double>::clamped_uniform(p, n_elem));
     auto surface = std::make_shared<Patch<double, 2>>(
         rectangle<double>(bsp, bsp, a, a));
 
@@ -373,7 +373,7 @@ TEST_CASE("PenaltyBoundaryCondition RM-3p plate: SS (w-only) matches Navier", "[
     int   nq = p + 1;
 
     auto bsp = std::make_shared<BSpline<double>>(
-        p, clamped_uniform_knots<double>(p, n_elem));
+        p, KnotVector<double>::clamped_uniform(p, n_elem));
     auto surface = std::make_shared<Patch<double, 2>>(
         rectangle<double>(bsp, bsp, a, a));
 
@@ -446,7 +446,7 @@ TEST_CASE("PenaltyBoundaryCondition RM-3p plate: clamped BCs agree with DirectCo
     int   nq = p + 1;
 
     auto bsp = std::make_shared<BSpline<double>>(
-        p, clamped_uniform_knots<double>(p, n_elem));
+        p, KnotVector<double>::clamped_uniform(p, n_elem));
 
     auto make_surface = [&]() {
         return std::make_shared<Patch<double, 2>>(
@@ -577,7 +577,7 @@ TEST_CASE("PenaltyBoundaryCondition RM-3p: prescribed non-zero displacement",
     int   nq = p + 1;
 
     auto bsp = std::make_shared<BSpline<double>>(
-        p, clamped_uniform_knots<double>(p, n_elem));
+        p, KnotVector<double>::clamped_uniform(p, n_elem));
     auto surface = std::make_shared<Patch<double, 2>>(
         rectangle<double>(bsp, bsp, a, a));
 
@@ -633,7 +633,7 @@ TEST_CASE("PenaltyBoundaryCondition normal direction: axis-aligned rectangle",
 
     Index p = 2, n_elem = 3;
     auto bsp = std::make_shared<BSpline<double>>(
-        p, clamped_uniform_knots<double>(p, n_elem));
+        p, KnotVector<double>::clamped_uniform(p, n_elem));
     auto surface = std::make_shared<Patch<double, 2>>(
         rectangle<double>(bsp, bsp, 1.0, 1.0));
 

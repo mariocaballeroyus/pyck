@@ -17,6 +17,7 @@ namespace pyck
 /**
  * @brief Tensor product basis functions defined on a multi-dimensional parametric 
  *        space
+ *
  * @tparam T Scalar type
  * @tparam d Parametric dimension
  */
@@ -25,6 +26,8 @@ class TensorProduct
 {
 public:
 
+    // === Constructors ===============================================================
+
     /**
      * @brief Construct a tensor product basis from an array of 1D basis pointers
      * 
@@ -32,33 +35,23 @@ public:
      */
     explicit TensorProduct(std::array<Ptr<const Basis<T>>, d> bases);
 
-    /// @brief Construct a tensor product basis for a 1D curve
-    explicit TensorProduct(Ptr<const Basis<T>> b0)
-    requires (d == 1);
-
-    /// @brief Construct a tensor product basis for a 2D surface
-    TensorProduct(Ptr<const Basis<T>> b0, 
-                  Ptr<const Basis<T>> b1)
-    requires (d == 2);
-
-    /// @brief Construct a tensor product basis for a 3D volume
-    TensorProduct(Ptr<const Basis<T>> b0, 
-                  Ptr<const Basis<T>> b1, 
-                  Ptr<const Basis<T>> b2)
-    requires (d == 3);
+    // === Evaluation =================================================================
 
     /**
      * @brief Evaluate non-zero basis functions and mixed partial derivatives for the
      *        tensor product space within a given multi-dimensional knot span.
      *
-     * @param params A matrix of size (m × d) containing parametric points.
-     * @param spans  Per-direction knot-span indices.
-     * @param order  Maximum derivative order to compute (same for all directions).
-     * @return A flat std::vector of matrices (one per derivative multi-index).
+     * @param params  A matrix of size (m × d) containing parametric points.
+     * @param spans   Per-direction knot-span indices.
+     * @param order   Maximum derivative order to compute (same for all directions).
+     * @param results Output buffer; the function resizes it to (order+1)^d matrices.
      */
-    std::vector<Matrix<T>> eval_on_span(const Matrix<T>& params,
-                                       const std::array<Index, d>& spans,
-                                       Index order) const;
+    void eval_on_span(const Matrix<T>& params,
+                      const std::array<Index, d>& spans,
+                      Index order,
+                      std::vector<Matrix<T>>& results) const;
+
+    // === Properties =================================================================
 
     /// @brief Get the parametric dimension (e.g., 2 for a surface)
     static constexpr std::size_t dim() 
@@ -74,14 +67,14 @@ public:
     const Basis<T>& basis(Index dir) const;
 
     /// @brief Get a shared pointer to the 1D basis for a given parametric direction
-    Ptr<const Basis<T>> basis_ptr(std::size_t dir) const { return bases_[dir]; }
+    Ptr<const Basis<T>> basis_ptr(std::size_t dir) const 
+    { return bases_[dir]; }
 
 private:
 
-    // === Member Variables ===========================================================
-
     /// @brief Array of 1D basis objects for each parametric dimension
     std::array<Ptr<const Basis<T>>, d> bases_;
+    
 };
 
 } // namespace pyck

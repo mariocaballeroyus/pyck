@@ -20,8 +20,6 @@ class BSpline : public Basis<T>
 {
 public:
 
-    using BasisType = Basis<T>;
-
     // === Constructors ===============================================================
 
     /// @brief Default constructor
@@ -34,60 +32,78 @@ public:
      * @param knots Knot vector defining the B-spline basis functions
      */
     BSpline(Index degree, KnotVector<T> knots)
-        : BasisType(degree, std::move(knots)) {}
+        : Basis<T>(degree, std::move(knots)) {}
 
     // === Evaluation =================================================================
 
     /**
      * @brief Evaluate the (p+1) non-zero B-spline basis functions and their
      *        derivatives at given parameter values within a single knot span.
-     * 
-     * @param points Parameter values (all assumed to lie in knot span `span`).
-     * @param span   Knot-span index (as returned by KnotVector::find_span).
-     * @param order  Highest order of derivatives to compute.
-     * @return A vector of (order+1) matrices, each of size (m, p+1).
-     *         results[k](i, j) = d^k N_{span-p+j,p} / du^k (points[i])
-     */
-    std::vector<Matrix<T>> eval_on_span(const Vector<T>& points,
-                                       Index span,
-                                       Index order = 0) const override;
+     *
+     * @details The first pass builds a triangular table of basis function values via 
+     *          the Cox-de Boor recurrence. The second pass computes the derivatives 
+     *          via de Boor's derivative formula.
 
-    /**
-     * @brief Evaluate all basis functions and their derivatives at given parameter values.
-     * 
-     * @param points Parameter values.
-     * @param order  Highest order of derivatives to compute (default 0).
-     * @return A vector of (order+1) matrices, each of size (m, n).
+     * @note References: 
+     *       - [Piegl & Tiller] The NURBS Book, Chapter 3, Algorithms A2.2 and A2.3.
+     *
+     * @param points   Parameter values (all assumed to lie in knot span `span_idx`).
+     * @param span_idx Knot-span index (as returned by KnotVector::find_span).
+     * @param order    Maximum derivative order to compute.
+     * @param results  Output buffer; the function resizes it to (order+1) matrices,
+     *                 each of size (m, p+1).
      */
-    std::vector<Matrix<T>> eval_all(const Vector<T>& points,
-                                    Index order = 0) const override;
+    void eval_on_span(const Vector<T>& points,
+                      Index span_idx,
+                      Index order,
+                      std::vector<Matrix<T>>& results) const override;
 
     /**
      * @brief Compute the Greville abscissae for the B-spline basis.
+     *
+     * @details The Greville abscissa for basis function N_{i,p} is the average
+     *          of its p interior knots. They satisfy linear precision and serve
+     *          as natural node points for interpolation and collocation.
+     *          
+     * @returns The Greville abscissae for the B-spline basis.
      */
     Vector<T> greville_abscissae() const override;
 
     // === Refinement =================================================================
 
     /**
-     * @brief Boehm knot insertion.
+     * @brief Boehm knot insertion (single step).
      *
-     * @param u     Knot value to insert.
-     * @param count Number of times to insert.
-     * @return Refined BSpline basis (wrapped in @c basis) and the transform
-     *         matrix mapping old control points to new control points.
+     * @param u Knot value to insert.
+     * @return A pair of (refined basis, transform matrix).
      */
-    KnotInsertion<T> insert_knot(T u, Index count = 1) const override;
+    std::pair<Ptr<Basis<T>>, Matrix<T>> insert_knot(T u) const override;
 
     /**
-     * @brief Degree elevation (p-refinement).
+     * @brief Degree elevation by one (p-refinement).
      *
      * Implements the textbook Bezier-extraction / Bezier-elevation /
      * knot-removal composition (Piegl-Tiller §5.5). Continuity at each
      * existing internal knot is preserved.
+     *
+     * @return A pair of (elevated basis, transform matrix).
      */
-    DegreeElevation<T> elevate_degree(Index count = 1) const override;
-};
+    std::pair<Ptr<Basis<T>>, Matrix<T>> elevate_degree() const override;
+
+    // === Factory Methods =============================================================
+
+    /**
+     * @brief Create a clamped, uniformly-spaced B-spline basis on [0, 1].
+     * @param degree Polynomial degree.
+     * @param num_basis Number of basis functions. Must satisfy `num_basis >= degree + 1`.
+     * @return A B-spline basis with clamped uniform knots.
+     */
+    static BSpline<T> clamped_uniform(Index degree, Index num_basis)
+    {
+        return BSpline<T>(degree, KnotVector<T>::clamped_uniform(degree, num_basis));
+    }
+
+}; // class BSpline : public Basis<T>
 
 } // namespace pyck
 

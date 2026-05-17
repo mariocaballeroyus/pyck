@@ -34,13 +34,11 @@ void bind_geometry(py::module_& m)
             py::arg("pts"))
 
         .def("insert_knot",
-            static_cast<Patch1d (Patch1d::*)(double, Index) const>(&Patch1d::insert_knot),
-            py::arg("u"),
-            py::arg("count") = 1)
+            static_cast<Patch1d (Patch1d::*)(double) const>(&Patch1d::insert_knot),
+            py::arg("u"))
 
         .def("elevate_degree",
-            static_cast<Patch1d (Patch1d::*)(Index) const>(&Patch1d::elevate_degree),
-            py::arg("count") = 1);
+            static_cast<Patch1d (Patch1d::*)() const>(&Patch1d::elevate_degree));
 
     using Patch2d = Patch<double, 2>;
 
@@ -61,12 +59,12 @@ void bind_geometry(py::module_& m)
             py::arg("pts"))
 
         .def("insert_knot",
-            static_cast<Patch2d (Patch2d::*)(std::size_t, double, Index) const>(&Patch2d::insert_knot),
-            py::arg("dir"), py::arg("u"), py::arg("count") = 1)
+            static_cast<Patch2d (Patch2d::*)(std::size_t, double) const>(&Patch2d::insert_knot),
+            py::arg("dir"), py::arg("u"))
 
         .def("elevate_degree",
-            static_cast<Patch2d (Patch2d::*)(std::size_t, Index) const>(&Patch2d::elevate_degree),
-            py::arg("dir"), py::arg("count") = 1);
+            static_cast<Patch2d (Patch2d::*)(std::size_t) const>(&Patch2d::elevate_degree),
+            py::arg("dir"));
 
     // === Patch Boundary =============================================================
 

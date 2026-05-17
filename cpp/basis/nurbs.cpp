@@ -4,12 +4,18 @@
 #include <cmath>
 #include <stdexcept>
 
+#include "evaluation.hpp"
+#include "refinement.hpp"
+
 namespace pyck
 {
 
-namespace {
+namespace 
+{
 
-/// Binomial coefficient C(n, k), computed iteratively for small n.
+/**
+ * Binomial coefficient C(n, k), computed iteratively for small n.
+ */
 inline std::size_t binomial(std::size_t n, std::size_t k)
 {
     if (k > n) return 0;
@@ -24,20 +30,6 @@ inline std::size_t binomial(std::size_t n, std::size_t k)
 /**
  * Apply the rational quotient-rule recurrence to a stack of B-spline
  * derivative matrices.
- *
- * Inputs:
- *   bspline_derivs[k](q, j) = N_j^{(k)}(u_q) for each evaluation point u_q
- *                              and each *active* basis index j (column).
- *   active_weights[j]       = weight for the j-th active basis index.
- *
- * Output:
- *   result[k](q, j) = R_j^{(k)}(u_q) (rational shape function and derivatives).
- *
- * Recurrence (per evaluation point, per basis index j):
- *
- *   A_j^{(k)} = w_j N_j^{(k)}
- *   W^{(k)}   = Σ_j A_j^{(k)}
- *   R_j^{(k)} = ( A_j^{(k)} - Σ_{i=1..k} C(k,i) W^{(i)} R_j^{(k-i)} ) / W
  */
 template <std::floating_point T>
 std::vector<Matrix<T>> apply_rational_quotient(
@@ -98,11 +90,10 @@ std::vector<Matrix<T>> apply_rational_quotient(
 
 template <std::floating_point T>
 NURBS<T>::NURBS(Index degree, KnotVector<T> knots, Vector<T> weights)
-    : BasisType(degree, knots),
-      bspline_(degree, std::move(knots)),
+    : Basis<T>(degree, std::move(knots)),
       weights_(std::move(weights))
 {
-    const Index n = bspline_.num_basis();
+    const Index n = this->num_basis();
     if (static_cast<Index>(weights_.size()) != n) {
         throw std::invalid_argument(
             "NURBS: number of weights (" + std::to_string(weights_.size())
@@ -116,31 +107,26 @@ NURBS<T>::NURBS(Index degree, KnotVector<T> knots, Vector<T> weights)
 }
 
 template <std::floating_point T>
-std::vector<Matrix<T>> NURBS<T>::eval_on_span(const Vector<T>& points,
-                                              Index span,
-                                              Index order) const
+void NURBS<T>::eval_on_span(const Vector<T>& points,
+                            Index span_idx,
+                            Index order,
+                            std::vector<Matrix<T>>& results) const
 {
-    auto bspline_derivs = bspline_.eval_on_span(points, span, order);
+    std::vector<Matrix<T>> bspline_derivs;
+    bspline_kernel::eval_on_span(this->degree_, this->knots_,
+                                 points, span_idx, order, bspline_derivs);
 
-    // The (p+1) active basis indices on this span are span-p .. span.
+    // The (p+1) active basis indices on this span are span_idx-p .. span_idx.
     const Index p = this->degree_;
-    Vector<T> active = weights_.segment(span - p, p + 1);
+    Vector<T> active = weights_.segment(span_idx - p, p + 1);
 
-    return apply_rational_quotient<T>(bspline_derivs, active);
-}
-
-template <std::floating_point T>
-std::vector<Matrix<T>> NURBS<T>::eval_all(const Vector<T>& points,
-                                          Index order) const
-{
-    auto bspline_derivs = bspline_.eval_all(points, order);
-    return apply_rational_quotient<T>(bspline_derivs, weights_);
+    results = apply_rational_quotient<T>(bspline_derivs, active);
 }
 
 template <std::floating_point T>
 Vector<T> NURBS<T>::greville_abscissae() const
 {
-    return bspline_.greville_abscissae();
+    return bspline_kernel::greville_abscissae(this->degree_, this->knots_);
 }
 
 // === Knot Insertion =================================================================
@@ -157,7 +143,7 @@ single_nurbs_insertion(Index p,
                        T u)
 {
     const T eps = T(1e-14);
-    const Index n_old = kv.num_basis(p);
+    const Index n_old = kv.size() - p - 1;
     const Index n_new = n_old + 1;
     const Index k = kv.find_span(p, u);
 
@@ -195,59 +181,29 @@ single_nurbs_insertion(Index p,
 }
 
 template <std::floating_point T>
-KnotInsertion<T> NURBS<T>::insert_knot(T u, Index count) const
+std::pair<Ptr<Basis<T>>, Matrix<T>> NURBS<T>::insert_knot(T u) const
 {
     const Index p = this->degree_;
 
-    if (count == 0)
-    {
-        return KnotInsertion<T>{
-            std::make_shared<NURBS<T>>(p, this->knots_, weights_),
-            Matrix<T>::Identity(this->num_basis(), this->num_basis())
-        };
-    }
+    auto [transform, w_new] =
+        single_nurbs_insertion<T>(p, this->knots_, weights_, u);
+    KnotVector<T> kv_new = this->knots_.insert_knot(u);
 
-    KnotVector<T> kv = this->knots_;
-    Vector<T> w = weights_;
-
-    auto [transform, w_next] = single_nurbs_insertion<T>(p, kv, w, u);
-    kv = kv.insert(u, 1);
-    w  = std::move(w_next);
-
-    for (Index step = 1; step < count; ++step)
-    {
-        auto [step_transform, w_step] = single_nurbs_insertion<T>(p, kv, w, u);
-        transform = step_transform * transform;
-        kv = kv.insert(u, 1);
-        w  = std::move(w_step);
-    }
-
-    return KnotInsertion<T>{
-        std::make_shared<NURBS<T>>(p, std::move(kv), std::move(w)),
-        std::move(transform)
-    };
+    return {std::make_shared<NURBS<T>>(p, std::move(kv_new), std::move(w_new)),
+            std::move(transform)};
 }
 
 // === Degree Elevation ===============================================================
 
 template <std::floating_point T>
-DegreeElevation<T> NURBS<T>::elevate_degree(Index count) const
+std::pair<Ptr<Basis<T>>, Matrix<T>> NURBS<T>::elevate_degree() const
 {
     const Index p = this->degree_;
     const Index n_old = this->num_basis();
 
-    if (count == 0)
-    {
-        return DegreeElevation<T>{
-            std::make_shared<NURBS<T>>(p, this->knots_, weights_),
-            Matrix<T>::Identity(n_old, n_old)
-        };
-    }
-
-    // Run elevation on the underlying B-spline; it operates on the
-    // homogeneous CPs through the basis transform.
-    DegreeElevation<T> bs_step = bspline_.elevate_degree(count);
-    const Matrix<T>& M_bs = bs_step.transform;
+    // Polynomial elevation on homogeneous CPs, followed by a rational projection.
+    auto [kv_new, M_bs] =
+        bspline_kernel::elevate_degree(p, this->knots_);
     const Index n_new = M_bs.rows();
 
     // New weights: w'_i = sum_j M_bs[i,j] * w_j.
@@ -265,11 +221,10 @@ DegreeElevation<T> NURBS<T>::elevate_degree(Index count) const
         }
     }
 
-    auto new_bspline = std::dynamic_pointer_cast<BSpline<T>>(bs_step.basis);
     auto new_basis = std::make_shared<NURBS<T>>(
-        p + count, new_bspline->knot_vector(), std::move(w_new));
+        p + 1, std::move(kv_new), std::move(w_new));
 
-    return DegreeElevation<T>{new_basis, std::move(M_rat)};
+    return {new_basis, std::move(M_rat)};
 }
 
 // === Template Instantiations ========================================================

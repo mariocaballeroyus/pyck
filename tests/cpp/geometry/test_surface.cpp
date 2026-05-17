@@ -106,7 +106,7 @@ TEST_CASE("Patch<double, 2>: Flat Rectangular Plate", "[geometry][surface]") {
 
 TEST_CASE("Patch<double, 2>: Rectangle factory area integral", "[geometry][surface]") {
 
-    auto kv = clamped_uniform_knots<double>(2, 4);
+    auto kv = KnotVector<double>::clamped_uniform(2, 4);
     auto basis_u = std::make_shared<BSpline<double>>(2, kv);
     auto basis_v = std::make_shared<BSpline<double>>(2, kv);
 
@@ -390,8 +390,8 @@ TEST_CASE("Patch<double, 2>: insert_knot preserves geometry", "[geometry][surfac
     // 3x3 B-spline surface with a curved interior to make all spatial columns active.
     const Index p = 2;
     const Index n = 4;
-    auto basis_u = std::make_shared<BSpline<double>>(p, clamped_uniform_knots<double>(p, n));
-    auto basis_v = std::make_shared<BSpline<double>>(p, clamped_uniform_knots<double>(p, n));
+    auto basis_u = std::make_shared<BSpline<double>>(p, KnotVector<double>::clamped_uniform(p, n));
+    auto basis_v = std::make_shared<BSpline<double>>(p, KnotVector<double>::clamped_uniform(p, n));
 
     Eigen::MatrixXd cps(n * n, 3);
     for (Index j = 0; j < n; ++j) {
@@ -403,7 +403,7 @@ TEST_CASE("Patch<double, 2>: insert_knot preserves geometry", "[geometry][surfac
     }
     Patch<double, 2> surf(basis_u, basis_v, cps);
 
-    Eigen::MatrixXd sample(5, 2);
+    ColMatrix<double, 2> sample(5, 2);
     sample << 0.1, 0.2,
               0.3, 0.7,
               0.5, 0.5,
@@ -413,19 +413,19 @@ TEST_CASE("Patch<double, 2>: insert_knot preserves geometry", "[geometry][surfac
     const auto phys_ref = surf.eval_physical(sample);
 
     SECTION("insert in u (dir=0)") {
-        auto refined = surf.insert_knot(0, 0.4, 1);
+        auto refined = surf.insert_knot(0, 0.4);
         const auto phys = refined.eval_physical(sample);
         REQUIRE((phys - phys_ref).cwiseAbs().maxCoeff() < 1e-12);
     }
 
     SECTION("insert in v (dir=1)") {
-        auto refined = surf.insert_knot(1, 0.6, 1);
+        auto refined = surf.insert_knot(1, 0.6);
         const auto phys = refined.eval_physical(sample);
         REQUIRE((phys - phys_ref).cwiseAbs().maxCoeff() < 1e-12);
     }
 
     SECTION("chained insertions in both directions") {
-        auto refined = surf.insert_knot(0, 0.4, 1).insert_knot(1, 0.6, 2);
+        auto refined = surf.insert_knot(0, 0.4).insert_knot(1, 0.6).insert_knot(1, 0.6);
         const auto phys = refined.eval_physical(sample);
         REQUIRE((phys - phys_ref).cwiseAbs().maxCoeff() < 1e-12);
     }

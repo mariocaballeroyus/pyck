@@ -20,7 +20,7 @@ namespace
 /// Build a unit box patch with degree 2, 4 control points per direction.
 auto make_unit_box()
 {
-    auto kv = clamped_uniform_knots<double>(2, 4);
+    auto kv = KnotVector<double>::clamped_uniform(2, 4);
     auto bu = std::make_shared<BSpline<double>>(2, kv);
     auto bv = std::make_shared<BSpline<double>>(2, kv);
     auto bw = std::make_shared<BSpline<double>>(2, kv);

@@ -17,14 +17,31 @@ class DofMapper
 public:
 
     /**
+     * @brief Default-construct an empty DofMapper.
+     */
+    DofMapper() = default;
+
+    /**
      * @brief Construct a new DofMapper object
-     * 
+     *
      * @param num_basis Array of the number of basis functions in each direction
      * @param degree Array of the polynomial degree in each direction
      */
     DofMapper(const std::array<Index, d>& num_basis,
               const std::array<Index, d>& degree)
         : num_basis_(num_basis), degree_(degree) {}
+
+    /**
+     * @brief Set the per-direction basis counts and degrees in place.
+     *
+     * Equivalent to assigning from a freshly-constructed `DofMapper(num_basis, degree)`.
+     */
+    void init(const std::array<Index, d>& num_basis,
+              const std::array<Index, d>& degree)
+    {
+        num_basis_ = num_basis;
+        degree_    = degree;
+    }
 
     /**
      * @brief Map logical tensor-product indices to a flattened global DOF index.
@@ -117,10 +134,10 @@ public:
 
 private:
     /// @brief Number of basis functions in each direction
-    std::array<Index, d> num_basis_;
+    std::array<Index, d> num_basis_{};
 
     /// @brief Polynomial degree in each direction
-    std::array<Index, d> degree_;
+    std::array<Index, d> degree_{};
 };
 
 } // namespace pyck

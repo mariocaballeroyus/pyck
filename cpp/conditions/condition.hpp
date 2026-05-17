@@ -28,9 +28,6 @@ public:
 
     virtual ~Condition() = default;
 
-    /// @brief Number of auxiliary DOFs introduced (e.g. Lagrange multipliers).
-    virtual std::size_t num_dofs() const { return 0; }
-
     /**
      * @brief Allocate auxiliary DOF blocks. Default: no-op.
      *

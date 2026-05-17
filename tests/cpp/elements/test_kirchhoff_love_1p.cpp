@@ -44,9 +44,9 @@ TEST_CASE("Kirchhoff-Love 1P Plate: Navier Bi-Sinusoidal Load",
     int   nq = p + 1; 
 
     auto knots_u = std::make_shared<BSpline<double>>(
-        p, clamped_uniform_knots<double>(p, n));
+        p, KnotVector<double>::clamped_uniform(p, n));
     auto knots_v = std::make_shared<BSpline<double>>(
-        p, clamped_uniform_knots<double>(p, n));
+        p, KnotVector<double>::clamped_uniform(p, n));
 
     auto surface = std::make_shared<Patch<double, 2>>(
         rectangle<double>(knots_u, knots_v, L, W));

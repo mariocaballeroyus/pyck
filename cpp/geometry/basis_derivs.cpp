@@ -13,11 +13,12 @@ eval_basis(const Patch<T, 1>& patch,
            std::size_t derivs_order)
 {
     std::array<Index, 1> spans = {span_idx};
-    auto raw = patch.tensor_product().eval_on_span(eval_coords, spans,
-                                                   static_cast<Index>(derivs_order));
+    const Index order = static_cast<Index>(derivs_order);
+    std::vector<Matrix<T>> raw;
+    patch.tensor_product().eval_on_span(eval_coords, spans, order, raw);
 
     BasisDerivs<T, 1> b;
-    b.order = static_cast<Index>(derivs_order);
+    b.order = order;
     b.N = std::move(raw[0]);
 
     if (b.order >= 1) b.N_u   = std::move(raw[1]);
@@ -34,12 +35,13 @@ eval_basis(const Patch<T, 2>& patch,
            std::size_t derivs_order)
 {
     auto spans = patch.decode_span(span_idx);
-    auto raw = patch.tensor_product().eval_on_span(eval_coords, spans,
-                                                   static_cast<Index>(derivs_order));
+    const Index order = static_cast<Index>(derivs_order);
+    const Index S = order + 1;
+    std::vector<Matrix<T>> raw;
+    patch.tensor_product().eval_on_span(eval_coords, spans, order, raw);
 
     BasisDerivs<T, 2> b;
-    b.order = static_cast<Index>(derivs_order);
-    const Index S = b.order + 1;
+    b.order = order;
     b.N = std::move(raw[0]);
 
     if (b.order >= 1)
@@ -71,13 +73,14 @@ eval_basis(const Patch<T, 3>& patch,
            std::size_t derivs_order)
 {
     auto spans = patch.decode_span(span_idx);
-    auto raw = patch.tensor_product().eval_on_span(eval_coords, spans,
-                                                   static_cast<Index>(derivs_order));
+    const Index order = static_cast<Index>(derivs_order);
+    const Index S  = order + 1;
+    const Index S2 = S * S;
+    std::vector<Matrix<T>> raw;
+    patch.tensor_product().eval_on_span(eval_coords, spans, order, raw);
 
     BasisDerivs<T, 3> b;
-    b.order = static_cast<Index>(derivs_order);
-    const Index S  = b.order + 1;
-    const Index S2 = S * S;
+    b.order = order;
     auto at = [&](Index a, Index bb, Index c) -> Index { return a * S2 + bb * S + c; };
 
     b.N = std::move(raw[at(0, 0, 0)]);

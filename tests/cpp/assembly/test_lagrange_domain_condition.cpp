@@ -28,7 +28,7 @@ TEST_CASE("LagrangeDomainCondition augments the system symmetrically",
     const double area = L * W;
 
     auto bsp = std::make_shared<BSpline<double>>(
-        p, clamped_uniform_knots<double>(p, n));
+        p, KnotVector<double>::clamped_uniform(p, n));
     auto surface = std::make_shared<Patch<double, 2>>(
         rectangle<double>(bsp, bsp, L, W));
 
@@ -83,7 +83,7 @@ TEST_CASE("LagrangeDomainCondition supports multiple slots",
     const Index p = 2;
     const Index n = 4;
     auto bsp = std::make_shared<BSpline<double>>(
-        p, clamped_uniform_knots<double>(p, n));
+        p, KnotVector<double>::clamped_uniform(p, n));
     auto surface = std::make_shared<Patch<double, 2>>(
         rectangle<double>(bsp, bsp, 1.0, 1.0));   // area = 1
 
@@ -125,7 +125,7 @@ TEST_CASE("LagrangeDomainCondition rejects out-of-range dof_index",
     const Index p = 2;
     const Index n = 4;
     auto bsp = std::make_shared<BSpline<double>>(
-        p, clamped_uniform_knots<double>(p, n));
+        p, KnotVector<double>::clamped_uniform(p, n));
     auto surface = std::make_shared<Patch<double, 2>>(
         rectangle<double>(bsp, bsp, 1.0, 1.0));
 

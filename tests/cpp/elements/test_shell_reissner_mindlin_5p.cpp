@@ -72,7 +72,7 @@ Matrix<T> assemble_global_K(const Patch<T, 2>& patch,
 TEST_CASE("ShellRM5p: K is symmetric and has 6 rigid-body modes (flat patch)",
           "[elements][shell-rm5p]") {
 
-    auto kv = clamped_uniform_knots<double>(2, 4);
+    auto kv = KnotVector<double>::clamped_uniform(2, 4);
     auto basis = std::make_shared<BSpline<double>>(2, kv);
     auto surf  = rectangle<double>(basis, basis, 1.0, 1.0);
     auto patch = std::make_shared<Patch<double, 2>>(surf);
@@ -108,7 +108,7 @@ TEST_CASE("ShellRM5p: K is symmetric and has 6 rigid-body modes (flat patch)",
 TEST_CASE("ShellRM5p: K has exactly 6 near-zero eigenvalues (flat patch)",
           "[elements][shell-rm5p]") {
 
-    auto kv = clamped_uniform_knots<double>(2, 4);
+    auto kv = KnotVector<double>::clamped_uniform(2, 4);
     auto basis = std::make_shared<BSpline<double>>(2, kv);
     auto surf  = rectangle<double>(basis, basis, 1.0, 1.0);
     auto patch = std::make_shared<Patch<double, 2>>(surf);
@@ -144,7 +144,7 @@ TEST_CASE("ShellRM5p reduces to PlateRM3p on a flat axis-aligned patch",
           "[elements][shell-rm5p]") {
 
     // p=2, n=4 quadratic patch on the unit square.
-    auto kv = clamped_uniform_knots<double>(2, 4);
+    auto kv = KnotVector<double>::clamped_uniform(2, 4);
     auto basis = std::make_shared<BSpline<double>>(2, kv);
     auto surf  = rectangle<double>(basis, basis, 1.0, 1.0);
     auto patch = std::make_shared<Patch<double, 2>>(surf);

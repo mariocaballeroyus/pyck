@@ -46,7 +46,7 @@ static Eigen::VectorXd solve_ss_rm_plate(
     double E, double nu, double h, int n_quad)
 {
     auto bsp = std::make_shared<BSpline<double>>(
-        degree, clamped_uniform_knots<double>(degree, num_basis_1d));
+        degree, KnotVector<double>::clamped_uniform(degree, num_basis_1d));
     auto surface = std::make_shared<Patch<double, 2>>(
         rectangle<double>(bsp, bsp, a, a));
 
@@ -113,7 +113,7 @@ static Eigen::VectorXd solve_ss_rm_plate(
 TEST_CASE("Reissner-Mindlin Plate element properties", "[RMPlate]")
 {
     auto knots = std::make_shared<BSpline<double>>(
-        1, clamped_uniform_knots<double>(1, 2)); // Linear spline
+        1, KnotVector<double>::clamped_uniform(1, 2)); // Linear spline
     auto surface = std::make_shared<Patch<double, 2>>(
         rectangle<double>(knots, knots, 1.0, 1.0));
 
@@ -141,7 +141,7 @@ TEST_CASE("Reissner-Mindlin Plate Stiffness Matrix Size", "[RMPlate]")
     Index p = 2;
     Index n = 3;
     auto knots = std::make_shared<BSpline<double>>(
-        p, clamped_uniform_knots<double>(p, n));
+        p, KnotVector<double>::clamped_uniform(p, n));
     Index num_pts = n * n;
     ColMatrix<double, 3> P(num_pts, 3);
     P.setZero();
@@ -201,7 +201,7 @@ TEST_CASE("RM Plate: SS uniform load — thin plate convergence", "[RMPlate]")
 
     // Evaluate w at centre (xi = eta = 0.5)
     auto bsp = std::make_shared<BSpline<double>>(
-        p, clamped_uniform_knots<double>(p, n));
+        p, KnotVector<double>::clamped_uniform(p, n));
     auto surf = std::make_shared<Patch<double, 2>>(
         rectangle<double>(bsp, bsp, a, a));
 
@@ -251,7 +251,7 @@ TEST_CASE("RM Plate: thick plate — RM > KL deflection coefficient", "[RMPlate]
 
     // Evaluate w at centre from each solution (same mesh → same shape fns)
     auto bsp = std::make_shared<BSpline<double>>(
-        p, clamped_uniform_knots<double>(p, n));
+        p, KnotVector<double>::clamped_uniform(p, n));
     auto surf = std::make_shared<Patch<double, 2>>(
         rectangle<double>(bsp, bsp, a, a));
 

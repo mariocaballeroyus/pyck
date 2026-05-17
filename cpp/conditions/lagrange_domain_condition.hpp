@@ -51,8 +51,6 @@ public:
      */
     LagrangeDomainCondition& add(std::size_t dof_index, T value = T(0));
 
-    std::size_t num_dofs() const override;
-
     void allocate_dofs(DofLayout& layout,
                        const std::vector<DofLayout::BlockId>& primal_blocks) override;
 

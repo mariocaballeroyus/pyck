@@ -10,7 +10,7 @@ using namespace pyck;
 TEST_CASE("KnotVector: monotonicity", "[basis][knots]") {
     for (std::size_t p = 1; p <= 4; ++p) {
         std::size_t n = p + 3;  
-        auto kv = clamped_uniform_knots<double>(p, n);
+        auto kv = KnotVector<double>::clamped_uniform(p, n);
 
         for (std::size_t i = 0; i + 1 < kv.size(); ++i)
             REQUIRE(kv[i] <= kv[i + 1]);
@@ -21,7 +21,7 @@ TEST_CASE("KnotVector: monotonicity", "[basis][knots]") {
  * Knot span test.
  */
 TEST_CASE("KnotVector: find_span", "[basis][knots]") {
-    auto kv = clamped_uniform_knots<double>(2, 5);
+    auto kv = KnotVector<double>::clamped_uniform(2, 5);
 
     SECTION("interior points land in the correct span") {
         REQUIRE(kv.find_span(2, 0.0) == 2);
@@ -39,7 +39,7 @@ TEST_CASE("KnotVector: find_span", "[basis][knots]") {
 TEST_CASE("KnotVector: clamped property", "[basis][knots]") {
     for (std::size_t p = 1; p <= 4; ++p) {
         std::size_t n = p + 2;
-        auto kv = clamped_uniform_knots<double>(p, n);
+        auto kv = KnotVector<double>::clamped_uniform(p, n);
 
         for (std::size_t i = 0; i <= p; ++i)
             REQUIRE(kv[i] == Approx(0.0));
@@ -54,7 +54,7 @@ TEST_CASE("KnotVector: clamped property", "[basis][knots]") {
  */
 TEST_CASE("KnotVector: unique spans", "[basis][knots]") {
     std::size_t p = 2, n = 6;
-    auto kv = clamped_uniform_knots<double>(p, n);
+    auto kv = KnotVector<double>::clamped_uniform(p, n);
 
     std::size_t num_elements = 0;
     for (std::size_t i = 0; i + 1 < kv.size(); ++i) {
@@ -72,7 +72,7 @@ TEST_CASE("KnotVector: unique spans", "[basis][knots]") {
 TEST_CASE("KnotVector: Greville abscissae", "[basis][knots]") {
     std::size_t p = 2;
     std::size_t n = 4;
-    auto kv = clamped_uniform_knots<double>(p, n); // [0,0,0, 0.5, 1,1,1]
+    auto kv = KnotVector<double>::clamped_uniform(p, n); // [0,0,0, 0.5, 1,1,1]
     
     // Expected: [0, (0+0.5)/2, (0.5+1)/2, 1]
     std::vector<double> expected = {0.0, 0.25, 0.75, 1.0};
@@ -90,17 +90,17 @@ TEST_CASE("KnotVector: Greville abscissae", "[basis][knots]") {
  * Knot insertion: splices values, preserves sortedness.
  */
 TEST_CASE("KnotVector: insert", "[basis][knots]") {
-    auto kv = clamped_uniform_knots<double>(2, 5); // [0,0,0, 1/3, 2/3, 1,1,1]
+    auto kv = KnotVector<double>::clamped_uniform(2, 5); // [0,0,0, 1/3, 2/3, 1,1,1]
 
     SECTION("single insertion grows the vector by one") {
-        auto kv2 = kv.insert(0.5, 1);
+        auto kv2 = kv.insert_knot(0.5);
         REQUIRE(kv2.size() == kv.size() + 1);
         for (std::size_t i = 0; i + 1 < kv2.size(); ++i)
             REQUIRE(kv2[i] <= kv2[i + 1]);
     }
 
-    SECTION("count > 1 inserts repeated knots in place") {
-        auto kv3 = kv.insert(0.5, 3);
+    SECTION("multiple insertions of the same knot") {
+        auto kv3 = kv.insert_knot(0.5).insert_knot(0.5).insert_knot(0.5);
         REQUIRE(kv3.size() == kv.size() + 3);
         // Three consecutive 0.5 values must appear.
         std::size_t run = 0;
@@ -109,13 +109,8 @@ TEST_CASE("KnotVector: insert", "[basis][knots]") {
         REQUIRE(run == 3);
     }
 
-    SECTION("count = 0 returns a copy") {
-        auto kv0 = kv.insert(0.5, 0);
-        REQUIRE(kv0.size() == kv.size());
-    }
-
     SECTION("u outside knot range throws") {
-        REQUIRE_THROWS_AS(kv.insert(-0.1), std::invalid_argument);
-        REQUIRE_THROWS_AS(kv.insert(1.5), std::invalid_argument);
+        REQUIRE_THROWS_AS(kv.insert_knot(-0.1), std::invalid_argument);
+        REQUIRE_THROWS_AS(kv.insert_knot(1.5), std::invalid_argument);
     }
 }

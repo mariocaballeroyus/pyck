@@ -10,6 +10,11 @@ namespace pyck
 
 /**
  * @brief Non-decreasing knot vector for basis functions.
+ *
+ * @details Knot vectors are the building blocks used to define B-Spline and NURBS 
+ *          basis functions. They are defined over the parametric domain, typically 
+ *          in the unit interval [0, 1]. 
+ *
  * @tparam T Scalar type
  */
 template <std::floating_point T = double>
@@ -19,11 +24,13 @@ public:
 
     // === Constructors ===============================================================
 
+    /// @brief Default constructor. Creates an empty knot vector.
+    KnotVector() = default;
+
     /**
      * @brief Construct a knot vector from a sequence of knot values.
      *
      * @param knots Non-decreasing sequence of knot values.
-     * @throws std::invalid_argument if the sequence is empty or not non-decreasing.
      */
     explicit KnotVector(Vector<T> knots);
 
@@ -32,29 +39,25 @@ public:
     /**
      * @brief Find the knot span index for a given parameter value.
      *
-     * Returns the index `i` such that knots[i] <= point < knots[i+1],
-     * with the convention that the last span is closed on the right.
+     * @details Returns the index `i` such that `knots[i] <= point < knots[i+1]`,
+     *          with the convention that the last span is closed on the right.
      *
      * @param degree Polynomial degree.
-     * @param point Parameter value.
+     * @param point Parameter value to locate.
      * @return Span index.
      */
     Index find_span(Index degree, T point) const;
 
-    // === Properties =================================================================
-
     /**
      * @brief Get the parametric bounds of a knot span.
      *
-     * @param span Span index in [0, num_spans()).
-     * @return Pair (knots[span], knots[span+1]).
+     * @param span Span index in `[0, num_spans())`.
+     * @return Pair `(knots[span], knots[span+1])`.
      */
     std::pair<T, T> span_bounds(Index span) const
     { return {knots_[span], knots_[span + 1]}; }
 
-    /// @brief Number of basis functions of given degree supported by this vector.
-    Index num_basis(Index degree) const
-    { return knots_.size() - degree - 1; }
+    // === Properties =================================================================
 
     /// @brief Number of knots in the vector.
     Index size() const
@@ -80,49 +83,62 @@ public:
     const Vector<T>& data() const
     { return knots_; }
 
-    // === Knot Insertion =============================================================
+    // === Refinement =================================================================
 
     /**
-     * @brief Insert a knot value @p u into the knot vector @p count times.
+     * @brief Insert a knot value into the knot vector.
      *
-     * @param u     Knot value to insert. Must lie in [front(), back()].
-     * @param count Number of times to insert (default 1).
-     * @return A new KnotVector with @p u inserted @p count times.
+     * @details If `u` already exists, its multiplicity increases by 1. Otherwise, `u` is
+     *          added with multiplicity 1. The non-decreasing order is preserved.
+     *
+     * @param u Knot value to insert. Must lie in `[front(), back()]`.
+     * @return A new KnotVector with `u` inserted.
      */
-    KnotVector<T> insert(T u, Index count = 1) const;
-
-    // === Degree Elevation ===========================================================
+    KnotVector<T> insert_knot(T u) const;
 
     /**
-     * @brief Degree-elevate the knot vector @p count times.
+     * @brief Drop one copy of a knot value from the knot vector.
      *
-     * Each unique knot's multiplicity is incremented by @p count. Pure
-     * splice operation; the basis-level @c Basis::elevate_degree pairs
-     * this with the corresponding control-point transform.
+     * @details If `u` has multiplicity > 1 the multiplicity decreases by 1.
+     *          If multiplicity is exactly 1 the value is removed entirely.
+     *
+     * @param u Knot value to drop. Must be present in the knot vector.
+     * @return A new KnotVector with one copy of `u` removed.
+     * @throws std::invalid_argument if `u` is not present.
      */
-    KnotVector<T> elevate(Index count = 1) const;
+    KnotVector<T> drop_knot(T u) const;
+
+    /**
+     * @brief Degree-elevate the knot vector once.
+
+     * @details Each unique knot's multiplicity is incremented by 1, keeping it clamped if 
+     *          the original vector was, and conserving the total number of spans
+     *          (and hence the degree of the resulting basis).
+     *
+     * @return The degree-elevated knot vector.
+     */
+    KnotVector<T> elevate() const;
+
+    // === Factory Methods =============================================================
+
+    /**
+     * @brief Create a clamped, uniformly-spaced knot vector on [0, 1].
+
+     * @details Creates a knot vector with `(degree+1)` repeated knots at each end and
+     *          uniformly spaced internal knots.
+
+     * @param degree Polynomial degree.
+     * @param num_basis Number of basis functions. Must satisfy `num_basis >= degree + 1`.
+     * @return The clamped uniform knot vector.
+     */
+    static KnotVector<T> clamped_uniform(Index degree, Index num_basis);
 
 private:
 
     /// @brief Non-decreasing sequence of knot values.
     Vector<T> knots_;
 
-};
-
-// === Factory Methods ================================================================
-
-/**
- * @brief Create a clamped, uniformly-spaced knot vector on [0, 1].
- * @tparam T Scalar type
- * @param degree   Polynomial degree (p).
- * @param num_basis Number of basis functions (n).  Must satisfy n >= p + 1.
- * @return A knot vector with (p+1) repeated knots at each end and
- *         uniformly spaced internal knots.
- *
- * @throws std::invalid_argument if num_basis < degree + 1 or negative.
- */
-template <std::floating_point T = double>
-KnotVector<T> clamped_uniform_knots(Index degree, Index num_basis);
+}; // class KnotVector<T>
 
 } // namespace pyck
 

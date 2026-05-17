@@ -81,8 +81,6 @@ public:
     std::size_t patch_b_idx() const { return patch_b_idx_; }
     bool reverse() const { return reverse_; }
 
-    std::size_t num_dofs() const override;
-
     void allocate_dofs(DofLayout& layout,
                        const std::vector<DofLayout::BlockId>& primal_blocks) override;
 

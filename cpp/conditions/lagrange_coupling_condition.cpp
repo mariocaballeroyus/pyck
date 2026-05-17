@@ -43,6 +43,8 @@ LagrangeCouplingCondition<T, d>::LagrangeCouplingCondition(
     }
 }
 
+// === Utility Methods ================================================================
+
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
 LagrangeCouplingCondition<T, d>& LagrangeCouplingCondition<T, d>::add(
@@ -61,13 +63,6 @@ LagrangeCouplingCondition<T, d>& LagrangeCouplingCondition<T, d>::add(
 
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-std::size_t LagrangeCouplingCondition<T, d>::num_dofs() const
-{
-    return static_cast<std::size_t>(multiplier_dof_count_) * terms_.size();
-}
-
-template <std::floating_point T, std::size_t d>
-requires (d > 1)
 void LagrangeCouplingCondition<T, d>::allocate_dofs(
     DofLayout& layout,
     const std::vector<DofLayout::BlockId>& primal_blocks)
@@ -81,11 +76,11 @@ void LagrangeCouplingCondition<T, d>::allocate_dofs(
 
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-void LagrangeCouplingCondition<T, d>::apply(
-    Matrix<T>& stiffness,
-    Vector<T>& load,
-    const DofLayout& layout,
-    const std::vector<DofLayout::BlockId>& primal_blocks) const
+void 
+LagrangeCouplingCondition<T, d>::apply(Matrix<T>& stiffness,
+                                       Vector<T>& load,
+                                       const DofLayout& layout,
+                                       const std::vector<DofLayout::BlockId>& primal_blocks) const
 {
     if (terms_.empty()) return;
 
@@ -201,6 +196,8 @@ void LagrangeCouplingCondition<T, d>::apply(
         }
     }
 }
+
+// === Template Instantiations ========================================================
 
 template class LagrangeCouplingCondition<double, 2>;
 

@@ -4,7 +4,6 @@
 #include <vector>
 
 #include "basis.hpp"
-#include "bspline.hpp"
 #include "knots.hpp"
 #include "../types.hpp"
 
@@ -20,8 +19,6 @@ template <std::floating_point T = double>
 class NURBS : public Basis<T>
 {
 public:
-
-    using BasisType = Basis<T>;
 
     // === Constructors ===============================================================
 
@@ -46,17 +43,17 @@ public:
     /**
      * @brief Evaluate the (p+1) non-zero rational basis functions and their
      *        derivatives at the given parameter values within a single span.
+     *
+     * @param points   Parameter values (all assumed to lie in the span).
+     * @param span_idx Knot-span index (as returned by KnotVector::find_span).
+     * @param order    Maximum derivative order to compute.
+     * @param results  Output buffer; the function resizes it to (order+1) matrices,
+     *                 each of size (m, p+1).
      */
-    std::vector<Matrix<T>> eval_on_span(const Vector<T>& points,
-                                       Index span,
-                                       Index order = 0) const override;
-
-    /**
-     * @brief Evaluate all rational basis functions and their derivatives at
-     *        the given parameter values.
-     */
-    std::vector<Matrix<T>> eval_all(const Vector<T>& points,
-                                    Index order = 0) const override;
+    void eval_on_span(const Vector<T>& points,
+                      Index span_idx,
+                      Index order,
+                      std::vector<Matrix<T>>& results) const override;
 
     /**
      * @brief Greville abscissae of the NURBS basis (knot averages — identical
@@ -67,35 +64,44 @@ public:
     // === Refinement =================================================================
 
     /**
-     * @brief Knot insertion (Piegl-Tiller §5.3 rational variant).
+     * @brief Knot insertion (Piegl-Tiller §5.3 rational variant, single step).
      *
-     * The transform applies directly to unweighted 3D control points; the
-     * refined weights are baked into the returned NURBS basis so the patch
-     * invariant (unweighted control points) is preserved.
+     * The refined weights are baked into the returned NURBS basis.
+     *
+     * @param u Knot value to insert.
+     * @return A pair of (refined basis, transform matrix).
      */
-    KnotInsertion<T> insert_knot(T u, Index count = 1) const override;
+    std::pair<Ptr<Basis<T>>, Matrix<T>> insert_knot(T u) const override;
 
     /**
-     * @brief Degree elevation (rational variant).
+     * @brief Degree elevation by one (rational variant).
      *
-     * Runs the underlying B-spline elevation on the homogeneous CPs; new
-     * weights are baked into the returned NURBS basis so the transform
-     * applies directly to unweighted control points.
+     * New weights are baked into the returned NURBS basis.
+     *
+     * @return A pair of (elevated basis, transform matrix).
      */
-    DegreeElevation<T> elevate_degree(Index count = 1) const override;
+    std::pair<Ptr<Basis<T>>, Matrix<T>> elevate_degree() const override;
 
     // === Properties =================================================================
 
     /// @brief Per-basis-function weights.
     const Vector<T>& weights() const { return weights_; }
 
-    /// @brief Underlying B-spline basis (without rational weighting).
-    const BSpline<T>& bspline() const { return bspline_; }
+    // === Factory Methods =============================================================
+
+    /**
+     * @brief Create a clamped, uniformly-spaced NURBS basis on [0, 1].
+     * @param degree Polynomial degree.
+     * @param num_basis Number of basis functions. Must satisfy `num_basis >= degree + 1`.
+     * @param weights Per-basis-function weights (length `num_basis`), each strictly positive.
+     * @return A NURBS basis with clamped uniform knots.
+     */
+    static NURBS<T> clamped_uniform(Index degree, Index num_basis, const Vector<T>& weights)
+    {
+        return NURBS<T>(degree, KnotVector<T>::clamped_uniform(degree, num_basis), weights);
+    }
 
 private:
-
-    /// @brief Underlying polynomial B-spline basis (same degree and knots).
-    BSpline<T> bspline_;
 
     /// @brief Per-basis-function weights, indexed 0 .. num_basis - 1.
     Vector<T> weights_;

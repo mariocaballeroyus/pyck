@@ -32,7 +32,7 @@ TEST_CASE("LoadCondition 1D", "[conditions][load_condition]") {
     control_pts(1, 0) = 1.0;
     control_pts(2, 0) = 2.0;
     
-    Patch<double, 1> curve(basis, control_pts);
+    Patch<double, 1> curve({basis}, control_pts);
 
     // 2. Create a quadrature rule (Gauss-Legendre, 2 points per element should be enough for linear shape funcs)
     GaussLegendre<double, 1> gauss_rule(2);
