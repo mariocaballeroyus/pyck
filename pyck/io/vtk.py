@@ -18,7 +18,7 @@ import numpy as np
 import numpy.typing as npt
 
 from pyck.postprocessing import eval_geometry_at, eval_shape_at
-from pyck.geometry.surface import SurfacePatch
+from pyck.geometry.surface_patch import SurfacePatch
 
 
 _VTK_QUAD = 9

@@ -36,7 +36,7 @@ template <std::floating_point T, std::size_t d>
 LaplaceGradAux<T, d>
 compute_laplace_grad_aux(const IntrinsicGeometry<T, d>& ig)
 {
-    const Index Q = ig.a[0].rows();
+    const Index Q = ig.a(0).rows();
 
 
     LaplaceGradAux<T, d> aux;
@@ -54,23 +54,23 @@ compute_laplace_grad_aux(const IntrinsicGeometry<T, d>& ig)
     {
         // Symmetric accessors hiding the upper-tri storage convention.
         auto a1  = [&](std::size_t i) {
-            return ig.a[i].row(q);
+            return ig.a(i).row(q);
         };
         auto a2  = [&](std::size_t i, std::size_t j) {
             auto [lo, hi] = sym2(i, j);
-            return ig.a_d1[lo][hi].row(q);
+            return ig.a_d1(lo, hi).row(q);
         };
         auto a3  = [&](std::size_t i, std::size_t j, std::size_t k) {
             auto v = sym3(i, j, k);
-            return ig.a_d2[v[0]][v[1]][v[2]].row(q);
+            return ig.a_d2(v[0], v[1], v[2]).row(q);
         };
         auto G   = [&](std::size_t i, std::size_t j) {
             auto [lo, hi] = sym2(i, j);
-            return ig.g_inv[lo][hi](q);
+            return ig.g_inv(lo, hi)(q);
         };
         auto Gam = [&](std::size_t e, std::size_t i, std::size_t j) {
             auto [lo, hi] = sym2(i, j);
-            return ig.chr.Gamma[e][lo][hi](q);
+            return ig.chr.Gamma(e, lo, hi)(q);
         };
 
         // ---- Precompute unique dot products once per q ---------------------

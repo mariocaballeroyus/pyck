@@ -32,11 +32,11 @@ BeamTimoshenko1p<T>::strain_matrix(const Patch<T, 1>& /*patch*/,
 
     for (Index q = 0; q < Q; ++q)
     {
-        const T gi          = ig.g_inv[0][0](q);
-        const T G           = ig.chr.Gamma[0][0][0](q);
+        const T gi          = ig.g_inv(0, 0)(q);
+        const T G           = ig.chr.Gamma(0, 0, 0)(q);
         const T G2          = G * G;
-        const T a11_dot_a11 = ig.a_d1[0][0].row(q).squaredNorm();
-        const T a1_dot_a111 = ig.a[0].row(q).dot(ig.a_d2[0][0][0].row(q));
+        const T a11_dot_a11 = ig.a_d1(0, 0).row(q).squaredNorm();
+        const T a1_dot_a111 = ig.a(0).row(q).dot(ig.a_d2(0, 0, 0).row(q));
         const T coeff_Nu    = T(4) * G2 - gi * (a11_dot_a11 + a1_dot_a111);
         const T coeff_Nuu   = -T(3) * G;
 
@@ -58,7 +58,7 @@ template <std::floating_point T>
 Matrix<T> BeamTimoshenko1p<T>::constitutive_matrix(const IntrinsicGeometry<T, 1>& ig,
                                                    Index q) const
 {
-    const T gi = ig.g_inv[0][0](q);
+    const T gi = ig.g_inv(0, 0)(q);
     Matrix<T> D = Matrix<T>::Zero(2, 2);
 
     // D = [ D_b   0   ]
@@ -86,8 +86,8 @@ BeamTimoshenko1p<T>::displacement_shape_matrix(const Patch<T, 1>& patch,
     for (Index q = 0; q < Q; ++q)
     {
         // N_w = [ N_i - (K_b/K_s) g^{11} N_{i|11} ]
-        Nw.row(q) = basis.N().row(q) - ratio * ig.g_inv[0][0](q) *
-                    (basis.N_d2(0, 0).row(q) - ig.chr.Gamma[0][0][0](q) * basis.N_d1(0).row(q));
+        Nw.row(q) = basis.N().row(q) - ratio * ig.g_inv(0, 0)(q) *
+                    (basis.N_d2(0, 0).row(q) - ig.chr.Gamma(0, 0, 0)(q) * basis.N_d1(0).row(q));
     }
     return Nw;
 }

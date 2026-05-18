@@ -6,7 +6,7 @@ import numpy as np
 import numpy.typing as npt
 
 import pyck._pyck as _pyck
-from pyck.basis import Basis, BSpline, KnotVector, NURBS
+from pyck.basis import Basis, BSpline, NURBS
 from pyck.geometry.patch import Patch
 from pyck.geometry.patch_boundary import PatchBoundary
 
@@ -84,19 +84,16 @@ class SurfacePatch(Patch):
     # === Refinement ==================================================================
 
     def insert_knot(self, dir: int, u: float, count: int = 1) -> SurfacePatch:
-        """Refine the patch by inserting knot value `u` in parametric direction `dir`.
-
-        Returns a new patch with the refined basis and updated control points.
-        The original patch is unmodified; any derived objects (boundaries,
-        assembler entries, conditions) must be rebuilt against the returned patch.
-        """
+        """Refine the patch by inserting knot value `u` in parametric direction `dir`."""
         if dir not in (0, 1):
             raise ValueError(f"dir must be 0 or 1, got {dir}")
 
         old_basis = self._basis_u if dir == 0 else self._basis_v
         new_basis, _ = old_basis.insert_knot(u, count)
 
-        new_cpp = self._cpp_object.insert_knot(dir, float(u), int(count))
+        new_cpp = self._cpp_object
+        for _ in range(int(count)):
+            new_cpp = new_cpp.insert_knot(int(dir), float(u))
 
         basis_u = new_basis if dir == 0 else self._basis_u
         basis_v = new_basis if dir == 1 else self._basis_v
@@ -110,7 +107,9 @@ class SurfacePatch(Patch):
         old_basis = self._basis_u if dir == 0 else self._basis_v
         new_basis, _ = old_basis.elevate_degree(count)
 
-        new_cpp = self._cpp_object.elevate_degree(dir, int(count))
+        new_cpp = self._cpp_object
+        for _ in range(int(count)):
+            new_cpp = new_cpp.elevate_degree(int(dir))
 
         basis_u = new_basis if dir == 0 else self._basis_u
         basis_v = new_basis if dir == 1 else self._basis_v
@@ -222,8 +221,7 @@ class SurfacePatch(Patch):
 
         # Build the base p=2 NURBS arc.
         w_base = [1.0, np.cos(alpha / 2), 1.0]
-        kv_base = KnotVector([0.0, 0.0, 0.0, 1.0, 1.0, 1.0])
-        basis_u_base = NURBS(2, kv_base, w_base)
+        basis_u_base = NURBS.clamped_uniform(2, 3, w_base)
         ctrl_u_base = np.array([
             [c,                  0.0                  ],
             [c,                  c * np.tan(alpha / 2)],
@@ -278,8 +276,7 @@ class SurfacePatch(Patch):
             )
 
         w_base = [1.0, 1.0 / np.sqrt(2.0), 1.0]
-        kv_base = KnotVector([0.0, 0.0, 0.0, 1.0, 1.0, 1.0])
-        basis_uv_base = NURBS(2, kv_base, w_base)
+        basis_uv_base = NURBS.clamped_uniform(2, 3, w_base)
 
         R = radius
         cps_flat = np.array([

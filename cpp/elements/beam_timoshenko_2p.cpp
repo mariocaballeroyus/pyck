@@ -26,7 +26,7 @@ BeamTimoshenko2p<T>::constitutive_matrix(const IntrinsicGeometry<T, 1>& ig,
 {
     // D = [ D_b  0   ]
     //     [ 0    D_s ]
-    const T gi = ig.g_inv[0][0](q);
+    const T gi = ig.g_inv(0, 0)(q);
     Matrix<T> D = Matrix<T>::Zero(2, 2);
     D(0, 0) = material_->bending_stiffness() * gi;
     D(1, 1) = material_->shear_stiffness()   * gi;
@@ -45,7 +45,7 @@ BeamTimoshenko2p<T>::strain_matrix(const Patch<T, 1>& /*patch*/,
 
     for (Index q = 0; q < Q; ++q)
     {
-        const T G = ig.chr.Gamma[0][0][0](q);
+        const T G = ig.chr.Gamma(0, 0, 0)(q);
 
         for (Index i = 0; i < n; ++i)
         {

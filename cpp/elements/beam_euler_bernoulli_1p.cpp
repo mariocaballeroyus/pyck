@@ -34,7 +34,7 @@ BeamEulerBernoulli1p<T>::strain_matrix(const Patch<T, 1>& /*patch*/,
     {
         // Bending
         // B_b = [ -N_{i|11} ]
-        B.row(q) = -(basis.N_d2(0, 0).row(q) - ig.chr.Gamma[0][0][0](q) * basis.N_d1(0).row(q));
+        B.row(q) = -(basis.N_d2(0, 0).row(q) - ig.chr.Gamma(0, 0, 0)(q) * basis.N_d1(0).row(q));
 
         // B_s = 0 (normality assumption)
     }
@@ -46,7 +46,7 @@ Matrix<T>
 BeamEulerBernoulli1p<T>::constitutive_matrix(const IntrinsicGeometry<T, 1>& ig,
                                              Index q) const
 {
-    const T gi = ig.g_inv[0][0](q);
+    const T gi = ig.g_inv(0, 0)(q);
     Matrix<T> D(1, 1);
 
     // D_b = [ EI (g^{11})^2 ]

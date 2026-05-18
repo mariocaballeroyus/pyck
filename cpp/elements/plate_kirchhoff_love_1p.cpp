@@ -35,8 +35,8 @@ PlateKirchhoffLove1p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
 
     for (Index q = 0; q < Q; ++q)
     {
-        const T Gam1_11 = ig.chr.Gamma[0][0][0](q), Gam1_12 = ig.chr.Gamma[0][0][1](q), Gam1_22 = ig.chr.Gamma[0][1][1](q);
-        const T Gam2_11 = ig.chr.Gamma[1][0][0](q), Gam2_12 = ig.chr.Gamma[1][0][1](q), Gam2_22 = ig.chr.Gamma[1][1][1](q);
+        const T Gam1_11 = ig.chr.Gamma(0, 0, 0)(q), Gam1_12 = ig.chr.Gamma(0, 0, 1)(q), Gam1_22 = ig.chr.Gamma(0, 1, 1)(q);
+        const T Gam2_11 = ig.chr.Gamma(1, 0, 0)(q), Gam2_12 = ig.chr.Gamma(1, 0, 1)(q), Gam2_22 = ig.chr.Gamma(1, 1, 1)(q);
 
         // B_b = [ -N_{i|11}   ]
         //       [ -N_{i|22}   ]

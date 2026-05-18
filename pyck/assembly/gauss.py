@@ -139,62 +139,15 @@ class GaussLegendre(QuadratureRule):
  
     def __repr__(self) -> str:
         return f"GaussLegendre(num_points={self.num_points}, dim={self._dim})"
- 
- 
-def create_gauss_legendre(num_points: int, dim: int = 1) -> GaussLegendre:
-    """Create a :class:`GaussLegendre` quadrature rule.
- 
-    Parameters
-    ----------
-    num_points : int
-        Number of integration points per direction.
-    dim : int, optional
-        Topological dimension (1, 2, or 3). Defaults to 1.
- 
-    Returns
-    -------
-    GaussLegendre
-    """
-    return GaussLegendre(num_points, dim=dim)
- 
- 
-def create_gauss_legendre_2d(num_points: int) -> GaussLegendre:
-    """Create a 2D tensor-product Gauss-Legendre quadrature rule.
- 
-    Parameters
-    ----------
-    num_points : int
-        Number of integration points per direction.
- 
-    Returns
-    -------
-    GaussLegendre
-    """
-    return GaussLegendre(num_points, dim=2)
 
-
-def create_gauss_from_patch(patch: Any) -> GaussLegendre:
-    """Create a Gauss-Legendre quadrature rule suitable for a patch.
+    @classmethod
+    def from_patch(cls, patch) -> GaussLegendre:
+        """Build a Gauss-Legendre rule sized to integrate the patch's mass matrix
+        exactly: ``num_points = max_degree + 1`` per direction.
+        """
+        max_deg = max(b.degree for b in patch.basis)
+        return cls(int(max_deg) + 1, dim=int(patch.tdim))
  
-    The number of integration points per direction is set to degree + 1,
-    which is sufficient to integrate the mass matrix of the patch exactly.
  
-    Parameters
-    ----------
-    patch : Patch
-        The patch to create the quadrature rule for.
- 
-    Returns
-    -------
-    GaussLegendre
-    """
-    # Find max degree across all parametric directions
-    max_degree = 0
-    for i in range(patch.tdim):
-        max_degree = max(max_degree, patch.basis(i).degree)
-    
-    return GaussLegendre(max_degree + 1, dim=patch.tdim)
-
-
 # Alias for backward compatibility
 GaussLegendre2d = GaussLegendre

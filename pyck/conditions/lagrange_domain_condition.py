@@ -85,16 +85,3 @@ class LagrangeDomainCondition:
         return f"LagrangeDomainCondition(num_terms={len(self._terms)})"
 
 
-def create_zero_mean_lagrange(
-    patch: "Patch",
-    dof_index: int,
-    quadrature: "QuadratureRule | None" = None,
-) -> LagrangeDomainCondition:
-    """Suppress the constant mode of a single DOF by enforcing its zero mean.
-
-    Convenience constructor for the headline use case: pinning the rigid
-    mode of ψ in RM-D2 by enforcing ∫ψ dΩ = 0.
-    """
-    cond = LagrangeDomainCondition(patch, quadrature)
-    cond.add(dof_index, 0.0)
-    return cond

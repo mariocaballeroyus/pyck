@@ -12,7 +12,7 @@ from matplotlib.axes import Axes
 from matplotlib.figure import Figure
 from mpl_toolkits.mplot3d import Axes3D
 
-from pyck.geometry.surface import SurfacePatch
+from pyck.geometry.surface_patch import SurfacePatch
 
 
 def evaluate_surface(

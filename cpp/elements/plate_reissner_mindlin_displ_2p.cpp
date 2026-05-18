@@ -33,15 +33,15 @@ Matrix<T> PlateReissnerMindlinDispl2p<T>::strain_matrix(
 
     for (Index q = 0; q < Q; ++q)
     {
-        const T Gam1_11 = ig.chr.Gamma[0][0][0](q), Gam1_12 = ig.chr.Gamma[0][0][1](q), Gam1_22 = ig.chr.Gamma[0][1][1](q);
-        const T Gam2_11 = ig.chr.Gamma[1][0][0](q), Gam2_12 = ig.chr.Gamma[1][0][1](q), Gam2_22 = ig.chr.Gamma[1][1][1](q);
+        const T Gam1_11 = ig.chr.Gamma(0, 0, 0)(q), Gam1_12 = ig.chr.Gamma(0, 0, 1)(q), Gam1_22 = ig.chr.Gamma(0, 1, 1)(q);
+        const T Gam2_11 = ig.chr.Gamma(1, 0, 0)(q), Gam2_12 = ig.chr.Gamma(1, 0, 1)(q), Gam2_22 = ig.chr.Gamma(1, 1, 1)(q);
         const auto N11 = basis.N_d2(0, 0).row(q) - Gam1_11 * basis.N_d1(0).row(q) - Gam2_11 * basis.N_d1(1).row(q);
         const auto N12 = basis.N_d2(0, 1).row(q) - Gam1_12 * basis.N_d1(0).row(q) - Gam2_12 * basis.N_d1(1).row(q);
         const auto N22 = basis.N_d2(1, 1).row(q) - Gam1_22 * basis.N_d1(0).row(q) - Gam2_22 * basis.N_d1(1).row(q);
 
-        const T G11 = ig.g_inv[0][0](q);
-        const T G12 = ig.g_inv[0][1](q);
-        const T G22 = ig.g_inv[1][1](q);
+        const T G11 = ig.g_inv(0, 0)(q);
+        const T G12 = ig.g_inv(0, 1)(q);
+        const T G22 = ig.g_inv(1, 1)(q);
         const T G11_d1 = aux.G_inv_d[0][0][0](q), G12_d1 = aux.G_inv_d[0][1][0](q), G22_d1 = aux.G_inv_d[1][1][0](q);
         const T G11_d2 = aux.G_inv_d[0][0][1](q), G12_d2 = aux.G_inv_d[0][1][1](q), G22_d2 = aux.G_inv_d[1][1][1](q);
         const T c1 = aux.c[0](q), c2 = aux.c[1](q);
@@ -110,12 +110,12 @@ Matrix<T> PlateReissnerMindlinDispl2p<T>::displacement_shape_matrix(const Patch<
 
     for (Index q = 0; q < Q; ++q)
     {
-        const T gi11 = ig.g_inv[0][0](q);
-        const T gi12 = ig.g_inv[0][1](q);
-        const T gi22 = ig.g_inv[1][1](q);
+        const T gi11 = ig.g_inv(0, 0)(q);
+        const T gi12 = ig.g_inv(0, 1)(q);
+        const T gi22 = ig.g_inv(1, 1)(q);
 
-        const T Gam1_11 = ig.chr.Gamma[0][0][0](q), Gam1_12 = ig.chr.Gamma[0][0][1](q), Gam1_22 = ig.chr.Gamma[0][1][1](q);
-        const T Gam2_11 = ig.chr.Gamma[1][0][0](q), Gam2_12 = ig.chr.Gamma[1][0][1](q), Gam2_22 = ig.chr.Gamma[1][1][1](q);
+        const T Gam1_11 = ig.chr.Gamma(0, 0, 0)(q), Gam1_12 = ig.chr.Gamma(0, 0, 1)(q), Gam1_22 = ig.chr.Gamma(0, 1, 1)(q);
+        const T Gam2_11 = ig.chr.Gamma(1, 0, 0)(q), Gam2_12 = ig.chr.Gamma(1, 0, 1)(q), Gam2_22 = ig.chr.Gamma(1, 1, 1)(q);
 
         const auto N11 = basis.N_d2(0, 0).row(q) - Gam1_11 * basis.N_d1(0).row(q) - Gam2_11 * basis.N_d1(1).row(q);
         const auto N12 = basis.N_d2(0, 1).row(q) - Gam1_12 * basis.N_d1(0).row(q) - Gam2_12 * basis.N_d1(1).row(q);

@@ -160,34 +160,6 @@ class PlateReissnerMindlinDispl2p:
         return f"PlateReissnerMindlinDispl2p(material={self._material})"
 
 
-def create_kirchhoff_love_plate(
-    material: PlaneStress2d
-) -> PlateKirchhoffLove1p:
-    """Create a :class:`PlateKirchhoffLove1p` element."""
-    return PlateKirchhoffLove1p(material)
-
-
-def create_reissner_mindlin_plate(
-    material: PlaneStress2d, k_s: float = 5.0 / 6.0
-) -> PlateReissnerMindlin3p:
-    """Create a :class:`PlateReissnerMindlin3p` element."""
-    return PlateReissnerMindlin3p(material, k_s)
-
-
-def create_reissner_mindlin_displ_plate(
-    material: PlaneStress2d,
-) -> PlateReissnerMindlinDispl3p:
-    """Create a :class:`PlateReissnerMindlinDispl3p` element."""
-    return PlateReissnerMindlinDispl3p(material)
-
-
-def create_reissner_mindlin_displ_2p_plate(
-    material: PlaneStress2d,
-) -> PlateReissnerMindlinDispl2p:
-    """Create a :class:`PlateReissnerMindlinDispl2p` element."""
-    return PlateReissnerMindlinDispl2p(material)
-
-
 class ShellReissnerMindlin5p:
     """Reissner-Mindlin 5-parameter shell element.
 
@@ -215,8 +187,3 @@ class ShellReissnerMindlin5p:
         return f"ShellReissnerMindlin5p(material={self._material})"
 
 
-def create_reissner_mindlin_shell(
-    material: PlaneStressShell,
-) -> ShellReissnerMindlin5p:
-    """Create a :class:`ShellReissnerMindlin5p` element."""
-    return ShellReissnerMindlin5p(material)

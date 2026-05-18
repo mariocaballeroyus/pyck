@@ -104,33 +104,3 @@ class LoadBoundaryCondition:
         return f"LoadBoundaryCondition(num_fields={len(self._terms)})"
 
 
-def create_shear_load(
-    boundary: "PatchBoundary",
-    Q: float,
-    quadrature: "QuadratureRule | None" = None,
-) -> LoadBoundaryCondition:
-    """Constant transverse shear Q_bar prescribed on a Neumann edge.
-
-    Conjugate to the transverse displacement ``w``; works for both
-    Kirchhoff-Love and Reissner-Mindlin elements.
-    """
-    return LoadBoundaryCondition(boundary, quadrature).add("w", float(Q))
-
-
-def create_load_boundary_from_function(
-    boundary: "PatchBoundary",
-    field: "FieldName | _pyck.BoundaryField",
-    fn: Callable[[npt.NDArray[np.floating]], npt.NDArray[np.floating]],
-    quadrature: "QuadratureRule | None" = None,
-) -> LoadBoundaryCondition:
-    """Spatially-varying traction sampled from ``fn`` at boundary qpts.
-
-    ``fn`` receives an (N, 3) physical-coordinate array and must return
-    an (N,) array of traction values.
-    """
-    rule = quadrature if quadrature is not None else boundary.quadrature
-    x_phys = np.asarray(
-        _pyck.eval_physical_points(boundary._cpp_object, rule._cpp_object)
-    )
-    values = np.asarray(fn(x_phys), dtype=float).ravel()
-    return LoadBoundaryCondition(boundary, rule).add(field, values)

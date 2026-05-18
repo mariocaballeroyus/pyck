@@ -92,11 +92,3 @@ TimoshenkoBeam2p = BeamTimoshenko2p
 
 
 # Factory functions
-def create_euler_bernoulli_beam(material: SlenderBeam1d) -> BeamEulerBernoulli1p:
-    """Create a :class:`BeamEulerBernoulli1p` element."""
-    return BeamEulerBernoulli1p(material)
-
-
-def create_timoshenko_beam(material: SlenderBeam1d) -> BeamTimoshenko2p:
-    """Create a :class:`BeamTimoshenko2p` element."""
-    return BeamTimoshenko2p(material)

@@ -29,15 +29,15 @@ CurveDerivs metric_derivs(const BasisDerivs<double, 1>& basis,
                           IntrinsicGeometry<double, 1>& local,
                           Index q)
 {
-    const double g11      = local.g[0][0](q);
+    const double g11      = local.g(0, 0)(q);
     const double sqrt_g11 = std::sqrt(g11);
     const double g11_15   = g11 * sqrt_g11;
     local.compute_christoffels();
     const auto& chr = local.chr;
-    const double Gamma    = chr.Gamma[0][0][0](q);
+    const double Gamma    = chr.Gamma(0, 0, 0)(q);
 
-    const double a11_dot_a11 = local.a_d1[0][0].row(q).squaredNorm();
-    const double a1_dot_a111 = local.a[0].row(q).dot(local.a_d2[0][0][0].row(q));
+    const double a11_dot_a11 = local.a_d1(0, 0).row(q).squaredNorm();
+    const double a1_dot_a111 = local.a(0).row(q).dot(local.a_d2(0, 0, 0).row(q));
     const double Gamma_u     = (a11_dot_a11 + a1_dot_a111) / g11 - 2.0 * Gamma * Gamma;
 
     CurveDerivs d;

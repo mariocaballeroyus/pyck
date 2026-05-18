@@ -31,8 +31,8 @@ PlateReissnerMindlinDispl3p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
 
     for (Index q = 0; q < Q; ++q)
     {
-        const T Gam1_11 = ig.chr.Gamma[0][0][0](q), Gam1_12 = ig.chr.Gamma[0][0][1](q), Gam1_22 = ig.chr.Gamma[0][1][1](q);
-        const T Gam2_11 = ig.chr.Gamma[1][0][0](q), Gam2_12 = ig.chr.Gamma[1][0][1](q), Gam2_22 = ig.chr.Gamma[1][1][1](q);
+        const T Gam1_11 = ig.chr.Gamma(0, 0, 0)(q), Gam1_12 = ig.chr.Gamma(0, 0, 1)(q), Gam1_22 = ig.chr.Gamma(0, 1, 1)(q);
+        const T Gam2_11 = ig.chr.Gamma(1, 0, 0)(q), Gam2_12 = ig.chr.Gamma(1, 0, 1)(q), Gam2_22 = ig.chr.Gamma(1, 1, 1)(q);
         const auto N11 = basis.N_d2(0, 0).row(q) - Gam1_11 * basis.N_d1(0).row(q) - Gam2_11 * basis.N_d1(1).row(q);
         const auto N12 = basis.N_d2(0, 1).row(q) - Gam1_12 * basis.N_d1(0).row(q) - Gam2_12 * basis.N_d1(1).row(q);
         const auto N22 = basis.N_d2(1, 1).row(q) - Gam1_22 * basis.N_d1(0).row(q) - Gam2_22 * basis.N_d1(1).row(q);

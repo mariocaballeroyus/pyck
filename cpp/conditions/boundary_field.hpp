@@ -61,8 +61,8 @@ covariant_components(const ColMatrix<T, 3>& v,
     const Index Q = v.rows();
     Vector<T> v_cov_1(Q), v_cov_2(Q);
     for (Index q = 0; q < Q; ++q) {
-        v_cov_1(q) = v.row(q).dot(local.a[0].row(q));
-        v_cov_2(q) = v.row(q).dot(local.a[1].row(q));
+        v_cov_1(q) = v.row(q).dot(local.a(0).row(q));
+        v_cov_2(q) = v.row(q).dot(local.a(1).row(q));
     }
     return {std::move(v_cov_1), std::move(v_cov_2)};
 }
@@ -79,9 +79,9 @@ contravariant_components(const ColMatrix<T, 3>& v,
     const Index Q = v.rows();
     Vector<T> v_up_1(Q), v_up_2(Q);
     for (Index q = 0; q < Q; ++q) {
-        const T gi11 = local.g_inv[0][0](q);
-        const T gi12 = local.g_inv[0][1](q);
-        const T gi22 = local.g_inv[1][1](q);
+        const T gi11 = local.g_inv(0, 0)(q);
+        const T gi12 = local.g_inv(0, 1)(q);
+        const T gi22 = local.g_inv(1, 1)(q);
         v_up_1(q) = gi11 * v_cov_1(q) + gi12 * v_cov_2(q);
         v_up_2(q) = gi12 * v_cov_1(q) + gi22 * v_cov_2(q);
     }
@@ -249,8 +249,8 @@ public:
         Matrix<T> C = Matrix<T>::Zero(Q, n * ndof);
         const Index slot = static_cast<Index>(dof_index_);
         for (Index q = 0; q < Q; ++q) {
-            const T G1_11 = parent_ig.chr.Gamma[0][0][0](q), G1_12 = parent_ig.chr.Gamma[0][0][1](q), G1_22 = parent_ig.chr.Gamma[0][1][1](q);
-            const T G2_11 = parent_ig.chr.Gamma[1][0][0](q), G2_12 = parent_ig.chr.Gamma[1][0][1](q), G2_22 = parent_ig.chr.Gamma[1][1][1](q);
+            const T G1_11 = parent_ig.chr.Gamma(0, 0, 0)(q), G1_12 = parent_ig.chr.Gamma(0, 0, 1)(q), G1_22 = parent_ig.chr.Gamma(0, 1, 1)(q);
+            const T G2_11 = parent_ig.chr.Gamma(1, 0, 0)(q), G2_12 = parent_ig.chr.Gamma(1, 0, 1)(q), G2_22 = parent_ig.chr.Gamma(1, 1, 1)(q);
             const T n1 = n_up_1(q);
             const T n2 = n_up_2(q);
             const T n1n1 = n1 * n1;
@@ -357,7 +357,7 @@ public:
             *boundary.parent(), parent_basis, parent_ig);
         const ColMatrix<T, 3> n =
             boundary.eval_outward_normal(boundary_local, parent_ig);
-        const ExtrinsicGeometry<T, 2, 3> eg(parent_ig);
+        const ExtrinsicGeometry<T, 2> eg(parent_ig);
         const ColMatrix<T, 3>& a_3 = eg.n;
         const ColMatrix<T, 3> s = detail::surface_tangent(n, a_3);
         const auto [s_up_1, s_up_2] =
@@ -483,7 +483,7 @@ public:
             *boundary.parent(), parent_basis, parent_ig);
         const ColMatrix<T, 3> n =
             boundary.eval_outward_normal(boundary_local, parent_ig);
-        const ExtrinsicGeometry<T, 2, 3> eg(parent_ig);
+        const ExtrinsicGeometry<T, 2> eg(parent_ig);
         const ColMatrix<T, 3>& a_3 = eg.n;
         const ColMatrix<T, 3> s = detail::surface_tangent(n, a_3);
         const auto [n_cov_1, n_cov_2] =

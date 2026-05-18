@@ -192,11 +192,8 @@ class LinearElasticProblem:
         ignored: constraints act on the global DOF vector directly.
         """
         del patch  # constraints are global; argument retained for API stability
-        if isinstance(constraint, DirectConstraint):
-            self._cpp_object.add_direct_constraint(constraint._cpp_object)
-        else:
-            cpp = getattr(constraint, "_cpp_object", constraint)
-            self._cpp_object.add_constraint(cpp)
+        cpp = getattr(constraint, "_cpp_object", constraint)
+        self._cpp_object.add_constraint(cpp)
 
     def assemble(self) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
         """Assemble the global system.
@@ -216,24 +213,3 @@ class LinearElasticProblem:
         return f"LinearElasticProblem(patches=[{patches}])"
 
 
-def create_linear_elastic_problem(
-    patches: Sequence[Patch],
-    element: Element,
-    quadrature: QuadratureRule | None = None,
-) -> LinearElasticProblem:
-    """Create a :class:`LinearElasticProblem` assembler.
-
-    Parameters
-    ----------
-    patches : Sequence[Patch]
-        Geometry on which the problem is defined.
-    element : Element
-        Finite element formulation.
-    quadrature : QuadratureRule, optional
-        Quadrature rule for assembly. Defaults to ``patches[0].quadrature``.
-
-    Returns
-    -------
-    LinearElasticProblem
-    """
-    return LinearElasticProblem(patches, element, quadrature)
