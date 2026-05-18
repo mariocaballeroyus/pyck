@@ -7,7 +7,7 @@
 #include <cstddef>
 
 #include "element.hpp"
-#include "basis_derivs.hpp"
+#include "basis_values.hpp"
 #include "intrinsic_geometry.hpp"
 #include "patch.hpp"
 #include "beam_euler_bernoulli_1p.hpp"
@@ -32,7 +32,7 @@ namespace {
 template <std::floating_point T, std::size_t d>
 using ShapeMatrixFn = Matrix<T> (Element<T, d>::*)(
     const Patch<T, d>&,
-    const BasisDerivs<T, d>&,
+    const BasisValues<T, d>&,
     const IntrinsicGeometry<T, d>&) const;
 
 /**

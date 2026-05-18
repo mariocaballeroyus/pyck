@@ -6,7 +6,7 @@
 
 #include "patch.hpp"
 #include "patch_boundary.hpp"
-#include "basis_derivs.hpp"
+#include "basis_values.hpp"
 #include "intrinsic_geometry.hpp"
 #include "extrinsic_geometry.hpp"
 #include "physical_points.hpp"
@@ -46,7 +46,13 @@ TEST_CASE("Patch<double, 2>: Flat Rectangular Plate", "[geometry][surface]") {
                0.5, 0.5,
                1.0, 1.0;
         const auto b = eval_basis(surf, pts, elem_idx, 0);
-        const auto phys = b.N() * act;
+        ColMatrix<double, 3> phys(b.Q(), 3);
+        for (Index q = 0; q < b.Q(); ++q) {
+            auto slab0 = b.data()[0].col(q);
+            Eigen::RowVector3d x_q = Eigen::RowVector3d::Zero();
+            for (Index i = 0; i < b.N(); ++i) x_q.noalias() += slab0(i) * act.row(i);
+            phys.row(q) = x_q;
+        }
 
         CHECK(phys(0, 0) == Approx(0.0).margin(1e-14));
         CHECK(phys(0, 1) == Approx(0.0).margin(1e-14));
@@ -89,12 +95,19 @@ TEST_CASE("Patch<double, 2>: Flat Rectangular Plate", "[geometry][surface]") {
         pts << 0.35, 0.72;
         const auto b = eval_basis(surf, pts, elem_idx, 2);
 
-        CHECK(b.N()   .row(0).sum() == Approx(1.0).margin(1e-14));
-        CHECK(b.N_d1(0) .row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_d1(1) .row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_d2(0, 0).row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_d2(0, 1).row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_d2(1, 1).row(0).sum() == Approx(0.0).margin(1e-14));
+        auto sum_at_0 = [&](Index k_order, Index packed, Index n_k) {
+            auto slab = b.data()[k_order].col(0);
+            double s = 0.0;
+            for (Index i = 0; i < b.N(); ++i) s += slab(i * n_k + packed);
+            return s;
+        };
+
+        CHECK(sum_at_0(0, 0, 1) == Approx(1.0).margin(1e-14));   // N
+        CHECK(sum_at_0(1, 0, 2) == Approx(0.0).margin(1e-14));   // ∂u N
+        CHECK(sum_at_0(1, 1, 2) == Approx(0.0).margin(1e-14));   // ∂v N
+        CHECK(sum_at_0(2, 0, 3) == Approx(0.0).margin(1e-14));   // ∂uu N (Voigt: (0,0))
+        CHECK(sum_at_0(2, 2, 3) == Approx(0.0).margin(1e-14));   // ∂uv N (Voigt: (0,1))
+        CHECK(sum_at_0(2, 1, 3) == Approx(0.0).margin(1e-14));   // ∂vv N (Voigt: (1,1))
     }
 }
 
@@ -225,12 +238,18 @@ TEST_CASE("Patch<double, 2>: Quadratic Basis — Partition of Unity",
             const auto b     = eval_basis(surf, pts, elem_idx, 3);
             IntrinsicGeometry local(b, act);
 
-            CHECK(b.N()   .row(0).sum() == Approx(1.0).margin(1e-14));
-            CHECK(b.N_d1(0) .row(0).sum() == Approx(0.0).margin(1e-12));
-            CHECK(b.N_d1(1) .row(0).sum() == Approx(0.0).margin(1e-12));
-            CHECK(b.N_d2(0, 0).row(0).sum() == Approx(0.0).margin(1e-11));
-            CHECK(b.N_d2(0, 1).row(0).sum() == Approx(0.0).margin(1e-11));
-            CHECK(b.N_d2(1, 1).row(0).sum() == Approx(0.0).margin(1e-11));
+            auto sum_at_0 = [&](Index k_order, Index packed, Index n_k) {
+                auto slab = b.data()[k_order].col(0);
+                double s = 0.0;
+                for (Index i = 0; i < b.N(); ++i) s += slab(i * n_k + packed);
+                return s;
+            };
+            CHECK(sum_at_0(0, 0, 1) == Approx(1.0).margin(1e-14));
+            CHECK(sum_at_0(1, 0, 2) == Approx(0.0).margin(1e-12));
+            CHECK(sum_at_0(1, 1, 2) == Approx(0.0).margin(1e-12));
+            CHECK(sum_at_0(2, 0, 3) == Approx(0.0).margin(1e-11));
+            CHECK(sum_at_0(2, 2, 3) == Approx(0.0).margin(1e-11));
+            CHECK(sum_at_0(2, 1, 3) == Approx(0.0).margin(1e-11));
             CHECK(local.jac(0) > 0.0);
         }
     }

@@ -41,10 +41,10 @@ public:
     virtual Matrix<T> evaluate(const Element<T, 2>& element,
                                const PatchBoundary<T, 2>& boundary,
                                Index boundary_span,
-                               const BasisDerivs<T, 1>& boundary_basis,
+                               const BasisValues<T, 1>& boundary_basis,
                                const IntrinsicGeometry<T, 1>& boundary_local,
                                Index parent_flat_span,
-                               const BasisDerivs<T, 2>& parent_basis,
+                               const BasisValues<T, 2>& parent_basis,
                                const IntrinsicGeometry<T, 2>& parent_ig) const = 0;
 };
 
@@ -127,21 +127,23 @@ public:
         const Element<T, 2>& element,
         const PatchBoundary<T, 2>& /*boundary*/,
         Index /*boundary_span*/,
-        const BasisDerivs<T, 1>& /*boundary_basis*/,
+        const BasisValues<T, 1>& /*boundary_basis*/,
         const IntrinsicGeometry<T, 1>& /*boundary_local*/,
         Index /*parent_flat_span*/,
-        const BasisDerivs<T, 2>& parent_basis,
+        const BasisValues<T, 2>& parent_basis,
         const IntrinsicGeometry<T, 2>& /*parent_ig*/) const override
     {
         const Index ndof = static_cast<Index>(element.num_node_dofs());
-        const auto N = parent_basis.N();
-        const Index Q = N.rows();
-        const Index n = N.cols();
-
-        Matrix<T> C = Matrix<T>::Zero(Q, n * ndof);
+        const Index Q = parent_basis.Q();
+        const Index N = parent_basis.N();
         const Index slot = static_cast<Index>(dof_index_);
-        for (Index i = 0; i < n; ++i) {
-            C.col(i * ndof + slot) = N.col(i);
+
+        Matrix<T> C = Matrix<T>::Zero(Q, N * ndof);
+        for (Index q = 0; q < Q; ++q) {
+            auto slab0 = parent_basis.data()[0].col(q);
+            for (Index i = 0; i < N; ++i) {
+                C(q, i * ndof + slot) = slab0(i);
+            }
         }
         return C;
     }
@@ -172,29 +174,31 @@ public:
         const Element<T, 2>& element,
         const PatchBoundary<T, 2>& boundary,
         Index /*boundary_span*/,
-        const BasisDerivs<T, 1>& /*boundary_basis*/,
+        const BasisValues<T, 1>& /*boundary_basis*/,
         const IntrinsicGeometry<T, 1>& boundary_local,
         Index /*parent_flat_span*/,
-        const BasisDerivs<T, 2>& parent_basis,
+        const BasisValues<T, 2>& parent_basis,
         const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
         const Index ndof = static_cast<Index>(element.num_node_dofs());
-        const auto N_u = parent_basis.N_d1(0);
-        const auto N_v = parent_basis.N_d1(1);
-        const Index Q = N_u.rows();
-        const Index n = N_u.cols();
+        const Index Q = parent_basis.Q();
+        const Index N = parent_basis.N();
+        const Index slot = static_cast<Index>(dof_index_);
 
         const ColMatrix<T, 3> normal =
             boundary.eval_outward_normal(boundary_local, parent_ig);
         const auto [n_up_1, n_up_2] =
             detail::contravariant_components(normal, parent_ig);
 
-        Matrix<T> C = Matrix<T>::Zero(Q, n * ndof);
-        const Index slot = static_cast<Index>(dof_index_);
+        Matrix<T> C = Matrix<T>::Zero(Q, N * ndof);
         for (Index q = 0; q < Q; ++q) {
-            for (Index i = 0; i < n; ++i) {
-                C(q, i * ndof + slot) =
-                    n_up_1(q) * N_u(q, i) + n_up_2(q) * N_v(q, i);
+            auto slab1 = parent_basis.data()[1].col(q);
+            const T n1 = n_up_1(q);
+            const T n2 = n_up_2(q);
+            for (Index i = 0; i < N; ++i) {
+                const T N_u_i = slab1(i * 2 + 0);
+                const T N_v_i = slab1(i * 2 + 1);
+                C(q, i * ndof + slot) = n1 * N_u_i + n2 * N_v_i;
             }
         }
         return C;
@@ -226,41 +230,47 @@ public:
         const Element<T, 2>& element,
         const PatchBoundary<T, 2>& boundary,
         Index /*boundary_span*/,
-        const BasisDerivs<T, 1>& /*boundary_basis*/,
+        const BasisValues<T, 1>& /*boundary_basis*/,
         const IntrinsicGeometry<T, 1>& boundary_local,
         Index /*parent_flat_span*/,
-        const BasisDerivs<T, 2>& parent_basis,
+        const BasisValues<T, 2>& parent_basis,
         const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
         const Index ndof = static_cast<Index>(element.num_node_dofs());
-        const auto N_u  = parent_basis.N_d1(0);
-        const auto N_v  = parent_basis.N_d1(1);
-        const auto N_uu = parent_basis.N_d2(0, 0);
-        const auto N_uv = parent_basis.N_d2(0, 1);
-        const auto N_vv = parent_basis.N_d2(1, 1);
-        const Index Q = N_uu.rows();
-        const Index n = N_uu.cols();
+        const Index Q = parent_basis.Q();
+        const Index N = parent_basis.N();
+        const Index slot = static_cast<Index>(dof_index_);
 
         const ColMatrix<T, 3> normal =
             boundary.eval_outward_normal(boundary_local, parent_ig);
         const auto [n_up_1, n_up_2] =
             detail::contravariant_components(normal, parent_ig);
 
-        Matrix<T> C = Matrix<T>::Zero(Q, n * ndof);
-        const Index slot = static_cast<Index>(dof_index_);
+        Matrix<T> C = Matrix<T>::Zero(Q, N * ndof);
         for (Index q = 0; q < Q; ++q) {
-            const T G1_11 = parent_ig.chr.Gamma(0, 0, 0)(q), G1_12 = parent_ig.chr.Gamma(0, 0, 1)(q), G1_22 = parent_ig.chr.Gamma(0, 1, 1)(q);
-            const T G2_11 = parent_ig.chr.Gamma(1, 0, 0)(q), G2_12 = parent_ig.chr.Gamma(1, 0, 1)(q), G2_22 = parent_ig.chr.Gamma(1, 1, 1)(q);
+            auto slab1 = parent_basis.data()[1].col(q);
+            auto slab2 = parent_basis.data()[2].col(q);
+            const T G1_11 = parent_ig.chr.Gamma(0, 0, 0)(q);
+            const T G1_12 = parent_ig.chr.Gamma(0, 0, 1)(q);
+            const T G1_22 = parent_ig.chr.Gamma(0, 1, 1)(q);
+            const T G2_11 = parent_ig.chr.Gamma(1, 0, 0)(q);
+            const T G2_12 = parent_ig.chr.Gamma(1, 0, 1)(q);
+            const T G2_22 = parent_ig.chr.Gamma(1, 1, 1)(q);
             const T n1 = n_up_1(q);
             const T n2 = n_up_2(q);
             const T n1n1 = n1 * n1;
             const T n2n2 = n2 * n2;
             const T two_n1n2 = T(2) * n1 * n2;
-            for (Index i = 0; i < n; ++i) {
-                // Covariant Hessian rows: N_{|αβ} = N_{,αβ} − Γ^γ_{αβ} N_{,γ}.
-                const T H11 = N_uu(q, i) - G1_11 * N_u(q, i) - G2_11 * N_v(q, i);
-                const T H12 = N_uv(q, i) - G1_12 * N_u(q, i) - G2_12 * N_v(q, i);
-                const T H22 = N_vv(q, i) - G1_22 * N_u(q, i) - G2_22 * N_v(q, i);
+            for (Index i = 0; i < N; ++i) {
+                const T N_u_i  = slab1(i * 2 + 0);
+                const T N_v_i  = slab1(i * 2 + 1);
+                const T N_uu_i = slab2(i * 3 + 0);
+                const T N_vv_i = slab2(i * 3 + 1);
+                const T N_uv_i = slab2(i * 3 + 2);
+                // Covariant Hessian: N_{|αβ} = N_{,αβ} − Γ^γ_{αβ} N_{,γ}.
+                const T H11 = N_uu_i - G1_11 * N_u_i - G2_11 * N_v_i;
+                const T H12 = N_uv_i - G1_12 * N_u_i - G2_12 * N_v_i;
+                const T H22 = N_vv_i - G1_22 * N_u_i - G2_22 * N_v_i;
                 C(q, i * ndof + slot) = n1n1 * H11 + two_n1n2 * H12 + n2n2 * H22;
             }
         }
@@ -282,10 +292,10 @@ public:
     Matrix<T> evaluate(const Element<T, 2>& element,
                        const PatchBoundary<T, 2>& boundary,
                        Index /*boundary_span*/,
-                       const BasisDerivs<T, 1>& /*boundary_basis*/,
+                       const BasisValues<T, 1>& /*boundary_basis*/,
                        const IntrinsicGeometry<T, 1>& /*boundary_local*/,
                        Index /*parent_flat_span*/,
-                       const BasisDerivs<T, 2>& parent_basis,
+                       const BasisValues<T, 2>& parent_basis,
                        const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
         return element.displacement_shape_matrix(*boundary.parent(),
@@ -309,10 +319,10 @@ public:
         const Element<T, 2>& element,
         const PatchBoundary<T, 2>& boundary,
         Index /*boundary_span*/,
-        const BasisDerivs<T, 1>& /*boundary_basis*/,
+        const BasisValues<T, 1>& /*boundary_basis*/,
         const IntrinsicGeometry<T, 1>& boundary_local,
         Index /*parent_flat_span*/,
-        const BasisDerivs<T, 2>& parent_basis,
+        const BasisValues<T, 2>& parent_basis,
         const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
         const Matrix<T> Nrot = element.rotation_shape_matrix(
@@ -347,10 +357,10 @@ public:
         const Element<T, 2>& element,
         const PatchBoundary<T, 2>& boundary,
         Index /*boundary_span*/,
-        const BasisDerivs<T, 1>& /*boundary_basis*/,
+        const BasisValues<T, 1>& /*boundary_basis*/,
         const IntrinsicGeometry<T, 1>& boundary_local,
         Index /*parent_flat_span*/,
-        const BasisDerivs<T, 2>& parent_basis,
+        const BasisValues<T, 2>& parent_basis,
         const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
         const Matrix<T> Nrot = element.rotation_shape_matrix(
@@ -391,10 +401,10 @@ public:
         const Element<T, 2>& element,
         const PatchBoundary<T, 2>& boundary,
         Index /*boundary_span*/,
-        const BasisDerivs<T, 1>& /*boundary_basis*/,
+        const BasisValues<T, 1>& /*boundary_basis*/,
         const IntrinsicGeometry<T, 1>& boundary_local,
         Index /*parent_flat_span*/,
-        const BasisDerivs<T, 2>& parent_basis,
+        const BasisValues<T, 2>& parent_basis,
         const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
         const Matrix<T> Nsigma = element.stress_matrix(
@@ -429,10 +439,10 @@ public:
         const Element<T, 2>& element,
         const PatchBoundary<T, 2>& boundary,
         Index /*boundary_span*/,
-        const BasisDerivs<T, 1>& /*boundary_basis*/,
+        const BasisValues<T, 1>& /*boundary_basis*/,
         const IntrinsicGeometry<T, 1>& boundary_local,
         Index /*parent_flat_span*/,
-        const BasisDerivs<T, 2>& parent_basis,
+        const BasisValues<T, 2>& parent_basis,
         const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
         const Matrix<T> Nsigma = element.stress_matrix(
@@ -473,10 +483,10 @@ public:
         const Element<T, 2>& element,
         const PatchBoundary<T, 2>& boundary,
         Index /*boundary_span*/,
-        const BasisDerivs<T, 1>& /*boundary_basis*/,
+        const BasisValues<T, 1>& /*boundary_basis*/,
         const IntrinsicGeometry<T, 1>& boundary_local,
         Index /*parent_flat_span*/,
-        const BasisDerivs<T, 2>& parent_basis,
+        const BasisValues<T, 2>& parent_basis,
         const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
         const Matrix<T> Nsigma = element.stress_matrix(

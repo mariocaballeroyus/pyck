@@ -41,7 +41,7 @@ public:
      * @return B-matrix.
      */
     Matrix<T> strain_matrix(const Patch<T, 1>& patch,
-                            const BasisDerivs<T, 1>& basis,
+                            const BasisValues<T, 1>& basis,
                             const IntrinsicGeometry<T, 1>& ig) const override;
 
     /**
@@ -65,7 +65,7 @@ public:
      * @return Displacement N-matrix.
      */
     Matrix<T> displacement_shape_matrix(const Patch<T, 1>& patch,
-                                        const BasisDerivs<T, 1>& basis,
+                                        const BasisValues<T, 1>& basis,
                                         const IntrinsicGeometry<T, 1>& ig) const override;
 
     /**
@@ -78,7 +78,7 @@ public:
      * @return Rotation N-matrix.
      */
     Matrix<T> rotation_shape_matrix(const Patch<T, 1>& patch,
-                                    const BasisDerivs<T, 1>& basis,
+                                    const BasisValues<T, 1>& basis,
                                     const IntrinsicGeometry<T, 1>& ig) const override;
 
     // === Getters ====================================================================

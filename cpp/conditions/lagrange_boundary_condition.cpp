@@ -2,7 +2,7 @@
 
 #include "patch_boundary.hpp"
 #include "patch.hpp"
-#include "basis_derivs.hpp"
+#include "basis_values.hpp"
 #include "intrinsic_geometry.hpp"
 
 #include <cmath>
@@ -121,10 +121,9 @@ LagrangeBoundaryCondition<T, d>::apply(Matrix<T>& stiffness, Vector<T>& load,
             for (Index q = 0; q < Q; ++q)
             {
                 const T dGamma = boundary_local.jac(q) * mapped_weights(q);
-                C_local.noalias() += dGamma
-                    * boundary_basis.N().row(q).transpose() * C.row(q);
-                G_local.noalias() += dGamma * term.value
-                    * boundary_basis.N().row(q).transpose();
+                auto slab0 = boundary_basis.data()[0].col(q);
+                C_local.noalias() += dGamma * slab0 * C.row(q);
+                G_local.noalias() += dGamma * term.value * slab0;
             }
 
             const Index multiplier_base = layout.block_base(term.block_id);

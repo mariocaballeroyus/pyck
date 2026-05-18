@@ -1,7 +1,7 @@
 #include "lagrange_domain_condition.hpp"
 
 #include "patch.hpp"
-#include "basis_derivs.hpp"
+#include "basis_values.hpp"
 #include "intrinsic_geometry.hpp"
 
 #include <array>
@@ -95,8 +95,7 @@ void LagrangeDomainCondition<T, d>::apply(
         auto basis   = eval_basis(patch_, mapped_pts, elem_idx, req_order);
         auto act_pts = patch_.active_control_pts(elem_idx);
         IntrinsicGeometry local(basis, act_pts);
-        const auto N = basis.N();   // Q × n_basis
-        const Index n_basis = N.cols();
+        const Index n_basis = basis.N();
 
         auto elem_cps = patch_.dof_mapper().get_element_dofs(elem_idx);
         std::vector<Index> elem_cps_v(elem_cps.begin(), elem_cps.end());
@@ -115,13 +114,18 @@ void LagrangeDomainCondition<T, d>::apply(
             const Index slot       = static_cast<Index>(term.dof_index);
             const Index lambda_row = layout.block_base(term.block_id);
 
-            // C_i = ∫ N_i dω over this element.  Scattered into the global
+            // C_i = ∫ N_i dω over this element. Scattered into the global
             // saddle-point coupling (symmetric).
-            for (Index i = 0; i < n_basis; ++i) {
-                T C_i = T(0);
-                for (Index q = 0; q < Q; ++q) {
-                    C_i += mapped_weights(q) * local.jac(q) * N(q, i);
+            Vector<T> C = Vector<T>::Zero(n_basis);
+            for (Index q = 0; q < Q; ++q) {
+                auto slab0 = basis.data()[0].col(q);
+                const T dV = mapped_weights(q) * local.jac(q);
+                for (Index i = 0; i < n_basis; ++i) {
+                    C(i) += dV * slab0(i);
                 }
+            }
+            for (Index i = 0; i < n_basis; ++i) {
+                const T C_i = C(i);
                 if (C_i == T(0)) continue;
                 const Index col = primal_dofs[i * ndof + slot];
                 stiffness(lambda_row, col) += C_i;

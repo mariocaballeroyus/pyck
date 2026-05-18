@@ -1,21 +1,18 @@
 #include "shell_reissner_mindlin_5p.hpp"
 #include "patch.hpp"
-#include "basis_derivs.hpp"
+#include "basis_values.hpp"
 #include "intrinsic_geometry.hpp"
 #include "extrinsic_geometry.hpp"
 
 namespace pyck
 {
 
-// === Constructors ===================================================================
-
 template <std::floating_point T>
 ShellReissnerMindlin5p<T>::ShellReissnerMindlin5p(Ptr<PlaneStress2d<T>> material)
     : material_(material)
 {
     if (!material_) {
-        throw std::invalid_argument("ShellReissnerMindlin5p: "
-                                    "material is null.");
+        throw std::invalid_argument("ShellReissnerMindlin5p: material is null.");
     }
 }
 
@@ -24,23 +21,21 @@ ShellReissnerMindlin5p<T>::ShellReissnerMindlin5p(Ptr<PlaneStress2d<T>> material
 template <std::floating_point T>
 Matrix<T>
 ShellReissnerMindlin5p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
-                                         const BasisDerivs<T, 2>& basis,
+                                         const BasisValues<T, 2>& basis,
                                          const IntrinsicGeometry<T, 2>& ig) const
 {
     const ExtrinsicGeometry<T, 2> eg(ig);
     const ColMatrix<T, 3>& a_3 = eg.n;
 
-    const auto N    = basis.N();
-    const auto N_u  = basis.N_d1(0);
-    const auto N_v  = basis.N_d1(1);
-
-    const Index Q = N.rows();
-    const Index n = N.cols();
-    Matrix<T> B = Matrix<T>::Zero(8 * Q, 5 * n);
-
+    const Index Q = basis.Q();
+    const Index N = basis.N();
+    Matrix<T> B = Matrix<T>::Zero(8 * Q, 5 * N);
 
     for (Index q = 0; q < Q; ++q)
     {
+        auto slab0 = basis.data()[0].col(q);
+        auto slab1 = basis.data()[1].col(q);
+
         const auto a1_q = ig.a(0).row(q);
         const auto a2_q = ig.a(1).row(q);
         const auto a3_q = a_3.row(q);
@@ -52,59 +47,50 @@ ShellReissnerMindlin5p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
         const T Gam2_12 = ig.chr.Gamma(1, 0, 1)(q);
         const T Gam2_22 = ig.chr.Gamma(1, 1, 1)(q);
 
-        for (Index i = 0; i < n; ++i)
+        for (Index i = 0; i < N; ++i)
         {
-            const T Ni   = N  (q, i);
-            const T Ni_u = N_u(q, i);
-            const T Ni_v = N_v(q, i);
+            const T N_i   = slab0(i);
+            const T N_u_i = slab1(i * 2 + 0);
+            const T N_v_i = slab1(i * 2 + 1);
 
-            // Membrane
-            // B_m = [ N_{i|1} (a_1)_x   N_{i|1} (a_1)_y   N_{i|1} (a_1)_z   0   0 ]
-            //       [ N_{i|2} (a_2)_x   N_{i|2} (a_2)_y   N_{i|2} (a_2)_z   0   0 ]
-            //       [ N_{i|1} (a_2) + N_{i|2} (a_1)                         0   0 ]
-            for (Index k = 0; k < 3; ++k)
-            {
-                B(8 * q    , 5 * i + k) = Ni_u * a1_q(k);
-                B(8 * q + 1, 5 * i + k) = Ni_v * a2_q(k);
-                B(8 * q + 2, 5 * i + k) = Ni_u * a2_q(k) + Ni_v * a1_q(k);
+            // Membrane: B_m
+            for (Index k = 0; k < 3; ++k) {
+                B(8*q,     5*i + k) = N_u_i * a1_q(k);
+                B(8*q + 1, 5*i + k) = N_v_i * a2_q(k);
+                B(8*q + 2, 5*i + k) = N_u_i * a2_q(k) + N_v_i * a1_q(k);
             }
 
-            // Bending and twisting
-            // B_b = [ 0  0  0   N_{i|1} − Γ¹_{11} N_i      −Γ²_{11} N_i            ]
-            //       [ 0  0  0   −Γ¹_{22} N_i               N_{i|2} − Γ²_{22} N_i   ]
-            //       [ 0  0  0   N_{i|2} − 2 Γ¹_{12} N_i    N_{i|1} − 2 Γ²_{12} N_i ]
-            B(8 * q + 3, 5 * i + 3) =  Ni_u - Gam1_11 * Ni;
-            B(8 * q + 3, 5 * i + 4) =       - Gam2_11 * Ni;
-            B(8 * q + 4, 5 * i + 3) =       - Gam1_22 * Ni;
-            B(8 * q + 4, 5 * i + 4) =  Ni_v - Gam2_22 * Ni;
-            B(8 * q + 5, 5 * i + 3) =  Ni_v - T(2) * Gam1_12 * Ni;
-            B(8 * q + 5, 5 * i + 4) =  Ni_u - T(2) * Gam2_12 * Ni;
+            // Bending and twisting: B_b
+            B(8*q + 3, 5*i + 3) =  N_u_i - Gam1_11 * N_i;
+            B(8*q + 3, 5*i + 4) =        - Gam2_11 * N_i;
+            B(8*q + 4, 5*i + 3) =        - Gam1_22 * N_i;
+            B(8*q + 4, 5*i + 4) =  N_v_i - Gam2_22 * N_i;
+            B(8*q + 5, 5*i + 3) =  N_v_i - T(2) * Gam1_12 * N_i;
+            B(8*q + 5, 5*i + 4) =  N_u_i - T(2) * Gam2_12 * N_i;
 
-            // Transverse shear
-            // B_s = [ N_{i|1} (a_3)_x   N_{i|1} (a_3)_y   N_{i|1} (a_3)_z   N_i  0  ]
-            //       [ N_{i|2} (a_3)_x   N_{i|2} (a_3)_y   N_{i|2} (a_3)_z   0   N_i ]
-            for (Index k = 0; k < 3; ++k)
-            {
-                B(8 * q + 6, 5 * i + k) = Ni_u * a3_q(k);
-                B(8 * q + 7, 5 * i + k) = Ni_v * a3_q(k);
+            // Transverse shear: B_s
+            for (Index k = 0; k < 3; ++k) {
+                B(8*q + 6, 5*i + k) = N_u_i * a3_q(k);
+                B(8*q + 7, 5*i + k) = N_v_i * a3_q(k);
             }
-            B(8 * q + 6, 5 * i + 3) = Ni;
-            B(8 * q + 7, 5 * i + 4) = Ni;
+            B(8*q + 6, 5*i + 3) = N_i;
+            B(8*q + 7, 5*i + 4) = N_i;
         }
     }
     return B;
 }
 
 template <std::floating_point T>
-Matrix<T> ShellReissnerMindlin5p<T>::constitutive_matrix(
-    const IntrinsicGeometry<T, 2>& ig, Index q) const
+Matrix<T>
+ShellReissnerMindlin5p<T>::constitutive_matrix(const IntrinsicGeometry<T, 2>& ig,
+                                               Index q) const
 {
     // D = [ D_m  0    0   ]
     //     [ 0    D_b  0   ]
     //     [ 0    0    D_s ]
     const Eigen::Matrix<T, 3, 1> g_inv_q = g_inv_voigt(ig, q);
     const Eigen::Matrix<T, 3, 3> C  = material_->surface_C_voigt(g_inv_q);
-    const T t  = material_->thickness();
+    const T t = material_->thickness();
     const Eigen::Matrix<T, 3, 3> Dm = t * C;
     const Eigen::Matrix<T, 3, 3> Db = (t * t * t / T(12)) * C;
     const Eigen::Matrix<T, 2, 2> Ds = material_->shear_voigt(g_inv_q);
@@ -121,28 +107,25 @@ Matrix<T> ShellReissnerMindlin5p<T>::constitutive_matrix(
 template <std::floating_point T>
 Matrix<T>
 ShellReissnerMindlin5p<T>::displacement_shape_matrix(const Patch<T, 2>& /*patch*/,
-                                                     const BasisDerivs<T, 2>& basis,
+                                                     const BasisValues<T, 2>& basis,
                                                      const IntrinsicGeometry<T, 2>& /*ig*/) const
 {
-    const Index Q = basis.N().rows();
-    const Index n = basis.N().cols();
-    Matrix<T> N_w = Matrix<T>::Zero(Q, 5 * n);
-    Matrix<T> N_psi = Matrix<T>::Zero(2 * Q, 5 * n);
-
+    const Index Q = basis.Q();
+    const Index N = basis.N();
+    Matrix<T> N_w = Matrix<T>::Zero(Q, 5 * N);
     // TODO: implement this
     return N_w;
 }
 
 template <std::floating_point T>
-Matrix<T> 
-ShellReissnerMindlin5p<T>::rotation_shape_matrix(const Patch<T, 2>& /*patch*/, 
-                                                 const BasisDerivs<T, 2>& basis, 
+Matrix<T>
+ShellReissnerMindlin5p<T>::rotation_shape_matrix(const Patch<T, 2>& /*patch*/,
+                                                 const BasisValues<T, 2>& basis,
                                                  const IntrinsicGeometry<T, 2>& /*ig*/) const
 {
-    const Index Q = basis.N().rows();
-    const Index n = basis.N().cols();
-    Matrix<T> N_psi = Matrix<T>::Zero(2 * Q, 5 * n);
-
+    const Index Q = basis.Q();
+    const Index N = basis.N();
+    Matrix<T> N_psi = Matrix<T>::Zero(2 * Q, 5 * N);
     // TODO: implement this
     return N_psi;
 }

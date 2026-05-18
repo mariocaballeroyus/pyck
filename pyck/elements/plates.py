@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import pyck._pyck as _pyck
+from pyck.elements.element import Element
 from pyck.materials import PlaneStress2d, PlaneStressShell
 
 
-class PlateKirchhoffLove1p:
+class PlateKirchhoffLove1p(Element):
     """Kirchhoff-Love thin plate element.
 
     Uses the transverse displacement w as the sole primary variable, 
@@ -21,6 +22,7 @@ class PlateKirchhoffLove1p:
         Plate material model.
     """
     _cpp_object: _pyck.PlateKirchhoffLove1p
+    num_node_dofs: int = 1
 
     def __init__(self, material: PlaneStress2d) -> None:
         self._material = material
@@ -34,7 +36,7 @@ class PlateKirchhoffLove1p:
         return f"PlateKirchhoffLove1p(material={self._material})"
 
 
-class PlateReissnerMindlin1p:
+class PlateReissnerMindlin1p(Element):
     """Rotation-free Reissner-Mindlin plate element.
 
     Uses a bending potential wb as the sole primary variable.
@@ -48,6 +50,7 @@ class PlateReissnerMindlin1p:
     material : PlaneStress2d
         Plate material model.
     """
+    num_node_dofs: int = 1
 
     def __init__(self, material: PlaneStress2d) -> None:
         self._material = material
@@ -61,7 +64,7 @@ class PlateReissnerMindlin1p:
         return f"PlateReissnerMindlin1p(material={self._material})"
 
 
-class PlateReissnerMindlin3p:
+class PlateReissnerMindlin3p(Element):
     """Standard Reissner-Mindlin plate element.
 
     Uses the transverse displacement w, and the rotations phi_x and phi_y 
@@ -75,6 +78,7 @@ class PlateReissnerMindlin3p:
     k_s : float, optional
         Shear correction factor (default 5/6).
     """
+    num_node_dofs: int = 3
 
     def __init__(self, material: PlaneStress2d, k_s: float = 5.0 / 6.0) -> None:
         self._material = material
@@ -93,7 +97,7 @@ class PlateReissnerMindlin3p:
         return f"PlateReissnerMindlin3p(material={self._material}, k_s={self._k_s})"
 
 
-class PlateReissnerMindlinDispl3p:
+class PlateReissnerMindlinDispl3p(Element):
     """Split-displacement Reissner-Mindlin plate element.
 
     Uses one bending displacement field ``w_b`` and two shear displacement
@@ -110,6 +114,7 @@ class PlateReissnerMindlinDispl3p:
     material : PlaneStress2d
         Plate material model.
     """
+    num_node_dofs: int = 3
 
     def __init__(self, material: PlaneStress2d) -> None:
         self._material = material
@@ -125,7 +130,7 @@ class PlateReissnerMindlinDispl3p:
         return f"PlateReissnerMindlinDispl3p(material={self._material})"
 
 
-class PlateReissnerMindlinDispl2p:
+class PlateReissnerMindlinDispl2p(Element):
     """Two-parameter rotation-free Reissner-Mindlin plate element.
 
     Uses a bending displacement field ``w_b`` and a Helmholtz scalar
@@ -145,6 +150,7 @@ class PlateReissnerMindlinDispl2p:
     material : PlaneStress2d
         Plate material model.
     """
+    num_node_dofs: int = 2
 
     def __init__(self, material: PlaneStress2d) -> None:
         self._material = material
@@ -160,7 +166,7 @@ class PlateReissnerMindlinDispl2p:
         return f"PlateReissnerMindlinDispl2p(material={self._material})"
 
 
-class ShellReissnerMindlin5p:
+class ShellReissnerMindlin5p(Element):
     """Reissner-Mindlin 5-parameter shell element.
 
     DOFs per control point:
@@ -174,6 +180,7 @@ class ShellReissnerMindlin5p:
     material : PlaneStressShell
         Shell material model.
     """
+    num_node_dofs: int = 5
 
     def __init__(self, material: PlaneStressShell) -> None:
         self._material = material

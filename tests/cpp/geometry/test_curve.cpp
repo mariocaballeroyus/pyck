@@ -4,7 +4,7 @@
 #include <string>
 
 #include "patch.hpp"
-#include "basis_derivs.hpp"
+#include "basis_values.hpp"
 #include "intrinsic_geometry.hpp"
 #include "bspline.hpp"
 #include "knots.hpp"
@@ -25,7 +25,7 @@ struct CurveDerivs
     Eigen::RowVectorXd N, dN, d2N, d3N;
 };
 
-CurveDerivs metric_derivs(const BasisDerivs<double, 1>& basis,
+CurveDerivs metric_derivs(const BasisValues<double, 1>& basis,
                           IntrinsicGeometry<double, 1>& local,
                           Index q)
 {
@@ -40,13 +40,30 @@ CurveDerivs metric_derivs(const BasisDerivs<double, 1>& basis,
     const double a1_dot_a111 = local.a(0).row(q).dot(local.a_d2(0, 0, 0).row(q));
     const double Gamma_u     = (a11_dot_a11 + a1_dot_a111) / g11 - 2.0 * Gamma * Gamma;
 
+    // For d=1, slabs are N-length (n_k = 1 for all orders): slab(i) is the
+    // value of the requested derivative for basis i at quadrature point q.
+    const Index N_eval = basis.N();
     CurveDerivs d;
-    d.N   = basis.N().row(q);
-    d.dN  = basis.N_d1(0).row(q) / sqrt_g11;
-    d.d2N = (basis.N_d2(0, 0).row(q) - Gamma * basis.N_d1(0).row(q)) / g11;
-    d.d3N = (basis.N_d3(0, 0, 0).row(q)
-             - 3.0 * Gamma * basis.N_d2(0, 0).row(q)
-             + (2.0 * Gamma * Gamma - Gamma_u) * basis.N_d1(0).row(q)) / g11_15;
+    d.N  .resize(N_eval);
+    d.dN .resize(N_eval);
+    d.d2N.resize(N_eval);
+    d.d3N.resize(N_eval);
+    auto slab0 = basis.data()[0].col(q);
+    auto slab1 = basis.data()[1].col(q);
+    auto slab2 = basis.data()[2].col(q);
+    auto slab3 = basis.data()[3].col(q);
+    for (Index i = 0; i < N_eval; ++i) {
+        const double N_i    = slab0(i);
+        const double N_u_i  = slab1(i);
+        const double N_uu_i = slab2(i);
+        const double N_uuu_i = slab3(i);
+        d.N(i)   = N_i;
+        d.dN(i)  = N_u_i / sqrt_g11;
+        d.d2N(i) = (N_uu_i - Gamma * N_u_i) / g11;
+        d.d3N(i) = (N_uuu_i
+                  - 3.0 * Gamma * N_uu_i
+                  + (2.0 * Gamma * Gamma - Gamma_u) * N_u_i) / g11_15;
+    }
     return d;
 }
 

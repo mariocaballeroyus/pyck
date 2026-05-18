@@ -6,7 +6,7 @@
 
 #include "patch.hpp"
 #include "patch_boundary.hpp"
-#include "basis_derivs.hpp"
+#include "basis_values.hpp"
 #include "intrinsic_geometry.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"

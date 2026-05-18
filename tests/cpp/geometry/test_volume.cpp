@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "patch.hpp"
-#include "basis_derivs.hpp"
+#include "basis_values.hpp"
 #include "intrinsic_geometry.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
@@ -125,16 +125,22 @@ TEST_CASE("Patch<double, 3>: Flat Box", "[geometry][volume]")
         pts << 0.35, 0.72, 0.18;
         const auto b = eval_basis(vol, pts, elem_idx, 2);
 
-        CHECK(b.N()   .row(0).sum() == Approx(1.0).margin(1e-14));
-        CHECK(b.N_d1(0) .row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_d1(1) .row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_d1(2) .row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_d2(0, 0).row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_d2(0, 1).row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_d2(0, 2).row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_d2(1, 1).row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_d2(1, 2).row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_d2(2, 2).row(0).sum() == Approx(0.0).margin(1e-14));
+        auto sum_at_0 = [&](Index k_order, Index packed, Index n_k) {
+            auto slab = b.data()[k_order].col(0);
+            double s = 0.0;
+            for (Index i = 0; i < b.N(); ++i) s += slab(i * n_k + packed);
+            return s;
+        };
+        CHECK(sum_at_0(0, 0, 1) == Approx(1.0).margin(1e-14));   // N
+        CHECK(sum_at_0(1, 0, 3) == Approx(0.0).margin(1e-14));   // ∂u
+        CHECK(sum_at_0(1, 1, 3) == Approx(0.0).margin(1e-14));   // ∂v
+        CHECK(sum_at_0(1, 2, 3) == Approx(0.0).margin(1e-14));   // ∂w
+        CHECK(sum_at_0(2, 0, 6) == Approx(0.0).margin(1e-14));   // ∂uu (Voigt: (0,0))
+        CHECK(sum_at_0(2, 3, 6) == Approx(0.0).margin(1e-14));   // ∂uv (Voigt: (0,1))
+        CHECK(sum_at_0(2, 4, 6) == Approx(0.0).margin(1e-14));   // ∂uw (Voigt: (0,2))
+        CHECK(sum_at_0(2, 1, 6) == Approx(0.0).margin(1e-14));   // ∂vv (Voigt: (1,1))
+        CHECK(sum_at_0(2, 5, 6) == Approx(0.0).margin(1e-14));   // ∂vw (Voigt: (1,2))
+        CHECK(sum_at_0(2, 2, 6) == Approx(0.0).margin(1e-14));   // ∂ww (Voigt: (2,2))
     }
 }
 

@@ -11,7 +11,7 @@
 #include "basis.hpp"
 #include "tensor.hpp"
 #include "bspline.hpp"
-#include "basis_derivs.hpp"
+#include "basis_values.hpp"
 #include "dof_mapper.hpp"
 #include "../types.hpp"
 
@@ -212,7 +212,7 @@ protected:
  * @param order       Highest total derivative order (0, 1, 2 or 3).
  */
 template <std::floating_point T, std::size_t d>
-inline BasisDerivs<T, d>
+inline BasisValues<T, d>
 eval_basis(const Patch<T, d>& patch,
            const std::type_identity_t<ColMatrix<T, d>>& eval_coords,
            Index span_idx,

@@ -5,7 +5,7 @@
 #include <vector>
 
 #include "patch.hpp"
-#include "basis_derivs.hpp"
+#include "basis_values.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
 #include "knots.hpp"
@@ -148,7 +148,7 @@ TEST_CASE("LoadBoundaryCondition: cantilever tip deflection matches closed form"
     for (std::size_t i = 0; i < active.size(); ++i) {
         w_active(i) = u(active[i] * 3 + 0);
     }
-    const double w_num = (b.N() * w_active)(0, 0);
+    const double w_num = b.data()[0].col(0).dot(w_active);
 
     // Free-edge plate strip cantilever: EI = E W h^3 / 12.
     //   total tip force = Q * W, w_tip = (Q W) L^3 / (3 E I) = 4 Q L^3 / (E h^3).

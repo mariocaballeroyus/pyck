@@ -2,7 +2,7 @@
 #define PYCK_PHYSICAL_POINTS_HPP
 
 #include "patch.hpp"
-#include "basis_derivs.hpp"
+#include "basis_values.hpp"
 #include "quadrature.hpp"
 #include "../types.hpp"
 

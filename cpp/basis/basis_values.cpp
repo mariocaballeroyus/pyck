@@ -1,4 +1,4 @@
-#include "basis_derivs.hpp"
+#include "basis_values.hpp"
 
 #include <stdexcept>
 
@@ -6,7 +6,7 @@ namespace pyck
 {
 
 template <std::floating_point T, std::size_t d>
-BasisDerivs<T, d>
+BasisValues<T, d>
 eval_basis(const TensorProduct<T, d>& tp,
            const std::type_identity_t<ColMatrix<T, d>>& coords,
            const std::array<Index, d>& spans,
@@ -35,6 +35,8 @@ eval_basis(const TensorProduct<T, d>& tp,
     {
         const auto dirs_list = enumerate_direction_indices<d>(k);
         const Index n_k = static_cast<Index>(dirs_list.size());
+        // Shape (K · n_k) × Q col-major. Row `b · n_k + m` and column q hold
+        // ∂_m B_b(u_q). `.col(q)` is one contiguous slab of all derivatives at q.
         per_order[k].resize(K * n_k, Q);
 
         for (Index packed = 0; packed < n_k; ++packed)
@@ -68,39 +70,39 @@ eval_basis(const TensorProduct<T, d>& tp,
         }
     }
 
-    return BasisDerivs<T, d>(std::move(per_order));
+    return BasisValues<T, d>(std::move(per_order));
 }
 
 // === Template Instantiations ========================================================
 
-template BasisDerivs<double, 1> eval_basis<double, 1>(
+template BasisValues<double, 1> eval_basis<double, 1>(
     const TensorProduct<double, 1>&, const ColMatrix<double, 1>&,
     const std::array<Index, 1>&, Index);
-template BasisDerivs<double, 2> eval_basis<double, 2>(
+template BasisValues<double, 2> eval_basis<double, 2>(
     const TensorProduct<double, 2>&, const ColMatrix<double, 2>&,
     const std::array<Index, 2>&, Index);
-template BasisDerivs<double, 3> eval_basis<double, 3>(
+template BasisValues<double, 3> eval_basis<double, 3>(
     const TensorProduct<double, 3>&, const ColMatrix<double, 3>&,
     const std::array<Index, 3>&, Index);
 
-template class BasisDerivs<double, 1>;
-template class BasisDerivs<double, 2>;
-template class BasisDerivs<double, 3>;
+template class BasisValues<double, 1>;
+template class BasisValues<double, 2>;
+template class BasisValues<double, 3>;
 
 #ifdef PYCK_BUILD_SINGLE_PRECISION
-template BasisDerivs<float, 1> eval_basis<float, 1>(
+template BasisValues<float, 1> eval_basis<float, 1>(
     const TensorProduct<float, 1>&, const ColMatrix<float, 1>&,
     const std::array<Index, 1>&, Index);
-template BasisDerivs<float, 2> eval_basis<float, 2>(
+template BasisValues<float, 2> eval_basis<float, 2>(
     const TensorProduct<float, 2>&, const ColMatrix<float, 2>&,
     const std::array<Index, 2>&, Index);
-template BasisDerivs<float, 3> eval_basis<float, 3>(
+template BasisValues<float, 3> eval_basis<float, 3>(
     const TensorProduct<float, 3>&, const ColMatrix<float, 3>&,
     const std::array<Index, 3>&, Index);
 
-template class BasisDerivs<float, 1>;
-template class BasisDerivs<float, 2>;
-template class BasisDerivs<float, 3>;
+template class BasisValues<float, 1>;
+template class BasisValues<float, 2>;
+template class BasisValues<float, 3>;
 #endif
 
 } // namespace pyck

@@ -5,7 +5,7 @@
 #include <Eigen/Dense>
 
 #include "patch.hpp"
-#include "basis_derivs.hpp"
+#include "basis_values.hpp"
 #include "intrinsic_geometry.hpp"
 #include "../types.hpp"
 
@@ -44,7 +44,7 @@ public:
      * @return The generalised-stress shape matrix.
      */
     virtual Matrix<T> stress_matrix(const Patch<T, d>& patch,
-                                    const BasisDerivs<T, d>& basis,
+                                    const BasisValues<T, d>& basis,
                                     const IntrinsicGeometry<T, d>& ig) const;
 
     /**
@@ -74,7 +74,7 @@ public:
      * @return The strain-displacement operator.
      */
     virtual Matrix<T> strain_matrix(const Patch<T, d>& patch,
-                                    const BasisDerivs<T, d>& basis,
+                                    const BasisValues<T, d>& basis,
                                     const IntrinsicGeometry<T, d>& ig) const = 0;
 
     /**
@@ -98,7 +98,7 @@ public:
      * @return The transverse-displacement shape matrix.
      */
     virtual Matrix<T> displacement_shape_matrix(const Patch<T, d>& patch,
-                                                const BasisDerivs<T, d>& basis,
+                                                const BasisValues<T, d>& basis,
                                                 const IntrinsicGeometry<T, d>& ig) const = 0;
 
     /**
@@ -110,7 +110,7 @@ public:
      * @return The rotation shape matrix.
      */
     virtual Matrix<T> rotation_shape_matrix(const Patch<T, d>& patch,
-                                            const BasisDerivs<T, d>& basis,
+                                            const BasisValues<T, d>& basis,
                                             const IntrinsicGeometry<T, d>& ig) const = 0;
 };
 
@@ -118,11 +118,11 @@ public:
 template <std::floating_point T, std::size_t d>
 Matrix<T>
 Element<T, d>::stress_matrix(const Patch<T, d>& patch,
-                             const BasisDerivs<T, d>& basis,
+                             const BasisValues<T, d>& basis,
                              const IntrinsicGeometry<T, d>& ig) const
 {
     const Matrix<T> B = strain_matrix(patch, basis, ig);
-    const Index Q        = basis.N().rows();
+    const Index Q        = basis.Q();
     const Index n_strain = B.rows() / Q;
     const Index K        = B.cols();
 

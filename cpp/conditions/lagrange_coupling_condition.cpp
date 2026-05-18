@@ -2,7 +2,7 @@
 
 #include "patch_boundary.hpp"
 #include "patch.hpp"
-#include "basis_derivs.hpp"
+#include "basis_values.hpp"
 #include "intrinsic_geometry.hpp"
 
 #include <cmath>
@@ -169,13 +169,11 @@ LagrangeCouplingCondition<T, d>::apply(Matrix<T>& stiffness,
             for (Index q = 0; q < Q; ++q)
             {
                 const T dG = local_a.jac(q) * w_a(q);
-                Cla.noalias() += dG
-                    * basis_a.N().row(q).transpose() * C_a.row(q);
-                Clb.noalias() += dG
-                    * basis_a.N().row(q).transpose() * C_b.row(q);
+                auto slab0_a = basis_a.data()[0].col(q);
+                Cla.noalias() += dG * slab0_a * C_a.row(q);
+                Clb.noalias() += dG * slab0_a * C_b.row(q);
                 if (term.value != T(0)) {
-                    G.noalias() += (dG * term.value)
-                        * basis_a.N().row(q).transpose();
+                    G.noalias() += (dG * term.value) * slab0_a;
                 }
             }
 

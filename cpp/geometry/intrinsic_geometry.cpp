@@ -7,88 +7,62 @@ namespace pyck
 {
 
 template <std::floating_point T, std::size_t d>
-IntrinsicGeometry<T, d>::IntrinsicGeometry(const BasisDerivs<T, d>& basis,
+IntrinsicGeometry<T, d>::IntrinsicGeometry(const BasisValues<T, d>& basis,
                                            const ColMatrix<T, 3>& act_pts)
 {
-    const Index order_ = basis.order();
-    const Index Q_     = basis.Q();
+    const Index order_b = basis.order();
+    const Index Q_      = basis.Q();
+    const Index N_      = basis.N();
     constexpr Index n_metric = d * (d + 1) / 2;
 
-    position_data.resize(order_ + 1);
+    // --- Allocate position storage per order (data_[k] of shape (Q · n_k) × 3) ------
 
-    // --- Order 0: position ----------------------------------------------------------
-
-    position_data[0].resize(Q_, 3);
-    position_data[0].noalias() = basis.N() * act_pts;
-
-    // --- Order 1: covariant basis ---------------------------------------------------
-
-    if (order_ >= 1)
-    {
-        constexpr Index n_k = d;            // C(1+d-1, d-1) = d
-        position_data[1].resize(Q_ * n_k, 3);
-        for (Index dir = 0; dir < d; ++dir) {
-            position_data[1].middleRows(dir * Q_, Q_).noalias() =
-                basis.N_d1(dir) * act_pts;
-        }
+    position_data.resize(order_b + 1);
+    for (Index k = 0; k <= order_b; ++k) {
+        const Index n_k = num_multi_indices<d>(k);
+        position_data[k].resize(Q_ * n_k, 3);
     }
-
-    // --- Metric and Jacobian --------------------------------------------------------
-
     g_data.resize(Q_, n_metric);
     g_inv_data.resize(Q_, n_metric);
     jac.resize(Q_);
 
     for (Index q = 0; q < Q_; ++q)
     {
+        // --- Position + all derivatives at q ----------------------------------------
+
+        for (Index k = 0; k <= order_b; ++k)
+        {
+            const Index n_k = num_multi_indices<d>(k);
+            auto slab = basis.data()[k].col(q);     // length N · n_k
+            for (Index packed = 0; packed < n_k; ++packed) {
+                Eigen::Matrix<T, 1, 3> deriv_q = Eigen::Matrix<T, 1, 3>::Zero();
+                for (Index b = 0; b < N_; ++b) {
+                    deriv_q.noalias() += slab(b * n_k + packed) * act_pts.row(b);
+                }
+                position_data[k].row(packed * Q_ + q) = deriv_q;
+            }
+        }
+
+        // --- Metric + jacobian (requires order ≥ 1; uses position_data[1]) ----------
+
+        if (order_b < 1) continue;
+
         Eigen::Matrix<T, d, d> g_mat;
-        for (std::size_t i = 0; i < d; ++i) {
-            for (std::size_t j = i; j < d; ++j) {
+        for (Index i = 0; i < d; ++i)
+            for (Index j = i; j < d; ++j) {
                 const T g_ij = a(i).row(q).dot(a(j).row(q));
                 g_mat(i, j) = g_ij;
                 if (j != i) g_mat(j, i) = g_ij;
             }
-        }
-
         const Eigen::Matrix<T, d, d> inv_g = g_mat.inverse();
         const T det_g = g_mat.determinant();
-
-        for (std::size_t i = 0; i < d; ++i) {
-            for (std::size_t j = i; j < d; ++j) {
+        for (Index i = 0; i < d; ++i)
+            for (Index j = i; j < d; ++j) {
                 const Index packed = pack2<d>(i, j);
                 g_data    (q, packed) = g_mat(i, j);
                 g_inv_data(q, packed) = inv_g(i, j);
             }
-        }
         jac(q) = std::sqrt(det_g);
-    }
-
-    // --- Order 2: a_d1 = ∂_{αβ} x ---------------------------------------------------
-
-    if (order_ >= 2)
-    {
-        constexpr Index n_k = d * (d + 1) / 2;
-        position_data[2].resize(Q_ * n_k, 3);
-        for (std::size_t i = 0; i < d; ++i)
-            for (std::size_t j = i; j < d; ++j) {
-                const Index packed = pack2<d>(i, j);
-                position_data[2].middleRows(packed * Q_, Q_).noalias() =
-                    basis.N_d2(i, j) * act_pts;
-            }
-    }
-
-    // --- Order 3: a_d2 = ∂_{αβγ} x --------------------------------------------------
-
-    if (order_ >= 3)
-    {
-        const auto dirs_list = enumerate_direction_indices<d>(3);
-        const Index n_k = static_cast<Index>(dirs_list.size());
-        position_data[3].resize(Q_ * n_k, 3);
-        for (Index packed = 0; packed < n_k; ++packed) {
-            const auto& dirs = dirs_list[packed];
-            position_data[3].middleRows(packed * Q_, Q_).noalias() =
-                basis.N_d3(dirs[0], dirs[1], dirs[2]) * act_pts;
-        }
     }
 }
 

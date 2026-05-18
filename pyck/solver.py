@@ -88,6 +88,4 @@ def solve(
 
 
 def _looks_like_problem(value: Any) -> bool:
-    return callable(getattr(value, "assemble", None)) and hasattr(
-        value, "num_physical_dofs"
-    )
+    return callable(getattr(value, "assemble", None))

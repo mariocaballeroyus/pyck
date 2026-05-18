@@ -6,7 +6,7 @@
 #include <numeric>
 
 #include "patch.hpp"
-#include "basis_derivs.hpp"
+#include "basis_values.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
 #include "knots.hpp"
@@ -220,7 +220,7 @@ TEST_CASE("RM Plate: SS uniform load — thin plate convergence", "[RMPlate]")
     for (std::size_t i = 0; i < active.size(); ++i)
         w_active(i) = u(active[i] * ndof + 0);  // w-DOF
 
-    double w_num = (b.N() * w_active)(0, 0);
+    double w_num = b.data()[0].col(0).dot(w_active);
     double rel_err = std::abs(w_num - w_exact) / std::abs(w_exact);
 
     INFO("w_exact = " << w_exact);
@@ -270,7 +270,7 @@ TEST_CASE("RM Plate: thick plate — RM > KL deflection coefficient", "[RMPlate]
         Vector<double> wa(active.size());
         for (std::size_t i = 0; i < active.size(); ++i)
             wa(i) = u(active[i] * ndof + 0);
-        return (b.N() * wa)(0, 0);
+        return b.data()[0].col(0).dot(wa);
     };
 
     double w_thin  = get_w(u_thin);

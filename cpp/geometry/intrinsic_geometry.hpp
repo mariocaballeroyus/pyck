@@ -7,7 +7,7 @@
 
 #include <Eigen/Core>
 
-#include "../basis/basis_derivs.hpp"
+#include "../basis/basis_values.hpp"
 #include "../multi_index.hpp"
 #include "../types.hpp"
 
@@ -96,7 +96,7 @@ struct IntrinsicGeometry
      * @brief Populate position, metric, inverse metric, Jacobian and position
      *        derivatives up to @c basis.order().
      */
-    IntrinsicGeometry(const BasisDerivs<T, d>& basis,
+    IntrinsicGeometry(const BasisValues<T, d>& basis,
                       const ColMatrix<T, 3>& act_pts);
 
     // === Methods ====================================================================

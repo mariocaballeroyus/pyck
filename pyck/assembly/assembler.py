@@ -109,7 +109,7 @@ class LinearElasticProblem:
     @property
     def num_physical_dofs(self) -> int:
         """Return the number of non-auxiliary solution DOFs."""
-        num_node_dofs = int(self._element._cpp_object.num_node_dofs())
+        num_node_dofs = int(self._element.num_node_dofs)
         return sum(
             patch.num_control_pts * num_node_dofs
             for patch in self._patches.values()

@@ -50,11 +50,19 @@ ColMatrix<T, 3> eval_physical_points(
         }
         if (zero_volume) continue;
 
-        // phys_pts = N * act_pts, with N from eval_basis at order 0.
+        // phys_pts(q) = sum_i N_i(u_q) · P_i, with basis evaluated at order 0.
         auto [mapped_pts, mapped_weights] = quadrature.map_to_domain(lo, hi);
         auto basis = eval_basis(patch, mapped_pts, static_cast<Index>(elem_idx), 0);
         auto act_pts = patch.active_control_pts(static_cast<Index>(elem_idx));
-        result.block(out, 0, Q, 3).noalias() = basis.N() * act_pts;
+        const Index N = basis.N();
+        for (Index q = 0; q < Q; ++q) {
+            auto slab0 = basis.data()[0].col(q);
+            Eigen::Matrix<T, 1, 3> x_q = Eigen::Matrix<T, 1, 3>::Zero();
+            for (Index i = 0; i < N; ++i) {
+                x_q.noalias() += slab0(i) * act_pts.row(i);
+            }
+            result.row(out + q) = x_q;
+        }
         out += Q;
     }
 

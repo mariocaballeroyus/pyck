@@ -1,44 +1,44 @@
 """Gauss-Legendre quadrature rules for different topological dimensions."""
- 
+
 from __future__ import annotations
- 
-from typing import Any, Sequence, overload
- 
+
+from typing import Sequence, overload
+
 import numpy as np
 import numpy.typing as npt
- 
+
 import pyck._pyck as _pyck
 from pyck.assembly.quadrature import QuadratureRule
 
 
 class GaussLegendre(QuadratureRule):
     """Gauss-Legendre tensor-product quadrature rule.
- 
-    This class provides a unified interface for 1D, 2D, and 3D Gauss-Legendre
+
+    This class provides a unified interface for 1D and 2D Gauss-Legendre
     quadrature rules. It wraps the underlying C++ implementations and ensures
     consistent array shapes across dimensions.
- 
+
     Parameters
     ----------
     num_points : int or Sequence[int]
-        Number of integration points per direction. For 2D and 3D, if an
-        integer is provided, the same number of points is used in each
-        parametric direction (uniform rule). If a sequence is provided, its
-        length must match ``dim``.
+        Number of integration points per direction. For 2D, if an integer is
+        provided, the same number of points is used in each parametric
+        direction (uniform rule). If a sequence is provided, its length must
+        match ``dim``.
     dim : int, optional
-        Topological dimension (1, 2, or 3). If not provided, it is inferred
-        from ``num_points`` if it's a sequence, otherwise defaults to 1.
+        Topological dimension (1 or 2). If not provided, it is inferred from
+        ``num_points`` if it's a sequence, otherwise defaults to 1.
     """
- 
-    _cpp_object: _pyck.GaussLegendre | _pyck.GaussLegendre2d | _pyck.GaussLegendre3d
+
+    _cpp_object: _pyck.GaussLegendre1d | _pyck.GaussLegendre2d
     _dim: int
- 
+
     @overload
     def __init__(self, num_points: int, dim: int = 1) -> None: ...
- 
+
     @overload
     def __init__(self, num_points: Sequence[int], dim: int | None = None) -> None: ...
- 
+
     def __init__(
         self, num_points: int | Sequence[int], dim: int | None = None
     ) -> None:
@@ -54,32 +54,30 @@ class GaussLegendre(QuadratureRule):
                     "by the C++ backend for tensor-product rules."
                 )
             num_points = num_points[0]
- 
+
         if dim is None:
             dim = 1
- 
+
         if dim == 1:
-            self._cpp_object = _pyck.GaussLegendre(int(num_points))
+            self._cpp_object = _pyck.GaussLegendre1d(int(num_points))
         elif dim == 2:
             self._cpp_object = _pyck.GaussLegendre2d(int(num_points))
-        elif dim == 3:
-            self._cpp_object = _pyck.GaussLegendre3d(int(num_points))
         else:
             raise ValueError(f"Unsupported dimension: {dim}")
- 
+
         self._dim = dim
- 
+
     @classmethod
     def _from_cpp(
-        cls, cpp_obj: _pyck.GaussLegendre | _pyck.GaussLegendre2d | _pyck.GaussLegendre3d
+        cls, cpp_obj: _pyck.GaussLegendre1d | _pyck.GaussLegendre2d
     ) -> GaussLegendre:
         """Wrap an existing C++ Gauss-Legendre object.
- 
+
         Parameters
         ----------
         cpp_obj : C++ object
             Underlying C++ quadrature rule from :module:`_pyck`.
- 
+
         Returns
         -------
         GaussLegendre
@@ -87,12 +85,7 @@ class GaussLegendre(QuadratureRule):
         """
         obj = object.__new__(cls)
         obj._cpp_object = cpp_obj
-        if isinstance(cpp_obj, _pyck.GaussLegendre):
-            obj._dim = 1
-        elif isinstance(cpp_obj, _pyck.GaussLegendre2d):
-            obj._dim = 2
-        else:
-            obj._dim = 3
+        obj._dim = 1 if isinstance(cpp_obj, _pyck.GaussLegendre1d) else 2
         return obj
  
     @property
@@ -126,7 +119,7 @@ class GaussLegendre(QuadratureRule):
     @property
     def num_points(self) -> int:
         """Total number of integration points."""
-        return self._cpp_object.num_points()
+        return int(np.asarray(self._cpp_object.weights()).size)
  
     @property
     def dim(self) -> int:

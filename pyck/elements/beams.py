@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import pyck._pyck as _pyck
+from pyck.elements.element import Element
 from pyck.materials import SlenderBeam1d
 
 
-class BeamEulerBernoulli1p:
+class BeamEulerBernoulli1p(Element):
     """Euler-Bernoulli beam element.
 
     Parameters
@@ -14,6 +15,7 @@ class BeamEulerBernoulli1p:
     material : SlenderBeam1d
         Beam material model.
     """
+    num_node_dofs: int = 1
 
     def __init__(self, material: SlenderBeam1d) -> None:
         if not isinstance(material, SlenderBeam1d):
@@ -29,7 +31,7 @@ class BeamEulerBernoulli1p:
         return f"BeamEulerBernoulli1p(material={self._material})"
 
 
-class BeamTimoshenko1p:
+class BeamTimoshenko1p(Element):
     """1-parameter Timoshenko beam element (rotation-free formulation).
 
     Wraps :class:`pyck::BeamTimoshenko1p<double>`.
@@ -42,6 +44,7 @@ class BeamTimoshenko1p:
     material : SlenderBeam1d
         Beam material model.
     """
+    num_node_dofs: int = 1
 
     def __init__(self, material: SlenderBeam1d) -> None:
         if not isinstance(material, SlenderBeam1d):
@@ -57,7 +60,7 @@ class BeamTimoshenko1p:
         return f"BeamTimoshenko1p(material={self._material})"
 
 
-class BeamTimoshenko2p:
+class BeamTimoshenko2p(Element):
     r"""2-parameter Timoshenko beam element.
 
     Wraps :class:`pyck::BeamTimoshenko2p<double>`.
@@ -70,6 +73,7 @@ class BeamTimoshenko2p:
     material : SlenderBeam1d
         Beam material model.
     """
+    num_node_dofs: int = 2
 
     def __init__(self, material: SlenderBeam1d) -> None:
         if not isinstance(material, SlenderBeam1d):

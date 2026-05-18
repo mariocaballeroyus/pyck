@@ -9,7 +9,7 @@
 
 #include "../types.hpp"
 #include "patch.hpp"
-#include "basis_derivs.hpp"
+#include "basis_values.hpp"
 #include "intrinsic_geometry.hpp"
 
 namespace pyck

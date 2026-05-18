@@ -7,7 +7,7 @@
 #include <Eigen/Dense>
 
 #include "patch.hpp"
-#include "basis_derivs.hpp"
+#include "basis_values.hpp"
 #include "patch_boundary.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
@@ -82,7 +82,7 @@ static double eval_w_at(const Ptr<Patch<double, 2>>& patch,
     Vector<double> w_active(active.size());
     for (std::size_t i = 0; i < active.size(); ++i)
         w_active(i) = u_full(dof_offset + active[i] * ndof + 0);
-    return (b.N() * w_active)(0, 0);
+    return b.data()[0].col(0).dot(w_active);
 }
 
 // ===========================================================================
