@@ -22,11 +22,11 @@ PlateKirchhoffLove1p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
                                        const BasisDerivs<T, 2>& basis,
                                        const IntrinsicGeometry<T, 2>& ig) const
 {
-    const Matrix<T>& N_u  = basis.N_d1[0];
-    const Matrix<T>& N_v  = basis.N_d1[1];
-    const Matrix<T>& N_uu = basis.N_d2[0][0];
-    const Matrix<T>& N_uv = basis.N_d2[0][1];
-    const Matrix<T>& N_vv = basis.N_d2[1][1];
+    const auto N_u  = basis.N_d1(0);
+    const auto N_v  = basis.N_d1(1);
+    const auto N_uu = basis.N_d2(0, 0);
+    const auto N_uv = basis.N_d2(0, 1);
+    const auto N_vv = basis.N_d2(1, 1);
 
     const Index Q = N_u.rows();
     const Index n = N_u.cols();
@@ -68,7 +68,7 @@ Matrix<T> PlateKirchhoffLove1p<T>::displacement_shape_matrix(const Patch<T, 2>& 
                                                              const IntrinsicGeometry<T, 2>& /*ig*/) const
 {
     // N_w = [ N_i ]
-    return basis.N;
+    return basis.N();
 }
 
 template <std::floating_point T>
@@ -77,8 +77,8 @@ PlateKirchhoffLove1p<T>::rotation_shape_matrix(const Patch<T, 2>& /*patch*/,
                                                const BasisDerivs<T, 2>& basis,
                                                const IntrinsicGeometry<T, 2>& /*ig*/) const
 {
-    const Matrix<T>& N_u = basis.N_d1[0];
-    const Matrix<T>& N_v = basis.N_d1[1];
+    const auto N_u = basis.N_d1(0);
+    const auto N_v = basis.N_d1(1);
 
     const Index Q = N_u.rows();
     const Index n = N_u.cols();

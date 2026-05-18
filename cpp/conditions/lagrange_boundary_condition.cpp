@@ -122,9 +122,9 @@ LagrangeBoundaryCondition<T, d>::apply(Matrix<T>& stiffness, Vector<T>& load,
             {
                 const T dGamma = boundary_local.jac(q) * mapped_weights(q);
                 C_local.noalias() += dGamma
-                    * boundary_basis.N.row(q).transpose() * C.row(q);
+                    * boundary_basis.N().row(q).transpose() * C.row(q);
                 G_local.noalias() += dGamma * term.value
-                    * boundary_basis.N.row(q).transpose();
+                    * boundary_basis.N().row(q).transpose();
             }
 
             const Index multiplier_base = layout.block_base(term.block_id);

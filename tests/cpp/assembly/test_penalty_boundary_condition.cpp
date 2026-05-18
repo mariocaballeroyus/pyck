@@ -116,7 +116,7 @@ static double eval_w_centre(const Ptr<Patch<double,2>>& surf,
     Vector<double> w_active(active.size());
     for (std::size_t i = 0; i < active.size(); ++i)
         w_active(i) = u(active[i] * ndof + 0);
-    return (b.N * w_active)(0, 0);
+    return (b.N() * w_active)(0, 0);
 }
 
 // ===========================================================================
@@ -278,7 +278,7 @@ TEST_CASE("PenaltyBoundaryCondition KL plate: SS via penalty matches Navier", "[
             for (std::size_t i = 0; i < active.size(); ++i)
                 u_a(i) = u(active[i]);
 
-            double w_num   = (b.N * u_a)(0, 0);
+            double w_num   = (b.N() * u_a)(0, 0);
             double w_exact = navier_bisin(pu * L, pv * W, L, W, f0, D);
             double rel_err = std::abs(w_num - w_exact) / std::abs(w_exact);
 

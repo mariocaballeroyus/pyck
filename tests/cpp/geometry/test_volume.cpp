@@ -125,16 +125,16 @@ TEST_CASE("Patch<double, 3>: Flat Box", "[geometry][volume]")
         pts << 0.35, 0.72, 0.18;
         const auto b = eval_basis(vol, pts, elem_idx, 2);
 
-        CHECK(b.N   .row(0).sum() == Approx(1.0).margin(1e-14));
-        CHECK(b.N_d1[0] .row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_d1[1] .row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_d1[2] .row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_d2[0][0].row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_d2[0][1].row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_d2[0][2].row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_d2[1][1].row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_d2[1][2].row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_d2[2][2].row(0).sum() == Approx(0.0).margin(1e-14));
+        CHECK(b.N()   .row(0).sum() == Approx(1.0).margin(1e-14));
+        CHECK(b.N_d1(0) .row(0).sum() == Approx(0.0).margin(1e-14));
+        CHECK(b.N_d1(1) .row(0).sum() == Approx(0.0).margin(1e-14));
+        CHECK(b.N_d1(2) .row(0).sum() == Approx(0.0).margin(1e-14));
+        CHECK(b.N_d2(0, 0).row(0).sum() == Approx(0.0).margin(1e-14));
+        CHECK(b.N_d2(0, 1).row(0).sum() == Approx(0.0).margin(1e-14));
+        CHECK(b.N_d2(0, 2).row(0).sum() == Approx(0.0).margin(1e-14));
+        CHECK(b.N_d2(1, 1).row(0).sum() == Approx(0.0).margin(1e-14));
+        CHECK(b.N_d2(1, 2).row(0).sum() == Approx(0.0).margin(1e-14));
+        CHECK(b.N_d2(2, 2).row(0).sum() == Approx(0.0).margin(1e-14));
     }
 }
 

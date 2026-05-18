@@ -25,8 +25,8 @@ BeamTimoshenko1p<T>::strain_matrix(const Patch<T, 1>& /*patch*/,
 {
     const T ratio = material_->bending_stiffness() / material_->shear_stiffness();
 
-    const Index Q = basis.N_d1[0].rows();
-    const Index n = basis.N_d1[0].cols();
+    const Index Q = basis.N_d1(0).rows();
+    const Index n = basis.N_d1(0).cols();
     Matrix<T> B(2 * Q, n);
 
 
@@ -42,14 +42,14 @@ BeamTimoshenko1p<T>::strain_matrix(const Patch<T, 1>& /*patch*/,
 
         // Bending
         // B_b = [ -N_{i|11} ]
-        B.row(2 * q    ) = -(basis.N_d2[0][0].row(q) - G * basis.N_d1[0].row(q));
+        B.row(2 * q    ) = -(basis.N_d2(0, 0).row(q) - G * basis.N_d1(0).row(q));
 
         // Transverse Shear
         // B_s = [ -(K_b/K_s) g^{11} N_{i|111} ]
         B.row(2 * q + 1) = -ratio * gi
-                         * (basis.N_d3[0][0][0].row(q)
-                            + coeff_Nuu * basis.N_d2[0][0].row(q)
-                            + coeff_Nu  * basis.N_d1[0].row(q));
+                         * (basis.N_d3(0, 0, 0).row(q)
+                            + coeff_Nuu * basis.N_d2(0, 0).row(q)
+                            + coeff_Nu  * basis.N_d1(0).row(q));
     }
     return B;
 }
@@ -78,16 +78,16 @@ BeamTimoshenko1p<T>::displacement_shape_matrix(const Patch<T, 1>& patch,
 {
     const T ratio = material_->bending_stiffness() / material_->shear_stiffness();
 
-    const Index Q = basis.N.rows();
-    const Index n = basis.N.cols();
+    const Index Q = basis.N().rows();
+    const Index n = basis.N().cols();
     Matrix<T> Nw(Q, n);
 
 
     for (Index q = 0; q < Q; ++q)
     {
         // N_w = [ N_i - (K_b/K_s) g^{11} N_{i|11} ]
-        Nw.row(q) = basis.N.row(q) - ratio * ig.g_inv[0][0](q) *
-                    (basis.N_d2[0][0].row(q) - ig.chr.Gamma[0][0][0](q) * basis.N_d1[0].row(q));
+        Nw.row(q) = basis.N().row(q) - ratio * ig.g_inv[0][0](q) *
+                    (basis.N_d2(0, 0).row(q) - ig.chr.Gamma[0][0][0](q) * basis.N_d1(0).row(q));
     }
     return Nw;
 }
@@ -99,7 +99,7 @@ BeamTimoshenko1p<T>::rotation_shape_matrix(const Patch<T, 1>& /*patch*/,
                                            const IntrinsicGeometry<T, 1>& /*ig*/) const
 {
     // N_rot = [ -N_{i|1} ]
-    return -basis.N_d1[0];
+    return -basis.N_d1(0);
 }
 
 // === Template Instantiations ========================================================

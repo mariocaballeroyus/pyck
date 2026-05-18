@@ -134,7 +134,7 @@ public:
         const IntrinsicGeometry<T, 2>& /*parent_ig*/) const override
     {
         const Index ndof = static_cast<Index>(element.num_node_dofs());
-        const Matrix<T>& N = parent_basis.N;
+        const auto N = parent_basis.N();
         const Index Q = N.rows();
         const Index n = N.cols();
 
@@ -179,8 +179,8 @@ public:
         const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
         const Index ndof = static_cast<Index>(element.num_node_dofs());
-        const Matrix<T>& N_u = parent_basis.N_d1[0];
-        const Matrix<T>& N_v = parent_basis.N_d1[1];
+        const auto N_u = parent_basis.N_d1(0);
+        const auto N_v = parent_basis.N_d1(1);
         const Index Q = N_u.rows();
         const Index n = N_u.cols();
 
@@ -233,11 +233,11 @@ public:
         const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
         const Index ndof = static_cast<Index>(element.num_node_dofs());
-        const Matrix<T>& N_u  = parent_basis.N_d1[0];
-        const Matrix<T>& N_v  = parent_basis.N_d1[1];
-        const Matrix<T>& N_uu = parent_basis.N_d2[0][0];
-        const Matrix<T>& N_uv = parent_basis.N_d2[0][1];
-        const Matrix<T>& N_vv = parent_basis.N_d2[1][1];
+        const auto N_u  = parent_basis.N_d1(0);
+        const auto N_v  = parent_basis.N_d1(1);
+        const auto N_uu = parent_basis.N_d2(0, 0);
+        const auto N_uv = parent_basis.N_d2(0, 1);
+        const auto N_vv = parent_basis.N_d2(1, 1);
         const Index Q = N_uu.rows();
         const Index n = N_uu.cols();
 

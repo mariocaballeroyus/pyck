@@ -30,9 +30,9 @@ ShellReissnerMindlin5p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
     const ExtrinsicGeometry<T, 2, 3> eg(ig);
     const ColMatrix<T, 3>& a_3 = eg.n;
 
-    const Matrix<T>& N    = basis.N;
-    const Matrix<T>& N_u  = basis.N_d1[0];
-    const Matrix<T>& N_v  = basis.N_d1[1];
+    const auto N    = basis.N();
+    const auto N_u  = basis.N_d1(0);
+    const auto N_v  = basis.N_d1(1);
 
     const Index Q = N.rows();
     const Index n = N.cols();
@@ -124,8 +124,8 @@ ShellReissnerMindlin5p<T>::displacement_shape_matrix(const Patch<T, 2>& /*patch*
                                                      const BasisDerivs<T, 2>& basis,
                                                      const IntrinsicGeometry<T, 2>& /*ig*/) const
 {
-    const Index Q = basis.N.rows();
-    const Index n = basis.N.cols();
+    const Index Q = basis.N().rows();
+    const Index n = basis.N().cols();
     Matrix<T> N_w = Matrix<T>::Zero(Q, 5 * n);
     Matrix<T> N_psi = Matrix<T>::Zero(2 * Q, 5 * n);
 
@@ -139,8 +139,8 @@ ShellReissnerMindlin5p<T>::rotation_shape_matrix(const Patch<T, 2>& /*patch*/,
                                                  const BasisDerivs<T, 2>& basis, 
                                                  const IntrinsicGeometry<T, 2>& /*ig*/) const
 {
-    const Index Q = basis.N.rows();
-    const Index n = basis.N.cols();
+    const Index Q = basis.N().rows();
+    const Index n = basis.N().cols();
     Matrix<T> N_psi = Matrix<T>::Zero(2 * Q, 5 * n);
 
     // TODO: implement this

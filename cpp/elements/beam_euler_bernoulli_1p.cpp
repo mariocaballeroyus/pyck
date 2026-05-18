@@ -25,8 +25,8 @@ BeamEulerBernoulli1p<T>::strain_matrix(const Patch<T, 1>& /*patch*/,
                                        const BasisDerivs<T, 1>& basis,
                                        const IntrinsicGeometry<T, 1>& ig) const
 {
-    const Index Q = basis.N_d1[0].rows();
-    const Index n = basis.N_d1[0].cols();
+    const Index Q = basis.N_d1(0).rows();
+    const Index n = basis.N_d1(0).cols();
     Matrix<T> B(Q, n);
 
 
@@ -34,7 +34,7 @@ BeamEulerBernoulli1p<T>::strain_matrix(const Patch<T, 1>& /*patch*/,
     {
         // Bending
         // B_b = [ -N_{i|11} ]
-        B.row(q) = -(basis.N_d2[0][0].row(q) - ig.chr.Gamma[0][0][0](q) * basis.N_d1[0].row(q));
+        B.row(q) = -(basis.N_d2(0, 0).row(q) - ig.chr.Gamma[0][0][0](q) * basis.N_d1(0).row(q));
 
         // B_s = 0 (normality assumption)
     }
@@ -63,7 +63,7 @@ BeamEulerBernoulli1p<T>::displacement_shape_matrix(const Patch<T, 1>& /*patch*/,
                                                    const IntrinsicGeometry<T, 1>& /*ig*/) const
 {
     // N_w = [ N_i ]
-    return basis.N;
+    return basis.N();
 }
 
 template <std::floating_point T>
@@ -73,7 +73,7 @@ BeamEulerBernoulli1p<T>::rotation_shape_matrix(const Patch<T, 1>& /*patch*/,
                                                const IntrinsicGeometry<T, 1>& /*ig*/) const
 {
     // N_rot = [ -N_{i|1} ]
-    return -basis.N_d1[0];
+    return -basis.N_d1(0);
 }
 
 // === Template Instantiations ========================================================

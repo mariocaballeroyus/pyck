@@ -122,7 +122,7 @@ Element<T, d>::stress_matrix(const Patch<T, d>& patch,
                              const IntrinsicGeometry<T, d>& ig) const
 {
     const Matrix<T> B = strain_matrix(patch, basis, ig);
-    const Index Q        = basis.N.rows();
+    const Index Q        = basis.N().rows();
     const Index n_strain = B.rows() / Q;
     const Index K        = B.cols();
 

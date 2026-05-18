@@ -41,12 +41,12 @@ CurveDerivs metric_derivs(const BasisDerivs<double, 1>& basis,
     const double Gamma_u     = (a11_dot_a11 + a1_dot_a111) / g11 - 2.0 * Gamma * Gamma;
 
     CurveDerivs d;
-    d.N   = basis.N.row(q);
-    d.dN  = basis.N_d1[0].row(q) / sqrt_g11;
-    d.d2N = (basis.N_d2[0][0].row(q) - Gamma * basis.N_d1[0].row(q)) / g11;
-    d.d3N = (basis.N_d3[0][0][0].row(q)
-             - 3.0 * Gamma * basis.N_d2[0][0].row(q)
-             + (2.0 * Gamma * Gamma - Gamma_u) * basis.N_d1[0].row(q)) / g11_15;
+    d.N   = basis.N().row(q);
+    d.dN  = basis.N_d1(0).row(q) / sqrt_g11;
+    d.d2N = (basis.N_d2(0, 0).row(q) - Gamma * basis.N_d1(0).row(q)) / g11;
+    d.d3N = (basis.N_d3(0, 0, 0).row(q)
+             - 3.0 * Gamma * basis.N_d2(0, 0).row(q)
+             + (2.0 * Gamma * Gamma - Gamma_u) * basis.N_d1(0).row(q)) / g11_15;
     return d;
 }
 

@@ -13,9 +13,9 @@ IntrinsicGeometry<T, d, k>::IntrinsicGeometry(const BasisDerivs<T, d>& basis,
 {
     // --- Order 1 --------------------------------------------------------------------
 
-    x = basis.N * act_pts;
+    x = basis.N() * act_pts;
     for (std::size_t i = 0; i < d; ++i) {
-        a[i] = basis.N_d1[i] * act_pts;
+        a[i] = basis.N_d1(i) * act_pts;
     }
 
     // --- Metric and Jacobian --------------------------------------------------------
@@ -56,10 +56,11 @@ IntrinsicGeometry<T, d, k>::IntrinsicGeometry(const BasisDerivs<T, d>& basis,
     // --- Order 2 --------------------------------------------------------------------
     if constexpr (k >= 2)
     {
+        const bool have_d2 = basis.order() >= 2;
         for (std::size_t i = 0; i < d; ++i)
             for (std::size_t j = i; j < d; ++j) {
-                if (basis.N_d2[i][j].size() > 0)
-                    a_d1[i][j] = basis.N_d2[i][j] * act_pts;
+                if (have_d2)
+                    a_d1[i][j] = basis.N_d2(i, j) * act_pts;
                 else
                     a_d1[i][j].setZero(Q, 3);
             }
@@ -69,11 +70,12 @@ IntrinsicGeometry<T, d, k>::IntrinsicGeometry(const BasisDerivs<T, d>& basis,
 
     if constexpr (k >= 3)
     {
+        const bool have_d3 = basis.order() >= 3;
         for (std::size_t i = 0; i < d; ++i)
             for (std::size_t j = i; j < d; ++j)
                 for (std::size_t idx = j; idx < d; ++idx) {
-                    if (basis.N_d3[i][j][idx].size() > 0)
-                        a_d2[i][j][idx] = basis.N_d3[i][j][idx] * act_pts;
+                    if (have_d3)
+                        a_d2[i][j][idx] = basis.N_d3(i, j, idx) * act_pts;
                     else
                         a_d2[i][j][idx].setZero(Q, 3);
                 }

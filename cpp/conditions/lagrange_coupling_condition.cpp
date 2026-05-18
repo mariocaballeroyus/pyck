@@ -170,12 +170,12 @@ LagrangeCouplingCondition<T, d>::apply(Matrix<T>& stiffness,
             {
                 const T dG = local_a.jac(q) * w_a(q);
                 Cla.noalias() += dG
-                    * basis_a.N.row(q).transpose() * C_a.row(q);
+                    * basis_a.N().row(q).transpose() * C_a.row(q);
                 Clb.noalias() += dG
-                    * basis_a.N.row(q).transpose() * C_b.row(q);
+                    * basis_a.N().row(q).transpose() * C_b.row(q);
                 if (term.value != T(0)) {
                     G.noalias() += (dG * term.value)
-                        * basis_a.N.row(q).transpose();
+                        * basis_a.N().row(q).transpose();
                 }
             }
 

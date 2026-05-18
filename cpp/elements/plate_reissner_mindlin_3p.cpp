@@ -25,8 +25,8 @@ PlateReissnerMindlin3p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
                                          const BasisDerivs<T, 2>& basis,
                                          const IntrinsicGeometry<T, 2>& ig) const
 {
-    const Index Q = basis.N.rows();
-    const Index n = basis.N.cols();
+    const Index Q = basis.N().rows();
+    const Index n = basis.N().cols();
     Matrix<T> B = Matrix<T>::Zero(5 * Q, 3 * n);
 
 
@@ -37,9 +37,9 @@ PlateReissnerMindlin3p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
 
         for (Index i = 0; i < n; ++i)
         {
-            const T Ni   = basis.N  (q, i);
-            const T Ni_u = basis.N_d1[0](q, i);
-            const T Ni_v = basis.N_d1[1](q, i);
+            const T Ni   = basis.N()  (q, i);
+            const T Ni_u = basis.N_d1(0)(q, i);
+            const T Ni_v = basis.N_d1(1)(q, i);
 
             // B_b = [ 0    N_{i|1} − Γ¹_{11} N_i      −Γ²_{11} N_i            ]   κ_{11}
             //       [ 0    −Γ¹_{22} N_i               N_{i|2} − Γ²_{22} N_i   ]   κ_{22}
@@ -83,14 +83,14 @@ PlateReissnerMindlin3p<T>::displacement_shape_matrix(const Patch<T, 2>& /*patch*
                                                      const BasisDerivs<T, 2>& basis,
                                                      const IntrinsicGeometry<T, 2>& /*ig*/) const
 {
-    const Index Q = basis.N.rows();
-    const Index n = basis.N.cols();
+    const Index Q = basis.N().rows();
+    const Index n = basis.N().cols();
     Matrix<T> Nw = Matrix<T>::Zero(Q, 3 * n);
 
     for (Index i = 0; i < n; ++i)
     {
         // N_w = [ N_i  0  0 ]
-        Nw.col(3*i) = basis.N.col(i);
+        Nw.col(3*i) = basis.N().col(i);
     }
     return Nw;
 }
@@ -101,8 +101,8 @@ PlateReissnerMindlin3p<T>::rotation_shape_matrix(const Patch<T, 2>& /*patch*/,
                                                  const BasisDerivs<T, 2>& basis,
                                                  const IntrinsicGeometry<T, 2>& /*ig*/) const
 {
-    const Index Q = basis.N.rows();
-    const Index n = basis.N.cols();
+    const Index Q = basis.N().rows();
+    const Index n = basis.N().cols();
     Matrix<T> Nphi = Matrix<T>::Zero(2 * Q, 3 * n);
 
     for (Index q = 0; q < Q; ++q)
@@ -111,8 +111,8 @@ PlateReissnerMindlin3p<T>::rotation_shape_matrix(const Patch<T, 2>& /*patch*/,
         {
             // N_rot = [ 0  N_i  0 ]
             //         [ 0  0   N_i ]
-            Nphi(2*q,     3*i + 1) = basis.N(q, i);
-            Nphi(2*q + 1, 3*i + 2) = basis.N(q, i);
+            Nphi(2*q,     3*i + 1) = basis.N()(q, i);
+            Nphi(2*q + 1, 3*i + 2) = basis.N()(q, i);
         }
     }
     return Nphi;

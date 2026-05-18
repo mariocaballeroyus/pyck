@@ -46,7 +46,7 @@ TEST_CASE("Patch<double, 2>: Flat Rectangular Plate", "[geometry][surface]") {
                0.5, 0.5,
                1.0, 1.0;
         const auto b = eval_basis(surf, pts, elem_idx, 0);
-        const auto phys = b.N * act;
+        const auto phys = b.N() * act;
 
         CHECK(phys(0, 0) == Approx(0.0).margin(1e-14));
         CHECK(phys(0, 1) == Approx(0.0).margin(1e-14));
@@ -89,12 +89,12 @@ TEST_CASE("Patch<double, 2>: Flat Rectangular Plate", "[geometry][surface]") {
         pts << 0.35, 0.72;
         const auto b = eval_basis(surf, pts, elem_idx, 2);
 
-        CHECK(b.N   .row(0).sum() == Approx(1.0).margin(1e-14));
-        CHECK(b.N_d1[0] .row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_d1[1] .row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_d2[0][0].row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_d2[0][1].row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_d2[1][1].row(0).sum() == Approx(0.0).margin(1e-14));
+        CHECK(b.N()   .row(0).sum() == Approx(1.0).margin(1e-14));
+        CHECK(b.N_d1(0) .row(0).sum() == Approx(0.0).margin(1e-14));
+        CHECK(b.N_d1(1) .row(0).sum() == Approx(0.0).margin(1e-14));
+        CHECK(b.N_d2(0, 0).row(0).sum() == Approx(0.0).margin(1e-14));
+        CHECK(b.N_d2(0, 1).row(0).sum() == Approx(0.0).margin(1e-14));
+        CHECK(b.N_d2(1, 1).row(0).sum() == Approx(0.0).margin(1e-14));
     }
 }
 
@@ -225,12 +225,12 @@ TEST_CASE("Patch<double, 2>: Quadratic Basis — Partition of Unity",
             const auto b     = eval_basis(surf, pts, elem_idx, 3);
             IntrinsicGeometry local(b, act);
 
-            CHECK(b.N   .row(0).sum() == Approx(1.0).margin(1e-14));
-            CHECK(b.N_d1[0] .row(0).sum() == Approx(0.0).margin(1e-12));
-            CHECK(b.N_d1[1] .row(0).sum() == Approx(0.0).margin(1e-12));
-            CHECK(b.N_d2[0][0].row(0).sum() == Approx(0.0).margin(1e-11));
-            CHECK(b.N_d2[0][1].row(0).sum() == Approx(0.0).margin(1e-11));
-            CHECK(b.N_d2[1][1].row(0).sum() == Approx(0.0).margin(1e-11));
+            CHECK(b.N()   .row(0).sum() == Approx(1.0).margin(1e-14));
+            CHECK(b.N_d1(0) .row(0).sum() == Approx(0.0).margin(1e-12));
+            CHECK(b.N_d1(1) .row(0).sum() == Approx(0.0).margin(1e-12));
+            CHECK(b.N_d2(0, 0).row(0).sum() == Approx(0.0).margin(1e-11));
+            CHECK(b.N_d2(0, 1).row(0).sum() == Approx(0.0).margin(1e-11));
+            CHECK(b.N_d2(1, 1).row(0).sum() == Approx(0.0).margin(1e-11));
             CHECK(local.jac(0) > 0.0);
         }
     }

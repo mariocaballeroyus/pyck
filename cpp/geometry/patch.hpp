@@ -11,6 +11,7 @@
 #include "basis.hpp"
 #include "tensor.hpp"
 #include "bspline.hpp"
+#include "basis_derivs.hpp"
 #include "dof_mapper.hpp"
 #include "../types.hpp"
 
@@ -200,6 +201,28 @@ protected:
     /// @brief Map from global DOF indices to local indices on this patch.
     DofMapper<d> dof_mapper_;
 };
+
+/**
+ * @brief Evaluate basis functions and derivatives at the given coordinates
+ *        within one element span of a patch (ergonomic Patch-level overload).
+ *
+ * @param patch       Source patch.
+ * @param eval_coords (Q × d) parametric coordinates on the span.
+ * @param span_idx    Flat element / span index; decoded internally.
+ * @param order       Highest total derivative order (0, 1, 2 or 3).
+ */
+template <std::floating_point T, std::size_t d>
+inline BasisDerivs<T, d>
+eval_basis(const Patch<T, d>& patch,
+           const std::type_identity_t<ColMatrix<T, d>>& eval_coords,
+           Index span_idx,
+           std::size_t order = 0)
+{
+    return eval_basis(patch.tensor_product(),
+                      eval_coords,
+                      patch.decode_span(span_idx),
+                      static_cast<Index>(order));
+}
 
 } // namespace pyck
 

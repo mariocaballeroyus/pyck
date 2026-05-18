@@ -54,7 +54,7 @@ ColMatrix<T, 3> eval_physical_points(
         auto [mapped_pts, mapped_weights] = quadrature.map_to_domain(lo, hi);
         auto basis = eval_basis(patch, mapped_pts, static_cast<Index>(elem_idx), 0);
         auto act_pts = patch.active_control_pts(static_cast<Index>(elem_idx));
-        result.block(out, 0, Q, 3).noalias() = basis.N * act_pts;
+        result.block(out, 0, Q, 3).noalias() = basis.N() * act_pts;
         out += Q;
     }
 
