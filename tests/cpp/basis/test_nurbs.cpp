@@ -103,8 +103,7 @@ TEST_CASE("NURBS: equal weights ⇒ B-spline", "[basis][nurbs]") {
  */
 TEST_CASE("NURBS: exact unit circle", "[basis][nurbs]") {
     const double s = std::sqrt(2.0) / 2.0;
-    KnotVector<double> kv(
-        (Vector<double>(12) << 0, 0, 0, 0.25, 0.25, 0.5, 0.5, 0.75, 0.75, 1, 1, 1).finished());
+    KnotVector<double> kv(std::vector<double>{0, 0, 0, 0.25, 0.25, 0.5, 0.5, 0.75, 0.75, 1, 1, 1});
     NURBS<double> nb(2, kv,
         (Vector<double>(9) << 1, s, 1, s, 1, s, 1, s, 1).finished());
 
@@ -181,8 +180,7 @@ TEST_CASE("NURBS: derivatives match finite differences", "[basis][nurbs]") {
 TEST_CASE("NURBS: insert_knot preserves geometry", "[basis][nurbs]") {
     // Quarter-circle NURBS: degree 2, knot vector [0,0,0, 1,1,1], weights [1, sqrt(2)/2, 1]
     const Index p = 2;
-    KnotVector<double> kv(
-        (Vector<double>(6) << 0.0, 0.0, 0.0, 1.0, 1.0, 1.0).finished());
+    KnotVector<double> kv(std::vector<double>{0.0, 0.0, 0.0, 1.0, 1.0, 1.0});
     Vector<double> w(3);
     w << 1.0, std::sqrt(2.0) / 2.0, 1.0;
     NURBS<double> nb(p, kv, w);

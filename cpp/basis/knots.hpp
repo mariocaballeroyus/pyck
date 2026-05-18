@@ -2,8 +2,7 @@
 #define PYCK_KNOT_VECTOR_HPP
 
 #include <cstddef>
-
-#include "../types.hpp"
+#include <vector>
 
 namespace pyck
 {
@@ -32,9 +31,9 @@ public:
      *
      * @param knots Non-decreasing sequence of knot values.
      */
-    explicit KnotVector(Vector<T> knots);
+    explicit KnotVector(std::vector<T> knots);
 
-    // === Utility Methods ============================================================
+    // === Utility ====================================================================
 
     /**
      * @brief Find the knot span index for a given parameter value.
@@ -46,7 +45,7 @@ public:
      * @param point Parameter value to locate.
      * @return Span index.
      */
-    Index find_span(Index degree, T point) const;
+    int find_span(int degree, T point) const;
 
     /**
      * @brief Get the parametric bounds of a knot span.
@@ -54,34 +53,27 @@ public:
      * @param span Span index in `[0, num_spans())`.
      * @return Pair `(knots[span], knots[span+1])`.
      */
-    std::pair<T, T> span_bounds(Index span) const
-    { return {knots_[span], knots_[span + 1]}; }
+    std::pair<T, T> span_bounds(int span) const { return {knots_[span], knots_[span + 1]}; }
 
     // === Properties =================================================================
 
     /// @brief Number of knots in the vector.
-    Index size() const
-    { return knots_.size(); }
+    int size() const { return static_cast<int>(knots_.size()); }
 
     /// @brief Total number of knot spans (including zero-length clamped ones).
-    Index num_spans() const
-    { return knots_.size() - 1; }
+    int num_spans() const { return static_cast<int>(knots_.size()) - 1; }
 
     /// @brief Access the i-th knot value.
-    T operator[](Index i) const
-    { return knots_[i]; }
+    T operator[](int i) const { return knots_[i]; }
 
     /// @brief First knot value.
-    T front() const
-    { return knots_(0); }
+    T front() const { return knots_.front(); }
 
     /// @brief Last knot value.
-    T back() const
-    { return knots_(knots_.size() - 1); }
+    T back() const { return knots_.back(); }
 
-    /// @brief Read-only reference to the underlying Eigen vector.
-    const Vector<T>& data() const
-    { return knots_; }
+    /// @brief Read-only reference to the underlying knot values.
+    const std::vector<T>& data() const { return knots_; }
 
     // === Refinement =================================================================
 
@@ -131,12 +123,12 @@ public:
      * @param num_basis Number of basis functions. Must satisfy `num_basis >= degree + 1`.
      * @return The clamped uniform knot vector.
      */
-    static KnotVector<T> clamped_uniform(Index degree, Index num_basis);
+    static KnotVector<T> clamped_uniform(int degree, int num_basis);
 
 private:
 
     /// @brief Non-decreasing sequence of knot values.
-    Vector<T> knots_;
+    std::vector<T> knots_;
 
 }; // class KnotVector<T>
 

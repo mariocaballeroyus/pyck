@@ -71,9 +71,7 @@ CurveDerivs metric_derivs(const BasisValues<double, 1>& basis,
 
 
 TEST_CASE("Patch<double, 1>: Analytical Push-Forward Verification", "[geometry][curve]") {
-    Vector<double> knots_vec(8);
-    knots_vec << 0, 0, 0, 0, 1, 1, 1, 1;
-    auto basis_ptr = std::make_shared<BSpline<double>>(3, KnotVector<double>(knots_vec));
+    auto basis_ptr = std::make_shared<BSpline<double>>(3, KnotVector<double>(std::vector<double>{0, 0, 0, 0, 1, 1, 1, 1}));
 
     Eigen::MatrixXd control_pts(4, 3);
     control_pts.row(0) << 0.0,  0.0, 0.0;
@@ -147,9 +145,7 @@ TEST_CASE("Patch<double, 1>: Analytical Push-Forward Verification", "[geometry][
 
 
 TEST_CASE("Patch<double, 1>: External AD Numerical Validation", "[geometry][curve]") {
-    Vector<double> knots_vec(8);
-    knots_vec << 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0;
-    auto basis_ptr = std::make_shared<BSpline<double>>(3, KnotVector<double>(knots_vec));
+    auto basis_ptr = std::make_shared<BSpline<double>>(3, KnotVector<double>(std::vector<double>{0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0}));
 
     Eigen::MatrixXd control_pts(4, 3);
     control_pts.row(0) << 0.0,  0.0, 0.0;

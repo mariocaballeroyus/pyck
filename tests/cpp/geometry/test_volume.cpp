@@ -20,7 +20,7 @@ using namespace pyck;
 
 TEST_CASE("Patch<double, 3>: Flat Box", "[geometry][volume]")
 {
-    auto kv = KnotVector<double>((Vector<double>(4) << 0, 0, 1, 1).finished());
+    auto kv = KnotVector<double>(std::vector<double>{0, 0, 1, 1});
     auto basis_u = std::make_shared<BSpline<double>>(1, kv);
     auto basis_v = std::make_shared<BSpline<double>>(1, kv);
     auto basis_w = std::make_shared<BSpline<double>>(1, kv);

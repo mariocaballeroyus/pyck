@@ -109,7 +109,7 @@ public:
     { return knots_; }
 
     /// @brief Get the raw knot values
-    const Vector<T>& knots() const
+    const std::vector<T>& knots() const
     { return knots_.data(); }
 
     /// @brief Get the degree of the basis functions

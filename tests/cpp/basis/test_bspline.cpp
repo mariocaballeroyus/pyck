@@ -137,8 +137,7 @@ TEST_CASE("BSpline: non-negativity", "[basis][bspline]") {
  * and verify that each basis function vanishes outside its support.
  */
 TEST_CASE("BSpline: local support", "[basis][bspline]") {
-    Vector<double> raw_knots(8);
-    raw_knots << 0, 0, 0, 0.3, 0.7, 1, 1, 1;
+    std::vector<double> raw_knots{0, 0, 0, 0.3, 0.7, 1, 1, 1};
     KnotVector<double> kv(raw_knots);
     BSpline<double> bs(2, kv);
     std::size_t n = bs.num_basis();
@@ -263,7 +262,7 @@ TEST_CASE("BSpline: analytical values", "[basis][bspline]") {
     u << 0.0, 0.25, 0.5, 0.75, 1.0;
 
     SECTION("degree 1: linear Bernstein") {
-        KnotVector<double> kv_1((Vector<double>(4) << 0, 0, 1, 1).finished());
+        KnotVector<double> kv_1(std::vector<double>{0, 0, 1, 1});
         BSpline<double> bs(1, kv_1);
         auto span = bs.find_span(0.5);
         std::vector<Eigen::MatrixXd> _bufN; bs.eval_on_span(u, span, 0, _bufN); auto N = _bufN[0];
@@ -275,7 +274,7 @@ TEST_CASE("BSpline: analytical values", "[basis][bspline]") {
     }
 
     SECTION("degree 2: quadratic Bernstein") {
-        KnotVector<double> kv_2((Vector<double>(6) << 0, 0, 0, 1, 1, 1).finished());
+        KnotVector<double> kv_2(std::vector<double>{0, 0, 0, 1, 1, 1});
         BSpline<double> bs(2, kv_2);
         auto span = bs.find_span(0.5);
         std::vector<Eigen::MatrixXd> _bufN; bs.eval_on_span(u, span, 0, _bufN); auto N = _bufN[0];
@@ -307,7 +306,7 @@ TEST_CASE("BSpline: analytical derivatives", "[basis][bspline]") {
     u << 0.0, 0.5, 1.0;
 
     SECTION("degree 1: first derivative") {
-        KnotVector<double> kv_1((Vector<double>(4) << 0, 0, 1, 1).finished());
+        KnotVector<double> kv_1(std::vector<double>{0, 0, 1, 1});
         BSpline<double> bs(1, kv_1);
         auto span = bs.find_span(0.5);
         std::vector<Eigen::MatrixXd> _bufdN; bs.eval_on_span(u, span, 1, _bufdN); auto dN = _bufdN[1];
@@ -319,7 +318,7 @@ TEST_CASE("BSpline: analytical derivatives", "[basis][bspline]") {
     }
 
     SECTION("degree 2: first derivative") {
-        KnotVector<double> kv_2((Vector<double>(6) << 0, 0, 0, 1, 1, 1).finished());
+        KnotVector<double> kv_2(std::vector<double>{0, 0, 0, 1, 1, 1});
         BSpline<double> bs(2, kv_2);
         auto span = bs.find_span(0.5);
         std::vector<Eigen::MatrixXd> _bufdN; bs.eval_on_span(u, span, 1, _bufdN); auto dN = _bufdN[1];
@@ -333,7 +332,7 @@ TEST_CASE("BSpline: analytical derivatives", "[basis][bspline]") {
     }
 
     SECTION("degree 2: second derivative") {
-        KnotVector<double> kv_2((Vector<double>(6) << 0, 0, 0, 1, 1, 1).finished());
+        KnotVector<double> kv_2(std::vector<double>{0, 0, 0, 1, 1, 1});
         BSpline<double> bs(2, kv_2);
         auto span = bs.find_span(0.5);
         std::vector<Eigen::MatrixXd> _bufd2N; bs.eval_on_span(u, span, 2, _bufd2N); auto d2N = _bufd2N[2];
@@ -346,7 +345,7 @@ TEST_CASE("BSpline: analytical derivatives", "[basis][bspline]") {
     }
 
     SECTION("degree 2: third derivative is zero") {
-        KnotVector<double> kv_2((Vector<double>(6) << 0, 0, 0, 1, 1, 1).finished());
+        KnotVector<double> kv_2(std::vector<double>{0, 0, 0, 1, 1, 1});
         BSpline<double> bs(2, kv_2);
         auto span = bs.find_span(0.5);
         std::vector<Eigen::MatrixXd> _bufd3N; bs.eval_on_span(u, span, 3, _bufd3N); auto d3N = _bufd3N[3];
@@ -418,12 +417,12 @@ TEST_CASE("BSpline: finite-difference derivative check", "[basis][bspline][deriv
 TEST_CASE("BSpline: compare with naive Cox-de Boor", "[basis][bspline]") {
     for (int p = 1; p <= 3; ++p) {
         // Create a non-uniform knot vector
-        Vector<double> knots(2 * (p + 1) + 2);
-        Index k = 0;
-        for (int i = 0; i <= p; ++i) knots(k++) = 0.0;
-        knots(k++) = 0.3;
-        knots(k++) = 0.7;
-        for (int i = 0; i <= p; ++i) knots(k++) = 1.0;
+        std::vector<double> knots;
+        knots.reserve(2 * (p + 1) + 2);
+        for (int i = 0; i <= p; ++i) knots.push_back(0.0);
+        knots.push_back(0.3);
+        knots.push_back(0.7);
+        for (int i = 0; i <= p; ++i) knots.push_back(1.0);
 
         KnotVector<double> kv(knots);
         BSpline<double> bs(p, kv);
@@ -459,9 +458,9 @@ TEST_CASE("BSpline: non-clamped knot vector", "[basis][bspline]") {
     for (int p = 1; p <= 3; ++p) {
         // Create a uniform, non-clamped knot vector: {0, 1, 2, 3, 4, 5, ...}
         int n = 7; // Number of basis functions
-        Vector<double> knots(n + p + 1);
+        std::vector<double> knots(n + p + 1);
         for (int i = 0; i < n + p + 1; ++i) {
-            knots(i) = static_cast<double>(i);
+            knots[i] = static_cast<double>(i);
         }
 
         KnotVector<double> kv(knots);

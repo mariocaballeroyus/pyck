@@ -51,8 +51,10 @@ void bind_basis(py::module_& m)
           .def("degree", &Basis<double>::degree)
           .def("num_basis", &Basis<double>::num_basis)
           .def("num_intervals", &Basis<double>::num_intervals)
-          .def("knots", &Basis<double>::knots,
-               py::return_value_policy::reference_internal)
+          .def("knots", [](const Basis<double>& b) {
+               const auto& kv = b.knots();
+               return py::array_t<double>(kv.size(), kv.data());
+          })
           .def("greville_abscissae", &Basis<double>::greville_abscissae)
 
           // Methods

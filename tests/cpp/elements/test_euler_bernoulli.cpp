@@ -33,9 +33,7 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load", "[assembly][eul
     // 1. Geometry: Single patch line from x=0 to x=L
     // A simply supported Euler-Bernoulli beam under uniform load has a quartic O(x^4) deflection profile.
     // For exact representation, we need at least p=4 (Quartic BSplines).
-    Vector<double> knots_vec(10);
-    knots_vec << 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0;
-    auto basis = std::make_shared<BSpline<double>>(4, KnotVector<double>(knots_vec));
+    auto basis = std::make_shared<BSpline<double>>(4, KnotVector<double>(std::vector<double>{0.0, 0.0, 0.0, 0.0, 0.0, 1.0, 1.0, 1.0, 1.0, 1.0}));
     
     Index num_pts = basis->num_basis(); // 5 control points
     ColMatrix<double, 3> control_pts(num_pts, 3);
@@ -129,9 +127,7 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load (Cubic Approximat
     // By providing a cubic basis (p=3), we force the system to approximate the solution.
     // However, by inserting an intermediate knot at ξ=0.5, we split the domain into two 
     // cubic elements, significantly improving the approximation accuracy.
-    Vector<double> knots_vec(9);
-    knots_vec << 0.0, 0.0, 0.0, 0.0, 0.5, 1.0, 1.0, 1.0, 1.0;
-    auto basis = std::make_shared<BSpline<double>>(3, KnotVector<double>(knots_vec));
+    auto basis = std::make_shared<BSpline<double>>(3, KnotVector<double>(std::vector<double>{0.0, 0.0, 0.0, 0.0, 0.5, 1.0, 1.0, 1.0, 1.0}));
     
     Index num_pts = basis->num_basis(); // 5 control points
     ColMatrix<double, 3> control_pts(num_pts, 3);
