@@ -1,7 +1,7 @@
 #include "patch_boundary.hpp"
 #include "patch.hpp"
 #include "dof_mapper.hpp"
-#include "local_frame.hpp"
+#include "intrinsic_geometry.hpp"
 
 #include <array>
 #include <cmath>
@@ -12,7 +12,8 @@ namespace pyck
 namespace {
 
 /// Construct the inherited Patch<T, d-1> base for a PatchBoundary<T, d>.
-/// Dispatches via `if constexpr` to the right Patch ctor signature.
+/// Gathers the d-1 free-direction basis pointers of the parent (skipping
+/// `param_dim`) and unpacks them into the parent's variadic ctor.
 template <std::floating_point T, std::size_t d>
 Patch<T, d - 1>
 make_boundary_patch(const Ptr<Patch<T, d>>& parent,
@@ -22,18 +23,13 @@ make_boundary_patch(const Ptr<Patch<T, d>>& parent,
     auto cps = parent->get_control_points(
         parent->dof_mapper().get_layer_dofs(param_dim, at_start, 0));
 
-    if constexpr (d == 2) {
-        return Patch<T, 1>(parent->basis_ptr(1 - param_dim), cps);
-    } else {  // d == 3
-        std::array<std::size_t, 2> other{};
-        std::size_t idx = 0;
-        for (std::size_t k = 0; k < d; ++k) {
-            if (k != param_dim) other[idx++] = k;
-        }
-        return Patch<T, 2>(parent->basis_ptr(other[0]),
-                           parent->basis_ptr(other[1]),
-                           cps);
+    std::array<Ptr<const Basis<T>>, d - 1> free_bases;
+    std::size_t idx = 0;
+    for (std::size_t k = 0; k < d; ++k) {
+        if (k != param_dim) free_bases[idx++] = parent->basis_ptr(k);
     }
+
+    return Patch<T, d - 1>(free_bases, cps);
 }
 
 /// sign convention for the outward boundary normal.
@@ -129,24 +125,14 @@ Index PatchBoundary<T, d>::parent_flat_span(Index boundary_span) const
 
 template <std::floating_point T, std::size_t d> requires (d > 1)
 ColMatrix<T, d>
-PatchBoundary<T, d>::lift_to_parent(const Vector<T>& boundary_pts) const requires(d == 2)
-{
-    const Index Q = boundary_pts.size();
-    ColMatrix<T, d> pts(Q, d);
-    pts.col(param_dim_).setConstant(u_eval_fixed_);
-    pts.col(1 - param_dim_) = boundary_pts;
-    return pts;
-}
-
-template <std::floating_point T, std::size_t d> requires (d > 1)
-ColMatrix<T, d>
-PatchBoundary<T, d>::lift_to_parent(const ColMatrix<T, 2>& boundary_pts) const requires(d == 3)
+PatchBoundary<T, d>::lift_to_parent(const ColMatrix<T, d - 1>& boundary_pts) const
 {
     const Index Q = boundary_pts.rows();
     ColMatrix<T, d> pts(Q, d);
     pts.col(param_dim_).setConstant(u_eval_fixed_);
 
-    // Copy the two free-direction columns in canonical order (skip param_dim_).
+    // Fill the d-1 free parametric directions (skipping param_dim_) from the
+    // columns of boundary_pts in canonical order.
     Index bi = 0;
     for (std::size_t k = 0; k < d; ++k) {
         if (k == param_dim_) continue;
@@ -157,24 +143,24 @@ PatchBoundary<T, d>::lift_to_parent(const ColMatrix<T, 2>& boundary_pts) const r
 
 template <std::floating_point T, std::size_t d> requires (d > 1)
 ColMatrix<T, 3>
-PatchBoundary<T, d>::eval_outward_normal(const LocalFrame<T, d - 1>& boundary_local,
-                                         const LocalFrame<T, d>& parent_local) const requires(d == 2)
+PatchBoundary<T, d>::eval_outward_normal(const IntrinsicGeometry<T, d - 1>& boundary_local,
+                                         const IntrinsicGeometry<T, d>& parent_local) const requires(d == 2)
 {
-    const Index Q = boundary_local.a1.rows();
+    const Index Q = boundary_local.a[0].rows();
     ColMatrix<T, 3> n_mat(Q, 3);
 
     for (Index q = 0; q < Q; ++q)
     {
         // Parent surface normal a_3 = (a_1 × a_2) / ‖a_1 × a_2‖.
-        Eigen::Matrix<T, 3, 1> pa1 = parent_local.a1.row(q).transpose();
-        Eigen::Matrix<T, 3, 1> pa2 = parent_local.a2.row(q).transpose();
+        Eigen::Matrix<T, 3, 1> pa1 = parent_local.a[0].row(q).transpose();
+        Eigen::Matrix<T, 3, 1> pa2 = parent_local.a[1].row(q).transpose();
         Eigen::Matrix<T, 3, 1> a3 = pa1.cross(pa2);
         const T jac_p = parent_local.jac(q);
         if (jac_p > T(1e-14)) a3 /= jac_p;
         else a3 = Eigen::Matrix<T, 3, 1>(T(0), T(0), T(1));
 
         // Outward in-surface normal n = sign_n · (a_1^bd × a_3) / ‖…‖.
-        Eigen::Matrix<T, 3, 1> t = boundary_local.a1.row(q).transpose();
+        Eigen::Matrix<T, 3, 1> t = boundary_local.a[0].row(q).transpose();
         Eigen::Matrix<T, 3, 1> n_vec = sign_n_ * t.cross(a3);
         const T n_norm = n_vec.norm();
         if (n_norm > T(1e-14)) n_vec /= n_norm;
@@ -185,17 +171,17 @@ PatchBoundary<T, d>::eval_outward_normal(const LocalFrame<T, d - 1>& boundary_lo
 
 template <std::floating_point T, std::size_t d> requires (d > 1)
 ColMatrix<T, 3>
-PatchBoundary<T, d>::eval_outward_normal(const LocalFrame<T, d - 1>& boundary_local) const requires(d == 3)
+PatchBoundary<T, d>::eval_outward_normal(const IntrinsicGeometry<T, d - 1>& boundary_local) const requires(d == 3)
 {
     // Boundary is a 2D surface in 3D physical space; outward normal is the
     // boundary's own surface normal a_3 = a_1^bd × a_2^bd / ‖…‖, signed.
-    const Index Q = boundary_local.a1.rows();
+    const Index Q = boundary_local.a[0].rows();
     ColMatrix<T, 3> n_mat(Q, 3);
 
     for (Index q = 0; q < Q; ++q)
     {
-        Eigen::Matrix<T, 3, 1> a1 = boundary_local.a1.row(q).transpose();
-        Eigen::Matrix<T, 3, 1> a2 = boundary_local.a2.row(q).transpose();
+        Eigen::Matrix<T, 3, 1> a1 = boundary_local.a[0].row(q).transpose();
+        Eigen::Matrix<T, 3, 1> a2 = boundary_local.a[1].row(q).transpose();
         Eigen::Matrix<T, 3, 1> n_vec = sign_n_ * a1.cross(a2);
         const T n_norm = n_vec.norm();
         if (n_norm > T(1e-14)) n_vec /= n_norm;

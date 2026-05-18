@@ -7,8 +7,7 @@
 
 #include "patch.hpp"
 #include "basis_derivs.hpp"
-#include "local_frame.hpp"
-#include "christoffels.hpp"
+#include "intrinsic_geometry.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
 #include "knots.hpp"
@@ -251,9 +250,8 @@ TEST_CASE("RM 1P Plate: thin plate matches KL", "[RM1P]")
 
     const auto basis_d = eval_basis(*surf, pt, flat, element.min_order());
     const auto act_pts = surf->active_control_pts(flat);
-    const auto local   = eval_local_frame(basis_d, act_pts);
-    const auto chr     = eval_christoffel(local);
-    auto N_eff = element.displacement_shape_matrix(*surf, basis_d, local, chr);
+    IntrinsicGeometry ig(basis_d, act_pts);
+    ig.compute_christoffels();   auto N_eff = element.displacement_shape_matrix(*surf, basis_d, ig);
     auto active = surf->dof_mapper().get_element_dofs(flat);
 
     Vector<double> u_active(active.size());
@@ -310,9 +308,8 @@ TEST_CASE("RM 1P Plate: thick plate — captures shear deformation", "[RM1P]")
 
         const auto basis_d = eval_basis(*surf, pt, flat, element.min_order());
         const auto act_pts = surf->active_control_pts(flat);
-        const auto local   = eval_local_frame(basis_d, act_pts);
-        const auto chr     = eval_christoffel(local);
-        auto N_eff = element.displacement_shape_matrix(*surf, basis_d, local, chr);
+        IntrinsicGeometry ig(basis_d, act_pts);
+        ig.compute_christoffels();       auto N_eff = element.displacement_shape_matrix(*surf, basis_d, ig);
         auto active = surf->dof_mapper().get_element_dofs(flat);
 
         Vector<double> u_active(active.size());

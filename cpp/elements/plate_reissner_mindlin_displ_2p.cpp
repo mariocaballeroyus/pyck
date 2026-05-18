@@ -1,6 +1,6 @@
 #include "plate_reissner_mindlin_displ_2p.hpp"
 #include "patch.hpp"
-#include "christoffels.hpp"
+#include "intrinsic_geometry.hpp"
 #include "laplace_beltrami.hpp"
 
 namespace pyck
@@ -23,10 +23,9 @@ PlateReissnerMindlinDispl2p<T>::PlateReissnerMindlinDispl2p(Ptr<PlaneStress2d<T>
 
 template <std::floating_point T>
 Matrix<T> PlateReissnerMindlinDispl2p<T>::strain_matrix(
-    const Patch<T, 2>& /*patch*/, const BasisDerivs<T, 2>& basis, const LocalFrame<T, 2>& local,
-    const ChristoffelSymbols<T, 2>& chr) const
+    const Patch<T, 2>& /*patch*/, const BasisDerivs<T, 2>& basis, const IntrinsicGeometry<T, 2>& ig) const
 {
-    auto aux = compute_laplace_grad_aux(local, chr);
+    auto aux = compute_laplace_grad_aux(ig);
     const T ratio = material_->bending_stiffness() / material_->shear_stiffness();
     const Index Q = basis.N.rows();
     const Index n = basis.N.cols();
@@ -34,31 +33,31 @@ Matrix<T> PlateReissnerMindlinDispl2p<T>::strain_matrix(
 
     for (Index q = 0; q < Q; ++q)
     {
-        const T Gam1_11 = chr.G1_11(q), Gam1_12 = chr.G1_12(q), Gam1_22 = chr.G1_22(q);
-        const T Gam2_11 = chr.G2_11(q), Gam2_12 = chr.G2_12(q), Gam2_22 = chr.G2_22(q);
-        const auto N11 = basis.N_uu.row(q) - Gam1_11 * basis.N_u.row(q) - Gam2_11 * basis.N_v.row(q);
-        const auto N12 = basis.N_uv.row(q) - Gam1_12 * basis.N_u.row(q) - Gam2_12 * basis.N_v.row(q);
-        const auto N22 = basis.N_vv.row(q) - Gam1_22 * basis.N_u.row(q) - Gam2_22 * basis.N_v.row(q);
+        const T Gam1_11 = ig.chr.Gamma[0][0][0](q), Gam1_12 = ig.chr.Gamma[0][0][1](q), Gam1_22 = ig.chr.Gamma[0][1][1](q);
+        const T Gam2_11 = ig.chr.Gamma[1][0][0](q), Gam2_12 = ig.chr.Gamma[1][0][1](q), Gam2_22 = ig.chr.Gamma[1][1][1](q);
+        const auto N11 = basis.N_d2[0][0].row(q) - Gam1_11 * basis.N_d1[0].row(q) - Gam2_11 * basis.N_d1[1].row(q);
+        const auto N12 = basis.N_d2[0][1].row(q) - Gam1_12 * basis.N_d1[0].row(q) - Gam2_12 * basis.N_d1[1].row(q);
+        const auto N22 = basis.N_d2[1][1].row(q) - Gam1_22 * basis.N_d1[0].row(q) - Gam2_22 * basis.N_d1[1].row(q);
 
-        const T G11 = local.g_inv(q, 0);
-        const T G12 = local.g_inv(q, 1);
-        const T G22 = local.g_inv(q, 2);
-        const T G11_d1 = aux.G11_d1(q), G12_d1 = aux.G12_d1(q), G22_d1 = aux.G22_d1(q);
-        const T G11_d2 = aux.G11_d2(q), G12_d2 = aux.G12_d2(q), G22_d2 = aux.G22_d2(q);
-        const T c1 = aux.c1(q), c2 = aux.c2(q);
-        const T c1_d1 = aux.c1_d1(q), c2_d1 = aux.c2_d1(q);
-        const T c1_d2 = aux.c1_d2(q), c2_d2 = aux.c2_d2(q);
+        const T G11 = ig.g_inv[0][0](q);
+        const T G12 = ig.g_inv[0][1](q);
+        const T G22 = ig.g_inv[1][1](q);
+        const T G11_d1 = aux.G_inv_d[0][0][0](q), G12_d1 = aux.G_inv_d[0][1][0](q), G22_d1 = aux.G_inv_d[1][1][0](q);
+        const T G11_d2 = aux.G_inv_d[0][0][1](q), G12_d2 = aux.G_inv_d[0][1][1](q), G22_d2 = aux.G_inv_d[1][1][1](q);
+        const T c1 = aux.c[0](q), c2 = aux.c[1](q);
+        const T c1_d1 = aux.c_d[0][0](q), c2_d1 = aux.c_d[1][0](q);
+        const T c1_d2 = aux.c_d[0][1](q), c2_d2 = aux.c_d[1][1](q);
 
         const auto lap_1 = ratio * (
-              G11_d1 * basis.N_uu.row(q)  + T(2)*G12_d1 * basis.N_uv.row(q) + G22_d1 * basis.N_vv.row(q)
-            + G11    * basis.N_uuu.row(q) + T(2)*G12    * basis.N_uuv.row(q) + G22   * basis.N_uvv.row(q)
-            - c1_d1  * basis.N_u.row(q)   - c2_d1       * basis.N_v.row(q)
-            - c1     * basis.N_uu.row(q)  - c2          * basis.N_uv.row(q));
+              G11_d1 * basis.N_d2[0][0].row(q)  + T(2)*G12_d1 * basis.N_d2[0][1].row(q) + G22_d1 * basis.N_d2[1][1].row(q)
+            + G11    * basis.N_d3[0][0][0].row(q) + T(2)*G12    * basis.N_d3[0][0][1].row(q) + G22   * basis.N_d3[0][1][1].row(q)
+            - c1_d1  * basis.N_d1[0].row(q)   - c2_d1       * basis.N_d1[1].row(q)
+            - c1     * basis.N_d2[0][0].row(q)  - c2          * basis.N_d2[0][1].row(q));
         const auto lap_2 = ratio * (
-              G11_d2 * basis.N_uu.row(q)  + T(2)*G12_d2 * basis.N_uv.row(q) + G22_d2 * basis.N_vv.row(q)
-            + G11    * basis.N_uuv.row(q) + T(2)*G12    * basis.N_uvv.row(q) + G22   * basis.N_vvv.row(q)
-            - c1_d2  * basis.N_u.row(q)   - c2_d2       * basis.N_v.row(q)
-            - c1     * basis.N_uv.row(q)  - c2          * basis.N_vv.row(q));
+              G11_d2 * basis.N_d2[0][0].row(q)  + T(2)*G12_d2 * basis.N_d2[0][1].row(q) + G22_d2 * basis.N_d2[1][1].row(q)
+            + G11    * basis.N_d3[0][0][1].row(q) + T(2)*G12    * basis.N_d3[0][1][1].row(q) + G22   * basis.N_d3[1][1][1].row(q)
+            - c1_d2  * basis.N_d1[0].row(q)   - c2_d2       * basis.N_d1[1].row(q)
+            - c1     * basis.N_d2[0][1].row(q)  - c2          * basis.N_d2[1][1].row(q));
 
         for (Index i = 0; i < n; ++i)
         {
@@ -75,9 +74,9 @@ Matrix<T> PlateReissnerMindlinDispl2p<T>::strain_matrix(
             // B_s = [ -(K_b/K_s) (Δ_g N_i)_{|1}    N_{i|2} ]   γ_1
             //       [ -(K_b/K_s) (Δ_g N_i)_{|2}   -N_{i|1} ]   γ_2
             B(5 * q + 3, 2 * i    ) = -lap_1(i);
-            B(5 * q + 3, 2 * i + 1) =  basis.N_v(q, i);
+            B(5 * q + 3, 2 * i + 1) =  basis.N_d1[1](q, i);
             B(5 * q + 4, 2 * i    ) = -lap_2(i);
-            B(5 * q + 4, 2 * i + 1) = -basis.N_u(q, i);
+            B(5 * q + 4, 2 * i + 1) = -basis.N_d1[0](q, i);
         }
     }
     return B;
@@ -85,13 +84,13 @@ Matrix<T> PlateReissnerMindlinDispl2p<T>::strain_matrix(
 
 template <std::floating_point T>
 Matrix<T> PlateReissnerMindlinDispl2p<T>::constitutive_matrix(
-    const LocalFrame<T, 2>& local, Index q) const
+    const IntrinsicGeometry<T, 2>& ig, Index q) const
 {
     // D = [ D_b  0   ]
     //     [  0   D_s ]
     Matrix<T> D = Matrix<T>::Zero(5, 5);
-    D.template topLeftCorner    <3, 3>() = material_->bending_voigt(local.g_inv.row(q).transpose());
-    D.template bottomRightCorner<2, 2>() = material_->shear_voigt  (local.g_inv.row(q).transpose());
+    D.template topLeftCorner    <3, 3>() = material_->bending_voigt(g_inv_voigt(ig, q));
+    D.template bottomRightCorner<2, 2>() = material_->shear_voigt  (g_inv_voigt(ig, q));
     return D;
 }
 
@@ -100,8 +99,7 @@ Matrix<T> PlateReissnerMindlinDispl2p<T>::constitutive_matrix(
 template <std::floating_point T>
 Matrix<T> PlateReissnerMindlinDispl2p<T>::displacement_shape_matrix(const Patch<T, 2>& patch,
                                                                     const BasisDerivs<T, 2>& basis,
-                                                                    const LocalFrame<T, 2>& local,
-                                                                    const ChristoffelSymbols<T, 2>& chr) const
+                                                                    const IntrinsicGeometry<T, 2>& ig) const
 {
     const T ratio = material_->bending_stiffness() / material_->shear_stiffness();
 
@@ -109,18 +107,19 @@ Matrix<T> PlateReissnerMindlinDispl2p<T>::displacement_shape_matrix(const Patch<
     const Index n = basis.N.cols();
     Matrix<T> Nw = Matrix<T>::Zero(Q, 2 * n);
 
-    for (Index q = 0; q < Q; ++q) 
+
+    for (Index q = 0; q < Q; ++q)
     {
-        const T gi11 = local.g_inv(q, 0);
-        const T gi12 = local.g_inv(q, 1);
-        const T gi22 = local.g_inv(q, 2);
+        const T gi11 = ig.g_inv[0][0](q);
+        const T gi12 = ig.g_inv[0][1](q);
+        const T gi22 = ig.g_inv[1][1](q);
 
-        const T Gam1_11 = chr.G1_11(q), Gam1_12 = chr.G1_12(q), Gam1_22 = chr.G1_22(q);
-        const T Gam2_11 = chr.G2_11(q), Gam2_12 = chr.G2_12(q), Gam2_22 = chr.G2_22(q);
+        const T Gam1_11 = ig.chr.Gamma[0][0][0](q), Gam1_12 = ig.chr.Gamma[0][0][1](q), Gam1_22 = ig.chr.Gamma[0][1][1](q);
+        const T Gam2_11 = ig.chr.Gamma[1][0][0](q), Gam2_12 = ig.chr.Gamma[1][0][1](q), Gam2_22 = ig.chr.Gamma[1][1][1](q);
 
-        const auto N11 = basis.N_uu.row(q) - Gam1_11 * basis.N_u.row(q) - Gam2_11 * basis.N_v.row(q);
-        const auto N12 = basis.N_uv.row(q) - Gam1_12 * basis.N_u.row(q) - Gam2_12 * basis.N_v.row(q);
-        const auto N22 = basis.N_vv.row(q) - Gam1_22 * basis.N_u.row(q) - Gam2_22 * basis.N_v.row(q);
+        const auto N11 = basis.N_d2[0][0].row(q) - Gam1_11 * basis.N_d1[0].row(q) - Gam2_11 * basis.N_d1[1].row(q);
+        const auto N12 = basis.N_d2[0][1].row(q) - Gam1_12 * basis.N_d1[0].row(q) - Gam2_12 * basis.N_d1[1].row(q);
+        const auto N22 = basis.N_d2[1][1].row(q) - Gam1_22 * basis.N_d1[0].row(q) - Gam2_22 * basis.N_d1[1].row(q);
         const auto Ntilde = basis.N.row(q) - ratio * (gi11 * N11 + T(2) * gi12 * N12 + gi22 * N22);
 
         for (Index i = 0; i < n; ++i) 
@@ -136,8 +135,7 @@ template <std::floating_point T>
 Matrix<T>
 PlateReissnerMindlinDispl2p<T>::rotation_shape_matrix(const Patch<T, 2>& /*patch*/,
                                                       const BasisDerivs<T, 2>& basis,
-                                                      const LocalFrame<T, 2>& /*local*/,
-                                                      const ChristoffelSymbols<T, 2>& /*chr*/) const
+                                                      const IntrinsicGeometry<T, 2>& /*ig*/) const
 {
     const Index Q = basis.N.rows();
     const Index n = basis.N.cols();
@@ -149,10 +147,10 @@ PlateReissnerMindlinDispl2p<T>::rotation_shape_matrix(const Patch<T, 2>& /*patch
         {
             // N_rot = [ -N_{i|1}   N_{i|2} ]
             //         [ -N_{i|2}  -N_{i|1} ]
-            Nphi(2 * q,     2 * i)     = -basis.N_u(q, i);
-            Nphi(2 * q,     2 * i + 1) =  basis.N_v(q, i);
-            Nphi(2 * q + 1, 2 * i)     = -basis.N_v(q, i);
-            Nphi(2 * q + 1, 2 * i + 1) = -basis.N_u(q, i);
+            Nphi(2 * q,     2 * i)     = -basis.N_d1[0](q, i);
+            Nphi(2 * q,     2 * i + 1) =  basis.N_d1[1](q, i);
+            Nphi(2 * q + 1, 2 * i)     = -basis.N_d1[1](q, i);
+            Nphi(2 * q + 1, 2 * i + 1) = -basis.N_d1[0](q, i);
         }
     }
     return Nphi;

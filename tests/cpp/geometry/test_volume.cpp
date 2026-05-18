@@ -5,8 +5,7 @@
 
 #include "patch.hpp"
 #include "basis_derivs.hpp"
-#include "local_frame.hpp"
-#include "christoffels.hpp"
+#include "intrinsic_geometry.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
 #include "knots.hpp"
@@ -73,52 +72,52 @@ TEST_CASE("Patch<double, 3>: Flat Box", "[geometry][volume]")
     SECTION("Metric and Jacobian on a stretched box") {
         ColMatrix<double, 3> pts(1, 3);
         pts << 0.3, 0.5, 0.7;
-        const auto b     = eval_basis(vol, pts, elem_idx, 2);
-        const auto local = eval_local_frame(b, act);
+        const auto b     = eval_basis(vol, pts, elem_idx, 3);
+        IntrinsicGeometry local(b, act);
 
         // Metric layout: (g_11, g_12, g_13, g_22, g_23, g_33).
-        CHECK(local.g(0, 0) == Approx(Lx * Lx).margin(1e-12));
-        CHECK(local.g(0, 1) == Approx(0.0     ).margin(1e-12));
-        CHECK(local.g(0, 2) == Approx(0.0     ).margin(1e-12));
-        CHECK(local.g(0, 3) == Approx(Ly * Ly).margin(1e-12));
-        CHECK(local.g(0, 4) == Approx(0.0     ).margin(1e-12));
-        CHECK(local.g(0, 5) == Approx(Lz * Lz).margin(1e-12));
+        CHECK(local.g[0][0](0) == Approx(Lx * Lx).margin(1e-12));
+        CHECK(local.g[0][1](0) == Approx(0.0     ).margin(1e-12));
+        CHECK(local.g[0][2](0) == Approx(0.0     ).margin(1e-12));
+        CHECK(local.g[1][1](0) == Approx(Ly * Ly).margin(1e-12));
+        CHECK(local.g[1][2](0) == Approx(0.0     ).margin(1e-12));
+        CHECK(local.g[2][2](0) == Approx(Lz * Lz).margin(1e-12));
         CHECK(local.jac(0)  == Approx(Lx * Ly * Lz).margin(1e-12));
 
         // Inverse metric: diagonal entries are reciprocals of diagonal g.
-        CHECK(local.g_inv(0, 0) == Approx(1.0 / (Lx * Lx)).margin(1e-12));
-        CHECK(local.g_inv(0, 3) == Approx(1.0 / (Ly * Ly)).margin(1e-12));
-        CHECK(local.g_inv(0, 5) == Approx(1.0 / (Lz * Lz)).margin(1e-12));
-        CHECK(local.g_inv(0, 1) == Approx(0.0).margin(1e-12));
-        CHECK(local.g_inv(0, 2) == Approx(0.0).margin(1e-12));
-        CHECK(local.g_inv(0, 4) == Approx(0.0).margin(1e-12));
+        CHECK(local.g_inv[0][0](0) == Approx(1.0 / (Lx * Lx)).margin(1e-12));
+        CHECK(local.g_inv[1][1](0) == Approx(1.0 / (Ly * Ly)).margin(1e-12));
+        CHECK(local.g_inv[2][2](0) == Approx(1.0 / (Lz * Lz)).margin(1e-12));
+        CHECK(local.g_inv[0][1](0) == Approx(0.0).margin(1e-12));
+        CHECK(local.g_inv[0][2](0) == Approx(0.0).margin(1e-12));
+        CHECK(local.g_inv[1][2](0) == Approx(0.0).margin(1e-12));
     }
 
     SECTION("Christoffels vanish on flat box") {
         ColMatrix<double, 3> pts(1, 3);
         pts << 0.4, 0.6, 0.2;
-        const auto b     = eval_basis(vol, pts, elem_idx, 2);
-        const auto local = eval_local_frame(b, act);
-        const auto chr   = eval_christoffel(local);
-
-        CHECK(chr.G1_11(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.G1_12(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.G1_13(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.G1_22(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.G1_23(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.G1_33(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.G2_11(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.G2_12(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.G2_13(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.G2_22(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.G2_23(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.G2_33(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.G3_11(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.G3_12(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.G3_13(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.G3_22(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.G3_23(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.G3_33(0) == Approx(0.0).margin(1e-14));
+        const auto b     = eval_basis(vol, pts, elem_idx, 3);
+        IntrinsicGeometry local(b, act);
+        local.compute_christoffels();
+        const auto& chr = local.chr;
+        CHECK(chr.Gamma[0][0][0](0) == Approx(0.0).margin(1e-14));
+        CHECK(chr.Gamma[0][0][1](0) == Approx(0.0).margin(1e-14));
+        CHECK(chr.Gamma[0][0][2](0) == Approx(0.0).margin(1e-14));
+        CHECK(chr.Gamma[0][1][1](0) == Approx(0.0).margin(1e-14));
+        CHECK(chr.Gamma[0][1][2](0) == Approx(0.0).margin(1e-14));
+        CHECK(chr.Gamma[0][2][2](0) == Approx(0.0).margin(1e-14));
+        CHECK(chr.Gamma[1][0][0](0) == Approx(0.0).margin(1e-14));
+        CHECK(chr.Gamma[1][0][1](0) == Approx(0.0).margin(1e-14));
+        CHECK(chr.Gamma[1][0][2](0) == Approx(0.0).margin(1e-14));
+        CHECK(chr.Gamma[1][1][1](0) == Approx(0.0).margin(1e-14));
+        CHECK(chr.Gamma[1][1][2](0) == Approx(0.0).margin(1e-14));
+        CHECK(chr.Gamma[1][2][2](0) == Approx(0.0).margin(1e-14));
+        CHECK(chr.Gamma[2][0][0](0) == Approx(0.0).margin(1e-14));
+        CHECK(chr.Gamma[2][0][1](0) == Approx(0.0).margin(1e-14));
+        CHECK(chr.Gamma[2][0][2](0) == Approx(0.0).margin(1e-14));
+        CHECK(chr.Gamma[2][1][1](0) == Approx(0.0).margin(1e-14));
+        CHECK(chr.Gamma[2][1][2](0) == Approx(0.0).margin(1e-14));
+        CHECK(chr.Gamma[2][2][2](0) == Approx(0.0).margin(1e-14));
     }
 
     SECTION("Partition of unity (3D)") {
@@ -127,15 +126,15 @@ TEST_CASE("Patch<double, 3>: Flat Box", "[geometry][volume]")
         const auto b = eval_basis(vol, pts, elem_idx, 2);
 
         CHECK(b.N   .row(0).sum() == Approx(1.0).margin(1e-14));
-        CHECK(b.N_u .row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_v .row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_w .row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_uu.row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_uv.row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_uw.row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_vv.row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_vw.row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_ww.row(0).sum() == Approx(0.0).margin(1e-14));
+        CHECK(b.N_d1[0] .row(0).sum() == Approx(0.0).margin(1e-14));
+        CHECK(b.N_d1[1] .row(0).sum() == Approx(0.0).margin(1e-14));
+        CHECK(b.N_d1[2] .row(0).sum() == Approx(0.0).margin(1e-14));
+        CHECK(b.N_d2[0][0].row(0).sum() == Approx(0.0).margin(1e-14));
+        CHECK(b.N_d2[0][1].row(0).sum() == Approx(0.0).margin(1e-14));
+        CHECK(b.N_d2[0][2].row(0).sum() == Approx(0.0).margin(1e-14));
+        CHECK(b.N_d2[1][1].row(0).sum() == Approx(0.0).margin(1e-14));
+        CHECK(b.N_d2[1][2].row(0).sum() == Approx(0.0).margin(1e-14));
+        CHECK(b.N_d2[2][2].row(0).sum() == Approx(0.0).margin(1e-14));
     }
 }
 
@@ -191,7 +190,7 @@ TEST_CASE("Patch<double, 3>: Box factory volume integral", "[geometry][volume]")
             auto [mp, mw] = quad.map_to_domain(lo, hi);
             const auto b     = eval_basis(vol, mp, e, 1);
             const auto act   = vol.active_control_pts(e);
-            const auto local = eval_local_frame(b, act);
+            IntrinsicGeometry local(b, act);
 
             for (Eigen::Index q = 0; q < mw.size(); ++q)
                 vol_int += local.jac(q) * mw(q);

@@ -5,132 +5,98 @@
 namespace pyck
 {
 
-template <std::floating_point T>
-BasisDerivs<T, 1>
-eval_basis(const Patch<T, 1>& patch,
-           const ColMatrix<T, 1>& eval_coords,
+namespace {
+
+/// Linearise a multi-index of partial-derivative orders into the flat index of
+/// the `raw[]` buffer returned by `tensor_product::eval_on_span`. The buffer
+/// layout is dim-0-outermost, dim-(d-1)-innermost; with S = order + 1, the
+/// flat index of `(i_0, i_1, …, i_{d-1})` is Σ i_k · S^{d-1-k}.
+template <std::size_t d>
+Index raw_flat(const std::array<Index, d>& derivs, Index S)
+{
+    Index idx = 0;
+    for (std::size_t k = 0; k < d; ++k) {
+        idx = idx * S + derivs[k];
+    }
+    return idx;
+}
+
+}  // namespace
+
+template <std::floating_point T, std::size_t d>
+BasisDerivs<T, d>
+eval_basis(const Patch<T, d>& patch,
+           const std::type_identity_t<ColMatrix<T, d>>& eval_coords,
            Index span_idx,
            std::size_t derivs_order)
 {
-    std::array<Index, 1> spans = {span_idx};
     const Index order = static_cast<Index>(derivs_order);
+    const Index S     = order + 1;
+    const auto spans  = patch.decode_span(span_idx);
+
     std::vector<Matrix<T>> raw;
     patch.tensor_product().eval_on_span(eval_coords, spans, order, raw);
 
-    BasisDerivs<T, 1> b;
+    BasisDerivs<T, d> b;
     b.order = order;
-    b.N = std::move(raw[0]);
 
-    if (b.order >= 1) b.N_u   = std::move(raw[1]);
-    if (b.order >= 2) b.N_uu  = std::move(raw[2]);
-    if (b.order >= 3) b.N_uuu = std::move(raw[3]);
+    // 0th derivative — values N (multi-index all-zero).
+    {
+        std::array<Index, d> derivs{};
+        b.N = std::move(raw[raw_flat<d>(derivs, S)]);
+    }
+
+    if (order >= 1) 
+    {
+        for (std::size_t i = 0; i < d; ++i) 
+        {
+            std::array<Index, d> derivs{};
+            derivs[i] = 1;
+            b.N_d1[i] = std::move(raw[raw_flat<d>(derivs, S)]);
+        }
+    }
+
+    if (order >= 2) 
+    {
+        for (std::size_t i = 0; i < d; ++i)
+            for (std::size_t j = i; j < d; ++j) 
+            {
+                std::array<Index, d> derivs{};
+                derivs[i] += 1; derivs[j] += 1;
+                b.N_d2[i][j] = std::move(raw[raw_flat<d>(derivs, S)]);
+            }
+    }
+
+    if (order >= 3) 
+    {
+        for (std::size_t i = 0; i < d; ++i)
+            for (std::size_t j = i; j < d; ++j)
+                for (std::size_t k = j; k < d; ++k) 
+                {
+                    std::array<Index, d> derivs{};
+                    derivs[i] += 1; derivs[j] += 1; derivs[k] += 1;
+                    b.N_d3[i][j][k] = std::move(raw[raw_flat<d>(derivs, S)]);
+                }
+    }
+
     return b;
 }
 
-template <std::floating_point T>
-BasisDerivs<T, 2>
-eval_basis(const Patch<T, 2>& patch,
-           const ColMatrix<T, 2>& eval_coords,
-           Index span_idx,
-           std::size_t derivs_order)
-{
-    auto spans = patch.decode_span(span_idx);
-    const Index order = static_cast<Index>(derivs_order);
-    const Index S = order + 1;
-    std::vector<Matrix<T>> raw;
-    patch.tensor_product().eval_on_span(eval_coords, spans, order, raw);
+// === Template Instantiations ========================================================
 
-    BasisDerivs<T, 2> b;
-    b.order = order;
-    b.N = std::move(raw[0]);
-
-    if (b.order >= 1)
-    {
-        b.N_u = std::move(raw[1 * S + 0]);
-        b.N_v = std::move(raw[0 * S + 1]);
-    }
-    if (b.order >= 2)
-    {
-        b.N_uu = std::move(raw[2 * S + 0]);
-        b.N_uv = std::move(raw[1 * S + 1]);
-        b.N_vv = std::move(raw[0 * S + 2]);
-    }
-    if (b.order >= 3)
-    {
-        b.N_uuu = std::move(raw[3 * S + 0]);
-        b.N_uuv = std::move(raw[2 * S + 1]);
-        b.N_uvv = std::move(raw[1 * S + 2]);
-        b.N_vvv = std::move(raw[0 * S + 3]);
-    }
-    return b;
-}
-
-template <std::floating_point T>
-BasisDerivs<T, 3>
-eval_basis(const Patch<T, 3>& patch,
-           const ColMatrix<T, 3>& eval_coords,
-           Index span_idx,
-           std::size_t derivs_order)
-{
-    auto spans = patch.decode_span(span_idx);
-    const Index order = static_cast<Index>(derivs_order);
-    const Index S  = order + 1;
-    const Index S2 = S * S;
-    std::vector<Matrix<T>> raw;
-    patch.tensor_product().eval_on_span(eval_coords, spans, order, raw);
-
-    BasisDerivs<T, 3> b;
-    b.order = order;
-    auto at = [&](Index a, Index bb, Index c) -> Index { return a * S2 + bb * S + c; };
-
-    b.N = std::move(raw[at(0, 0, 0)]);
-
-    if (b.order >= 1)
-    {
-        b.N_u = std::move(raw[at(1, 0, 0)]);
-        b.N_v = std::move(raw[at(0, 1, 0)]);
-        b.N_w = std::move(raw[at(0, 0, 1)]);
-    }
-    if (b.order >= 2)
-    {
-        b.N_uu = std::move(raw[at(2, 0, 0)]);
-        b.N_uv = std::move(raw[at(1, 1, 0)]);
-        b.N_uw = std::move(raw[at(1, 0, 1)]);
-        b.N_vv = std::move(raw[at(0, 2, 0)]);
-        b.N_vw = std::move(raw[at(0, 1, 1)]);
-        b.N_ww = std::move(raw[at(0, 0, 2)]);
-    }
-    if (b.order >= 3)
-    {
-        b.N_uuu = std::move(raw[at(3, 0, 0)]);
-        b.N_uuv = std::move(raw[at(2, 1, 0)]);
-        b.N_uuw = std::move(raw[at(2, 0, 1)]);
-        b.N_uvv = std::move(raw[at(1, 2, 0)]);
-        b.N_uvw = std::move(raw[at(1, 1, 1)]);
-        b.N_uww = std::move(raw[at(1, 0, 2)]);
-        b.N_vvv = std::move(raw[at(0, 3, 0)]);
-        b.N_vvw = std::move(raw[at(0, 2, 1)]);
-        b.N_vww = std::move(raw[at(0, 1, 2)]);
-        b.N_www = std::move(raw[at(0, 0, 3)]);
-    }
-    return b;
-}
-
-// === Template Specializations =======================================================
-
-template BasisDerivs<double, 1> eval_basis<double>(
+template BasisDerivs<double, 1> eval_basis<double, 1>(
     const Patch<double, 1>&, const ColMatrix<double, 1>&, Index, std::size_t);
-template BasisDerivs<double, 2> eval_basis<double>(
+template BasisDerivs<double, 2> eval_basis<double, 2>(
     const Patch<double, 2>&, const ColMatrix<double, 2>&, Index, std::size_t);
-template BasisDerivs<double, 3> eval_basis<double>(
+template BasisDerivs<double, 3> eval_basis<double, 3>(
     const Patch<double, 3>&, const ColMatrix<double, 3>&, Index, std::size_t);
 
 #ifdef PYCK_BUILD_SINGLE_PRECISION
-template BasisDerivs<float, 1> eval_basis<float>(
+template BasisDerivs<float, 1> eval_basis<float, 1>(
     const Patch<float, 1>&, const ColMatrix<float, 1>&, Index, std::size_t);
-template BasisDerivs<float, 2> eval_basis<float>(
+template BasisDerivs<float, 2> eval_basis<float, 2>(
     const Patch<float, 2>&, const ColMatrix<float, 2>&, Index, std::size_t);
-template BasisDerivs<float, 3> eval_basis<float>(
+template BasisDerivs<float, 3> eval_basis<float, 3>(
     const Patch<float, 3>&, const ColMatrix<float, 3>&, Index, std::size_t);
 #endif
 

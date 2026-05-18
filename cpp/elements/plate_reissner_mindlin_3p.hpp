@@ -44,8 +44,7 @@ public:
      */
     Matrix<T> strain_matrix(const Patch<T, 2>& patch,
                             const BasisDerivs<T, 2>& basis,
-                            const LocalFrame<T, 2>& local,
-                            const ChristoffelSymbols<T, 2>& chr) const override;
+                            const IntrinsicGeometry<T, 2>& ig) const override;
 
     /**
      * @brief Constitutive D-matrix (5×5 block-diag [Db; Ds]).
@@ -54,7 +53,7 @@ public:
      * @param q Quadrature point.
      * @return Constitutive matrix.
      */
-    Matrix<T> constitutive_matrix(const LocalFrame<T, 2>& local, Index q) const override;
+    Matrix<T> constitutive_matrix(const IntrinsicGeometry<T, 2>& ig, Index q) const override;
 
     // === Shape Matrices =============================================================
 
@@ -69,8 +68,7 @@ public:
      */
     Matrix<T> displacement_shape_matrix(const Patch<T, 2>& patch,
                                         const BasisDerivs<T, 2>& basis,
-                                        const LocalFrame<T, 2>& local,
-                                        const ChristoffelSymbols<T, 2>& chr) const override;
+                                        const IntrinsicGeometry<T, 2>& ig) const override;
 
     /**
      * @brief Rotation shape matrix.
@@ -83,8 +81,7 @@ public:
      */
     Matrix<T> rotation_shape_matrix(const Patch<T, 2>& patch,
                                     const BasisDerivs<T, 2>& basis,
-                                    const LocalFrame<T, 2>& local,
-                                    const ChristoffelSymbols<T, 2>& chr) const override;
+                                    const IntrinsicGeometry<T, 2>& ig) const override;
 
     // === Getters ================================================================
 

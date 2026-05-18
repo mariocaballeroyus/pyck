@@ -5,8 +5,8 @@
 
 #include "../elements/element.hpp"
 #include "../geometry/patch_boundary.hpp"
-#include "../geometry/christoffels.hpp"
-#include "../geometry/directors.hpp"
+#include "../geometry/intrinsic_geometry.hpp"
+#include "../geometry/extrinsic_geometry.hpp"
 #include "../types.hpp"
 
 namespace pyck
@@ -35,17 +35,17 @@ public:
      * @param boundary_local The local frame of the boundary.
      * @param parent_flat_span The flat span of the parent.
      * @param parent_basis The basis derivatives of the parent.
-     * @param parent_local The local frame of the parent.
+     * @param parent_ig The intrinsic geometry of the parent.
      * @return The boundary field evaluated at the quadrature points.
      */
     virtual Matrix<T> evaluate(const Element<T, 2>& element,
                                const PatchBoundary<T, 2>& boundary,
                                Index boundary_span,
                                const BasisDerivs<T, 1>& boundary_basis,
-                               const LocalFrame<T, 1>& boundary_local,
+                               const IntrinsicGeometry<T, 1>& boundary_local,
                                Index parent_flat_span,
                                const BasisDerivs<T, 2>& parent_basis,
-                               const LocalFrame<T, 2>& parent_local) const = 0;
+                               const IntrinsicGeometry<T, 2>& parent_ig) const = 0;
 };
 
 namespace detail
@@ -56,13 +56,13 @@ namespace detail
 template <std::floating_point T>
 inline std::pair<Vector<T>, Vector<T>>
 covariant_components(const ColMatrix<T, 3>& v,
-                     const LocalFrame<T, 2>& local)
+                     const IntrinsicGeometry<T, 2>& local)
 {
     const Index Q = v.rows();
     Vector<T> v_cov_1(Q), v_cov_2(Q);
     for (Index q = 0; q < Q; ++q) {
-        v_cov_1(q) = v.row(q).dot(local.a1.row(q));
-        v_cov_2(q) = v.row(q).dot(local.a2.row(q));
+        v_cov_1(q) = v.row(q).dot(local.a[0].row(q));
+        v_cov_2(q) = v.row(q).dot(local.a[1].row(q));
     }
     return {std::move(v_cov_1), std::move(v_cov_2)};
 }
@@ -73,15 +73,15 @@ covariant_components(const ColMatrix<T, 3>& v,
 template <std::floating_point T>
 inline std::pair<Vector<T>, Vector<T>>
 contravariant_components(const ColMatrix<T, 3>& v,
-                         const LocalFrame<T, 2>& local)
+                         const IntrinsicGeometry<T, 2>& local)
 {
     auto [v_cov_1, v_cov_2] = covariant_components(v, local);
     const Index Q = v.rows();
     Vector<T> v_up_1(Q), v_up_2(Q);
     for (Index q = 0; q < Q; ++q) {
-        const T gi11 = local.g_inv(q, 0);
-        const T gi12 = local.g_inv(q, 1);
-        const T gi22 = local.g_inv(q, 2);
+        const T gi11 = local.g_inv[0][0](q);
+        const T gi12 = local.g_inv[0][1](q);
+        const T gi22 = local.g_inv[1][1](q);
         v_up_1(q) = gi11 * v_cov_1(q) + gi12 * v_cov_2(q);
         v_up_2(q) = gi12 * v_cov_1(q) + gi22 * v_cov_2(q);
     }
@@ -128,10 +128,10 @@ public:
         const PatchBoundary<T, 2>& /*boundary*/,
         Index /*boundary_span*/,
         const BasisDerivs<T, 1>& /*boundary_basis*/,
-        const LocalFrame<T, 1>& /*boundary_local*/,
+        const IntrinsicGeometry<T, 1>& /*boundary_local*/,
         Index /*parent_flat_span*/,
         const BasisDerivs<T, 2>& parent_basis,
-        const LocalFrame<T, 2>& /*parent_local*/) const override
+        const IntrinsicGeometry<T, 2>& /*parent_ig*/) const override
     {
         const Index ndof = static_cast<Index>(element.num_node_dofs());
         const Matrix<T>& N = parent_basis.N;
@@ -173,21 +173,21 @@ public:
         const PatchBoundary<T, 2>& boundary,
         Index /*boundary_span*/,
         const BasisDerivs<T, 1>& /*boundary_basis*/,
-        const LocalFrame<T, 1>& boundary_local,
+        const IntrinsicGeometry<T, 1>& boundary_local,
         Index /*parent_flat_span*/,
         const BasisDerivs<T, 2>& parent_basis,
-        const LocalFrame<T, 2>& parent_local) const override
+        const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
         const Index ndof = static_cast<Index>(element.num_node_dofs());
-        const Matrix<T>& N_u = parent_basis.N_u;
-        const Matrix<T>& N_v = parent_basis.N_v;
+        const Matrix<T>& N_u = parent_basis.N_d1[0];
+        const Matrix<T>& N_v = parent_basis.N_d1[1];
         const Index Q = N_u.rows();
         const Index n = N_u.cols();
 
         const ColMatrix<T, 3> normal =
-            boundary.eval_outward_normal(boundary_local, parent_local);
+            boundary.eval_outward_normal(boundary_local, parent_ig);
         const auto [n_up_1, n_up_2] =
-            detail::contravariant_components(normal, parent_local);
+            detail::contravariant_components(normal, parent_ig);
 
         Matrix<T> C = Matrix<T>::Zero(Q, n * ndof);
         const Index slot = static_cast<Index>(dof_index_);
@@ -227,32 +227,30 @@ public:
         const PatchBoundary<T, 2>& boundary,
         Index /*boundary_span*/,
         const BasisDerivs<T, 1>& /*boundary_basis*/,
-        const LocalFrame<T, 1>& boundary_local,
+        const IntrinsicGeometry<T, 1>& boundary_local,
         Index /*parent_flat_span*/,
         const BasisDerivs<T, 2>& parent_basis,
-        const LocalFrame<T, 2>& parent_local) const override
+        const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
         const Index ndof = static_cast<Index>(element.num_node_dofs());
-        const Matrix<T>& N_u  = parent_basis.N_u;
-        const Matrix<T>& N_v  = parent_basis.N_v;
-        const Matrix<T>& N_uu = parent_basis.N_uu;
-        const Matrix<T>& N_uv = parent_basis.N_uv;
-        const Matrix<T>& N_vv = parent_basis.N_vv;
+        const Matrix<T>& N_u  = parent_basis.N_d1[0];
+        const Matrix<T>& N_v  = parent_basis.N_d1[1];
+        const Matrix<T>& N_uu = parent_basis.N_d2[0][0];
+        const Matrix<T>& N_uv = parent_basis.N_d2[0][1];
+        const Matrix<T>& N_vv = parent_basis.N_d2[1][1];
         const Index Q = N_uu.rows();
         const Index n = N_uu.cols();
 
         const ColMatrix<T, 3> normal =
-            boundary.eval_outward_normal(boundary_local, parent_local);
+            boundary.eval_outward_normal(boundary_local, parent_ig);
         const auto [n_up_1, n_up_2] =
-            detail::contravariant_components(normal, parent_local);
-        const ChristoffelSymbols<T, 2> chr =
-            eval_christoffel(parent_local);
+            detail::contravariant_components(normal, parent_ig);
 
         Matrix<T> C = Matrix<T>::Zero(Q, n * ndof);
         const Index slot = static_cast<Index>(dof_index_);
         for (Index q = 0; q < Q; ++q) {
-            const T G1_11 = chr.G1_11(q), G1_12 = chr.G1_12(q), G1_22 = chr.G1_22(q);
-            const T G2_11 = chr.G2_11(q), G2_12 = chr.G2_12(q), G2_22 = chr.G2_22(q);
+            const T G1_11 = parent_ig.chr.Gamma[0][0][0](q), G1_12 = parent_ig.chr.Gamma[0][0][1](q), G1_22 = parent_ig.chr.Gamma[0][1][1](q);
+            const T G2_11 = parent_ig.chr.Gamma[1][0][0](q), G2_12 = parent_ig.chr.Gamma[1][0][1](q), G2_22 = parent_ig.chr.Gamma[1][1][1](q);
             const T n1 = n_up_1(q);
             const T n2 = n_up_2(q);
             const T n1n1 = n1 * n1;
@@ -285,14 +283,13 @@ public:
                        const PatchBoundary<T, 2>& boundary,
                        Index /*boundary_span*/,
                        const BasisDerivs<T, 1>& /*boundary_basis*/,
-                       const LocalFrame<T, 1>& /*boundary_local*/,
+                       const IntrinsicGeometry<T, 1>& /*boundary_local*/,
                        Index /*parent_flat_span*/,
                        const BasisDerivs<T, 2>& parent_basis,
-                       const LocalFrame<T, 2>& parent_local) const override
+                       const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
-        const ChristoffelSymbols<T, 2> chr = eval_christoffel(parent_local);
         return element.displacement_shape_matrix(*boundary.parent(),
-                                                 parent_basis, parent_local, chr);
+                                                 parent_basis, parent_ig);
     }
 };
 
@@ -313,18 +310,17 @@ public:
         const PatchBoundary<T, 2>& boundary,
         Index /*boundary_span*/,
         const BasisDerivs<T, 1>& /*boundary_basis*/,
-        const LocalFrame<T, 1>& boundary_local,
+        const IntrinsicGeometry<T, 1>& boundary_local,
         Index /*parent_flat_span*/,
         const BasisDerivs<T, 2>& parent_basis,
-        const LocalFrame<T, 2>& parent_local) const override
+        const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
-        const ChristoffelSymbols<T, 2> chr = eval_christoffel(parent_local);
         const Matrix<T> Nrot = element.rotation_shape_matrix(
-            *boundary.parent(), parent_basis, parent_local, chr);
+            *boundary.parent(), parent_basis, parent_ig);
         const ColMatrix<T, 3> n =
-            boundary.eval_outward_normal(boundary_local, parent_local);
+            boundary.eval_outward_normal(boundary_local, parent_ig);
         const auto [n_up_1, n_up_2] =
-            detail::contravariant_components(n, parent_local);
+            detail::contravariant_components(n, parent_ig);
         const Index Q = static_cast<Index>(n.rows());
         Matrix<T> C(Q, Nrot.cols());
         for (Index q = 0; q < Q; ++q) {
@@ -352,20 +348,20 @@ public:
         const PatchBoundary<T, 2>& boundary,
         Index /*boundary_span*/,
         const BasisDerivs<T, 1>& /*boundary_basis*/,
-        const LocalFrame<T, 1>& boundary_local,
+        const IntrinsicGeometry<T, 1>& boundary_local,
         Index /*parent_flat_span*/,
         const BasisDerivs<T, 2>& parent_basis,
-        const LocalFrame<T, 2>& parent_local) const override
+        const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
-        const ChristoffelSymbols<T, 2> chr = eval_christoffel(parent_local);
         const Matrix<T> Nrot = element.rotation_shape_matrix(
-            *boundary.parent(), parent_basis, parent_local, chr);
+            *boundary.parent(), parent_basis, parent_ig);
         const ColMatrix<T, 3> n =
-            boundary.eval_outward_normal(boundary_local, parent_local);
-        const ColMatrix<T, 3> a_3 = eval_normal(parent_local);
+            boundary.eval_outward_normal(boundary_local, parent_ig);
+        const ExtrinsicGeometry<T, 2, 3> eg(parent_ig);
+        const ColMatrix<T, 3>& a_3 = eg.n;
         const ColMatrix<T, 3> s = detail::surface_tangent(n, a_3);
         const auto [s_up_1, s_up_2] =
-            detail::contravariant_components(s, parent_local);
+            detail::contravariant_components(s, parent_ig);
         const Index Q = static_cast<Index>(n.rows());
         Matrix<T> C(Q, Nrot.cols());
         for (Index q = 0; q < Q; ++q) {
@@ -396,17 +392,17 @@ public:
         const PatchBoundary<T, 2>& boundary,
         Index /*boundary_span*/,
         const BasisDerivs<T, 1>& /*boundary_basis*/,
-        const LocalFrame<T, 1>& boundary_local,
+        const IntrinsicGeometry<T, 1>& boundary_local,
         Index /*parent_flat_span*/,
         const BasisDerivs<T, 2>& parent_basis,
-        const LocalFrame<T, 2>& parent_local) const override
+        const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
         const Matrix<T> Nsigma = element.stress_matrix(
-            *boundary.parent(), parent_basis, parent_local);
+            *boundary.parent(), parent_basis, parent_ig);
         const ColMatrix<T, 3> n =
-            boundary.eval_outward_normal(boundary_local, parent_local);
+            boundary.eval_outward_normal(boundary_local, parent_ig);
         const auto [n_cov_1, n_cov_2] =
-            detail::covariant_components(n, parent_local);
+            detail::covariant_components(n, parent_ig);
         const Index Q = static_cast<Index>(n.rows());
         Matrix<T> C(Q, Nsigma.cols());
         for (Index q = 0; q < Q; ++q) {
@@ -434,17 +430,17 @@ public:
         const PatchBoundary<T, 2>& boundary,
         Index /*boundary_span*/,
         const BasisDerivs<T, 1>& /*boundary_basis*/,
-        const LocalFrame<T, 1>& boundary_local,
+        const IntrinsicGeometry<T, 1>& boundary_local,
         Index /*parent_flat_span*/,
         const BasisDerivs<T, 2>& parent_basis,
-        const LocalFrame<T, 2>& parent_local) const override
+        const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
         const Matrix<T> Nsigma = element.stress_matrix(
-            *boundary.parent(), parent_basis, parent_local);
+            *boundary.parent(), parent_basis, parent_ig);
         const ColMatrix<T, 3> n =
-            boundary.eval_outward_normal(boundary_local, parent_local);
+            boundary.eval_outward_normal(boundary_local, parent_ig);
         const auto [n_cov_1, n_cov_2] =
-            detail::covariant_components(n, parent_local);
+            detail::covariant_components(n, parent_ig);
         const Index Q = static_cast<Index>(n.rows());
         const Index n_strain = Nsigma.rows() / Q;
         Matrix<T> C(Q, Nsigma.cols());
@@ -478,21 +474,22 @@ public:
         const PatchBoundary<T, 2>& boundary,
         Index /*boundary_span*/,
         const BasisDerivs<T, 1>& /*boundary_basis*/,
-        const LocalFrame<T, 1>& boundary_local,
+        const IntrinsicGeometry<T, 1>& boundary_local,
         Index /*parent_flat_span*/,
         const BasisDerivs<T, 2>& parent_basis,
-        const LocalFrame<T, 2>& parent_local) const override
+        const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
         const Matrix<T> Nsigma = element.stress_matrix(
-            *boundary.parent(), parent_basis, parent_local);
+            *boundary.parent(), parent_basis, parent_ig);
         const ColMatrix<T, 3> n =
-            boundary.eval_outward_normal(boundary_local, parent_local);
-        const ColMatrix<T, 3> a_3 = eval_normal(parent_local);
+            boundary.eval_outward_normal(boundary_local, parent_ig);
+        const ExtrinsicGeometry<T, 2, 3> eg(parent_ig);
+        const ColMatrix<T, 3>& a_3 = eg.n;
         const ColMatrix<T, 3> s = detail::surface_tangent(n, a_3);
         const auto [n_cov_1, n_cov_2] =
-            detail::covariant_components(n, parent_local);
+            detail::covariant_components(n, parent_ig);
         const auto [s_cov_1, s_cov_2] =
-            detail::covariant_components(s, parent_local);
+            detail::covariant_components(s, parent_ig);
         const Index Q = static_cast<Index>(n.rows());
         const Index n_strain = Nsigma.rows() / Q;
         Matrix<T> C(Q, Nsigma.cols());

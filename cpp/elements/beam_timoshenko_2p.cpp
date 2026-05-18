@@ -1,6 +1,6 @@
 #include "beam_timoshenko_2p.hpp"
 #include "patch.hpp"
-#include "christoffels.hpp"
+#include "intrinsic_geometry.hpp"
 
 namespace pyck
 {
@@ -21,12 +21,12 @@ BeamTimoshenko2p<T>::BeamTimoshenko2p(Ptr<UniaxialStress1d<T>> material)
 
 
 template <std::floating_point T> Matrix<T>
-BeamTimoshenko2p<T>::constitutive_matrix(const LocalFrame<T, 1>& local,
+BeamTimoshenko2p<T>::constitutive_matrix(const IntrinsicGeometry<T, 1>& ig,
                                          Index q) const
 {
     // D = [ D_b  0   ]
     //     [ 0    D_s ]
-    const T gi = local.g_inv_11(q);
+    const T gi = ig.g_inv[0][0](q);
     Matrix<T> D = Matrix<T>::Zero(2, 2);
     D(0, 0) = material_->bending_stiffness() * gi;
     D(1, 1) = material_->shear_stiffness()   * gi;
@@ -36,26 +36,26 @@ BeamTimoshenko2p<T>::constitutive_matrix(const LocalFrame<T, 1>& local,
 template <std::floating_point T> Matrix<T>
 BeamTimoshenko2p<T>::strain_matrix(const Patch<T, 1>& /*patch*/,
                                    const BasisDerivs<T, 1>& basis,
-                                   const LocalFrame<T, 1>& local,
-                                   const ChristoffelSymbols<T, 1>& chr) const
+                                   const IntrinsicGeometry<T, 1>& ig) const
 {
     const Index Q = basis.N.rows();
     const Index n = basis.N.cols();
     Matrix<T> B = Matrix<T>::Zero(2 * Q, 2 * n);
 
+
     for (Index q = 0; q < Q; ++q)
     {
-        const T G = chr.G1_11(q);
+        const T G = ig.chr.Gamma[0][0][0](q);
 
         for (Index i = 0; i < n; ++i)
         {
             // Bending
             // B_b = [ 0        N_{i|1} − Γ^1_{11} N_i ]
-            B(2 * q,     2 * i + 1) = basis.N_u(q, i) - G * basis.N(q, i);
+            B(2 * q,     2 * i + 1) = basis.N_d1[0](q, i) - G * basis.N(q, i);
 
             // Transverse Shear
             // B_s = [ N_{i|1}  N_i ]
-            B(2 * q + 1, 2 * i    ) = basis.N_u(q, i);
+            B(2 * q + 1, 2 * i    ) = basis.N_d1[0](q, i);
             B(2 * q + 1, 2 * i + 1) = basis.N  (q, i);
         }
     }
@@ -68,8 +68,7 @@ BeamTimoshenko2p<T>::strain_matrix(const Patch<T, 1>& /*patch*/,
 template <std::floating_point T> Matrix<T>
 BeamTimoshenko2p<T>::displacement_shape_matrix(const Patch<T, 1>& /*patch*/,
                                                const BasisDerivs<T, 1>& basis,
-                                               const LocalFrame<T, 1>& /*local*/,
-                                               const ChristoffelSymbols<T, 1>& /*chr*/) const
+                                               const IntrinsicGeometry<T, 1>& /*ig*/) const
 {
     const Index Q = basis.N.rows();
     const Index n = basis.N.cols();
@@ -86,8 +85,7 @@ BeamTimoshenko2p<T>::displacement_shape_matrix(const Patch<T, 1>& /*patch*/,
 template <std::floating_point T> Matrix<T>
 BeamTimoshenko2p<T>::rotation_shape_matrix(const Patch<T, 1>& /*patch*/,
                                            const BasisDerivs<T, 1>& basis,
-                                           const LocalFrame<T, 1>& /*local*/,
-                                           const ChristoffelSymbols<T, 1>& /*chr*/) const
+                                           const IntrinsicGeometry<T, 1>& /*ig*/) const
 {
     const Index Q = basis.N.rows();
     const Index n = basis.N.cols();

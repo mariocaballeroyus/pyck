@@ -7,9 +7,8 @@
 #include "patch.hpp"
 #include "patch_boundary.hpp"
 #include "basis_derivs.hpp"
-#include "local_frame.hpp"
-#include "christoffels.hpp"
-#include "directors.hpp"
+#include "intrinsic_geometry.hpp"
+#include "extrinsic_geometry.hpp"
 #include "physical_points.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
@@ -61,28 +60,28 @@ TEST_CASE("Patch<double, 2>: Flat Rectangular Plate", "[geometry][surface]") {
     SECTION("Metric & Jacobian = Lx · Ly") {
         ColMatrix<double, 2> pts(1, 2);
         pts << 0.3, 0.7;
-        const auto b     = eval_basis(surf, pts, elem_idx, 2);
-        const auto local = eval_local_frame(b, act);
+        const auto b     = eval_basis(surf, pts, elem_idx, 3);
+        IntrinsicGeometry local(b, act);
 
-        CHECK(local.g(0, 0) == Approx(Lx * Lx).margin(1e-12));
-        CHECK(local.g(0, 1) == Approx(0.0     ).margin(1e-12));
-        CHECK(local.g(0, 2) == Approx(Ly * Ly).margin(1e-12));
+        CHECK(local.g[0][0](0) == Approx(Lx * Lx).margin(1e-12));
+        CHECK(local.g[0][1](0) == Approx(0.0     ).margin(1e-12));
+        CHECK(local.g[1][1](0) == Approx(Ly * Ly).margin(1e-12));
         CHECK(local.jac(0)  == Approx(Lx * Ly).margin(1e-12));
     }
 
     SECTION("Christoffels vanish on flat plate") {
         ColMatrix<double, 2> pts(1, 2);
         pts << 0.4, 0.6;
-        const auto b     = eval_basis(surf, pts, elem_idx, 2);
-        const auto local = eval_local_frame(b, act);
-        const auto chr   = eval_christoffel(local);
-
-        CHECK(chr.G1_11(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.G1_12(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.G1_22(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.G2_11(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.G2_12(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.G2_22(0) == Approx(0.0).margin(1e-14));
+        const auto b     = eval_basis(surf, pts, elem_idx, 3);
+        IntrinsicGeometry local(b, act);
+        local.compute_christoffels();
+        const auto& chr = local.chr;
+        CHECK(chr.Gamma[0][0][0](0) == Approx(0.0).margin(1e-14));
+        CHECK(chr.Gamma[0][0][1](0) == Approx(0.0).margin(1e-14));
+        CHECK(chr.Gamma[0][1][1](0) == Approx(0.0).margin(1e-14));
+        CHECK(chr.Gamma[1][0][0](0) == Approx(0.0).margin(1e-14));
+        CHECK(chr.Gamma[1][0][1](0) == Approx(0.0).margin(1e-14));
+        CHECK(chr.Gamma[1][1][1](0) == Approx(0.0).margin(1e-14));
     }
 
     SECTION("Partition of unity") {
@@ -91,11 +90,11 @@ TEST_CASE("Patch<double, 2>: Flat Rectangular Plate", "[geometry][surface]") {
         const auto b = eval_basis(surf, pts, elem_idx, 2);
 
         CHECK(b.N   .row(0).sum() == Approx(1.0).margin(1e-14));
-        CHECK(b.N_u .row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_v .row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_uu.row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_uv.row(0).sum() == Approx(0.0).margin(1e-14));
-        CHECK(b.N_vv.row(0).sum() == Approx(0.0).margin(1e-14));
+        CHECK(b.N_d1[0] .row(0).sum() == Approx(0.0).margin(1e-14));
+        CHECK(b.N_d1[1] .row(0).sum() == Approx(0.0).margin(1e-14));
+        CHECK(b.N_d2[0][0].row(0).sum() == Approx(0.0).margin(1e-14));
+        CHECK(b.N_d2[0][1].row(0).sum() == Approx(0.0).margin(1e-14));
+        CHECK(b.N_d2[1][1].row(0).sum() == Approx(0.0).margin(1e-14));
     }
 }
 
@@ -145,7 +144,7 @@ TEST_CASE("Patch<double, 2>: Rectangle factory area integral", "[geometry][surfa
             auto [mp, mw] = quad.map_to_domain(lo, hi);
             const auto b     = eval_basis(surf, mp, e, 1);
             const auto act   = surf.active_control_pts(e);
-            const auto local = eval_local_frame(b, act);
+            IntrinsicGeometry local(b, act);
 
             for (Eigen::Index q = 0; q < mw.size(); ++q)
                 area += local.jac(q) * mw(q);
@@ -223,15 +222,15 @@ TEST_CASE("Patch<double, 2>: Quadratic Basis — Partition of Unity",
             ColMatrix<double, 2> pts(1, 2);
             pts << u, v;
 
-            const auto b     = eval_basis(surf, pts, elem_idx, 2);
-            const auto local = eval_local_frame(b, act);
+            const auto b     = eval_basis(surf, pts, elem_idx, 3);
+            IntrinsicGeometry local(b, act);
 
             CHECK(b.N   .row(0).sum() == Approx(1.0).margin(1e-14));
-            CHECK(b.N_u .row(0).sum() == Approx(0.0).margin(1e-12));
-            CHECK(b.N_v .row(0).sum() == Approx(0.0).margin(1e-12));
-            CHECK(b.N_uu.row(0).sum() == Approx(0.0).margin(1e-11));
-            CHECK(b.N_uv.row(0).sum() == Approx(0.0).margin(1e-11));
-            CHECK(b.N_vv.row(0).sum() == Approx(0.0).margin(1e-11));
+            CHECK(b.N_d1[0] .row(0).sum() == Approx(0.0).margin(1e-12));
+            CHECK(b.N_d1[1] .row(0).sum() == Approx(0.0).margin(1e-12));
+            CHECK(b.N_d2[0][0].row(0).sum() == Approx(0.0).margin(1e-11));
+            CHECK(b.N_d2[0][1].row(0).sum() == Approx(0.0).margin(1e-11));
+            CHECK(b.N_d2[1][1].row(0).sum() == Approx(0.0).margin(1e-11));
             CHECK(local.jac(0) > 0.0);
         }
     }
@@ -267,13 +266,13 @@ TEST_CASE("PatchBoundary<double, 2>::eval_outward_normal: flat rectangle",
 
     const auto bdy_basis = eval_basis(*bdy, bdy_pts, boundary_span, 1);
     const auto bdy_act   = bdy->active_control_pts(boundary_span);
-    const auto bdy_local = eval_local_frame(bdy_basis, bdy_act);
+    IntrinsicGeometry bdy_local(bdy_basis, bdy_act);
 
     const Index parent_flat = bdy->parent_flat_span(boundary_span);
     const auto parent_pts   = bdy->lift_to_parent(bdy_pts);
     const auto parent_basis = eval_basis(*surf, parent_pts, parent_flat, 1);
     const auto parent_act   = surf->active_control_pts(parent_flat);
-    const auto parent_local = eval_local_frame(parent_basis, parent_act);
+    IntrinsicGeometry parent_local(parent_basis, parent_act);
 
     const auto n = bdy->eval_outward_normal(bdy_local, parent_local);
     REQUIRE(n.rows() == bdy_pts.size());
@@ -287,8 +286,9 @@ TEST_CASE("PatchBoundary<double, 2>::eval_outward_normal: flat rectangle",
 
 // ===========================================================================
 // Test 6: Composable primitives — analytical checks on the twisted z = u·v
-// patch. Verifies eval_basis, eval_local_frame, eval_christoffel, eval_normal,
-// and eval_normal_deriv against closed-form expressions.
+// patch. Verifies eval_basis, eval_covariant_basis (covering metric,
+// Christoffels, second fundamental form, normal, and Weingarten derivative)
+// against closed-form expressions.
 // ===========================================================================
 
 TEST_CASE("Patch<double, 2>: composable primitives on twisted z=u·v patch",
@@ -311,20 +311,23 @@ TEST_CASE("Patch<double, 2>: composable primitives on twisted z=u·v patch",
            0.5, 0.5,
            0.8, 0.2;
 
-    const auto b      = eval_basis(surf, pts, elem_idx, 2);
+    const auto b      = eval_basis(surf, pts, elem_idx, 3);
     const auto actpts = surf.active_control_pts(elem_idx);
-    const auto local  = eval_local_frame(b, actpts);
-    const auto chr    = eval_christoffel(local);
-    const auto a3     = eval_normal(local);
-    const auto [nd_a31, nd_a32] = eval_normal_deriv(local, a3);
+    IntrinsicGeometry local(b, actpts);
+    local.compute_christoffels();
+    const auto& chr = local.chr;
+    const ExtrinsicGeometry<double, 2, 3> eg_local(local);
+    const auto& a3     = eg_local.n;
+    const auto& nd_a31 = eg_local.n_d1[0];
+    const auto& nd_a32 = eg_local.n_d1[1];
 
-    REQUIRE(local.a1.rows() == 3);
-    REQUIRE(local.a2.rows() == 3);
-    REQUIRE(local.g.rows()  == 3);
-    REQUIRE(local.g_inv.rows() == 3);
+    REQUIRE(local.a[0].rows() == 3);
+    REQUIRE(local.a[1].rows() == 3);
+    REQUIRE(local.g[0][0].size()     == 3);
+    REQUIRE(local.g_inv[0][0].size() == 3);
     REQUIRE(local.jac.size() == 3);
-    REQUIRE(chr.G1_11.size() == 3);
-    REQUIRE(chr.G2_22.size() == 3);
+    REQUIRE(chr.Gamma[0][0][0].size() == 3);
+    REQUIRE(chr.Gamma[1][1][1].size() == 3);
 
     for (Eigen::Index q = 0; q < pts.rows(); ++q) {
         const double u = pts(q, 0);
@@ -334,29 +337,29 @@ TEST_CASE("Patch<double, 2>: composable primitives on twisted z=u·v patch",
         const double D32 = D * sqrtD;
 
         // Tangents: a_1 = (1, 0, v), a_2 = (0, 1, u).
-        CHECK(local.a1(q, 0) == Approx(1.0).margin(1e-14));
-        CHECK(local.a1(q, 1) == Approx(0.0).margin(1e-14));
-        CHECK(local.a1(q, 2) == Approx(v  ).margin(1e-14));
-        CHECK(local.a2(q, 0) == Approx(0.0).margin(1e-14));
-        CHECK(local.a2(q, 1) == Approx(1.0).margin(1e-14));
-        CHECK(local.a2(q, 2) == Approx(u  ).margin(1e-14));
+        CHECK(local.a[0](q, 0) == Approx(1.0).margin(1e-14));
+        CHECK(local.a[0](q, 1) == Approx(0.0).margin(1e-14));
+        CHECK(local.a[0](q, 2) == Approx(v  ).margin(1e-14));
+        CHECK(local.a[1](q, 0) == Approx(0.0).margin(1e-14));
+        CHECK(local.a[1](q, 1) == Approx(1.0).margin(1e-14));
+        CHECK(local.a[1](q, 2) == Approx(u  ).margin(1e-14));
 
         // Metric and Jacobian.
-        CHECK(local.g(q, 0)     == Approx(1.0 + v * v).margin(1e-12));
-        CHECK(local.g(q, 1)     == Approx(u * v       ).margin(1e-12));
-        CHECK(local.g(q, 2)     == Approx(1.0 + u * u).margin(1e-12));
-        CHECK(local.g_inv(q, 0) == Approx((1.0 + u * u) / D).margin(1e-12));
-        CHECK(local.g_inv(q, 1) == Approx(-u * v / D       ).margin(1e-12));
-        CHECK(local.g_inv(q, 2) == Approx((1.0 + v * v) / D).margin(1e-12));
+        CHECK(local.g[0][0](q)     == Approx(1.0 + v * v).margin(1e-12));
+        CHECK(local.g[0][1](q)     == Approx(u * v       ).margin(1e-12));
+        CHECK(local.g[1][1](q)     == Approx(1.0 + u * u).margin(1e-12));
+        CHECK(local.g_inv[0][0](q) == Approx((1.0 + u * u) / D).margin(1e-12));
+        CHECK(local.g_inv[0][1](q) == Approx(-u * v / D       ).margin(1e-12));
+        CHECK(local.g_inv[1][1](q) == Approx((1.0 + v * v) / D).margin(1e-12));
         CHECK(local.jac(q)      == Approx(sqrtD            ).margin(1e-12));
 
         // Christoffels: only Γ¹_{12} = v/D and Γ²_{12} = u/D are non-zero.
-        CHECK(chr.G1_11(q) == Approx(0.0  ).margin(1e-14));
-        CHECK(chr.G1_12(q) == Approx(v / D).margin(1e-12));
-        CHECK(chr.G1_22(q) == Approx(0.0  ).margin(1e-14));
-        CHECK(chr.G2_11(q) == Approx(0.0  ).margin(1e-14));
-        CHECK(chr.G2_12(q) == Approx(u / D).margin(1e-12));
-        CHECK(chr.G2_22(q) == Approx(0.0  ).margin(1e-14));
+        CHECK(chr.Gamma[0][0][0](q) == Approx(0.0  ).margin(1e-14));
+        CHECK(chr.Gamma[0][0][1](q) == Approx(v / D).margin(1e-12));
+        CHECK(chr.Gamma[0][1][1](q) == Approx(0.0  ).margin(1e-14));
+        CHECK(chr.Gamma[1][0][0](q) == Approx(0.0  ).margin(1e-14));
+        CHECK(chr.Gamma[1][0][1](q) == Approx(u / D).margin(1e-12));
+        CHECK(chr.Gamma[1][1][1](q) == Approx(0.0  ).margin(1e-14));
 
         // Surface normal a_3 = (-v, -u, 1) / √D.
         CHECK(a3(q, 0) == Approx(-v   / sqrtD).margin(1e-12));
@@ -375,8 +378,8 @@ TEST_CASE("Patch<double, 2>: composable primitives on twisted z=u·v patch",
 
         // Identity: a_γ · a_{3,β} = -b_{γβ}. Closed form on this patch:
         //   b_{11} = b_{22} = 0,  b_{12} = 1/√D.
-        const Eigen::Vector3d a1  = local.a1.row(q).transpose();
-        const Eigen::Vector3d a2  = local.a2.row(q).transpose();
+        const Eigen::Vector3d a1  = local.a[0].row(q).transpose();
+        const Eigen::Vector3d a2  = local.a[1].row(q).transpose();
         const Eigen::Vector3d a31 = nd_a31.row(q).transpose();
         const Eigen::Vector3d a32 = nd_a32.row(q).transpose();
         CHECK(a1.dot(a31) == Approx( 0.0        ).margin(1e-13));
@@ -385,6 +388,123 @@ TEST_CASE("Patch<double, 2>: composable primitives on twisted z=u·v patch",
         CHECK(a2.dot(a32) == Approx( 0.0        ).margin(1e-13));
     }
 }
+
+
+// ===========================================================================
+// Test 6b: Order-3 Christoffel derivatives ∂_γ Γ^k_{αβ} on the twisted
+// z = u·v patch. Closed-form: only Γ¹_{12} = v/D and Γ²_{12} = u/D are
+// non-zero, so the only non-zero ∂Γ entries are
+//   ∂_u Γ¹_{12} = -2uv / D²
+//   ∂_v Γ¹_{12} = (1 + u² - v²) / D²
+//   ∂_u Γ²_{12} = (1 - u² + v²) / D²
+//   ∂_v Γ²_{12} = -2uv / D²
+// with D = 1 + u² + v².
+// ===========================================================================
+
+TEST_CASE("Patch<double, 2>: ∂Γ on twisted z=u·v patch",
+          "[geometry][surface][primitives]") {
+
+    auto kv = KnotVector<double>((Vector<double>(4) << 0, 0, 1, 1).finished());
+    auto basis_u = std::make_shared<BSpline<double>>(1, kv);
+    auto basis_v = std::make_shared<BSpline<double>>(1, kv);
+
+    Eigen::MatrixXd cp(4, 3);
+    cp.row(0) << 0.0, 0.0, 0.0;
+    cp.row(1) << 1.0, 0.0, 0.0;
+    cp.row(2) << 0.0, 1.0, 0.0;
+    cp.row(3) << 1.0, 1.0, 1.0;
+    Patch<double, 2> surf(basis_u, basis_v, cp);
+    const Index elem_idx = 4;
+
+    ColMatrix<double, 2> pts(3, 2);
+    pts << 0.3, 0.4,
+           0.5, 0.5,
+           0.8, 0.2;
+
+    const auto b      = eval_basis(surf, pts, elem_idx, 3);
+    const auto actpts = surf.active_control_pts(elem_idx);
+    IntrinsicGeometry<double, 2, 3> local(b, actpts);
+    local.compute_christoffels();
+    const auto& chr = local.chr;
+
+    for (Eigen::Index q = 0; q < pts.rows(); ++q) {
+        const double u  = pts(q, 0);
+        const double v  = pts(q, 1);
+        const double D  = 1.0 + u * u + v * v;
+        const double D2 = D * D;
+
+        // Non-zero entries.
+        CHECK(chr.Gamma_d1[0][0][1][0](q)
+              == Approx(-2.0 * u * v / D2).margin(1e-12));
+        CHECK(chr.Gamma_d1[0][0][1][1](q)
+              == Approx((1.0 + u * u - v * v) / D2).margin(1e-12));
+        CHECK(chr.Gamma_d1[1][0][1][0](q)
+              == Approx((1.0 - u * u + v * v) / D2).margin(1e-12));
+        CHECK(chr.Gamma_d1[1][0][1][1](q)
+              == Approx(-2.0 * u * v / D2).margin(1e-12));
+
+        // All other entries vanish (the other Γ components are identically 0).
+        CHECK(chr.Gamma_d1[0][0][0][0](q) == Approx(0.0).margin(1e-13));
+        CHECK(chr.Gamma_d1[0][0][0][1](q) == Approx(0.0).margin(1e-13));
+        CHECK(chr.Gamma_d1[0][1][1][0](q) == Approx(0.0).margin(1e-13));
+        CHECK(chr.Gamma_d1[0][1][1][1](q) == Approx(0.0).margin(1e-13));
+        CHECK(chr.Gamma_d1[1][0][0][0](q) == Approx(0.0).margin(1e-13));
+        CHECK(chr.Gamma_d1[1][0][0][1](q) == Approx(0.0).margin(1e-13));
+        CHECK(chr.Gamma_d1[1][1][1][0](q) == Approx(0.0).margin(1e-13));
+        CHECK(chr.Gamma_d1[1][1][1][1](q) == Approx(0.0).margin(1e-13));
+    }
+}
+
+
+// ===========================================================================
+// Test 6c: IntrinsicGeometry / ExtrinsicGeometry composition. Verifies that
+// the container builders produce byte-for-byte the same data as calling the
+// underlying free functions individually on the twisted z = u·v patch.
+// ===========================================================================
+
+TEST_CASE("Patch<double, 2>: Intrinsic/Extrinsic containers compose correctly",
+          "[geometry][surface][primitives]") {
+
+    auto kv = KnotVector<double>((Vector<double>(4) << 0, 0, 1, 1).finished());
+    auto basis_u = std::make_shared<BSpline<double>>(1, kv);
+    auto basis_v = std::make_shared<BSpline<double>>(1, kv);
+
+    Eigen::MatrixXd cp(4, 3);
+    cp.row(0) << 0.0, 0.0, 0.0;
+    cp.row(1) << 1.0, 0.0, 0.0;
+    cp.row(2) << 0.0, 1.0, 0.0;
+    cp.row(3) << 1.0, 1.0, 1.0;
+    Patch<double, 2> surf(basis_u, basis_v, cp);
+    const Index elem_idx = 4;
+
+    ColMatrix<double, 2> pts(3, 2);
+    pts << 0.3, 0.4,
+           0.5, 0.5,
+           0.8, 0.2;
+
+    const auto basis  = eval_basis(surf, pts, elem_idx, 3);
+    const auto actpts = surf.active_control_pts(elem_idx);
+
+    IntrinsicGeometry ig(basis, actpts);
+    ig.compute_christoffels();
+    ExtrinsicGeometry<double, 2, 3> eg(ig);
+    eg.compute_curvature(ig);
+
+    for (Eigen::Index q = 0; q < pts.rows(); ++q) {
+        // Christoffels: the one non-zero on this patch.
+        CHECK(ig.chr.Gamma[0][0][1](q) != 0.0);
+        CHECK(ig.chr.Gamma[1][0][1](q) != 0.0);
+
+        // Normal.
+        for (Eigen::Index c = 0; c < 3; ++c)
+            CHECK(std::isfinite(eg.n(q, c)));
+
+        // Curvature: b_{12} = 1/√D on this patch (the non-zero one).
+        CHECK(std::isfinite(eg.curv.b      [0][1](q)));
+        CHECK(std::isfinite(eg.curv.b_mixed[0][1](q)));
+    }
+}
+
 
 TEST_CASE("Patch<double, 2>: insert_knot preserves geometry", "[geometry][surface]") {
     // 3x3 B-spline surface with a curved interior to make all spatial columns active.

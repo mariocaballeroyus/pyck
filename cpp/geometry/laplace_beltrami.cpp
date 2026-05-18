@@ -1,121 +1,177 @@
 #include "laplace_beltrami.hpp"
 
+#include "intrinsic_geometry.hpp"
+
+#include <algorithm>
+#include <array>
+#include <utility>
+
 namespace pyck
 {
 
-template <std::floating_point T>
-LaplaceGradAux<T>
-compute_laplace_grad_aux(const LocalFrame<T, 2>& local,
-                         const ChristoffelSymbols<T, 2>& chr)
+namespace {
+
+/// Symmetric 2-tuple swap to upper-tri form (i ≤ j).
+constexpr std::pair<std::size_t, std::size_t>
+sym2(std::size_t i, std::size_t j)
 {
-    const Index Q = local.a1.rows();
+    return i <= j ? std::pair{i, j} : std::pair{j, i};
+}
 
-    LaplaceGradAux<T> aux;
-    aux.G11_d1.resize(Q); aux.G12_d1.resize(Q); aux.G22_d1.resize(Q);
-    aux.G11_d2.resize(Q); aux.G12_d2.resize(Q); aux.G22_d2.resize(Q);
-    aux.c1.resize(Q);     aux.c2.resize(Q);
-    aux.c1_d1.resize(Q);  aux.c2_d1.resize(Q);
-    aux.c1_d2.resize(Q);  aux.c2_d2.resize(Q);
+/// Symmetric 3-tuple sort to upper-tri form (i ≤ j ≤ k) via a 3-element
+/// sorting network.
+constexpr std::array<std::size_t, 3>
+sym3(std::size_t i, std::size_t j, std::size_t k)
+{
+    std::array<std::size_t, 3> v{i, j, k};
+    if (v[0] > v[1]) std::swap(v[0], v[1]);
+    if (v[1] > v[2]) std::swap(v[1], v[2]);
+    if (v[0] > v[1]) std::swap(v[0], v[1]);
+    return v;
+}
 
-    for (Index q = 0; q < Q; ++q) 
+}  // namespace
+
+template <std::floating_point T, std::size_t d>
+LaplaceGradAux<T, d>
+compute_laplace_grad_aux(const IntrinsicGeometry<T, d>& ig)
+{
+    const Index Q = ig.a[0].rows();
+
+
+    LaplaceGradAux<T, d> aux;
+    for (std::size_t i = 0; i < d; ++i)
+        for (std::size_t j = i; j < d; ++j)
+            for (std::size_t a = 0; a < d; ++a)
+                aux.G_inv_d[i][j][a].resize(Q);
+    for (std::size_t delta = 0; delta < d; ++delta) {
+        aux.c[delta].resize(Q);
+        for (std::size_t a = 0; a < d; ++a)
+            aux.c_d[delta][a].resize(Q);
+    }
+
+    for (Index q = 0; q < Q; ++q)
     {
-        const T G11 = local.g_inv(q, 0);
-        const T G12 = local.g_inv(q, 1);
-        const T G22 = local.g_inv(q, 2);
-        const T Gam1_11 = chr.G1_11(q), Gam1_12 = chr.G1_12(q), Gam1_22 = chr.G1_22(q);
-        const T Gam2_11 = chr.G2_11(q), Gam2_12 = chr.G2_12(q), Gam2_22 = chr.G2_22(q);
+        // Symmetric accessors hiding the upper-tri storage convention.
+        auto a1  = [&](std::size_t i) {
+            return ig.a[i].row(q);
+        };
+        auto a2  = [&](std::size_t i, std::size_t j) {
+            auto [lo, hi] = sym2(i, j);
+            return ig.a_d1[lo][hi].row(q);
+        };
+        auto a3  = [&](std::size_t i, std::size_t j, std::size_t k) {
+            auto v = sym3(i, j, k);
+            return ig.a_d2[v[0]][v[1]][v[2]].row(q);
+        };
+        auto G   = [&](std::size_t i, std::size_t j) {
+            auto [lo, hi] = sym2(i, j);
+            return ig.g_inv[lo][hi](q);
+        };
+        auto Gam = [&](std::size_t e, std::size_t i, std::size_t j) {
+            auto [lo, hi] = sym2(i, j);
+            return ig.chr.Gamma[e][lo][hi](q);
+        };
 
-        const auto a1   = local.a1.row(q);
-        const auto a2   = local.a2.row(q);
-        const auto a11  = local.a11.row(q);
-        const auto a12  = local.a12.row(q);
-        const auto a22  = local.a22.row(q);
-        const auto a111 = local.a111.row(q);
-        const auto a112 = local.a112.row(q);
-        const auto a122 = local.a122.row(q);
-        const auto a222 = local.a222.row(q);
+        // ---- Precompute unique dot products once per q ---------------------
 
-        // Tangent dot products
-        const T a1_a11  = a1.dot(a11),  a1_a12  = a1.dot(a12),  a1_a22  = a1.dot(a22);
-        const T a2_a11  = a2.dot(a11),  a2_a12  = a2.dot(a12),  a2_a22  = a2.dot(a22);
-        const T a11_a11 = a11.squaredNorm(), a11_a12 = a11.dot(a12), a11_a22 = a11.dot(a22);
-        const T a12_a12 = a12.squaredNorm(), a12_a22 = a12.dot(a22), a22_a22 = a22.squaredNorm();
-        const T a1_a111 = a1.dot(a111), a1_a112 = a1.dot(a112);
-        const T a1_a122 = a1.dot(a122), a1_a222 = a1.dot(a222);
-        const T a2_a111 = a2.dot(a111), a2_a112 = a2.dot(a112);
-        const T a2_a122 = a2.dot(a122), a2_a222 = a2.dot(a222);
+        // dot1[μ][i][j] = a_μ · a_{ij}, symmetric in (i, j).
+        std::array<std::array<std::array<T, d>, d>, d> dot1{};
+        for (std::size_t mu = 0; mu < d; ++mu)
+            for (std::size_t i = 0; i < d; ++i)
+                for (std::size_t j = i; j < d; ++j) {
+                    const T v = a1(mu).dot(a2(i, j));
+                    dot1[mu][i][j] = v;
+                    dot1[mu][j][i] = v;
+                }
 
-        // Metric partials g_{μν,γ} = a_{μγ}·a_ν + a_μ·a_{νγ}
-        const T g11_d1 = T(2) * a1_a11;
-        const T g11_d2 = T(2) * a1_a12;
-        const T g12_d1 = a2_a11 + a1_a12;
-        const T g12_d2 = a2_a12 + a1_a22;
-        const T g22_d1 = T(2) * a2_a12;
-        const T g22_d2 = T(2) * a2_a22;
+        // dot2[i][j][k][l] = a_{ij} · a_{kl}, mirrored on (i, j) and (k, l).
+        std::array<std::array<std::array<std::array<T, d>, d>, d>, d> dot2{};
+        for (std::size_t i = 0; i < d; ++i)
+            for (std::size_t j = i; j < d; ++j)
+                for (std::size_t k = 0; k < d; ++k)
+                    for (std::size_t l = k; l < d; ++l) {
+                        const T v = a2(i, j).dot(a2(k, l));
+                        dot2[i][j][k][l] = v;
+                        dot2[j][i][k][l] = v;
+                        dot2[i][j][l][k] = v;
+                        dot2[j][i][l][k] = v;
+                    }
 
-        // Inverse-metric partials (g^{βγ})_{,α} = -g^{βμ} g^{γν} g_{μν,α}
-        const T G11_d1 = -(G11*G11*g11_d1 + T(2)*G11*G12*g12_d1 + G12*G12*g22_d1);
-        const T G11_d2 = -(G11*G11*g11_d2 + T(2)*G11*G12*g12_d2 + G12*G12*g22_d2);
-        const T G12_d1 = -(G11*G12*g11_d1 + (G11*G22 + G12*G12)*g12_d1 + G12*G22*g22_d1);
-        const T G12_d2 = -(G11*G12*g11_d2 + (G11*G22 + G12*G12)*g12_d2 + G12*G22*g22_d2);
-        const T G22_d1 = -(G12*G12*g11_d1 + T(2)*G12*G22*g12_d1 + G22*G22*g22_d1);
-        const T G22_d2 = -(G12*G12*g11_d2 + T(2)*G12*G22*g12_d2 + G22*G22*g22_d2);
+        // dot3[μ][i][j][k] = a_μ · a_{ijk}, fully symmetric in (i, j, k).
+        std::array<std::array<std::array<std::array<T, d>, d>, d>, d> dot3{};
+        for (std::size_t mu = 0; mu < d; ++mu)
+            for (std::size_t i = 0; i < d; ++i)
+                for (std::size_t j = i; j < d; ++j)
+                    for (std::size_t k = j; k < d; ++k) {
+                        const T v = a1(mu).dot(a3(i, j, k));
+                        std::array<std::size_t, 3> p{i, j, k};
+                        do { dot3[mu][p[0]][p[1]][p[2]] = v; }
+                        while (std::next_permutation(p.begin(), p.end()));
+                    }
 
-        // Γ^δ_{βγ,α} = (g^{δε})_{,α}(a_ε·a_{βγ}) + g^{δε}(a_{εα}·a_{βγ} + a_ε·a_{βγα})
-        const T G1_11_d1 = G11_d1*a1_a11 + G12_d1*a2_a11
-                         + G11*(a11_a11 + a1_a111) + G12*(a11_a12 + a2_a111);
-        const T G1_12_d1 = G11_d1*a1_a12 + G12_d1*a2_a12
-                         + G11*(a11_a12 + a1_a112) + G12*(a12_a12 + a2_a112);
-        const T G1_22_d1 = G11_d1*a1_a22 + G12_d1*a2_a22
-                         + G11*(a11_a22 + a1_a122) + G12*(a12_a22 + a2_a122);
-        const T G2_11_d1 = G12_d1*a1_a11 + G22_d1*a2_a11
-                         + G12*(a11_a11 + a1_a111) + G22*(a11_a12 + a2_a111);
-        const T G2_12_d1 = G12_d1*a1_a12 + G22_d1*a2_a12
-                         + G12*(a11_a12 + a1_a112) + G22*(a12_a12 + a2_a112);
-        const T G2_22_d1 = G12_d1*a1_a22 + G22_d1*a2_a22
-                         + G12*(a11_a22 + a1_a122) + G22*(a12_a22 + a2_a122);
-        const T G1_11_d2 = G11_d2*a1_a11 + G12_d2*a2_a11
-                         + G11*(a11_a12 + a1_a112) + G12*(a11_a22 + a2_a112);
-        const T G1_12_d2 = G11_d2*a1_a12 + G12_d2*a2_a12
-                         + G11*(a12_a12 + a1_a122) + G12*(a12_a22 + a2_a122);
-        const T G1_22_d2 = G11_d2*a1_a22 + G12_d2*a2_a22
-                         + G11*(a12_a22 + a1_a222) + G12*(a22_a22 + a2_a222);
-        const T G2_11_d2 = G12_d2*a1_a11 + G22_d2*a2_a11
-                         + G12*(a11_a12 + a1_a112) + G22*(a11_a22 + a2_a112);
-        const T G2_12_d2 = G12_d2*a1_a12 + G22_d2*a2_a12
-                         + G12*(a12_a12 + a1_a122) + G22*(a12_a22 + a2_a122);
-        const T G2_22_d2 = G12_d2*a1_a22 + G22_d2*a2_a22
-                         + G12*(a12_a22 + a1_a222) + G22*(a22_a22 + a2_a222);
+        // ---- Scalar arithmetic on the tables -------------------------------
 
-        // c^δ and (c^δ)_{,α}
-        const T c1 = G11*Gam1_11 + T(2)*G12*Gam1_12 + G22*Gam1_22;
-        const T c2 = G11*Gam2_11 + T(2)*G12*Gam2_12 + G22*Gam2_22;
-        const T c1_d1 = G11_d1*Gam1_11 + T(2)*G12_d1*Gam1_12 + G22_d1*Gam1_22
-                      + G11*G1_11_d1 + T(2)*G12*G1_12_d1 + G22*G1_22_d1;
-        const T c2_d1 = G11_d1*Gam2_11 + T(2)*G12_d1*Gam2_12 + G22_d1*Gam2_22
-                      + G11*G2_11_d1 + T(2)*G12*G2_12_d1 + G22*G2_22_d1;
-        const T c1_d2 = G11_d2*Gam1_11 + T(2)*G12_d2*Gam1_12 + G22_d2*Gam1_22
-                      + G11*G1_11_d2 + T(2)*G12*G1_12_d2 + G22*G1_22_d2;
-        const T c2_d2 = G11_d2*Gam2_11 + T(2)*G12_d2*Gam2_12 + G22_d2*Gam2_22
-                      + G11*G2_11_d2 + T(2)*G12*G2_12_d2 + G22*G2_22_d2;
+        // g_{ij,α} = a_{iα}·a_j + a_i·a_{jα}, sym in (i, j).
+        auto g_d = [&](std::size_t i, std::size_t j, std::size_t alpha) -> T {
+            return dot1[j][i][alpha] + dot1[i][j][alpha];
+        };
 
-        aux.G11_d1(q) = G11_d1; aux.G12_d1(q) = G12_d1; aux.G22_d1(q) = G22_d1;
-        aux.G11_d2(q) = G11_d2; aux.G12_d2(q) = G12_d2; aux.G22_d2(q) = G22_d2;
-        aux.c1(q)     = c1;     aux.c2(q)     = c2;
-        aux.c1_d1(q)  = c1_d1;  aux.c2_d1(q)  = c2_d1;
-        aux.c1_d2(q)  = c1_d2;  aux.c2_d2(q)  = c2_d2;
+        // (g^{ij})_{,α} = -g^{im} g^{jn} g_{mn,α}, sym in (i, j).
+        std::array<std::array<std::array<T, d>, d>, d> Gup_d{};
+        for (std::size_t i = 0; i < d; ++i)
+            for (std::size_t j = i; j < d; ++j)
+                for (std::size_t alpha = 0; alpha < d; ++alpha) {
+                    T s = T(0);
+                    for (std::size_t m = 0; m < d; ++m)
+                        for (std::size_t n = 0; n < d; ++n)
+                            s += G(i, m) * G(j, n) * g_d(m, n, alpha);
+                    Gup_d[i][j][alpha] = -s;
+                    Gup_d[j][i][alpha] = -s;
+                    aux.G_inv_d[std::min(i, j)][std::max(i, j)][alpha](q) = -s;
+                }
+
+        // Γ^δ_{ij,α} = (g^{δε})_{,α}(a_ε·a_{ij}) + g^{δε}(a_{εα}·a_{ij} + a_ε·a_{ijα}).
+        auto Gam_d = [&](std::size_t delta, std::size_t i,
+                         std::size_t j, std::size_t alpha) -> T {
+            T s = T(0);
+            for (std::size_t eps = 0; eps < d; ++eps) {
+                s += Gup_d[delta][eps][alpha] * dot1[eps][i][j]
+                   + G(delta, eps) * (dot2[eps][alpha][i][j]
+                                    + dot3[eps][i][j][alpha]);
+            }
+            return s;
+        };
+
+        // c^δ = g^{ij} Γ^δ_{ij} and (c^δ)_{,α}.
+        for (std::size_t delta = 0; delta < d; ++delta) {
+            T cv = T(0);
+            for (std::size_t i = 0; i < d; ++i)
+                for (std::size_t j = 0; j < d; ++j)
+                    cv += G(i, j) * Gam(delta, i, j);
+            aux.c[delta](q) = cv;
+
+            for (std::size_t alpha = 0; alpha < d; ++alpha) {
+                T s = T(0);
+                for (std::size_t i = 0; i < d; ++i)
+                    for (std::size_t j = 0; j < d; ++j)
+                        s += Gup_d[i][j][alpha] * Gam(delta, i, j)
+                           + G(i, j) * Gam_d(delta, i, j, alpha);
+                aux.c_d[delta][alpha](q) = s;
+            }
+        }
     }
     return aux;
 }
 
-// === Template Specializations =======================================================
+// === Template Instantiations ========================================================
 
-template LaplaceGradAux<double> compute_laplace_grad_aux<double>(
-    const LocalFrame<double, 2>&, const ChristoffelSymbols<double, 2>&);
+template LaplaceGradAux<double, 2> compute_laplace_grad_aux<double, 2>(
+    const IntrinsicGeometry<double, 2>&);
 
 #ifdef PYCK_BUILD_SINGLE_PRECISION
-template LaplaceGradAux<float> compute_laplace_grad_aux<float>(
-    const LocalFrame<float, 2>&, const ChristoffelSymbols<float, 2>&);
+template LaplaceGradAux<float, 2> compute_laplace_grad_aux<float, 2>(
+    const IntrinsicGeometry<float, 2>&);
 #endif
 
 } // namespace pyck

@@ -1,6 +1,6 @@
 #include "plate_kirchhoff_love_1p.hpp"
 #include "patch.hpp"
-#include "christoffels.hpp"
+#include "intrinsic_geometry.hpp"
 
 namespace pyck
 {
@@ -20,23 +20,23 @@ template <std::floating_point T>
 Matrix<T>
 PlateKirchhoffLove1p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
                                        const BasisDerivs<T, 2>& basis,
-                                       const LocalFrame<T, 2>& local,
-                                       const ChristoffelSymbols<T, 2>& chr) const
+                                       const IntrinsicGeometry<T, 2>& ig) const
 {
-    const Matrix<T>& N_u  = basis.N_u;
-    const Matrix<T>& N_v  = basis.N_v;
-    const Matrix<T>& N_uu = basis.N_uu;
-    const Matrix<T>& N_uv = basis.N_uv;
-    const Matrix<T>& N_vv = basis.N_vv;
+    const Matrix<T>& N_u  = basis.N_d1[0];
+    const Matrix<T>& N_v  = basis.N_d1[1];
+    const Matrix<T>& N_uu = basis.N_d2[0][0];
+    const Matrix<T>& N_uv = basis.N_d2[0][1];
+    const Matrix<T>& N_vv = basis.N_d2[1][1];
 
     const Index Q = N_u.rows();
     const Index n = N_u.cols();
     Matrix<T> B(3 * Q, n);
 
+
     for (Index q = 0; q < Q; ++q)
     {
-        const T Gam1_11 = chr.G1_11(q), Gam1_12 = chr.G1_12(q), Gam1_22 = chr.G1_22(q);
-        const T Gam2_11 = chr.G2_11(q), Gam2_12 = chr.G2_12(q), Gam2_22 = chr.G2_22(q);
+        const T Gam1_11 = ig.chr.Gamma[0][0][0](q), Gam1_12 = ig.chr.Gamma[0][0][1](q), Gam1_22 = ig.chr.Gamma[0][1][1](q);
+        const T Gam2_11 = ig.chr.Gamma[1][0][0](q), Gam2_12 = ig.chr.Gamma[1][0][1](q), Gam2_22 = ig.chr.Gamma[1][1][1](q);
 
         // B_b = [ -N_{i|11}   ]
         //       [ -N_{i|22}   ]
@@ -52,12 +52,12 @@ PlateKirchhoffLove1p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
 
 template <std::floating_point T> 
 Matrix<T>
-PlateKirchhoffLove1p<T>::constitutive_matrix(const LocalFrame<T, 2>& local,
+PlateKirchhoffLove1p<T>::constitutive_matrix(const IntrinsicGeometry<T, 2>& ig,
                                              Index q) const
 {
     // D = D_b
     // No shear block (normality assumption)
-    return material_->bending_voigt(local.g_inv.row(q).transpose());
+    return material_->bending_voigt(g_inv_voigt(ig, q));
 }
 
 // === Shape Matrices =================================================================
@@ -65,8 +65,7 @@ PlateKirchhoffLove1p<T>::constitutive_matrix(const LocalFrame<T, 2>& local,
 template <std::floating_point T>
 Matrix<T> PlateKirchhoffLove1p<T>::displacement_shape_matrix(const Patch<T, 2>& /*patch*/,
                                                              const BasisDerivs<T, 2>& basis,
-                                                             const LocalFrame<T, 2>& /*local*/,
-                                                             const ChristoffelSymbols<T, 2>& /*chr*/) const
+                                                             const IntrinsicGeometry<T, 2>& /*ig*/) const
 {
     // N_w = [ N_i ]
     return basis.N;
@@ -76,11 +75,10 @@ template <std::floating_point T>
 Matrix<T>
 PlateKirchhoffLove1p<T>::rotation_shape_matrix(const Patch<T, 2>& /*patch*/,
                                                const BasisDerivs<T, 2>& basis,
-                                               const LocalFrame<T, 2>& /*local*/,
-                                               const ChristoffelSymbols<T, 2>& /*chr*/) const
+                                               const IntrinsicGeometry<T, 2>& /*ig*/) const
 {
-    const Matrix<T>& N_u = basis.N_u;
-    const Matrix<T>& N_v = basis.N_v;
+    const Matrix<T>& N_u = basis.N_d1[0];
+    const Matrix<T>& N_v = basis.N_d1[1];
 
     const Index Q = N_u.rows();
     const Index n = N_u.cols();

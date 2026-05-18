@@ -1,87 +1,103 @@
 #include "patch.hpp"
 
 #include <stdexcept>
+#include <utility>
 
 namespace pyck
 {
 
+namespace {
+
+/// Apply a 1D linear transform `Top` along parametric direction `dir` of a
+/// d-dimensional tensor of control points stored as a (∏ shape_in × 3) column-
+/// major matrix.
+///
+/// View the column-k slice as a (shape_in[0] × shape_in[1] × … × shape_in[d-1])
+/// tensor with dim-0-fastest layout (matches DofMapper's `to_global`). The
+/// returned matrix has the same layout but with shape_in[dir] replaced by
+/// Top.rows().
+///
+/// `dir == 0`     →  view as (n_dir, suffix), out = Top * view              (BLAS-3)
+/// `dir == d-1`   →  view as (prefix, n_dir), out = view * Topᵀ              (BLAS-3)
+/// otherwise      →  loop over `suffix` slices, each (prefix, n_dir) * Topᵀ  (BLAS-3 per slice)
+///
+/// d == 1 falls through the `dir == 0` branch with suffix = 1, matching the
+/// `Top * control_pts` fast path for curves.
 template <std::floating_point T, std::size_t d>
-Patch<T, d>::Patch(Ptr<const Basis<T>> basis_u,
-                   const ColMatrix<T, 3>& control_pts) requires(d == 1)
-    : control_pts_(control_pts),
-      tensor_product_({basis_u}),
-      dof_mapper_({tensor_product_.basis(0).num_basis()},
-                  {tensor_product_.basis(0).degree()})
+ColMatrix<T, 3>
+apply_1d_transform_along_dir(const ColMatrix<T, 3>& cps,
+                             const std::array<Index, d>& shape_in,
+                             const Matrix<T>& Top,
+                             std::size_t dir)
 {
-    if (control_pts.cols() != 3) {
-        throw std::invalid_argument("Patch<T, 1>: "
-                                    "Control points must be embedded in 3D space.");
+    Index prefix = 1, suffix = 1;
+    for (std::size_t i = 0;       i < dir; ++i) prefix *= shape_in[i];
+    for (std::size_t i = dir + 1; i < d;   ++i) suffix *= shape_in[i];
+    const Index n_dir_in  = shape_in[dir];
+    const Index n_dir_out = static_cast<Index>(Top.rows());
+
+    ColMatrix<T, 3> out(prefix * n_dir_out * suffix, 3);
+
+    for (Index k = 0; k < 3; ++k)
+    {
+        const T* src = cps.col(k).data();
+        T*       dst = out.col(k).data();
+
+        if (dir == 0) {
+            Eigen::Map<const Matrix<T>> M(src, n_dir_in,  suffix);
+            Eigen::Map<      Matrix<T>> N(dst, n_dir_out, suffix);
+            N.noalias() = Top * M;
+        } else if (dir == d - 1) {
+            Eigen::Map<const Matrix<T>> M(src, prefix, n_dir_in);
+            Eigen::Map<      Matrix<T>> N(dst, prefix, n_dir_out);
+            N.noalias() = M * Top.transpose();
+        } else {
+            // Only reachable when d == 3 and dir == 1.
+            for (Index s = 0; s < suffix; ++s) {
+                Eigen::Map<const Matrix<T>> M(src + s * prefix * n_dir_in,  prefix, n_dir_in);
+                Eigen::Map<      Matrix<T>> N(dst + s * prefix * n_dir_out, prefix, n_dir_out);
+                N.noalias() = M * Top.transpose();
+            }
+        }
     }
 
-    const Index expected_n = this->tensor_product_.basis(0).num_basis();
+    return out;
+}
+
+/// Build a `std::array<Index, d>` by applying a member-function `mfn` to each
+/// element of a `std::array<Ptr<const Basis<T>>, d>`.
+template <std::floating_point T, std::size_t d, typename MemFn>
+std::array<Index, d>
+basis_attr_array(const std::array<Ptr<const Basis<T>>, d>& bases, MemFn mfn)
+{
+    std::array<Index, d> out{};
+    for (std::size_t i = 0; i < d; ++i) {
+        out[i] = (bases[i].get()->*mfn)();
+    }
+    return out;
+}
+
+}  // namespace
+
+template <std::floating_point T, std::size_t d>
+Patch<T, d>::Patch(const std::array<Ptr<const Basis<T>>, d>& bases,
+                   const ColMatrix<T, 3>& control_pts)
+    : control_pts_(control_pts),
+      tensor_product_(bases),
+      dof_mapper_(basis_attr_array<T, d>(bases, &Basis<T>::num_basis),
+                  basis_attr_array<T, d>(bases, &Basis<T>::degree))
+{
+    if (control_pts.cols() != 3) {
+        throw std::invalid_argument(
+            "Patch: control points must be embedded in 3D space.");
+    }
+
+    Index expected_n = 1;
+    for (const auto& b : bases) expected_n *= b->num_basis();
     const Index actual_n = static_cast<Index>(control_pts.rows());
 
     if (actual_n != expected_n) {
-        throw std::invalid_argument("Patch<T, 1>: "
-                                    "Dimension mismatch.");
-    }
-}
-
-template <std::floating_point T, std::size_t d>
-Patch<T, d>::Patch(Ptr<const Basis<T>> basis_u,
-                   Ptr<const Basis<T>> basis_v,
-                   const ColMatrix<T, 3>& control_pts) requires(d == 2)
-    : control_pts_(control_pts),
-      tensor_product_({basis_u, basis_v}),
-      dof_mapper_({tensor_product_.basis(0).num_basis(), tensor_product_.basis(1).num_basis()},
-                  {tensor_product_.basis(0).degree(),    tensor_product_.basis(1).degree()})
-{
-    if (control_pts.cols() != 3)
-    {
-        throw std::invalid_argument("Patch<T, 2>: "
-                                    "Control points must be embedded in 3D space.");
-    }
-
-    const Index expected_n = this->tensor_product_.basis(0).num_basis()
-                           * this->tensor_product_.basis(1).num_basis();
-    const Index actual_n = static_cast<Index>(control_pts.rows());
-
-    if (actual_n != expected_n)
-    {
-        throw std::invalid_argument("Patch<T, 2>: "
-                                    "Dimension mismatch.");
-    }
-}
-
-template <std::floating_point T, std::size_t d>
-Patch<T, d>::Patch(Ptr<const Basis<T>> basis_u,
-                   Ptr<const Basis<T>> basis_v,
-                   Ptr<const Basis<T>> basis_w,
-                   const ColMatrix<T, 3>& control_pts) requires(d == 3)
-    : control_pts_(control_pts),
-      tensor_product_({basis_u, basis_v, basis_w}),
-      dof_mapper_({tensor_product_.basis(0).num_basis(),
-                   tensor_product_.basis(1).num_basis(),
-                   tensor_product_.basis(2).num_basis()},
-                  {tensor_product_.basis(0).degree(),
-                   tensor_product_.basis(1).degree(),
-                   tensor_product_.basis(2).degree()})
-{
-    if (control_pts.cols() != 3)
-    {
-        throw std::invalid_argument("Patch<T, 3>: "
-                                    "Control points must be embedded in 3D space.");
-    }
-
-    const Index expected_n = this->tensor_product_.basis(0).num_basis()
-                           * this->tensor_product_.basis(1).num_basis()
-                           * this->tensor_product_.basis(2).num_basis();
-    const Index actual_n = static_cast<Index>(control_pts.rows());
-
-    if (actual_n != expected_n)
-    {
-        throw std::invalid_argument("Patch<T, 3>: "
-                                    "Dimension mismatch.");
+        throw std::invalid_argument("Patch: dimension mismatch.");
     }
 }
 
@@ -121,23 +137,14 @@ template <std::floating_point T, std::size_t d>
 std::array<Index, d>
 Patch<T, d>::decode_span(Index flat_idx) const
 {
-    if constexpr (d == 1) 
-    {
-        return {flat_idx};
-    } 
-    else
-    {
-        auto intervals = tensor_product_.num_intervals();
-        std::array<Index, d> spans;
-        Index temp = flat_idx;
-        
-        for (std::size_t i = 0; i < d; ++i) 
-        {
-            spans[i] = temp % intervals[i];
-            temp /= intervals[i];
-        }
-        return spans;
+    const auto intervals = tensor_product_.num_intervals();
+    std::array<Index, d> spans;
+    Index temp = flat_idx;
+    for (std::size_t i = 0; i < d; ++i) {
+        spans[i] = temp % intervals[i];
+        temp /= intervals[i];
     }
+    return spans;
 }
 
 template <std::floating_point T, std::size_t d>
@@ -171,73 +178,73 @@ static Matrix<T> eval_dense_1d(const Basis<T>& basis, const Vector<T>& pts)
 
 template <std::floating_point T, std::size_t d>
 ColMatrix<T, 3>
-Patch<T, d>::eval_physical(const Vector<T>& pts) const requires(d == 1)
-{
-    const Matrix<T> N = eval_dense_1d(tensor_product_.basis(0), pts);
-    ColMatrix<T, 3> result(pts.size(), 3);
-    result.noalias() = N * control_pts_;
-    return result;
-}
-
-template <std::floating_point T, std::size_t d>
-ColMatrix<T, 3>
-Patch<T, d>::eval_physical(const Matrix<T>& pts) const requires(d == 2)
+Patch<T, d>::eval_physical(const ColMatrix<T, d>& pts) const
 {
     const Index n_pts = pts.rows();
-    const Index n_u = tensor_product_.basis(0).num_basis();
-    const Index n_v = tensor_product_.basis(1).num_basis();
 
-    const Vector<T> u_pts = pts.col(0);
-    const Vector<T> v_pts = pts.col(1);
-
-    const Matrix<T> N = eval_dense_1d(tensor_product_.basis(0), u_pts);  // (n_pts, n_u)
-    const Matrix<T> M = eval_dense_1d(tensor_product_.basis(1), v_pts);  // (n_pts, n_v)
-
-    ColMatrix<T, 3> result(n_pts, 3);
-
-    for (Index k = 0; k < 3; ++k)
-    {
-        Eigen::Map<const Matrix<T>> CP_k(control_pts_.col(k).data(), n_u, n_v);
-        for (Index p = 0; p < n_pts; ++p)
-            result(p, k) = (N.row(p) * CP_k * M.row(p).transpose())(0, 0);
+    std::array<Matrix<T>, d> N;        // N[dir] is (n_pts, num_basis[dir])
+    std::array<Index, d>     n_basis;
+    for (std::size_t dir = 0; dir < d; ++dir) {
+        const Vector<T> pts_dir = pts.col(dir);
+        N[dir]       = eval_dense_1d(tensor_product_.basis(dir), pts_dir);
+        n_basis[dir] = tensor_product_.basis(dir).num_basis();
     }
 
-    return result;
-}
-
-template <std::floating_point T, std::size_t d>
-ColMatrix<T, 3>
-Patch<T, d>::eval_physical(const Matrix<T>& pts) const requires(d == 3)
-{
-    const Index n_pts = pts.rows();
-    const Index n_u = tensor_product_.basis(0).num_basis();
-    const Index n_v = tensor_product_.basis(1).num_basis();
-    const Index n_w = tensor_product_.basis(2).num_basis();
-
-    const Vector<T> u_pts = pts.col(0);
-    const Vector<T> v_pts = pts.col(1);
-    const Vector<T> w_pts = pts.col(2);
-
-    const Matrix<T> Nu = eval_dense_1d(tensor_product_.basis(0), u_pts); // (n_pts, n_u)
-    const Matrix<T> Nv = eval_dense_1d(tensor_product_.basis(1), v_pts); // (n_pts, n_v)
-    const Matrix<T> Nw = eval_dense_1d(tensor_product_.basis(2), w_pts); // (n_pts, n_w)
-
     ColMatrix<T, 3> result(n_pts, 3);
 
-    for (Index dim = 0; dim < 3; ++dim)
-    {
-        Eigen::Map<const Matrix<T>> CP(control_pts_.col(dim).data(), n_u * n_v, n_w);
-        for (Index p = 0; p < n_pts; ++p)
-        {
-            // Contract over w to get a (n_u·n_v)×1 vector, reshape as (n_u, n_v),
-            // then contract over u and v.
-            Vector<T> tmp = CP * Nw.row(p).transpose();
-            Eigen::Map<const Matrix<T>> tmp_uv(tmp.data(), n_u, n_v);
-            result(p, dim) = (Nu.row(p) * tmp_uv * Nv.row(p).transpose())(0, 0);
+    if constexpr (d == 1) {
+        // Single 3-column GEMM over all quadrature points and physical coords.
+        result.noalias() = N[0] * control_pts_;
+    } else {
+        // Per-point d-fold sequential contraction, vectorised over the 3 coords.
+        // Contract axes d-1, d-2, …, 0; after the last contraction the tensor has
+        // shape (1, 3) — the 3 physical coordinates at that point.
+        for (Index p = 0; p < n_pts; ++p) {
+            ColMatrix<T, 3> tensor = control_pts_;
+            Index rem = tensor.rows();
+            for (std::size_t step = 0; step < d; ++step) {
+                const std::size_t dir = d - 1 - step;
+                const Index n_dir  = n_basis[dir];
+                const Index prefix = rem / n_dir;
+                ColMatrix<T, 3> next(prefix, 3);
+                for (Index k = 0; k < 3; ++k) {
+                    Eigen::Map<const Matrix<T>> view(
+                        tensor.col(k).data(), prefix, n_dir);
+                    next.col(k).noalias() = view * N[dir].row(p).transpose();
+                }
+                tensor = std::move(next);
+                rem = prefix;
+            }
+            result.row(p) = tensor.row(0);
         }
     }
-
     return result;
+}
+
+// Apply a 1D `Top` transform along direction `dir` and rebuild the patch with
+// the refined basis substituted in slot `dir`. Used by `insert_knot` and
+// `elevate_degree`, which differ only in the source of `Top`.
+template <std::floating_point T, std::size_t d>
+static Patch<T, d>
+refine_along_dir(const Patch<T, d>& self,
+                 std::size_t dir,
+                 Ptr<const Basis<T>> refined_basis,
+                 const Matrix<T>& Top)
+{
+    std::array<Index, d> shape_in;
+    for (std::size_t i = 0; i < d; ++i) {
+        shape_in[i] = self.basis(i).num_basis();
+    }
+
+    ColMatrix<T, 3> new_cps = apply_1d_transform_along_dir<T, d>(
+        self.control_pts(), shape_in, Top, dir);
+
+    std::array<Ptr<const Basis<T>>, d> new_bases;
+    for (std::size_t i = 0; i < d; ++i) {
+        new_bases[i] = (i == dir) ? refined_basis : self.basis_ptr(i);
+    }
+
+    return Patch<T, d>(new_bases, new_cps);
 }
 
 template <std::floating_point T, std::size_t d>
@@ -247,81 +254,8 @@ Patch<T, d>::insert_knot(std::size_t dir, T u) const
     if (dir >= d) {
         throw std::invalid_argument("Patch::insert_knot: direction out of range.");
     }
-
     auto [basis, transform] = tensor_product_.basis(dir).insert_knot(u);
-    const Matrix<T>& Top = transform;
-
-    if constexpr (d == 1)
-    {
-        ColMatrix<T, 3> new_cps(Top.rows(), 3);
-        new_cps.noalias() = Top * control_pts_;
-        return Patch<T, d>(basis, new_cps);
-    }
-    else if constexpr (d == 2)
-    {
-        const Index n_u = tensor_product_.basis(0).num_basis();
-        const Index n_v = tensor_product_.basis(1).num_basis();
-        const Index n_u_new = (dir == 0) ? Top.rows() : n_u;
-        const Index n_v_new = (dir == 1) ? Top.rows() : n_v;
-
-        ColMatrix<T, 3> new_cps(n_u_new * n_v_new, 3);
-
-        for (Index k = 0; k < 3; ++k)
-        {
-            Eigen::Map<const Matrix<T>> CP_k(control_pts_.col(k).data(), n_u, n_v);
-            Eigen::Map<Matrix<T>> new_k(new_cps.col(k).data(), n_u_new, n_v_new);
-
-            if (dir == 0) {
-                new_k.noalias() = Top * CP_k;
-            } else {
-                new_k.noalias() = CP_k * Top.transpose();
-            }
-        }
-
-        Ptr<const Basis<T>> basis_u = (dir == 0) ? basis : tensor_product_.basis_ptr(0);
-        Ptr<const Basis<T>> basis_v = (dir == 1) ? basis : tensor_product_.basis_ptr(1);
-        return Patch<T, d>(basis_u, basis_v, new_cps);
-    }
-    else  // d == 3
-    {
-        const Index n_u = tensor_product_.basis(0).num_basis();
-        const Index n_v = tensor_product_.basis(1).num_basis();
-        const Index n_w = tensor_product_.basis(2).num_basis();
-        const Index n_u_new = (dir == 0) ? Top.rows() : n_u;
-        const Index n_v_new = (dir == 1) ? Top.rows() : n_v;
-        const Index n_w_new = (dir == 2) ? Top.rows() : n_w;
-
-        ColMatrix<T, 3> new_cps(n_u_new * n_v_new * n_w_new, 3);
-
-        for (Index k_coord = 0; k_coord < 3; ++k_coord)
-        {
-            if (dir == 0) {
-                // CP viewed as (n_u, n_v*n_w); transform multiplies on the left.
-                Eigen::Map<const Matrix<T>> CP(control_pts_.col(k_coord).data(), n_u, n_v * n_w);
-                Eigen::Map<Matrix<T>> NEW(new_cps.col(k_coord).data(), n_u_new, n_v_new * n_w_new);
-                NEW.noalias() = Top * CP;
-            } else if (dir == 2) {
-                // CP viewed as (n_u*n_v, n_w); transform multiplies on the right (transposed).
-                Eigen::Map<const Matrix<T>> CP(control_pts_.col(k_coord).data(), n_u * n_v, n_w);
-                Eigen::Map<Matrix<T>> NEW(new_cps.col(k_coord).data(), n_u_new * n_v_new, n_w_new);
-                NEW.noalias() = CP * Top.transpose();
-            } else {
-                // dir == 1: per w-slice, view (n_u, n_v) and transform on the right.
-                for (Index k_slice = 0; k_slice < n_w; ++k_slice) {
-                    Eigen::Map<const Matrix<T>> CP_s(
-                        control_pts_.col(k_coord).data() + k_slice * n_u * n_v, n_u, n_v);
-                    Eigen::Map<Matrix<T>> NEW_s(
-                        new_cps.col(k_coord).data() + k_slice * n_u_new * n_v_new, n_u_new, n_v_new);
-                    NEW_s.noalias() = CP_s * Top.transpose();
-                }
-            }
-        }
-
-        Ptr<const Basis<T>> basis_u = (dir == 0) ? basis : tensor_product_.basis_ptr(0);
-        Ptr<const Basis<T>> basis_v = (dir == 1) ? basis : tensor_product_.basis_ptr(1);
-        Ptr<const Basis<T>> basis_w = (dir == 2) ? basis : tensor_product_.basis_ptr(2);
-        return Patch<T, d>(basis_u, basis_v, basis_w, new_cps);
-    }
+    return refine_along_dir<T, d>(*this, dir, basis, transform);
 }
 
 template <std::floating_point T, std::size_t d>
@@ -331,78 +265,8 @@ Patch<T, d>::elevate_degree(std::size_t dir) const
     if (dir >= d) {
         throw std::invalid_argument("Patch::elevate_degree: direction out of range.");
     }
-
     auto [basis, transform] = tensor_product_.basis(dir).elevate_degree();
-    const Matrix<T>& Top = transform;
-
-    if constexpr (d == 1)
-    {
-        ColMatrix<T, 3> new_cps(Top.rows(), 3);
-        new_cps.noalias() = Top * control_pts_;
-        return Patch<T, d>(basis, new_cps);
-    }
-    else if constexpr (d == 2)
-    {
-        const Index n_u = tensor_product_.basis(0).num_basis();
-        const Index n_v = tensor_product_.basis(1).num_basis();
-        const Index n_u_new = (dir == 0) ? Top.rows() : n_u;
-        const Index n_v_new = (dir == 1) ? Top.rows() : n_v;
-
-        ColMatrix<T, 3> new_cps(n_u_new * n_v_new, 3);
-
-        for (Index k = 0; k < 3; ++k)
-        {
-            Eigen::Map<const Matrix<T>> CP_k(control_pts_.col(k).data(), n_u, n_v);
-            Eigen::Map<Matrix<T>> new_k(new_cps.col(k).data(), n_u_new, n_v_new);
-
-            if (dir == 0) {
-                new_k.noalias() = Top * CP_k;
-            } else {
-                new_k.noalias() = CP_k * Top.transpose();
-            }
-        }
-
-        Ptr<const Basis<T>> basis_u = (dir == 0) ? basis : tensor_product_.basis_ptr(0);
-        Ptr<const Basis<T>> basis_v = (dir == 1) ? basis : tensor_product_.basis_ptr(1);
-        return Patch<T, d>(basis_u, basis_v, new_cps);
-    }
-    else  // d == 3
-    {
-        const Index n_u = tensor_product_.basis(0).num_basis();
-        const Index n_v = tensor_product_.basis(1).num_basis();
-        const Index n_w = tensor_product_.basis(2).num_basis();
-        const Index n_u_new = (dir == 0) ? Top.rows() : n_u;
-        const Index n_v_new = (dir == 1) ? Top.rows() : n_v;
-        const Index n_w_new = (dir == 2) ? Top.rows() : n_w;
-
-        ColMatrix<T, 3> new_cps(n_u_new * n_v_new * n_w_new, 3);
-
-        for (Index k_coord = 0; k_coord < 3; ++k_coord)
-        {
-            if (dir == 0) {
-                Eigen::Map<const Matrix<T>> CP(control_pts_.col(k_coord).data(), n_u, n_v * n_w);
-                Eigen::Map<Matrix<T>> NEW(new_cps.col(k_coord).data(), n_u_new, n_v_new * n_w_new);
-                NEW.noalias() = Top * CP;
-            } else if (dir == 2) {
-                Eigen::Map<const Matrix<T>> CP(control_pts_.col(k_coord).data(), n_u * n_v, n_w);
-                Eigen::Map<Matrix<T>> NEW(new_cps.col(k_coord).data(), n_u_new * n_v_new, n_w_new);
-                NEW.noalias() = CP * Top.transpose();
-            } else {
-                for (Index k_slice = 0; k_slice < n_w; ++k_slice) {
-                    Eigen::Map<const Matrix<T>> CP_s(
-                        control_pts_.col(k_coord).data() + k_slice * n_u * n_v, n_u, n_v);
-                    Eigen::Map<Matrix<T>> NEW_s(
-                        new_cps.col(k_coord).data() + k_slice * n_u_new * n_v_new, n_u_new, n_v_new);
-                    NEW_s.noalias() = CP_s * Top.transpose();
-                }
-            }
-        }
-
-        Ptr<const Basis<T>> basis_u = (dir == 0) ? basis : tensor_product_.basis_ptr(0);
-        Ptr<const Basis<T>> basis_v = (dir == 1) ? basis : tensor_product_.basis_ptr(1);
-        Ptr<const Basis<T>> basis_w = (dir == 2) ? basis : tensor_product_.basis_ptr(2);
-        return Patch<T, d>(basis_u, basis_v, basis_w, new_cps);
-    }
+    return refine_along_dir<T, d>(*this, dir, basis, transform);
 }
 
 // === Template Specializations =======================================================

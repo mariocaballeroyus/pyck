@@ -3,7 +3,7 @@
 #include <array>
 #include <cmath>
 
-#include "../geometry/local_frame.hpp"
+#include "../geometry/intrinsic_geometry.hpp"
 
 namespace pyck
 {
@@ -152,7 +152,7 @@ Vector<T> eval_integration_measures(
         auto [mapped_pts, mapped_weights] = quadrature.map_to_domain(lo, hi);
         auto basis   = eval_basis(patch, mapped_pts, static_cast<Index>(elem_idx), 1);
         auto act_pts = patch.active_control_pts(static_cast<Index>(elem_idx));
-        auto local   = eval_local_frame(basis, act_pts);
+        IntrinsicGeometry local(basis, act_pts);
 
         for (Index q = 0; q < Q; ++q)
             result(out + q) = mapped_weights(q) * local.jac(q);

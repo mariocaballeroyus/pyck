@@ -5,8 +5,7 @@
 
 #include "patch.hpp"
 #include "basis_derivs.hpp"
-#include "local_frame.hpp"
-#include "christoffels.hpp"
+#include "intrinsic_geometry.hpp"
 #include "bspline.hpp"
 #include "knots.hpp"
 
@@ -27,26 +26,27 @@ struct CurveDerivs
 };
 
 CurveDerivs metric_derivs(const BasisDerivs<double, 1>& basis,
-                          const LocalFrame<double, 1>& local,
-                          const ChristoffelSymbols<double, 1>& chr,
+                          IntrinsicGeometry<double, 1>& local,
                           Index q)
 {
-    const double g11      = local.g11(q);
+    const double g11      = local.g[0][0](q);
     const double sqrt_g11 = std::sqrt(g11);
     const double g11_15   = g11 * sqrt_g11;
-    const double Gamma    = chr.G1_11(q);
+    local.compute_christoffels();
+    const auto& chr = local.chr;
+    const double Gamma    = chr.Gamma[0][0][0](q);
 
-    const double a11_dot_a11 = local.a11.row(q).squaredNorm();
-    const double a1_dot_a111 = local.a1.row(q).dot(local.a111.row(q));
+    const double a11_dot_a11 = local.a_d1[0][0].row(q).squaredNorm();
+    const double a1_dot_a111 = local.a[0].row(q).dot(local.a_d2[0][0][0].row(q));
     const double Gamma_u     = (a11_dot_a11 + a1_dot_a111) / g11 - 2.0 * Gamma * Gamma;
 
     CurveDerivs d;
     d.N   = basis.N.row(q);
-    d.dN  = basis.N_u.row(q) / sqrt_g11;
-    d.d2N = (basis.N_uu.row(q) - Gamma * basis.N_u.row(q)) / g11;
-    d.d3N = (basis.N_uuu.row(q)
-             - 3.0 * Gamma * basis.N_uu.row(q)
-             + (2.0 * Gamma * Gamma - Gamma_u) * basis.N_u.row(q)) / g11_15;
+    d.dN  = basis.N_d1[0].row(q) / sqrt_g11;
+    d.d2N = (basis.N_d2[0][0].row(q) - Gamma * basis.N_d1[0].row(q)) / g11;
+    d.d3N = (basis.N_d3[0][0][0].row(q)
+             - 3.0 * Gamma * basis.N_d2[0][0].row(q)
+             + (2.0 * Gamma * Gamma - Gamma_u) * basis.N_d1[0].row(q)) / g11_15;
     return d;
 }
 
@@ -104,9 +104,7 @@ TEST_CASE("Patch<double, 1>: Analytical Push-Forward Verification", "[geometry][
             // New-API evaluation.
             auto b     = eval_basis(curve, params, span, 3);
             auto act   = curve.active_control_pts(span);
-            auto local = eval_local_frame(b, act);
-            auto chr   = eval_christoffel(local);
-            auto md    = metric_derivs(b, local, chr, 0);
+            IntrinsicGeometry local(b, act);            auto md    = metric_derivs(b, local, 0);
 
             CHECK(local.jac(0) == Approx(sqrt_g11).margin(1e-12));
 
@@ -149,9 +147,7 @@ TEST_CASE("Patch<double, 1>: External AD Numerical Validation", "[geometry][curv
     auto eval_at = [&](double u) {
         ColMatrix<double, 1> params(1, 1); params << u;
         auto b     = eval_basis(curve, params, span, 3);
-        auto local = eval_local_frame(b, act);
-        auto chr   = eval_christoffel(local);
-        return metric_derivs(b, local, chr, 0);
+        IntrinsicGeometry local(b, act);        return metric_derivs(b, local, 0);
     };
 
     SECTION("Evaluation at u = 0.15") {

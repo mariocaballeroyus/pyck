@@ -11,7 +11,7 @@
 
 #include "../elements/element.hpp"
 #include "../geometry/basis_derivs.hpp"
-#include "../geometry/local_frame.hpp"
+#include "../geometry/intrinsic_geometry.hpp"
 #include "../geometry/patch.hpp"
 #include "../quadrature/quadrature.hpp"
 #include "../types.hpp"
@@ -93,7 +93,7 @@ Vector<T> compute_l2_error(
 
         auto basis   = eval_basis(patch, mapped_pts, static_cast<Index>(elem_idx), basis_order);
         auto act_pts = patch.active_control_pts(static_cast<Index>(elem_idx));
-        auto local   = eval_local_frame(basis, act_pts);
+        IntrinsicGeometry local(basis, act_pts);
 
         const ColMatrix<T, 3> phys_pts = basis.N * act_pts;
 
@@ -110,25 +110,25 @@ Vector<T> compute_l2_error(
         std::vector<Matrix<T>> shape_derivs;
         if constexpr (d == 1) {
             shape_derivs.push_back(basis.N);
-            if (order >= 1) shape_derivs.push_back(basis.N_u);
-            if (order >= 2) shape_derivs.push_back(basis.N_uu);
-            if (order >= 3) shape_derivs.push_back(basis.N_uuu);
+            if (order >= 1) shape_derivs.push_back(basis.N_d1[0]);
+            if (order >= 2) shape_derivs.push_back(basis.N_d2[0][0]);
+            if (order >= 3) shape_derivs.push_back(basis.N_d3[0][0][0]);
         } else {
             shape_derivs.push_back(basis.N);
             if (order >= 1) {
-                shape_derivs.push_back(basis.N_u);
-                shape_derivs.push_back(basis.N_v);
+                shape_derivs.push_back(basis.N_d1[0]);
+                shape_derivs.push_back(basis.N_d1[1]);
             }
             if (order >= 2) {
-                shape_derivs.push_back(basis.N_uu);
-                shape_derivs.push_back(basis.N_uv);
-                shape_derivs.push_back(basis.N_vv);
+                shape_derivs.push_back(basis.N_d2[0][0]);
+                shape_derivs.push_back(basis.N_d2[0][1]);
+                shape_derivs.push_back(basis.N_d2[1][1]);
             }
             if (order >= 3) {
-                shape_derivs.push_back(basis.N_uuu);
-                shape_derivs.push_back(basis.N_uuv);
-                shape_derivs.push_back(basis.N_uvv);
-                shape_derivs.push_back(basis.N_vvv);
+                shape_derivs.push_back(basis.N_d3[0][0][0]);
+                shape_derivs.push_back(basis.N_d3[0][0][1]);
+                shape_derivs.push_back(basis.N_d3[0][1][1]);
+                shape_derivs.push_back(basis.N_d3[1][1][1]);
             }
         }
 

@@ -1,8 +1,7 @@
 #include "load_condition.hpp"
 #include "patch.hpp"
 #include "basis_derivs.hpp"
-#include "local_frame.hpp"
-#include "christoffels.hpp"
+#include "intrinsic_geometry.hpp"
 #include "bspline.hpp"
 #include <stdexcept>
 
@@ -114,13 +113,13 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
         std::size_t req_order = element.min_order();
         auto basis   = eval_basis(patch, mapped_pts, elem_idx, req_order);
         auto act_pts = patch.active_control_pts(elem_idx);
-        auto local   = eval_local_frame(basis, act_pts);
-        auto chr     = eval_christoffel(local);
-        Matrix<T> N_w = element.displacement_shape_matrix(patch, basis, local, chr);
+        IntrinsicGeometry ig(basis, act_pts);
+        ig.compute_christoffels();
+        Matrix<T> N_w = element.displacement_shape_matrix(patch, basis, ig);
 
         Vector<T> W_J_T(Q);
         for (std::size_t k = 0; k < Q; ++k) {
-            T scale = mapped_weights(k) * local.jac(k);
+            T scale = mapped_weights(k) * ig.jac(k);
             W_J_T(k) = broadcasted_values((qp_offset + k) * ndof) * scale;
         }
         qp_offset += Q;

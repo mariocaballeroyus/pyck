@@ -2,7 +2,7 @@
 
 #include "patch.hpp"
 #include "basis_derivs.hpp"
-#include "local_frame.hpp"
+#include "intrinsic_geometry.hpp"
 
 #include <array>
 #include <cmath>
@@ -94,7 +94,7 @@ void LagrangeDomainCondition<T, d>::apply(
 
         auto basis   = eval_basis(patch_, mapped_pts, elem_idx, req_order);
         auto act_pts = patch_.active_control_pts(elem_idx);
-        auto local   = eval_local_frame(basis, act_pts);
+        IntrinsicGeometry local(basis, act_pts);
         const Matrix<T>& N = basis.N;   // Q × n_basis
         const Index n_basis = N.cols();
 

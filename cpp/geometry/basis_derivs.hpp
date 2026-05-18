@@ -1,8 +1,10 @@
 #ifndef PYCK_BASIS_DERIVS_HPP
 #define PYCK_BASIS_DERIVS_HPP
 
-#include <cstddef>
+#include <array>
 #include <concepts>
+#include <cstddef>
+#include <type_traits>
 
 #include "../types.hpp"
 #include "patch.hpp"
@@ -13,48 +15,28 @@ namespace pyck
 /**
  * @brief Parametric basis derivatives at a set of quadrature points
  *        defined on a single span of a patch.
+ *
+ * Stored in nested `std::array` form indexed by parametric directions.
+ * Symmetric components (`N_d2`, `N_d3`) populate only their upper-triangular
+ * slots (i ≤ j, i ≤ j ≤ k); the remaining slots are default-initialised and
+ * unused.
  */
 template <std::floating_point T, std::size_t d>
-struct BasisDerivs;
-
-/**
- * @brief Parametric basis derivatives defined on 1-dimensional patches.
- */
-template <std::floating_point T>
-struct BasisDerivs<T, 1>
+struct BasisDerivs
 {
-    Matrix<T> N;          ///< values                                             (Q×K)
-    Matrix<T> N_u;        ///< 1st derivative N_{,u}             (order ≥ 1)      (Q×K)
-    Matrix<T> N_uu;       ///< 2nd derivative N_{,uu}            (order ≥ 2)      (Q×K)
-    Matrix<T> N_uuu;      ///< 3rd derivative N_{,uuu}           (order ≥ 3)      (Q×K)
-    Index     order = 0;
-};
+    /// Shape function values N                                                   (Q×K).
+    Matrix<T> N;
 
-/**
- * @brief Basis derivatives defined on 2-dimensional patches.
- */
-template <std::floating_point T>
-struct BasisDerivs<T, 2>
-{
-    Matrix<T> N;                           ///< values                            (Q×K)
-    Matrix<T> N_u,   N_v;                  ///< 1st derivatives  (order ≥ 1)      (Q×K)
-    Matrix<T> N_uu,  N_uv,  N_vv;          ///< 2nd derivatives  (order ≥ 2)      (Q×K)
-    Matrix<T> N_uuu, N_uuv, N_uvv, N_vvv;  ///< 3rd derivatives  (order ≥ 3)      (Q×K)
-    Index     order = 0;
-};
+    /// First derivatives ∂_i N                                              (order ≥ 1).
+    std::array<Matrix<T>, d> N_d1;
 
-/**
- * @brief Basis derivatives defined on 3-dimensional patches.
- */
-template <std::floating_point T>
-struct BasisDerivs<T, 3>
-{
-    Matrix<T> N;                                                ///< values                       (Q×K)
-    Matrix<T> N_u,   N_v,   N_w;                                ///< 1st derivs  (order ≥ 1)      (Q×K)
-    Matrix<T> N_uu,  N_uv,  N_uw,  N_vv,  N_vw,  N_ww;          ///< 2nd derivs  (order ≥ 2)      (Q×K)
-    Matrix<T> N_uuu, N_uuv, N_uuw, N_uvv, N_uvw, N_uww,
-              N_vvv, N_vvw, N_vww, N_www;                       ///< 3rd derivs  (order ≥ 3)      (Q×K)
-    Index     order = 0;
+    /// Second derivatives ∂_{ij} N, sym; i ≤ j filled.           (order ≥ 2).
+    std::array<std::array<Matrix<T>, d>, d> N_d2;
+
+    /// Third derivatives ∂_{ijk} N, sym; i ≤ j ≤ k filled.           (order ≥ 3).
+    std::array<std::array<std::array<Matrix<T>, d>, d>, d> N_d3;
+
+    Index order = 0;
 };
 
 /**
@@ -62,29 +44,15 @@ struct BasisDerivs<T, 3>
  *        in the parametric domain.
  *
  * @param patch        The patch carrying the tensor-product basis.
- * @param eval_coords  Coordinates in the parametric domain.
- * @param span_idx     Index of the span to evaluate.
+ * @param eval_coords  Coordinates in the parametric domain, shape (Q, d).
+ * @param span_idx     Flat index of the span to evaluate.
  * @param derivs_order Highest order of derivatives to compute.
  * @return A struct containing the basis functions and their derivatives.
  */
-template <std::floating_point T>
-BasisDerivs<T, 1>
-eval_basis(const Patch<T, 1>& patch,
-           const ColMatrix<T, 1>& eval_coords,
-           Index span_idx,
-           std::size_t derivs_order = 0);
-
-template <std::floating_point T>
-BasisDerivs<T, 2>
-eval_basis(const Patch<T, 2>& patch,
-           const ColMatrix<T, 2>& eval_coords,
-           Index span_idx,
-           std::size_t derivs_order = 0);
-
-template <std::floating_point T>
-BasisDerivs<T, 3>
-eval_basis(const Patch<T, 3>& patch,
-           const ColMatrix<T, 3>& eval_coords,
+template <std::floating_point T, std::size_t d>
+BasisDerivs<T, d>
+eval_basis(const Patch<T, d>& patch,
+           const std::type_identity_t<ColMatrix<T, d>>& eval_coords,
            Index span_idx,
            std::size_t derivs_order = 0);
 

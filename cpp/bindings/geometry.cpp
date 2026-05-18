@@ -5,7 +5,7 @@
 #include "bspline.hpp"
 #include "patch_boundary.hpp"
 #include "basis_derivs.hpp"
-#include "local_frame.hpp"
+#include "intrinsic_geometry.hpp"
 
 namespace py = pybind11;
 
@@ -30,7 +30,7 @@ void bind_geometry(py::module_& m)
             py::return_value_policy::reference_internal)
 
         .def("eval_physical",
-            static_cast<ColMatrix<double, 3> (Patch1d::*)(const Vector<double>&) const>(&Patch1d::eval_physical),
+            static_cast<ColMatrix<double, 3> (Patch1d::*)(const ColMatrix<double, 1>&) const>(&Patch1d::eval_physical),
             py::arg("pts"))
 
         .def("insert_knot",
@@ -55,7 +55,7 @@ void bind_geometry(py::module_& m)
             py::return_value_policy::reference_internal)
 
         .def("eval_physical",
-            static_cast<ColMatrix<double, 3> (Patch2d::*)(const Matrix<double>&) const>(&Patch2d::eval_physical),
+            static_cast<ColMatrix<double, 3> (Patch2d::*)(const ColMatrix<double, 2>&) const>(&Patch2d::eval_physical),
             py::arg("pts"))
 
         .def("insert_knot",

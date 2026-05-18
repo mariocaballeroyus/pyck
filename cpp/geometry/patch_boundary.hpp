@@ -10,7 +10,7 @@
 #include "../types.hpp"
 #include "patch.hpp"
 #include "basis_derivs.hpp"
-#include "local_frame.hpp"
+#include "intrinsic_geometry.hpp"
 
 namespace pyck
 {
@@ -75,11 +75,13 @@ public:
     /**
      * @brief Lift Q boundary parameter values into Q parent parametric coordinates.
      *
-     * @param boundary_pts Boundary parameter values, shape (Q,) for d=2 or (Q, 2) for d=3.
+     * @param boundary_pts Boundary parameter values, shape (Q, d-1). For d=2
+     *                     this is a column vector; for d=3 it has two columns
+     *                     in the order of the two free parametric directions
+     *                     of the parent.
      * @return Matrix of parametric coordinates in the parent patch, shape (Q, d).
      */
-    ColMatrix<T, d> lift_to_parent(const Vector<T>& boundary_pts) const requires(d == 2);
-    ColMatrix<T, d> lift_to_parent(const ColMatrix<T, 2>& boundary_pts) const requires(d == 3);
+    ColMatrix<T, d> lift_to_parent(const ColMatrix<T, d - 1>& boundary_pts) const;
 
     /**
      * @brief Outward in-surface unit normal at the boundary quadrature points
@@ -93,9 +95,9 @@ public:
      * outward normal is the boundary's own a_3 = a_1^bd × a_2^bd / ‖…‖,
      * signed by `sign_n_`. The parent local frame is unused.
      */
-    ColMatrix<T, 3> eval_outward_normal(const LocalFrame<T, d - 1>& boundary_local,
-                                        const LocalFrame<T, d>& parent_local) const requires(d == 2);
-    ColMatrix<T, 3> eval_outward_normal(const LocalFrame<T, d - 1>& boundary_local) const requires(d == 3);
+    ColMatrix<T, 3> eval_outward_normal(const IntrinsicGeometry<T, d - 1>& boundary_local,
+                                        const IntrinsicGeometry<T, d>& parent_local) const requires(d == 2);
+    ColMatrix<T, 3> eval_outward_normal(const IntrinsicGeometry<T, d - 1>& boundary_local) const requires(d == 3);
 
 private:
 

@@ -1,9 +1,8 @@
 #include "shell_reissner_mindlin_5p.hpp"
 #include "patch.hpp"
 #include "basis_derivs.hpp"
-#include "local_frame.hpp"
-#include "christoffels.hpp"
-#include "directors.hpp"
+#include "intrinsic_geometry.hpp"
+#include "extrinsic_geometry.hpp"
 
 namespace pyck
 {
@@ -26,31 +25,32 @@ template <std::floating_point T>
 Matrix<T>
 ShellReissnerMindlin5p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
                                          const BasisDerivs<T, 2>& basis,
-                                         const LocalFrame<T, 2>& local,
-                                         const ChristoffelSymbols<T, 2>& chr) const
+                                         const IntrinsicGeometry<T, 2>& ig) const
 {
-    auto a_3  = eval_normal(local);
+    const ExtrinsicGeometry<T, 2, 3> eg(ig);
+    const ColMatrix<T, 3>& a_3 = eg.n;
 
     const Matrix<T>& N    = basis.N;
-    const Matrix<T>& N_u  = basis.N_u;
-    const Matrix<T>& N_v  = basis.N_v;
+    const Matrix<T>& N_u  = basis.N_d1[0];
+    const Matrix<T>& N_v  = basis.N_d1[1];
 
     const Index Q = N.rows();
     const Index n = N.cols();
     Matrix<T> B = Matrix<T>::Zero(8 * Q, 5 * n);
 
+
     for (Index q = 0; q < Q; ++q)
     {
-        const auto a1_q = local.a1.row(q);
-        const auto a2_q = local.a2.row(q);
+        const auto a1_q = ig.a[0].row(q);
+        const auto a2_q = ig.a[1].row(q);
         const auto a3_q = a_3.row(q);
 
-        const T Gam1_11 = chr.G1_11(q);
-        const T Gam1_12 = chr.G1_12(q);
-        const T Gam1_22 = chr.G1_22(q);
-        const T Gam2_11 = chr.G2_11(q);
-        const T Gam2_12 = chr.G2_12(q);
-        const T Gam2_22 = chr.G2_22(q);
+        const T Gam1_11 = ig.chr.Gamma[0][0][0](q);
+        const T Gam1_12 = ig.chr.Gamma[0][0][1](q);
+        const T Gam1_22 = ig.chr.Gamma[0][1][1](q);
+        const T Gam2_11 = ig.chr.Gamma[1][0][0](q);
+        const T Gam2_12 = ig.chr.Gamma[1][0][1](q);
+        const T Gam2_22 = ig.chr.Gamma[1][1][1](q);
 
         for (Index i = 0; i < n; ++i)
         {
@@ -97,12 +97,12 @@ ShellReissnerMindlin5p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
 
 template <std::floating_point T>
 Matrix<T> ShellReissnerMindlin5p<T>::constitutive_matrix(
-    const LocalFrame<T, 2>& local, Index q) const
+    const IntrinsicGeometry<T, 2>& ig, Index q) const
 {
     // D = [ D_m  0    0   ]
     //     [ 0    D_b  0   ]
     //     [ 0    0    D_s ]
-    const Eigen::Matrix<T, 3, 1> g_inv_q = local.g_inv.row(q).transpose();
+    const Eigen::Matrix<T, 3, 1> g_inv_q = g_inv_voigt(ig, q);
     const Eigen::Matrix<T, 3, 3> C  = material_->surface_C_voigt(g_inv_q);
     const T t  = material_->thickness();
     const Eigen::Matrix<T, 3, 3> Dm = t * C;
@@ -122,8 +122,7 @@ template <std::floating_point T>
 Matrix<T>
 ShellReissnerMindlin5p<T>::displacement_shape_matrix(const Patch<T, 2>& /*patch*/,
                                                      const BasisDerivs<T, 2>& basis,
-                                                     const LocalFrame<T, 2>& /*local*/,
-                                                     const ChristoffelSymbols<T, 2>& /*chr*/) const
+                                                     const IntrinsicGeometry<T, 2>& /*ig*/) const
 {
     const Index Q = basis.N.rows();
     const Index n = basis.N.cols();
@@ -138,8 +137,7 @@ template <std::floating_point T>
 Matrix<T> 
 ShellReissnerMindlin5p<T>::rotation_shape_matrix(const Patch<T, 2>& /*patch*/, 
                                                  const BasisDerivs<T, 2>& basis, 
-                                                 const LocalFrame<T, 2>& /*local*/,
-                                                 const ChristoffelSymbols<T, 2>& /*chr*/) const
+                                                 const IntrinsicGeometry<T, 2>& /*ig*/) const
 {
     const Index Q = basis.N.rows();
     const Index n = basis.N.cols();

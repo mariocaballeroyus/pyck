@@ -7,7 +7,7 @@
 #include "patch.hpp"
 #include "patch_boundary.hpp"
 #include "basis_derivs.hpp"
-#include "local_frame.hpp"
+#include "intrinsic_geometry.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
 #include "knots.hpp"
@@ -194,7 +194,7 @@ TEST_CASE("PatchBoundary<double, 3>: outward normal on cube faces",
 
             const auto bbasis = eval_basis(*bdy, mapped, span, 1);
             const auto bact   = bdy->active_control_pts(span);
-            const auto blocal = eval_local_frame(bbasis, bact);
+            IntrinsicGeometry blocal(bbasis, bact);
 
             const auto normals = bdy->eval_outward_normal(blocal);
             REQUIRE(normals.rows() == 2);

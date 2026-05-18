@@ -6,8 +6,7 @@
 
 #include "patch.hpp"
 #include "basis_derivs.hpp"
-#include "local_frame.hpp"
-#include "christoffels.hpp"
+#include "intrinsic_geometry.hpp"
 #include "../types.hpp"
 
 namespace pyck
@@ -38,20 +37,20 @@ public:
     /**
      * @brief Generalised-stress shape matrix.
      *        S = D B.
-     * 
+     *
      * @param patch The patch.
      * @param basis The basis derivatives.
-     * @param local The local frame.
+     * @param local The local geometry.
      * @return The generalised-stress shape matrix.
      */
     virtual Matrix<T> stress_matrix(const Patch<T, d>& patch,
                                     const BasisDerivs<T, d>& basis,
-                                    const LocalFrame<T, d>& local) const;
+                                    const IntrinsicGeometry<T, d>& ig) const;
 
     /**
      * @brief Local stiffness matrix \
      *        K = \int_{\Omega}{ B^T D B dV }.
-     * 
+     *
      * @param patch The patch.
      * @param elem_idx The element index.
      * @param mapped_pts The mapped quadrature points.
@@ -71,23 +70,21 @@ public:
      *
      * @param patch The patch.
      * @param basis The basis derivatives.
-     * @param local The local frame.
-     * @param chr The Christoffel symbols.
+     * @param local The local geometry (provides metric, Christoffels, curvature).
      * @return The strain-displacement operator.
      */
     virtual Matrix<T> strain_matrix(const Patch<T, d>& patch,
                                     const BasisDerivs<T, d>& basis,
-                                    const LocalFrame<T, d>& local,
-                                    const ChristoffelSymbols<T, d>& chr) const = 0;
+                                    const IntrinsicGeometry<T, d>& ig) const = 0;
 
     /**
      * @brief Constitutive operator D at quadrature point q.
-     * 
-     * @param local The local frame.
+     *
+     * @param local The local geometry.
      * @param q Quadrature point index.
      * @return The constitutive operator.
      */
-    virtual Matrix<T> constitutive_matrix(const LocalFrame<T, d>& local,
+    virtual Matrix<T> constitutive_matrix(const IntrinsicGeometry<T, d>& ig,
                                           Index q) const = 0;
 
     // === Shape Matrices (Pure Virtual) ==============================================
@@ -97,28 +94,24 @@ public:
      *
      * @param patch The patch.
      * @param basis The basis derivatives.
-     * @param local The local frame.
-     * @param chr The Christoffel symbols.
+     * @param local The local geometry.
      * @return The transverse-displacement shape matrix.
      */
     virtual Matrix<T> displacement_shape_matrix(const Patch<T, d>& patch,
                                                 const BasisDerivs<T, d>& basis,
-                                                const LocalFrame<T, d>& local,
-                                                const ChristoffelSymbols<T, d>& chr) const = 0;
+                                                const IntrinsicGeometry<T, d>& ig) const = 0;
 
     /**
      * @brief Rotation shape matrix.
      *
      * @param patch The patch.
      * @param basis The basis derivatives.
-     * @param local The local frame.
-     * @param chr The Christoffel symbols.
+     * @param local The local geometry.
      * @return The rotation shape matrix.
      */
     virtual Matrix<T> rotation_shape_matrix(const Patch<T, d>& patch,
                                             const BasisDerivs<T, d>& basis,
-                                            const LocalFrame<T, d>& local,
-                                            const ChristoffelSymbols<T, d>& chr) const = 0;
+                                            const IntrinsicGeometry<T, d>& ig) const = 0;
 };
 
 
@@ -126,17 +119,16 @@ template <std::floating_point T, std::size_t d>
 Matrix<T>
 Element<T, d>::stress_matrix(const Patch<T, d>& patch,
                              const BasisDerivs<T, d>& basis,
-                             const LocalFrame<T, d>& local) const
+                             const IntrinsicGeometry<T, d>& ig) const
 {
-    auto chr = eval_christoffel(local);
-    const Matrix<T> B = strain_matrix(patch, basis, local, chr);
+    const Matrix<T> B = strain_matrix(patch, basis, ig);
     const Index Q        = basis.N.rows();
     const Index n_strain = B.rows() / Q;
     const Index K        = B.cols();
 
     Matrix<T> Nsigma(n_strain * Q, K);
     for (Index q = 0; q < Q; ++q) {
-        const Matrix<T> D = constitutive_matrix(local, q);
+        const Matrix<T> D = constitutive_matrix(ig, q);
         Nsigma.middleRows(n_strain * q, n_strain).noalias() =
             D * B.middleRows(n_strain * q, n_strain);
     }
@@ -153,18 +145,18 @@ Element<T, d>::compute_local_stiffness(const Patch<T, d>& patch,
 {
     auto basis   = eval_basis(patch, mapped_pts, elem_idx, min_order());
     auto act_pts = patch.active_control_pts(elem_idx);
-    auto local   = eval_local_frame(basis, act_pts);
-    auto chr     = eval_christoffel(local);
+    IntrinsicGeometry ig(basis, act_pts);
+    ig.compute_christoffels();
 
-    const Matrix<T> B    = strain_matrix(patch, basis, local, chr);
+    const Matrix<T> B    = strain_matrix(patch, basis, ig);
     const Index Q        = q_weights.size();
     const Index n_strain = B.rows() / Q;
     const Index K        = B.cols();
 
     stiffness.setZero(K, K);
     for (Index q = 0; q < Q; ++q) {
-        const T dV = q_weights(q) * local.jac(q);
-        const Matrix<T> D = constitutive_matrix(local, q);
+        const T dV = q_weights(q) * ig.jac(q);
+        const Matrix<T> D = constitutive_matrix(ig, q);
         const auto B_q = B.middleRows(n_strain * q, n_strain);
         stiffness.noalias() += dV * (B_q.transpose() * D * B_q);
     }

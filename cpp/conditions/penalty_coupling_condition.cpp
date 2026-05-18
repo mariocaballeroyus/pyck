@@ -3,7 +3,7 @@
 #include "patch_boundary.hpp"
 #include "patch.hpp"
 #include "basis_derivs.hpp"
-#include "local_frame.hpp"
+#include "intrinsic_geometry.hpp"
 
 #include <cmath>
 #include <stdexcept>
@@ -90,14 +90,15 @@ void PenaltyCouplingCondition<T, d>::apply(
         const Index Q = static_cast<Index>(pts_a.rows());
 
         // Side A: composable primitives on boundary and parent.
-        auto basis_a   = eval_basis(side_a_, pts_a, span_a, 1);
+        auto basis_a   = eval_basis(side_a_, pts_a, span_a, 2);
         auto act_a     = side_a_.active_control_pts(span_a);
-        auto local_a   = eval_local_frame(basis_a, act_a);
+        IntrinsicGeometry local_a(basis_a, act_a);
         const Index flat_a = side_a_.parent_flat_span(span_a);
         const ColMatrix<T, 2> par_pts_a = side_a_.lift_to_parent(pts_a);
         auto parent_basis_a = eval_basis(parent_a, par_pts_a, flat_a, req_order_a);
         auto parent_act_a   = parent_a.active_control_pts(flat_a);
-        auto parent_local_a = eval_local_frame(parent_basis_a, parent_act_a);
+        IntrinsicGeometry parent_ig_a(parent_basis_a, parent_act_a);
+        parent_ig_a.compute_christoffels();
 
         // Side B: corresponding span and parametric points.
         const Index span_b = reverse_ ? (num_spans - 1 - span_a) : span_a;
@@ -108,15 +109,16 @@ void PenaltyCouplingCondition<T, d>::apply(
             pts_b = pts_a;
         }
 
-        auto basis_b   = eval_basis(side_b_, pts_b, span_b, 1);
+        auto basis_b   = eval_basis(side_b_, pts_b, span_b, 2);
         auto act_b     = side_b_.active_control_pts(span_b);
-        auto local_b   = eval_local_frame(basis_b, act_b);
+        IntrinsicGeometry local_b(basis_b, act_b);
         // local_a.jac is the surface measure dΓ; local_b.jac agrees up to round-off.
         const Index flat_b = side_b_.parent_flat_span(span_b);
         const ColMatrix<T, 2> par_pts_b = side_b_.lift_to_parent(pts_b);
         auto parent_basis_b = eval_basis(parent_b, par_pts_b, flat_b, req_order_b);
         auto parent_act_b   = parent_b.active_control_pts(flat_b);
-        auto parent_local_b = eval_local_frame(parent_basis_b, parent_act_b);
+        IntrinsicGeometry parent_ig_b(parent_basis_b, parent_act_b);
+        parent_ig_b.compute_christoffels();
 
         // DOFs on each side.
         auto cps_a = parent_a.dof_mapper().get_element_dofs(flat_a);
@@ -140,10 +142,10 @@ void PenaltyCouplingCondition<T, d>::apply(
         {
             Matrix<T> C_a = term.field_a->evaluate(
                 element_a_, side_a_, span_a, basis_a, local_a,
-                flat_a, parent_basis_a, parent_local_a);
+                flat_a, parent_basis_a, parent_ig_a);
             Matrix<T> C_b = term.field_b->evaluate(
                 element_b_, side_b_, span_b, basis_b, local_b,
-                flat_b, parent_basis_b, parent_local_b);
+                flat_b, parent_basis_b, parent_ig_b);
 
             for (Index q = 0; q < Q; ++q)
             {

@@ -8,9 +8,8 @@
 
 #include "element.hpp"
 #include "basis_derivs.hpp"
-#include "local_frame.hpp"
+#include "intrinsic_geometry.hpp"
 #include "patch.hpp"
-#include "christoffels.hpp"
 #include "beam_euler_bernoulli_1p.hpp"
 #include "beam_timoshenko_1p.hpp"
 #include "beam_timoshenko_2p.hpp"
@@ -31,10 +30,10 @@ namespace {
 
 /// @brief Pointer-to-member-function type for an element shape-matrix method.
 template <std::floating_point T, std::size_t d>
-using ShapeMatrixFn = Matrix<T> (Element<T, d>::*)(const Patch<T, d>&,
-                                                   const BasisDerivs<T, d>&,
-                                                   const LocalFrame<T, d>&,
-                                                   const ChristoffelSymbols<T, d>&) const;
+using ShapeMatrixFn = Matrix<T> (Element<T, d>::*)(
+    const Patch<T, d>&,
+    const BasisDerivs<T, d>&,
+    const IntrinsicGeometry<T, d>&) const;
 
 /**
  * @brief Evaluate a global shape matrix at a set of global parametric points.
@@ -79,88 +78,8 @@ Matrix<T> eval_global_shape(
 
         auto bd      = eval_basis(patch, pt, flat_span, order);
         auto act_pts = patch.active_control_pts(flat_span);
-        auto lf      = eval_local_frame(bd, act_pts);
-        auto chr     = eval_christoffel(lf);
-
-        const Matrix<T> N_span = (element.*mem_fn)(patch, bd, lf, chr);
-
-        if (!initialized)
-        {
-            n_rows_per_pt = static_cast<Index>(N_span.rows());
-            N_global = Matrix<T>::Zero(n_pts * n_rows_per_pt, n_global);
-            initialized = true;
-        }
-
-        const auto active_cp = patch.dof_mapper().get_element_dofs(flat_span);
-        const Index n_active = static_cast<Index>(active_cp.size());
-
-        const Index row_start = i * n_rows_per_pt;
-        for (Index k = 0; k < n_active; ++k)
-        {
-            for (Index v = 0; v < ndof; ++v)
-            {
-                N_global.block(row_start, active_cp[k] * ndof + v, n_rows_per_pt, 1)
-                    .noalias() = N_span.col(k * ndof + v);
-            }
-        }
-    }
-
-    if (!initialized)
-        return Matrix<T>(0, n_global);
-    return N_global;
-}
-
-/// @brief Pointer-to-member-function type for element matrix methods without Christoffel symbols.
-template <std::floating_point T, std::size_t d>
-using SimpleMatrixFn = Matrix<T> (Element<T, d>::*)(
-    const Patch<T, d>&,
-    const BasisDerivs<T, d>&,
-    const LocalFrame<T, d>&) const;
-
-/**
- * @brief Evaluate a global matrix (stress_matrix) at a set of global parametric points.
- *
- * Used exclusively by the Python bindings for methods that don't need Christoffel symbols.
- */
-template <std::floating_point T, std::size_t d>
-Matrix<T> eval_global_simple(
-    const Patch<T, d>& patch,
-    const Element<T, d>& element,
-    SimpleMatrixFn<T, d> mem_fn,
-    const ColMatrix<T, d>& params)
-{
-    const Index n_pts    = static_cast<Index>(params.rows());
-    const Index ndof     = static_cast<Index>(element.num_node_dofs());
-    const Index n_global = static_cast<Index>(patch.num_control_pts()) * ndof;
-    const std::size_t order = element.min_order();
-
-    // Number of knot spans per direction — matches the U-inner convention
-    // used by Patch::decode_span and DofMapper::get_element_dofs.
-    std::array<Index, d> n_spans;
-    for (std::size_t dir = 0; dir < d; ++dir)
-        n_spans[dir] = static_cast<Index>(
-            patch.basis(dir).knot_vector().num_spans());
-
-    Matrix<T> N_global;
-    Index n_rows_per_pt = 0;
-    bool initialized = false;
-
-    for (Index i = 0; i < n_pts; ++i)
-    {
-        ColMatrix<T, d> pt = params.row(i);
-
-        std::array<Index, d> span_idx;
-        for (std::size_t dir = 0; dir < d; ++dir)
-            span_idx[dir] = patch.basis(dir).find_span(
-                static_cast<T>(pt(0, static_cast<Index>(dir))));
-
-        Index flat_span = span_idx[0];
-        if constexpr (d >= 2)
-            flat_span += span_idx[1] * n_spans[0];
-
-        auto bd      = eval_basis(patch, pt, flat_span, order);
-        auto act_pts = patch.active_control_pts(flat_span);
-        auto lf      = eval_local_frame(bd, act_pts);
+        IntrinsicGeometry lf(bd, act_pts);
+        lf.compute_christoffels();
 
         const Matrix<T> N_span = (element.*mem_fn)(patch, bd, lf);
 
@@ -234,7 +153,7 @@ void bind_elements(py::module_& m)
                [](const Element1d& elem,
                   const Patch<double, 1>& patch,
                   const ColMatrix<double, 1>& params) -> Matrix<double> {
-                   return eval_global_simple<double, 1>(patch, elem,
+                   return eval_global_shape<double, 1>(patch, elem,
                        &Element1d::stress_matrix, params);
                },
                py::arg("patch"),
@@ -296,7 +215,7 @@ void bind_elements(py::module_& m)
                [](const Element2d& elem,
                   const Patch<double, 2>& patch,
                   const ColMatrix<double, 2>& params) -> Matrix<double> {
-                   return eval_global_simple<double, 2>(patch, elem,
+                   return eval_global_shape<double, 2>(patch, elem,
                        &Element2d::stress_matrix, params);
                },
                py::arg("patch"),

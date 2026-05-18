@@ -3,7 +3,7 @@
 #include "patch_boundary.hpp"
 #include "patch.hpp"
 #include "basis_derivs.hpp"
-#include "local_frame.hpp"
+#include "intrinsic_geometry.hpp"
 
 #include <cmath>
 #include <stdexcept>
@@ -85,9 +85,9 @@ LagrangeBoundaryCondition<T, d>::apply(Matrix<T>& stiffness, Vector<T>& load,
         auto [mapped_pts, mapped_weights] = quadrature_.map_to_domain(lo, hi);
         const Index Q = static_cast<Index>(mapped_pts.rows());
 
-        auto boundary_basis  = eval_basis(boundary_, mapped_pts, s, 1);
+        auto boundary_basis  = eval_basis(boundary_, mapped_pts, s, 2);
         auto boundary_act    = boundary_.active_control_pts(s);
-        auto boundary_local  = eval_local_frame(boundary_basis, boundary_act);
+        IntrinsicGeometry boundary_local(boundary_basis, boundary_act);
 
         auto multiplier_basis_ids = boundary_.dof_mapper().get_element_dofs(s);
 
@@ -95,7 +95,8 @@ LagrangeBoundaryCondition<T, d>::apply(Matrix<T>& stiffness, Vector<T>& load,
         const ColMatrix<T, 2> parent_pts = boundary_.lift_to_parent(mapped_pts);
         auto parent_basis  = eval_basis(parent, parent_pts, flat_parent, req_order);
         auto parent_act    = parent.active_control_pts(flat_parent);
-        auto parent_local  = eval_local_frame(parent_basis, parent_act);
+        IntrinsicGeometry parent_ig(parent_basis, parent_act);
+        parent_ig.compute_christoffels();
 
         auto elem_dofs = parent.dof_mapper().get_element_dofs(flat_parent);
         const Index n_elem = static_cast<Index>(elem_dofs.size());
@@ -112,7 +113,7 @@ LagrangeBoundaryCondition<T, d>::apply(Matrix<T>& stiffness, Vector<T>& load,
         {
             Matrix<T> C = term.field->evaluate(
                 element_, boundary_, s, boundary_basis, boundary_local,
-                flat_parent, parent_basis, parent_local);
+                flat_parent, parent_basis, parent_ig);
 
             Matrix<T> C_local = Matrix<T>::Zero(n_lambda, K_elem);
             Vector<T> G_local = Vector<T>::Zero(n_lambda);

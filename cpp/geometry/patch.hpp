@@ -31,25 +31,34 @@ public:
     // === Constructors ===============================================================
 
     /**
-     * @brief 1d constructor (curve patch).
+     * @brief Primary constructor: build from `d` univariate bases and a
+     *        control-point matrix in 3D physical space.
+     *
+     * The row count of `control_pts` must match ∏ basesᵢ->num_basis(), and
+     * it must have 3 columns. All other ctors below are one-line forwarders
+     * to this single algorithm.
      */
-    Patch(Ptr<const Basis<T>> basis_u, 
-          const ColMatrix<T, 3>& control_pts) requires(d == 1);
+    Patch(const std::array<Ptr<const Basis<T>>, d>& bases,
+          const ColMatrix<T, 3>& control_pts);
 
-    /**
-     * @brief 2d constructor (surface patch).
-     */
+    /// @brief Ergonomic forwarder for curve patches (d = 1).
+    Patch(Ptr<const Basis<T>> basis_u,
+          const ColMatrix<T, 3>& control_pts) requires (d == 1)
+        : Patch(std::array<Ptr<const Basis<T>>, 1>{basis_u}, control_pts) {}
+
+    /// @brief Ergonomic forwarder for surface patches (d = 2).
     Patch(Ptr<const Basis<T>> basis_u,
           Ptr<const Basis<T>> basis_v,
-          const ColMatrix<T, 3>& control_pts) requires(d == 2);
+          const ColMatrix<T, 3>& control_pts) requires (d == 2)
+        : Patch(std::array<Ptr<const Basis<T>>, 2>{basis_u, basis_v}, control_pts) {}
 
-    /**
-     * @brief 3d constructor (volume patch).
-     */
+    /// @brief Ergonomic forwarder for volume patches (d = 3).
     Patch(Ptr<const Basis<T>> basis_u,
           Ptr<const Basis<T>> basis_v,
           Ptr<const Basis<T>> basis_w,
-          const ColMatrix<T, 3>& control_pts) requires(d == 3);
+          const ColMatrix<T, 3>& control_pts) requires (d == 3)
+        : Patch(std::array<Ptr<const Basis<T>>, 3>{basis_u, basis_v, basis_w},
+                control_pts) {}
 
     /**
      * @brief Virtual destructor.
@@ -139,26 +148,11 @@ public:
     /**
      * @brief Evaluate physical coordinates at parametric sample points.
      *
-     * @param pts Parametric sample points, shape (n_pts,).
+     * @param pts Parametric sample points, shape (n_pts, d). For d=1 this is a
+     *            column vector; for d=2 columns are (u, v); for d=3 (u, v, w).
      * @return Physical coordinates, shape (n_pts, 3).
      */
-    ColMatrix<T, 3> eval_physical(const Vector<T>& pts) const requires(d == 1);
-
-    /**
-     * @brief Evaluate physical coordinates at parametric sample points.
-     *
-     * @param pts Parametric sample points, shape (n_pts, 2): column 0 = u, column 1 = v.
-     * @return Physical coordinates, shape (n_pts, 3).
-     */
-    ColMatrix<T, 3> eval_physical(const Matrix<T>& pts) const requires(d == 2);
-
-    /**
-     * @brief Evaluate physical coordinates at parametric sample points.
-     *
-     * @param pts Parametric sample points, shape (n_pts, 3): columns u, v, w.
-     * @return Physical coordinates, shape (n_pts, 3).
-     */
-    ColMatrix<T, 3> eval_physical(const Matrix<T>& pts) const requires(d == 3);
+    ColMatrix<T, 3> eval_physical(const ColMatrix<T, d>& pts) const;
 
     // === Refinement =================================================================
 

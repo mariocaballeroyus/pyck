@@ -1,6 +1,6 @@
 #include "plate_reissner_mindlin_3p.hpp"
 #include "patch.hpp"
-#include "christoffels.hpp"
+#include "intrinsic_geometry.hpp"
 
 namespace pyck
 {
@@ -23,23 +23,23 @@ template <std::floating_point T>
 Matrix<T>
 PlateReissnerMindlin3p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
                                          const BasisDerivs<T, 2>& basis,
-                                         const LocalFrame<T, 2>& local,
-                                         const ChristoffelSymbols<T, 2>& chr) const
+                                         const IntrinsicGeometry<T, 2>& ig) const
 {
     const Index Q = basis.N.rows();
     const Index n = basis.N.cols();
     Matrix<T> B = Matrix<T>::Zero(5 * Q, 3 * n);
 
+
     for (Index q = 0; q < Q; ++q)
     {
-        const T Gam1_11 = chr.G1_11(q), Gam1_12 = chr.G1_12(q), Gam1_22 = chr.G1_22(q);
-        const T Gam2_11 = chr.G2_11(q), Gam2_12 = chr.G2_12(q), Gam2_22 = chr.G2_22(q);
+        const T Gam1_11 = ig.chr.Gamma[0][0][0](q), Gam1_12 = ig.chr.Gamma[0][0][1](q), Gam1_22 = ig.chr.Gamma[0][1][1](q);
+        const T Gam2_11 = ig.chr.Gamma[1][0][0](q), Gam2_12 = ig.chr.Gamma[1][0][1](q), Gam2_22 = ig.chr.Gamma[1][1][1](q);
 
         for (Index i = 0; i < n; ++i)
         {
             const T Ni   = basis.N  (q, i);
-            const T Ni_u = basis.N_u(q, i);
-            const T Ni_v = basis.N_v(q, i);
+            const T Ni_u = basis.N_d1[0](q, i);
+            const T Ni_v = basis.N_d1[1](q, i);
 
             // B_b = [ 0    N_{i|1} − Γ¹_{11} N_i      −Γ²_{11} N_i            ]   κ_{11}
             //       [ 0    −Γ¹_{22} N_i               N_{i|2} − Γ²_{22} N_i   ]   κ_{22}
@@ -64,14 +64,14 @@ PlateReissnerMindlin3p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
 
 template <std::floating_point T> 
 Matrix<T>
-PlateReissnerMindlin3p<T>::constitutive_matrix(const LocalFrame<T, 2>& local,
+PlateReissnerMindlin3p<T>::constitutive_matrix(const IntrinsicGeometry<T, 2>& ig,
                                                Index q) const
 {
     // D = [ D_b   0  ]
     //     [  0   D_s ]
     Matrix<T> D = Matrix<T>::Zero(5, 5);
-    D.template topLeftCorner    <3, 3>() = material_->bending_voigt(local.g_inv.row(q).transpose());
-    D.template bottomRightCorner<2, 2>() = material_->shear_voigt  (local.g_inv.row(q).transpose());
+    D.template topLeftCorner    <3, 3>() = material_->bending_voigt(g_inv_voigt(ig, q));
+    D.template bottomRightCorner<2, 2>() = material_->shear_voigt  (g_inv_voigt(ig, q));
     return D;
 }
 
@@ -81,8 +81,7 @@ template <std::floating_point T>
 Matrix<T>
 PlateReissnerMindlin3p<T>::displacement_shape_matrix(const Patch<T, 2>& /*patch*/,
                                                      const BasisDerivs<T, 2>& basis,
-                                                     const LocalFrame<T, 2>& /*local*/,
-                                                     const ChristoffelSymbols<T, 2>& /*chr*/) const
+                                                     const IntrinsicGeometry<T, 2>& /*ig*/) const
 {
     const Index Q = basis.N.rows();
     const Index n = basis.N.cols();
@@ -100,8 +99,7 @@ template <std::floating_point T>
 Matrix<T>
 PlateReissnerMindlin3p<T>::rotation_shape_matrix(const Patch<T, 2>& /*patch*/,
                                                  const BasisDerivs<T, 2>& basis,
-                                                 const LocalFrame<T, 2>& /*local*/,
-                                                 const ChristoffelSymbols<T, 2>& /*chr*/) const
+                                                 const IntrinsicGeometry<T, 2>& /*ig*/) const
 {
     const Index Q = basis.N.rows();
     const Index n = basis.N.cols();
