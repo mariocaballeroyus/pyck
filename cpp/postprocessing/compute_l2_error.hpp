@@ -10,7 +10,7 @@
 #include <vector>
 
 #include "../elements/element.hpp"
-#include "../basis/basis_values.hpp"
+#include "../basis/tensor_product.hpp"
 #include "../geometry/intrinsic_geometry.hpp"
 #include "../geometry/patch.hpp"
 #include "../quadrature/quadrature.hpp"

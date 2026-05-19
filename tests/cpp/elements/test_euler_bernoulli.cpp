@@ -5,10 +5,10 @@
 #include <vector>
 
 #include "patch.hpp"
-#include "basis_values.hpp"
+#include "tensor_product.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
-#include "knots.hpp"
+#include "knot_vector.hpp"
 #include "beam_euler_bernoulli_1p.hpp"
 #include "quadrature.hpp"
 #include "gauss_legendre.hpp"

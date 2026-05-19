@@ -7,7 +7,7 @@
 #include <cstddef>
 
 #include "element.hpp"
-#include "basis_values.hpp"
+#include "tensor_product.hpp"
 #include "intrinsic_geometry.hpp"
 #include "patch.hpp"
 #include "beam_euler_bernoulli_1p.hpp"

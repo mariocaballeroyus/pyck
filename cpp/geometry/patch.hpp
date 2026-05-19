@@ -9,9 +9,8 @@
 #include <Eigen/Core>
 
 #include "basis.hpp"
-#include "tensor.hpp"
+#include "tensor_product.hpp"
 #include "bspline.hpp"
-#include "basis_values.hpp"
 #include "dof_mapper.hpp"
 #include "../types.hpp"
 
@@ -210,7 +209,26 @@ protected:
  * @param eval_coords (Q × d) parametric coordinates on the span.
  * @param span_idx    Flat element / span index; decoded internally.
  * @param order       Highest total derivative order (0, 1, 2 or 3).
+ * @param eval        Recurrence scratch workspace; reuse across calls in
+ *                    hot loops to avoid per-call heap allocation.
  */
+template <std::floating_point T, std::size_t d>
+inline BasisValues<T, d>
+eval_basis(const Patch<T, d>& patch,
+           const std::type_identity_t<ColMatrix<T, d>>& eval_coords,
+           Index span_idx,
+           std::size_t order,
+           Evaluator<T>& eval)
+{
+    return patch.tensor_product().eval_on_span(
+        eval_coords,
+        patch.decode_span(span_idx),
+        static_cast<Index>(order),
+        eval);
+}
+
+/// @brief Convenience overload that constructs an Evaluator internally.
+///        Hot-path callers should use the Evaluator-taking overload above.
 template <std::floating_point T, std::size_t d>
 inline BasisValues<T, d>
 eval_basis(const Patch<T, d>& patch,
@@ -218,10 +236,8 @@ eval_basis(const Patch<T, d>& patch,
            Index span_idx,
            std::size_t order = 0)
 {
-    return eval_basis(patch.tensor_product(),
-                      eval_coords,
-                      patch.decode_span(span_idx),
-                      static_cast<Index>(order));
+    Evaluator<T> eval;
+    return eval_basis(patch, eval_coords, span_idx, order, eval);
 }
 
 } // namespace pyck

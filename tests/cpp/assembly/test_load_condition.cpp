@@ -4,7 +4,7 @@
 #include <memory>
 #include <vector>
 
-#include "knots.hpp"
+#include "knot_vector.hpp"
 #include "bspline.hpp"
 #include "patch.hpp"
 #include "factories.hpp"

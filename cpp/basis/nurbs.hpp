@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "basis.hpp"
-#include "knots.hpp"
+#include "knot_vector.hpp"
 #include "../types.hpp"
 
 namespace pyck
@@ -12,6 +12,10 @@ namespace pyck
 
 /**
  * @brief NURBS (Non-Uniform Rational B-Spline) basis on a 1D parametric space.
+ *
+ * @details The basis holds no mutable state; concurrent evaluation from
+ *          multiple threads is safe provided each thread owns its own
+ *          `Evaluator<T>` workspace.
  *
  * @tparam T Scalar type
  */
@@ -21,9 +25,6 @@ class NURBS : public Basis<T>
 public:
 
     // === Constructors ===============================================================
-
-    /// @brief Default constructor
-    NURBS() = default;
 
     /**
      * @brief Construct a NURBS basis from a degree, knot vector and weights.
@@ -41,25 +42,24 @@ public:
     // === Evaluation =================================================================
 
     /**
-     * @brief Evaluate the (p+1) non-zero rational basis functions and their
-     *        derivatives at the given parameter values within a single span.
+     * @brief Evaluate the non-zero rational basis functions and their
+     *        derivatives at given parameter values within a single knot span.
      *
-     * @param points   Parameter values (all assumed to lie in the span).
-     * @param span_idx Knot-span index (as returned by KnotVector::find_span).
-     * @param order    Maximum derivative order to compute.
-     * @param results  Output buffer; the function resizes it to (order+1) matrices,
-     *                 each of size (m, p+1).
+     * @details Evaluates the underlying B-spline derivatives via Cox-de-Boor
+     *          plus the derivative recurrence, then applies the rational
+     *          quotient rule to obtain R_i^{(k)}.
+     *
+     * @param points    Parameter values (all assumed to lie in the same knot span).
+     * @param span_idx  Knot-span index (as returned by KnotVector::find_span).
+     * @param results   Output buffer; the caller must size it to `order + 1`,
+     *                  where `order` is the maximum derivative order to compute.
+     *                  Inner matrices are sized to (m × (p+1)) on return.
+     * @param eval      Pre-allocated workspace for the evaluation.
      */
     void eval_on_span(const Vector<T>& points,
                       Index span_idx,
-                      Index order,
-                      std::vector<Matrix<T>>& results) const override;
-
-    /**
-     * @brief Greville abscissae of the NURBS basis (knot averages — identical
-     *        to the underlying B-spline, independent of the weights).
-     */
-    Vector<T> greville_abscissae() const override;
+                      std::vector<Matrix<T>>& results,
+                      Evaluator<T>& eval) const override;
 
     // === Refinement =================================================================
 
@@ -96,15 +96,13 @@ public:
      * @param weights Per-basis-function weights (length `num_basis`), each strictly positive.
      * @return A NURBS basis with clamped uniform knots.
      */
-    static NURBS<T> clamped_uniform(Index degree, Index num_basis, const Vector<T>& weights)
-    {
-        return NURBS<T>(degree, KnotVector<T>::clamped_uniform(degree, num_basis), weights);
-    }
+    static NURBS<T> clamped_uniform(Index degree, Index num_basis, const Vector<T>& weights);
 
 private:
 
-    /// @brief Per-basis-function weights, indexed 0 .. num_basis - 1.
+    /// @brief Per-basis-function weights.
     Vector<T> weights_;
+
 };
 
 } // namespace pyck

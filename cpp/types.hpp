@@ -9,10 +9,14 @@
 namespace pyck
 {
 
-/// @brief Global integral type for indexing and sizes
-using Index = std::size_t;
+/// @brief Signed index type
+using Index = int;
 
-/// @brief Shared pointer alias
+/// @brief Row-major dynamic-sized dense matrix of type T
+template <std::floating_point T>
+using Matrix = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
+
+/// @brief Shared pointer type
 template <typename T>
 using Ptr = std::shared_ptr<T>;
 
@@ -23,10 +27,6 @@ using Vector = Eigen::Vector<T, Eigen::Dynamic>;
 /// @brief Dynamic-sized row vector of type T
 template <std::floating_point T>
 using RowVector = Eigen::RowVector<T, Eigen::Dynamic>;
-
-/// @brief Dynamic-sized dense matrix of type T
-template <std::floating_point T>
-using Matrix = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
 
 /// @brief Dynamic-sized dense matrix of integers (typically for DOFs)
 using IndexMatrix = Eigen::Matrix<Index, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;

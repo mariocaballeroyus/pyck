@@ -7,7 +7,7 @@
 
 #include <Eigen/Core>
 
-#include "../basis/basis_values.hpp"
+#include "../basis/tensor_product.hpp"
 #include "../multi_index.hpp"
 #include "../types.hpp"
 

@@ -1,7 +1,7 @@
 #include "lagrange_domain_condition.hpp"
 
 #include "patch.hpp"
-#include "basis_values.hpp"
+#include "tensor_product.hpp"
 #include "intrinsic_geometry.hpp"
 
 #include <array>

@@ -3,6 +3,8 @@
 #include <stdexcept>
 #include <utility>
 
+#include "evaluation.hpp"
+
 namespace pyck
 {
 
@@ -165,13 +167,16 @@ static Matrix<T> eval_dense_1d(const Basis<T>& basis, const Vector<T>& pts)
     const Index n = basis.num_basis();
     const Index p = basis.degree();
     Matrix<T> N = Matrix<T>::Zero(n_pts, n);
+    Evaluator<T> ev;
+    std::vector<Matrix<T>> local(1);
     for (Index i = 0; i < n_pts; ++i) {
         const Index span = basis.find_span(pts[i]);
         Vector<T> pt(1);
         pt << pts[i];
-        std::vector<Matrix<T>> local;
-        basis.eval_on_span(pt, span, 0, local);
-        N.row(i).segment(span - p, p + 1) = local[0].row(0);
+        basis.eval_on_span(pt, span, local, ev);
+        // local[0] is (p+1) x 1 col-major (N x Q with Q=1); the column holds
+        // the N active basis values at the single point `pt`.
+        N.row(i).segment(span - p, p + 1) = local[0].col(0).transpose();
     }
     return N;
 }

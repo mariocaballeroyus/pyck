@@ -1,6 +1,6 @@
 #include "catch.hpp"
 
-#include "knots.hpp"
+#include "knot_vector.hpp"
 
 using namespace pyck;
 

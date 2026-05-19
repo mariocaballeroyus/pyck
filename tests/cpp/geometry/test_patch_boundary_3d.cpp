@@ -6,11 +6,11 @@
 
 #include "patch.hpp"
 #include "patch_boundary.hpp"
-#include "basis_values.hpp"
+#include "tensor_product.hpp"
 #include "intrinsic_geometry.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
-#include "knots.hpp"
+#include "knot_vector.hpp"
 
 using namespace pyck;
 

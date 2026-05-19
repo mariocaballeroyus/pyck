@@ -4,7 +4,10 @@
 #include <cmath>
 #include <vector>
 
-namespace pyck::bspline_kernel
+namespace pyck
+{
+
+namespace basis::refine
 {
 
 // === Knot Insertion =================================================================
@@ -204,4 +207,6 @@ template std::pair<KnotVector<float>, Matrix<float>>
 elevate_degree<float>(Index, const KnotVector<float>&);
 #endif
 
-} // namespace pyck::bspline_kernel
+} // namespace basis::refine
+
+} // namespace pyck

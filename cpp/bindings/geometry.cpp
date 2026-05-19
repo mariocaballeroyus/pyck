@@ -4,7 +4,7 @@
 
 #include "bspline.hpp"
 #include "patch_boundary.hpp"
-#include "basis_values.hpp"
+#include "tensor_product.hpp"
 #include "intrinsic_geometry.hpp"
 
 namespace py = pybind11;

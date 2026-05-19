@@ -2,13 +2,15 @@
 #include <pybind11/stl.h>
 #include <pybind11/eigen.h>
 
-#include "knots.hpp"
+#include "knot_vector.hpp"
 #include "bspline.hpp"
 #include "nurbs.hpp"
+#include "evaluation.hpp"
 
 namespace py = pybind11;
 
-namespace pyck {
+namespace pyck
+{
 
 // Helper function: evaluate all n basis functions at m points via eval_on_span loop.
 // Returns (m × n) dense matrix by scattering span-local results.
@@ -25,14 +27,17 @@ static std::vector<Matrix<T>> eval_all_aux(const Basis<T>& basis,
     for (Index k = 0; k <= order; ++k)
         results[k] = Matrix<T>::Zero(n_pts, n);
 
+    Evaluator<T> eval;
+    std::vector<Matrix<T>> local(order + 1);
     for (Index i = 0; i < n_pts; ++i) {
         const Index span = basis.find_span(pts[i]);
         Vector<T> pt(1);
         pt << pts[i];
-        std::vector<Matrix<T>> local;
-        basis.eval_on_span(pt, span, order, local);
+        basis.eval_on_span(pt, span, local, eval);
+        // local[k] is (p+1) x 1 col-major (N x Q with Q=1); transpose its
+        // single column into the row-segment of the global (m x n) matrix.
         for (Index k = 0; k <= order; ++k) {
-            results[k].row(i).segment(span - p, p + 1) = local[k].row(0);
+            results[k].row(i).segment(span - p, p + 1) = local[k].col(0).transpose();
         }
     }
 
@@ -63,8 +68,9 @@ void bind_basis(py::module_& m)
 
           .def("eval_on_span",
                [](const Basis<double>& b, py::array_t<double> pts, Index span, Index order) {
-                   std::vector<Matrix<double>> results;
-                   b.eval_on_span(pts.cast<Vector<double>>(), span, order, results);
+                   std::vector<Matrix<double>> results(order + 1);
+                   Evaluator<double> eval;
+                   b.eval_on_span(pts.cast<Vector<double>>(), span, results, eval);
                    return results;
                },
                py::arg("pts"), py::arg("span"), py::arg("order") = 0)

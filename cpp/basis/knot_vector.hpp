@@ -130,7 +130,7 @@ private:
     /// @brief Non-decreasing sequence of knot values.
     std::vector<T> knots_;
 
-}; // class KnotVector<T>
+};
 
 } // namespace pyck
 

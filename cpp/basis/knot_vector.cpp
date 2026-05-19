@@ -1,4 +1,4 @@
-#include "knots.hpp"
+#include "knot_vector.hpp"
 
 #include <algorithm>
 #include <stdexcept>

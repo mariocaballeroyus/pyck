@@ -9,11 +9,11 @@
 #include <Eigen/SparseCholesky>
 
 #include "patch.hpp"
-#include "basis_values.hpp"
+#include "tensor_product.hpp"
 #include "patch_boundary.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
-#include "knots.hpp"
+#include "knot_vector.hpp"
 #include "boundary_field.hpp"
 #include "gauss_legendre.hpp"
 #include "quadrature.hpp"

@@ -4,11 +4,11 @@
 #include <vector>
 
 #include "patch.hpp"
-#include "basis_values.hpp"
+#include "tensor_product.hpp"
 #include "intrinsic_geometry.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
-#include "knots.hpp"
+#include "knot_vector.hpp"
 #include "gauss_legendre.hpp"
 
 using namespace pyck;

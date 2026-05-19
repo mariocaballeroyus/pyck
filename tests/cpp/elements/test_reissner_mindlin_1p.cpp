@@ -6,11 +6,11 @@
 #include <numeric>
 
 #include "patch.hpp"
-#include "basis_values.hpp"
+#include "tensor_product.hpp"
 #include "intrinsic_geometry.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
-#include "knots.hpp"
+#include "knot_vector.hpp"
 #include "plate_reissner_mindlin_1p.hpp"
 #include "plate_kirchhoff_love_1p.hpp"
 #include "quadrature.hpp"

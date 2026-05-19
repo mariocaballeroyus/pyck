@@ -6,10 +6,10 @@
 #include <numeric>
 
 #include "patch.hpp"
-#include "basis_values.hpp"
+#include "tensor_product.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
-#include "knots.hpp"
+#include "knot_vector.hpp"
 #include "plate_reissner_mindlin_3p.hpp"
 #include "quadrature.hpp"
 #include "gauss_legendre.hpp"

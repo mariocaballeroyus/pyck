@@ -5,14 +5,15 @@
 #include <vector>
 
 #include "basis.hpp"
-#include "knots.hpp"
+#include "knot_vector.hpp"
 #include "../types.hpp"
 
 namespace pyck
 {
 
 /**
- * @brief B-spline basis functions defined on a one-dimensional parametric space
+ * @brief B-spline basis functions defined on a one-dimensional parametric space.ce.
+ *
  * @tparam T Scalar type
  */
 template <std::floating_point T = double>
@@ -22,12 +23,9 @@ public:
 
     // === Constructors ===============================================================
 
-    /// @brief Default constructor
-    BSpline() = default;
-
     /**
      * @brief Construct a B-spline basis with the given degree and knot vector
-     * 
+     *
      * @param degree Degree of the B-spline basis functions
      * @param knots Knot vector defining the B-spline basis functions
      */
@@ -37,37 +35,19 @@ public:
     // === Evaluation =================================================================
 
     /**
-     * @brief Evaluate the (p+1) non-zero B-spline basis functions and their
-     *        derivatives at given parameter values within a single knot span.
+     * @brief Evaluate non-zero basis functions and mixed partial derivatives for the
+     *        tensor product space within a given knot span.
      *
-     * @details The first pass builds a triangular table of basis function values via 
-     *          the Cox-de Boor recurrence. The second pass computes the derivatives 
-     *          via de Boor's derivative formula.
-
-     * @note References: 
-     *       - [Piegl & Tiller] The NURBS Book, Chapter 3, Algorithms A2.2 and A2.3.
-     *
-     * @param points   Parameter values (all assumed to lie in knot span `span_idx`).
-     * @param span_idx Knot-span index (as returned by KnotVector::find_span).
-     * @param order    Maximum derivative order to compute.
-     * @param results  Output buffer; the function resizes it to (order+1) matrices,
-     *                 each of size (m, p+1).
+     * @param params  A matrix of size (m × d) containing parametric points.
+     * @param spans   Per-direction knot-span indices.
+     * @param results Output buffer; the caller must size it to `order + 1`, where
+     *                `order` is the maximum derivative order to compute. The
+     *                function resizes the inner matrices to (m × (p+1)).
+     * @param evaluator Pre-allocated workspace for the evaluation.
      */
-    void eval_on_span(const Vector<T>& points,
-                      Index span_idx,
-                      Index order,
-                      std::vector<Matrix<T>>& results) const override;
-
-    /**
-     * @brief Compute the Greville abscissae for the B-spline basis.
-     *
-     * @details The Greville abscissa for basis function N_{i,p} is the average
-     *          of its p interior knots. They satisfy linear precision and serve
-     *          as natural node points for interpolation and collocation.
-     *          
-     * @returns The Greville abscissae for the B-spline basis.
-     */
-    Vector<T> greville_abscissae() const override;
+    void eval_on_span(const Vector<T>& points, Index span_idx,
+                      std::vector<Matrix<T>>& results,
+                      Evaluator<T>& eval) const override;
 
     // === Refinement =================================================================
 
@@ -98,12 +78,9 @@ public:
      * @param num_basis Number of basis functions. Must satisfy `num_basis >= degree + 1`.
      * @return A B-spline basis with clamped uniform knots.
      */
-    static BSpline<T> clamped_uniform(Index degree, Index num_basis)
-    {
-        return BSpline<T>(degree, KnotVector<T>::clamped_uniform(degree, num_basis));
-    }
+    static BSpline<T> clamped_uniform(Index degree, Index num_basis);
 
-}; // class BSpline : public Basis<T>
+};
 
 } // namespace pyck
 

@@ -8,7 +8,7 @@
 #include "patch.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
-#include "knots.hpp"
+#include "knot_vector.hpp"
 #include "gauss_legendre.hpp"
 #include "plane_stress_2d.hpp"
 #include "plane_stress_2d.hpp"

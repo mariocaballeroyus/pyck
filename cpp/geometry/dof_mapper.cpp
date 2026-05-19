@@ -31,7 +31,7 @@ std::array<Index, d> DofMapper<d>::from_global(Index global_idx) const
 }
 
 template <std::size_t d>
-std::vector<Index> DofMapper<d>::get_layer_dofs(std::size_t param_dim,
+std::vector<Index> DofMapper<d>::get_layer_dofs(Index param_dim,
                                                 bool at_start,
                                                 Index layer_idx) const
 {
