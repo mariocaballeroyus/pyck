@@ -202,7 +202,10 @@ TEST_CASE("RM 1P Plate: stiffness matrix size and symmetry", "[RM1P]")
     Vector<double> q_weights = gauss->weights();
 
     Matrix<double> stiffness;
-    element.compute_local_stiffness(*surface, elem_idx, q_points, q_weights, stiffness);
+    BasisValues<double, 2> basis;
+    Evaluator<double>      eval;
+    element.compute_local_stiffness(*surface, elem_idx, q_points, q_weights, stiffness,
+                                    basis, eval);
 
     // n*n = 36 total, but element-level is (p+1)^2 = 16 for p=3
     Index local_n = (p + 1) * (p + 1);

@@ -54,11 +54,12 @@ const Basis<T>& TensorProduct<T, d>::basis(Index dir) const
 // === Evaluation =====================================================================
 
 template <std::floating_point T, std::size_t d>
-BasisValues<T, d>
+void
 TensorProduct<T, d>::eval_on_span(const std::type_identity_t<ColMatrix<T, d>>& coords,
                                   const std::array<Index, d>& spans,
                                   Index order,
-                                  Evaluator<T>& ev) const
+                                  Evaluator<T>& ev,
+                                  BasisValues<T, d>& out) const
 {
     if (order < 0 || order > 3) {
         throw std::invalid_argument("TensorProduct::eval_on_span: "
@@ -81,15 +82,10 @@ TensorProduct<T, d>::eval_on_span(const std::type_identity_t<ColMatrix<T, d>>& c
         K *= n_b[dim];
     }
 
-    // Output buffers per-order
-    std::vector<Matrix<T>> per_order(order + 1);
-    for (Index k = 0; k <= order; ++k) {
-        Index n_k = 0;
-        if constexpr (d == 1)      n_k = 1;
-        else if constexpr (d == 2) n_k = k + 1;
-        else if constexpr (d == 3) n_k = (k + 1) * (k + 2) / 2;
-        per_order[k].resize(K * n_k, Q);
-    }
+    // Resize the caller-owned output to (K · n_k) × Q per order. No-op when
+    // shape is unchanged — repeated calls in an assembly loop are allocation-free.
+    out.reset_for(K, Q, order);
+    std::vector<Matrix<T>>& per_order = out.data();
 
     // Main fill loop
     for (Index q = 0; q < Q; ++q)
@@ -222,8 +218,52 @@ TensorProduct<T, d>::eval_on_span(const std::type_identity_t<ColMatrix<T, d>>& c
             }
         }
     }
+    
+}
 
-    return BasisValues<T, d>(std::move(per_order));
+template <std::floating_point T, std::size_t d>
+BasisValues<T, d>
+TensorProduct<T, d>::eval(const std::type_identity_t<ColMatrix<T, d>>& coords,
+                          Index order) const
+{
+    if (order < 0 || order > 3) {
+        throw std::invalid_argument("TensorProduct::eval: "
+                                    "order must be in [0, 3].");
+    }
+
+    const Index Q = static_cast<Index>(coords.rows());
+
+    // K = ∏(p_i + 1): same number of active basis functions on every span.
+    Index K = 1;
+    for (std::size_t dim = 0; dim < d; ++dim) {
+        K *= bases_[dim]->degree() + 1;
+    }
+
+    BasisValues<T, d> out;
+    out.reset_for(K, Q, order);
+
+    // Per-point dispatch: find spans, evaluate one point's worth via the
+    // span-local kernel, copy into column q. The scratch Evaluator and the
+    // single-point BasisValues buffer are reused across q so allocation is
+    // amortized after the first iteration.
+    Evaluator<T>            ev;
+    BasisValues<T, d>       single;
+    ColMatrix<T, d>         single_pt(1, d);
+    std::array<Index, d>    spans;
+
+    for (Index q = 0; q < Q; ++q) {
+        single_pt.row(0) = coords.row(q);
+        for (std::size_t dim = 0; dim < d; ++dim) {
+            spans[dim] = bases_[dim]->find_span(coords(q, dim));
+        }
+        eval_on_span(single_pt, spans, order, ev, single);
+
+        for (Index k = 0; k <= order; ++k) {
+            out.data()[k].col(q) = single.data()[k].col(0);
+        }
+    }
+
+    return out;
 }
 
 // === Template Instantiations ========================================================

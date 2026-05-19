@@ -32,6 +32,9 @@ Matrix<T> assemble_global_K(const Patch<T, 2>& patch,
 
     GaussLegendre<T, 2> quad(gauss_p);
 
+    BasisValues<T, 2> basis;
+    Evaluator<T>      eval;
+
     for (Index e = 0; e < intervals[0] * intervals[1]; ++e) {
         auto spans = patch.decode_span(e);
         std::array<T, 2> lo, hi;
@@ -45,7 +48,7 @@ Matrix<T> assemble_global_K(const Patch<T, 2>& patch,
 
         auto [pts, w] = quad.map_to_domain(lo, hi);
         Matrix<T> Ke;
-        element.compute_local_stiffness(patch, e, pts, w, Ke);
+        element.compute_local_stiffness(patch, e, pts, w, Ke, basis, eval);
 
         const auto dofs = patch.dof_mapper().get_element_dofs(spans);
         for (Index i = 0; i < (Index)dofs.size(); ++i) {

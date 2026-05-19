@@ -56,12 +56,17 @@ public:
      * @param mapped_pts The mapped quadrature points.
      * @param q_weights The quadrature weights.
      * @param stiffness The local stiffness matrix.
+     * @param basis Output buffer for basis-and-derivatives at this element;
+     *              reused across the assembly loop, allocation-free on repeats.
+     * @param eval Recurrence scratch workspace, also reused across the loop.
      */
     virtual void compute_local_stiffness(const Patch<T, d>& patch,
                                          Index elem_idx,
                                          const ColMatrix<T, d>& mapped_pts,
                                          const Vector<T>& q_weights,
-                                         Matrix<T>& stiffness) const;
+                                         Matrix<T>& stiffness,
+                                         BasisValues<T, d>& basis,
+                                         Evaluator<T>& eval) const;
 
     // === Matrix Operators (Element Formulation-Specific) ============================
 
@@ -141,9 +146,11 @@ Element<T, d>::compute_local_stiffness(const Patch<T, d>& patch,
                                        Index elem_idx,
                                        const ColMatrix<T, d>& mapped_pts,
                                        const Vector<T>& q_weights,
-                                       Matrix<T>& stiffness) const
+                                       Matrix<T>& stiffness,
+                                       BasisValues<T, d>& basis,
+                                       Evaluator<T>& eval) const
 {
-    auto basis   = eval_basis(patch, mapped_pts, elem_idx, min_order());
+    eval_basis(patch, mapped_pts, elem_idx, min_order(), eval, basis);
     auto act_pts = patch.active_control_pts(elem_idx);
     IntrinsicGeometry ig(basis, act_pts);
     ig.compute_christoffels();

@@ -81,8 +81,31 @@ public:
     // === Raw Access =================================================================
 
     /// @brief Vector of per-order packed matrices (one per derivative order).
-    const std::vector<Matrix<T>>& data() const
-    { return data_; }
+    const std::vector<Matrix<T>>& data() const { return data_; }
+
+    /// @brief Mutable accessor; intended for fill kernels like
+    ///        `TensorProduct::eval_on_span` writing into a caller-owned buffer.
+    std::vector<Matrix<T>>& data() { return data_; }
+
+    /**
+     * @brief Resize the per-order matrices to hold N = K active basis functions
+     *        evaluated at Q points up to derivative @p order.
+     *
+     * @details Eigen's `Matrix::resize(rows, cols)` is a no-op when the shape
+     *          is unchanged, so reusing a `BasisValues` across calls with
+     *          identical (K, Q, order) skips all allocation after the first.
+     */
+    void reset_for(Index K, Index Q, Index order)
+    {
+        data_.resize(order + 1);
+        for (Index k = 0; k <= order; ++k) {
+            Index n_k = 0;
+            if constexpr (d == 1)      n_k = 1;
+            else if constexpr (d == 2) n_k = k + 1;
+            else if constexpr (d == 3) n_k = (k + 1) * (k + 2) / 2;
+            data_[k].resize(K * n_k, Q);
+        }
+    }
 
 private:
 
@@ -118,8 +141,8 @@ public:
 
     /**
      * @brief Evaluate the tensor-product basis and its derivatives up to total
-     *        @p order on one element span, returning the values in the packed
-     *        layout described in @ref BasisValues.
+     *        @p order on one element span, writing into a caller-owned
+     *        `BasisValues` in the packed layout described in @ref BasisValues.
      *
      * @param coords (Q × d) parametric coordinates on the span.
      * @param spans  Per-direction knot-span indices.
@@ -127,18 +150,35 @@ public:
      * @param eval   Recurrence scratch workspace, shared with the 1D basis
      *               evaluators. Reused across calls to avoid per-call
      *               heap allocation of the scratch buffers.
-     * @return       BasisValues wrapping the per-order packed matrices.
+     * @param out    Output buffer; resized in place via `reset_for` (no-op if
+     *               shape unchanged). Reusing one `BasisValues` across an
+     *               assembly loop makes the steady-state path allocation-free.
      *
      * @throws std::invalid_argument if @p order is outside [0, 3].
      */
+    void
+    eval_on_span(const std::type_identity_t<ColMatrix<T, d>>& coords,
+                 const std::array<Index, d>& spans,
+                 Index order,
+                 Evaluator<T>& eval,
+                 BasisValues<T, d>& out) const;
+
+    /// @brief Convenience overload that constructs the output `BasisValues`
+    ///        internally and returns it by move. Hot-path callers should pass
+    ///        a reused output buffer to the primary overload above.
     BasisValues<T, d>
     eval_on_span(const std::type_identity_t<ColMatrix<T, d>>& coords,
                  const std::array<Index, d>& spans,
                  Index order,
-                 Evaluator<T>& eval) const;
+                 Evaluator<T>& eval) const
+    {
+        BasisValues<T, d> out;
+        eval_on_span(coords, spans, order, eval, out);
+        return out;
+    }
 
-    /// @brief Convenience overload that constructs an Evaluator internally.
-    ///        Hot-path callers should pass a reused Evaluator instead.
+    /// @brief Convenience overload that constructs both the Evaluator and the
+    ///        output `BasisValues` internally. One-shot callers only.
     BasisValues<T, d>
     eval_on_span(const std::type_identity_t<ColMatrix<T, d>>& coords,
                  const std::array<Index, d>& spans,
@@ -147,6 +187,34 @@ public:
         Evaluator<T> eval;
         return eval_on_span(coords, spans, order, eval);
     }
+
+    /**
+     * @brief Evaluate the tensor-product basis at @p Q points that may lie in
+     *        **different** spans, returning the same packed layout as
+     *        @ref eval_on_span.
+     *
+     * @details Per-direction knot spans are determined per point via
+     *          `Basis::find_span`, so the caller need not pre-group points by
+     *          element. Column `q` of the output carries the K = ∏(p_i+1)
+     *          active basis values (and packed derivatives) at point
+     *          `coords.row(q)`. K is constant, but the *identity* of the K
+     *          active basis functions depends on the span — recover it from
+     *          `Basis::find_span(coords(q, dim))` per direction.
+     *
+     *          A scratch `Evaluator` is created internally on each call.
+     *          This is the FE-assembly entry point for scattered evaluation
+     *          points; for hot per-element loops where all Q points share a
+     *          span and a reusable `Evaluator` is available, call
+     *          @ref eval_on_span directly instead.
+     *
+     * @param coords (Q × d) parametric coordinates (one point per row).
+     * @param order  Highest total derivative order to evaluate (0, 1, 2 or 3).
+     *
+     * @throws std::invalid_argument if @p order is outside [0, 3].
+     */
+    BasisValues<T, d>
+    eval(const std::type_identity_t<ColMatrix<T, d>>& coords,
+         Index order) const;
 
     // === Properties =================================================================
 
