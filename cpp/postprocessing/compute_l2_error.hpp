@@ -93,15 +93,15 @@ Vector<T> compute_l2_error(
 
         auto basis   = eval_basis(patch, mapped_pts, static_cast<Index>(elem_idx), basis_order);
         auto act_pts = patch.active_control_pts(static_cast<Index>(elem_idx));
-        IntrinsicGeometry local(basis, act_pts);
+        IntrinsicGeometry<T, d> local(basis, act_pts);
 
-        const Index Q_eval = basis.Q();
-        const Index N_eval = basis.N();
+        const Index Q_eval = basis[0].cols();
+        const Index N_eval = basis[0].rows();
 
         // Physical points: x(q) = Σ_i N_i(u_q) · P_i.
         ColMatrix<T, 3> phys_pts(Q_eval, 3);
         for (Index q = 0; q < Q_eval; ++q) {
-            auto slab0 = basis.data()[0].col(q);
+            auto slab0 = basis[0].col(q);
             Eigen::Matrix<T, 1, 3> x_q = Eigen::Matrix<T, 1, 3>::Zero();
             for (Index i = 0; i < N_eval; ++i) {
                 x_q.noalias() += slab0(i) * act_pts.row(i);
@@ -125,7 +125,7 @@ Vector<T> compute_l2_error(
         auto extract_deriv = [&](Index k_order, Index packed_in_order, Index n_k) {
             Matrix<T> M(Q_eval, N_eval);
             for (Index q = 0; q < Q_eval; ++q) {
-                auto slab = basis.data()[k_order].col(q);
+                auto slab = basis[k_order].col(q);
                 for (Index i = 0; i < N_eval; ++i) {
                     M(q, i) = slab(i * n_k + packed_in_order);
                 }

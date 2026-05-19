@@ -204,8 +204,8 @@ protected:
 /**
  * @brief Evaluate basis functions and derivatives at the given coordinates
  *        within one element span of a patch, writing into a caller-owned
- *        `BasisValues` (ergonomic Patch-level overload, fully allocation-free
- *        on repeated calls).
+ *        per-order packed buffer (ergonomic Patch-level overload, fully
+ *        allocation-free on repeated calls).
  *
  * @param patch       Source patch.
  * @param eval_coords (Q × d) parametric coordinates on the span.
@@ -213,8 +213,8 @@ protected:
  * @param order       Highest total derivative order (0, 1, 2 or 3).
  * @param eval        Recurrence scratch workspace; reuse across calls in
  *                    hot loops to avoid per-call heap allocation.
- * @param out         Output buffer; resized in place via `reset_for` (no-op
- *                    if shape unchanged).
+ * @param out         Output buffer; resized in place via
+ *                    `resize_basis_buffer` (no-op if shape unchanged).
  */
 template <std::floating_point T, std::size_t d>
 inline void
@@ -223,7 +223,7 @@ eval_basis(const Patch<T, d>& patch,
            Index span_idx,
            std::size_t order,
            Evaluator<T>& eval,
-           BasisValues<T, d>& out)
+           std::vector<Matrix<T>>& out)
 {
     patch.tensor_product().eval_on_span(
         eval_coords,
@@ -233,26 +233,25 @@ eval_basis(const Patch<T, d>& patch,
         out);
 }
 
-/// @brief Convenience overload that constructs the output `BasisValues`
-///        internally. Hot-path callers should use the out-param overload
-///        above.
+/// @brief Convenience overload that constructs the output buffer internally.
+///        Hot-path callers should use the out-param overload above.
 template <std::floating_point T, std::size_t d>
-inline BasisValues<T, d>
+inline std::vector<Matrix<T>>
 eval_basis(const Patch<T, d>& patch,
            const std::type_identity_t<ColMatrix<T, d>>& eval_coords,
            Index span_idx,
            std::size_t order,
            Evaluator<T>& eval)
 {
-    BasisValues<T, d> out;
+    std::vector<Matrix<T>> out;
     eval_basis(patch, eval_coords, span_idx, order, eval, out);
     return out;
 }
 
 /// @brief Convenience overload that constructs both the Evaluator and the
-///        output `BasisValues` internally. One-shot callers only.
+///        output buffer internally. One-shot callers only.
 template <std::floating_point T, std::size_t d>
-inline BasisValues<T, d>
+inline std::vector<Matrix<T>>
 eval_basis(const Patch<T, d>& patch,
            const std::type_identity_t<ColMatrix<T, d>>& eval_coords,
            Index span_idx,

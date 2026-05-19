@@ -25,7 +25,7 @@ struct CurveDerivs
     Eigen::RowVectorXd N, dN, d2N, d3N;
 };
 
-CurveDerivs metric_derivs(const BasisValues<double, 1>& basis,
+CurveDerivs metric_derivs(const std::vector<Matrix<double>>& basis,
                           IntrinsicGeometry<double, 1>& local,
                           Index q)
 {
@@ -42,16 +42,16 @@ CurveDerivs metric_derivs(const BasisValues<double, 1>& basis,
 
     // For d=1, slabs are N-length (n_k = 1 for all orders): slab(i) is the
     // value of the requested derivative for basis i at quadrature point q.
-    const Index N_eval = basis.N();
+    const Index N_eval = basis[0].rows();
     CurveDerivs d;
     d.N  .resize(N_eval);
     d.dN .resize(N_eval);
     d.d2N.resize(N_eval);
     d.d3N.resize(N_eval);
-    auto slab0 = basis.data()[0].col(q);
-    auto slab1 = basis.data()[1].col(q);
-    auto slab2 = basis.data()[2].col(q);
-    auto slab3 = basis.data()[3].col(q);
+    auto slab0 = basis[0].col(q);
+    auto slab1 = basis[1].col(q);
+    auto slab2 = basis[2].col(q);
+    auto slab3 = basis[3].col(q);
     for (Index i = 0; i < N_eval; ++i) {
         const double N_i    = slab0(i);
         const double N_u_i  = slab1(i);
@@ -119,7 +119,7 @@ TEST_CASE("Patch<double, 1>: Analytical Push-Forward Verification", "[geometry][
             // New-API evaluation.
             auto b     = eval_basis(curve, params, span, 3);
             auto act   = curve.active_control_pts(span);
-            IntrinsicGeometry local(b, act);            auto md    = metric_derivs(b, local, 0);
+            IntrinsicGeometry<double, 1> local(b, act);            auto md    = metric_derivs(b, local, 0);
 
             CHECK(local.jac(0) == Approx(sqrt_g11).margin(1e-12));
 
@@ -160,7 +160,7 @@ TEST_CASE("Patch<double, 1>: External AD Numerical Validation", "[geometry][curv
     auto eval_at = [&](double u) {
         ColMatrix<double, 1> params(1, 1); params << u;
         auto b     = eval_basis(curve, params, span, 3);
-        IntrinsicGeometry local(b, act);        return metric_derivs(b, local, 0);
+        IntrinsicGeometry<double, 1> local(b, act);        return metric_derivs(b, local, 0);
     };
 
     SECTION("Evaluation at u = 0.15") {

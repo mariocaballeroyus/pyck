@@ -94,8 +94,8 @@ void LagrangeDomainCondition<T, d>::apply(
 
         auto basis   = eval_basis(patch_, mapped_pts, elem_idx, req_order);
         auto act_pts = patch_.active_control_pts(elem_idx);
-        IntrinsicGeometry local(basis, act_pts);
-        const Index n_basis = basis.N();
+        IntrinsicGeometry<T, d> local(basis, act_pts);
+        const Index n_basis = basis[0].rows();
 
         auto elem_cps = patch_.dof_mapper().get_element_dofs(elem_idx);
         std::vector<Index> elem_cps_v(elem_cps.begin(), elem_cps.end());
@@ -118,7 +118,7 @@ void LagrangeDomainCondition<T, d>::apply(
             // saddle-point coupling (symmetric).
             Vector<T> C = Vector<T>::Zero(n_basis);
             for (Index q = 0; q < Q; ++q) {
-                auto slab0 = basis.data()[0].col(q);
+                auto slab0 = basis[0].col(q);
                 const T dV = mapped_weights(q) * local.jac(q);
                 for (Index i = 0; i < n_basis; ++i) {
                     C(i) += dV * slab0(i);

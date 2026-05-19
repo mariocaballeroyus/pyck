@@ -87,7 +87,7 @@ LagrangeBoundaryCondition<T, d>::apply(Matrix<T>& stiffness, Vector<T>& load,
 
         auto boundary_basis  = eval_basis(boundary_, mapped_pts, s, 2);
         auto boundary_act    = boundary_.active_control_pts(s);
-        IntrinsicGeometry boundary_local(boundary_basis, boundary_act);
+        IntrinsicGeometry<T, d - 1> boundary_local(boundary_basis, boundary_act);
 
         auto multiplier_basis_ids = boundary_.dof_mapper().get_element_dofs(s);
 
@@ -95,7 +95,7 @@ LagrangeBoundaryCondition<T, d>::apply(Matrix<T>& stiffness, Vector<T>& load,
         const ColMatrix<T, 2> parent_pts = boundary_.lift_to_parent(mapped_pts);
         auto parent_basis  = eval_basis(parent, parent_pts, flat_parent, req_order);
         auto parent_act    = parent.active_control_pts(flat_parent);
-        IntrinsicGeometry parent_ig(parent_basis, parent_act);
+        IntrinsicGeometry<T, d> parent_ig(parent_basis, parent_act);
         parent_ig.compute_christoffels();
 
         auto elem_dofs = parent.dof_mapper().get_element_dofs(flat_parent);
@@ -121,7 +121,7 @@ LagrangeBoundaryCondition<T, d>::apply(Matrix<T>& stiffness, Vector<T>& load,
             for (Index q = 0; q < Q; ++q)
             {
                 const T dGamma = boundary_local.jac(q) * mapped_weights(q);
-                auto slab0 = boundary_basis.data()[0].col(q);
+                auto slab0 = boundary_basis[0].col(q);
                 C_local.noalias() += dGamma * slab0 * C.row(q);
                 G_local.noalias() += dGamma * term.value * slab0;
             }

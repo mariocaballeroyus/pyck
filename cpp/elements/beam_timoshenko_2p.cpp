@@ -33,17 +33,17 @@ BeamTimoshenko2p<T>::constitutive_matrix(const IntrinsicGeometry<T, 1>& ig,
 template <std::floating_point T>
 Matrix<T>
 BeamTimoshenko2p<T>::strain_matrix(const Patch<T, 1>& /*patch*/,
-                                   const BasisValues<T, 1>& basis,
+                                   const std::vector<Matrix<T>>& basis,
                                    const IntrinsicGeometry<T, 1>& ig) const
 {
-    const Index Q = basis.Q();
-    const Index N = basis.N();
+    const Index Q = basis[0].cols();
+    const Index N = basis[0].rows();
     Matrix<T> B = Matrix<T>::Zero(2 * Q, 2 * N);
 
     for (Index q = 0; q < Q; ++q)
     {
-        auto slab0 = basis.data()[0].col(q);
-        auto slab1 = basis.data()[1].col(q);
+        auto slab0 = basis[0].col(q);
+        auto slab1 = basis[1].col(q);
 
         const T G = ig.chr.Gamma(0, 0, 0)(q);
 
@@ -67,15 +67,15 @@ BeamTimoshenko2p<T>::strain_matrix(const Patch<T, 1>& /*patch*/,
 template <std::floating_point T>
 Matrix<T>
 BeamTimoshenko2p<T>::displacement_shape_matrix(const Patch<T, 1>& /*patch*/,
-                                               const BasisValues<T, 1>& basis,
+                                               const std::vector<Matrix<T>>& basis,
                                                const IntrinsicGeometry<T, 1>& /*ig*/) const
 {
     // N_w = [ N_i  0 ]
-    const Index Q = basis.Q();
-    const Index N = basis.N();
+    const Index Q = basis[0].cols();
+    const Index N = basis[0].rows();
     Matrix<T> Nw = Matrix<T>::Zero(Q, 2 * N);
     for (Index q = 0; q < Q; ++q) {
-        auto slab0 = basis.data()[0].col(q);
+        auto slab0 = basis[0].col(q);
         for (Index i = 0; i < N; ++i) {
             Nw(q, 2*i) = slab0(i);
         }
@@ -86,15 +86,15 @@ BeamTimoshenko2p<T>::displacement_shape_matrix(const Patch<T, 1>& /*patch*/,
 template <std::floating_point T>
 Matrix<T>
 BeamTimoshenko2p<T>::rotation_shape_matrix(const Patch<T, 1>& /*patch*/,
-                                           const BasisValues<T, 1>& basis,
+                                           const std::vector<Matrix<T>>& basis,
                                            const IntrinsicGeometry<T, 1>& /*ig*/) const
 {
     // N_rot = [ 0  N_i ]
-    const Index Q = basis.Q();
-    const Index N = basis.N();
+    const Index Q = basis[0].cols();
+    const Index N = basis[0].rows();
     Matrix<T> Nth = Matrix<T>::Zero(Q, 2 * N);
     for (Index q = 0; q < Q; ++q) {
-        auto slab0 = basis.data()[0].col(q);
+        auto slab0 = basis[0].col(q);
         for (Index i = 0; i < N; ++i) {
             Nth(q, 2*i + 1) = slab0(i);
         }

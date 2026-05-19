@@ -63,7 +63,8 @@ constexpr Index pack3(Index i, Index j, Index k)
 /**
  * @brief Enumerate the direction-index tuples for derivatives of total order
  *        @p k in @p d directions, in the canonical pack order used by
- *        symmetric-tensor packed storage (BasisValues, IntrinsicGeometry, etc.).
+ *        symmetric-tensor packed storage (per-order basis buffers,
+ *        IntrinsicGeometry, etc.).
  *
  *        k = 1: [{0}, {1}, …, {d-1}]
  *        k = 2: Voigt — diagonals first, then off-diagonals (i < j lex).

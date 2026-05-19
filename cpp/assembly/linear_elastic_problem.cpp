@@ -46,11 +46,6 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
 
     Matrix<T> Ke;
 
-    // Scratch reused across every element of every patch — allocation-free
-    // in steady state once the (K, Q, order) shape stabilises.
-    BasisValues<T, d> elem_basis;
-    Evaluator<T>      elem_eval;
-
     // Per-patch element loop.
     for (std::size_t p = 0; p < patches_.size(); ++p)
     {
@@ -97,8 +92,7 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
             auto [mapped_pts, mapped_weights] = quadrature.map_to_domain(u_a, u_b);
 
             // Local element stiffness.
-            element.compute_local_stiffness(patch, elem_idx, mapped_pts, mapped_weights, Ke,
-                                            elem_basis, elem_eval);
+            element.compute_local_stiffness(patch, elem_idx, mapped_pts, mapped_weights, Ke);
 
             // Scatter into the per-patch primal block.
             auto elem_nodes = mapper.get_element_dofs(elem_idx);

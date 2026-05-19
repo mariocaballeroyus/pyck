@@ -59,11 +59,11 @@ struct Christoffels
  *
  * Position derivatives storage @ref position_data is a `std::vector` of
  *   `(Q · n_k) × 3` col-major @c ColMatrix<T,3>, one entry per order
- *   `0 ≤ k ≤ basis.order()`. Within each order, the multi-index slice for
- *   packed-index `m` lives at rows `m·Q .. (m+1)·Q - 1`.
+ *   `0 ≤ k ≤ (basis.size() - 1)`. Within each order, the multi-index slice
+ *   for packed-index `m` lives at rows `m·Q .. (m+1)·Q - 1`.
  *
  * Metric and Jacobian are always populated. `position_data` has size
- *   `basis.order() + 1`; accessing higher-order derivatives is undefined
+ *   `basis.size()`; accessing higher-order derivatives is undefined
  *   behaviour. Christoffels are populated by an explicit call.
  *
  * @tparam T Floating point type.
@@ -94,9 +94,10 @@ struct IntrinsicGeometry
 
     /**
      * @brief Populate position, metric, inverse metric, Jacobian and position
-     *        derivatives up to @c basis.order().
+     *        derivatives up to the basis buffer's maximum order
+     *        (= `basis.size() - 1`).
      */
-    IntrinsicGeometry(const BasisValues<T, d>& basis,
+    IntrinsicGeometry(const std::vector<Matrix<T>>& basis,
                       const ColMatrix<T, 3>& act_pts);
 
     // === Methods ====================================================================

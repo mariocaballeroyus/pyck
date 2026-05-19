@@ -202,10 +202,7 @@ TEST_CASE("RM 1P Plate: stiffness matrix size and symmetry", "[RM1P]")
     Vector<double> q_weights = gauss->weights();
 
     Matrix<double> stiffness;
-    BasisValues<double, 2> basis;
-    Evaluator<double>      eval;
-    element.compute_local_stiffness(*surface, elem_idx, q_points, q_weights, stiffness,
-                                    basis, eval);
+    element.compute_local_stiffness(*surface, elem_idx, q_points, q_weights, stiffness);
 
     // n*n = 36 total, but element-level is (p+1)^2 = 16 for p=3
     Index local_n = (p + 1) * (p + 1);
@@ -253,7 +250,7 @@ TEST_CASE("RM 1P Plate: thin plate matches KL", "[RM1P]")
 
     const auto basis_d = eval_basis(*surf, pt, flat, element.min_order());
     const auto act_pts = surf->active_control_pts(flat);
-    IntrinsicGeometry ig(basis_d, act_pts);
+    IntrinsicGeometry<double, 2> ig(basis_d, act_pts);
     ig.compute_christoffels();   auto N_eff = element.displacement_shape_matrix(*surf, basis_d, ig);
     auto active = surf->dof_mapper().get_element_dofs(flat);
 
@@ -311,7 +308,7 @@ TEST_CASE("RM 1P Plate: thick plate — captures shear deformation", "[RM1P]")
 
         const auto basis_d = eval_basis(*surf, pt, flat, element.min_order());
         const auto act_pts = surf->active_control_pts(flat);
-        IntrinsicGeometry ig(basis_d, act_pts);
+        IntrinsicGeometry<double, 2> ig(basis_d, act_pts);
         ig.compute_christoffels();       auto N_eff = element.displacement_shape_matrix(*surf, basis_d, ig);
         auto active = surf->dof_mapper().get_element_dofs(flat);
 

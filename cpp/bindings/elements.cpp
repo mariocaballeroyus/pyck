@@ -32,7 +32,7 @@ namespace {
 template <std::floating_point T, std::size_t d>
 using ShapeMatrixFn = Matrix<T> (Element<T, d>::*)(
     const Patch<T, d>&,
-    const BasisValues<T, d>&,
+    const std::vector<Matrix<T>>&,
     const IntrinsicGeometry<T, d>&) const;
 
 /**
@@ -78,7 +78,7 @@ Matrix<T> eval_global_shape(
 
         auto bd      = eval_basis(patch, pt, flat_span, order);
         auto act_pts = patch.active_control_pts(flat_span);
-        IntrinsicGeometry lf(bd, act_pts);
+        IntrinsicGeometry<T, d> lf(bd, act_pts);
         lf.compute_christoffels();
 
         const Matrix<T> N_span = (element.*mem_fn)(patch, bd, lf);

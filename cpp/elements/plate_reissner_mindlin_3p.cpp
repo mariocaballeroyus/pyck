@@ -19,17 +19,17 @@ PlateReissnerMindlin3p<T>::PlateReissnerMindlin3p(Ptr<PlaneStress2d<T>> material
 template <std::floating_point T>
 Matrix<T>
 PlateReissnerMindlin3p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
-                                         const BasisValues<T, 2>& basis,
+                                         const std::vector<Matrix<T>>& basis,
                                          const IntrinsicGeometry<T, 2>& ig) const
 {
-    const Index Q = basis.Q();
-    const Index N = basis.N();
+    const Index Q = basis[0].cols();
+    const Index N = basis[0].rows();
     Matrix<T> B = Matrix<T>::Zero(5 * Q, 3 * N);
 
     for (Index q = 0; q < Q; ++q)
     {
-        auto slab0 = basis.data()[0].col(q);
-        auto slab1 = basis.data()[1].col(q);
+        auto slab0 = basis[0].col(q);
+        auto slab1 = basis[1].col(q);
 
         const T Gam1_11 = ig.chr.Gamma(0, 0, 0)(q);
         const T Gam1_12 = ig.chr.Gamma(0, 0, 1)(q);
@@ -83,15 +83,15 @@ PlateReissnerMindlin3p<T>::constitutive_matrix(const IntrinsicGeometry<T, 2>& ig
 template <std::floating_point T>
 Matrix<T>
 PlateReissnerMindlin3p<T>::displacement_shape_matrix(const Patch<T, 2>& /*patch*/,
-                                                     const BasisValues<T, 2>& basis,
+                                                     const std::vector<Matrix<T>>& basis,
                                                      const IntrinsicGeometry<T, 2>& /*ig*/) const
 {
     // N_w = [ N_i  0  0 ]
-    const Index Q = basis.Q();
-    const Index N = basis.N();
+    const Index Q = basis[0].cols();
+    const Index N = basis[0].rows();
     Matrix<T> Nw = Matrix<T>::Zero(Q, 3 * N);
     for (Index q = 0; q < Q; ++q) {
-        auto slab0 = basis.data()[0].col(q);
+        auto slab0 = basis[0].col(q);
         for (Index i = 0; i < N; ++i) {
             Nw(q, 3*i) = slab0(i);
         }
@@ -102,16 +102,16 @@ PlateReissnerMindlin3p<T>::displacement_shape_matrix(const Patch<T, 2>& /*patch*
 template <std::floating_point T>
 Matrix<T>
 PlateReissnerMindlin3p<T>::rotation_shape_matrix(const Patch<T, 2>& /*patch*/,
-                                                 const BasisValues<T, 2>& basis,
+                                                 const std::vector<Matrix<T>>& basis,
                                                  const IntrinsicGeometry<T, 2>& /*ig*/) const
 {
     // N_rot = [ 0  N_i  0   ]
     //         [ 0  0    N_i ]
-    const Index Q = basis.Q();
-    const Index N = basis.N();
+    const Index Q = basis[0].cols();
+    const Index N = basis[0].rows();
     Matrix<T> Nphi = Matrix<T>::Zero(2 * Q, 3 * N);
     for (Index q = 0; q < Q; ++q) {
-        auto slab0 = basis.data()[0].col(q);
+        auto slab0 = basis[0].col(q);
         for (Index i = 0; i < N; ++i) {
             Nphi(2*q,     3*i + 1) = slab0(i);
             Nphi(2*q + 1, 3*i + 2) = slab0(i);

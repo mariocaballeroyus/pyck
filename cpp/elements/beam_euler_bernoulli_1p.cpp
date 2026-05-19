@@ -19,17 +19,17 @@ BeamEulerBernoulli1p<T>::BeamEulerBernoulli1p(Ptr<UniaxialStress1d<T>> material)
 template <std::floating_point T>
 Matrix<T>
 BeamEulerBernoulli1p<T>::strain_matrix(const Patch<T, 1>& /*patch*/,
-                                       const BasisValues<T, 1>& basis,
+                                       const std::vector<Matrix<T>>& basis,
                                        const IntrinsicGeometry<T, 1>& ig) const
 {
-    const Index Q = basis.Q();
-    const Index N = basis.N();
+    const Index Q = basis[0].cols();
+    const Index N = basis[0].rows();
     Matrix<T> B(Q, N);
 
     for (Index q = 0; q < Q; ++q)
     {
-        auto slab1 = basis.data()[1].col(q);  // N
-        auto slab2 = basis.data()[2].col(q);  // N
+        auto slab1 = basis[1].col(q);  // N
+        auto slab2 = basis[2].col(q);  // N
 
         const T Gam = ig.chr.Gamma(0, 0, 0)(q);
 
@@ -63,15 +63,15 @@ BeamEulerBernoulli1p<T>::constitutive_matrix(const IntrinsicGeometry<T, 1>& ig,
 template <std::floating_point T>
 Matrix<T>
 BeamEulerBernoulli1p<T>::displacement_shape_matrix(const Patch<T, 1>& /*patch*/,
-                                                   const BasisValues<T, 1>& basis,
+                                                   const std::vector<Matrix<T>>& basis,
                                                    const IntrinsicGeometry<T, 1>& /*ig*/) const
 {
     // N_w = [ N_i ]
-    const Index Q = basis.Q();
-    const Index N = basis.N();
+    const Index Q = basis[0].cols();
+    const Index N = basis[0].rows();
     Matrix<T> N_w(Q, N);
     for (Index q = 0; q < Q; ++q) {
-        auto slab0 = basis.data()[0].col(q);
+        auto slab0 = basis[0].col(q);
         for (Index i = 0; i < N; ++i) {
             N_w(q, i) = slab0(i);
         }
@@ -82,15 +82,15 @@ BeamEulerBernoulli1p<T>::displacement_shape_matrix(const Patch<T, 1>& /*patch*/,
 template <std::floating_point T>
 Matrix<T>
 BeamEulerBernoulli1p<T>::rotation_shape_matrix(const Patch<T, 1>& /*patch*/,
-                                               const BasisValues<T, 1>& basis,
+                                               const std::vector<Matrix<T>>& basis,
                                                const IntrinsicGeometry<T, 1>& /*ig*/) const
 {
     // N_rot = [ -N_{i|1} ]
-    const Index Q = basis.Q();
-    const Index N = basis.N();
+    const Index Q = basis[0].cols();
+    const Index N = basis[0].rows();
     Matrix<T> N_varphi(Q, N);
     for (Index q = 0; q < Q; ++q) {
-        auto slab1 = basis.data()[1].col(q);
+        auto slab1 = basis[1].col(q);
         for (Index i = 0; i < N; ++i) {
             N_varphi(q, i) = -slab1(i);
         }

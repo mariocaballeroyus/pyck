@@ -124,7 +124,7 @@ TEST_CASE("Kirchhoff-Love 1P Plate: Navier Bi-Sinusoidal Load",
             for (std::size_t i = 0; i < active.size(); ++i)
                 u_active(i) = u(active[i]);
 
-            double w_num = b.data()[0].col(0).dot(u_active);
+            double w_num = b[0].col(0).dot(u_active);
             
             // Map parametric to physical for exact solution
             double x = pu * L;

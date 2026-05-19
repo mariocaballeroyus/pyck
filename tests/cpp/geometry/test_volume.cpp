@@ -73,7 +73,7 @@ TEST_CASE("Patch<double, 3>: Flat Box", "[geometry][volume]")
         ColMatrix<double, 3> pts(1, 3);
         pts << 0.3, 0.5, 0.7;
         const auto b     = eval_basis(vol, pts, elem_idx, 3);
-        IntrinsicGeometry local(b, act);
+        IntrinsicGeometry<double, 3> local(b, act);
 
         // Metric layout: (g_11, g_12, g_13, g_22, g_23, g_33).
         CHECK(local.g(0, 0)(0) == Approx(Lx * Lx).margin(1e-12));
@@ -97,7 +97,7 @@ TEST_CASE("Patch<double, 3>: Flat Box", "[geometry][volume]")
         ColMatrix<double, 3> pts(1, 3);
         pts << 0.4, 0.6, 0.2;
         const auto b     = eval_basis(vol, pts, elem_idx, 3);
-        IntrinsicGeometry local(b, act);
+        IntrinsicGeometry<double, 3> local(b, act);
         local.compute_christoffels();
         const auto& chr = local.chr;
         CHECK(chr.Gamma(0, 0, 0)(0) == Approx(0.0).margin(1e-14));
@@ -126,9 +126,9 @@ TEST_CASE("Patch<double, 3>: Flat Box", "[geometry][volume]")
         const auto b = eval_basis(vol, pts, elem_idx, 2);
 
         auto sum_at_0 = [&](Index k_order, Index packed, Index n_k) {
-            auto slab = b.data()[k_order].col(0);
+            auto slab = b[k_order].col(0);
             double s = 0.0;
-            for (Index i = 0; i < b.N(); ++i) s += slab(i * n_k + packed);
+            for (Index i = 0; i < b[0].rows(); ++i) s += slab(i * n_k + packed);
             return s;
         };
         CHECK(sum_at_0(0, 0, 1) == Approx(1.0).margin(1e-14));   // N
@@ -196,7 +196,7 @@ TEST_CASE("Patch<double, 3>: Box factory volume integral", "[geometry][volume]")
             auto [mp, mw] = quad.map_to_domain(lo, hi);
             const auto b     = eval_basis(vol, mp, e, 1);
             const auto act   = vol.active_control_pts(e);
-            IntrinsicGeometry local(b, act);
+            IntrinsicGeometry<double, 3> local(b, act);
 
             for (Eigen::Index q = 0; q < mw.size(); ++q)
                 vol_int += local.jac(q) * mw(q);

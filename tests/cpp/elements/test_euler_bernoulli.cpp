@@ -99,7 +99,7 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load", "[assembly][eul
     Vector<double> u_active(active.size());
     for (std::size_t i = 0; i < active.size(); ++i)
         u_active(i) = u(active[i]);
-    double v_num = b.data()[0].col(0).dot(u_active);
+    double v_num = b[0].col(0).dot(u_active);
 
     // Strain energy
     // U = 1/2 * u^T * K * u
@@ -185,7 +185,7 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load (Cubic Approximat
     Vector<double> u_active(active.size());
     for (std::size_t i = 0; i < active.size(); ++i)
         u_active(i) = u(active[i]);
-    double v_num = b.data()[0].col(0).dot(u_active);
+    double v_num = b[0].col(0).dot(u_active);
 
     // Strain energy
     double U_num = 0.5 * u.dot(K * u);

@@ -41,10 +41,10 @@ public:
     virtual Matrix<T> evaluate(const Element<T, 2>& element,
                                const PatchBoundary<T, 2>& boundary,
                                Index boundary_span,
-                               const BasisValues<T, 1>& boundary_basis,
+                               const std::vector<Matrix<T>>& boundary_basis,
                                const IntrinsicGeometry<T, 1>& boundary_local,
                                Index parent_flat_span,
-                               const BasisValues<T, 2>& parent_basis,
+                               const std::vector<Matrix<T>>& parent_basis,
                                const IntrinsicGeometry<T, 2>& parent_ig) const = 0;
 };
 
@@ -127,20 +127,20 @@ public:
         const Element<T, 2>& element,
         const PatchBoundary<T, 2>& /*boundary*/,
         Index /*boundary_span*/,
-        const BasisValues<T, 1>& /*boundary_basis*/,
+        const std::vector<Matrix<T>>& /*boundary_basis*/,
         const IntrinsicGeometry<T, 1>& /*boundary_local*/,
         Index /*parent_flat_span*/,
-        const BasisValues<T, 2>& parent_basis,
+        const std::vector<Matrix<T>>& parent_basis,
         const IntrinsicGeometry<T, 2>& /*parent_ig*/) const override
     {
         const Index ndof = static_cast<Index>(element.num_node_dofs());
-        const Index Q = parent_basis.Q();
-        const Index N = parent_basis.N();
+        const Index Q = parent_basis[0].cols();
+        const Index N = parent_basis[0].rows();
         const Index slot = static_cast<Index>(dof_index_);
 
         Matrix<T> C = Matrix<T>::Zero(Q, N * ndof);
         for (Index q = 0; q < Q; ++q) {
-            auto slab0 = parent_basis.data()[0].col(q);
+            auto slab0 = parent_basis[0].col(q);
             for (Index i = 0; i < N; ++i) {
                 C(q, i * ndof + slot) = slab0(i);
             }
@@ -174,15 +174,15 @@ public:
         const Element<T, 2>& element,
         const PatchBoundary<T, 2>& boundary,
         Index /*boundary_span*/,
-        const BasisValues<T, 1>& /*boundary_basis*/,
+        const std::vector<Matrix<T>>& /*boundary_basis*/,
         const IntrinsicGeometry<T, 1>& boundary_local,
         Index /*parent_flat_span*/,
-        const BasisValues<T, 2>& parent_basis,
+        const std::vector<Matrix<T>>& parent_basis,
         const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
         const Index ndof = static_cast<Index>(element.num_node_dofs());
-        const Index Q = parent_basis.Q();
-        const Index N = parent_basis.N();
+        const Index Q = parent_basis[0].cols();
+        const Index N = parent_basis[0].rows();
         const Index slot = static_cast<Index>(dof_index_);
 
         const ColMatrix<T, 3> normal =
@@ -192,7 +192,7 @@ public:
 
         Matrix<T> C = Matrix<T>::Zero(Q, N * ndof);
         for (Index q = 0; q < Q; ++q) {
-            auto slab1 = parent_basis.data()[1].col(q);
+            auto slab1 = parent_basis[1].col(q);
             const T n1 = n_up_1(q);
             const T n2 = n_up_2(q);
             for (Index i = 0; i < N; ++i) {
@@ -230,15 +230,15 @@ public:
         const Element<T, 2>& element,
         const PatchBoundary<T, 2>& boundary,
         Index /*boundary_span*/,
-        const BasisValues<T, 1>& /*boundary_basis*/,
+        const std::vector<Matrix<T>>& /*boundary_basis*/,
         const IntrinsicGeometry<T, 1>& boundary_local,
         Index /*parent_flat_span*/,
-        const BasisValues<T, 2>& parent_basis,
+        const std::vector<Matrix<T>>& parent_basis,
         const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
         const Index ndof = static_cast<Index>(element.num_node_dofs());
-        const Index Q = parent_basis.Q();
-        const Index N = parent_basis.N();
+        const Index Q = parent_basis[0].cols();
+        const Index N = parent_basis[0].rows();
         const Index slot = static_cast<Index>(dof_index_);
 
         const ColMatrix<T, 3> normal =
@@ -248,8 +248,8 @@ public:
 
         Matrix<T> C = Matrix<T>::Zero(Q, N * ndof);
         for (Index q = 0; q < Q; ++q) {
-            auto slab1 = parent_basis.data()[1].col(q);
-            auto slab2 = parent_basis.data()[2].col(q);
+            auto slab1 = parent_basis[1].col(q);
+            auto slab2 = parent_basis[2].col(q);
             const T G1_11 = parent_ig.chr.Gamma(0, 0, 0)(q);
             const T G1_12 = parent_ig.chr.Gamma(0, 0, 1)(q);
             const T G1_22 = parent_ig.chr.Gamma(0, 1, 1)(q);
@@ -292,10 +292,10 @@ public:
     Matrix<T> evaluate(const Element<T, 2>& element,
                        const PatchBoundary<T, 2>& boundary,
                        Index /*boundary_span*/,
-                       const BasisValues<T, 1>& /*boundary_basis*/,
+                       const std::vector<Matrix<T>>& /*boundary_basis*/,
                        const IntrinsicGeometry<T, 1>& /*boundary_local*/,
                        Index /*parent_flat_span*/,
-                       const BasisValues<T, 2>& parent_basis,
+                       const std::vector<Matrix<T>>& parent_basis,
                        const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
         return element.displacement_shape_matrix(*boundary.parent(),
@@ -319,10 +319,10 @@ public:
         const Element<T, 2>& element,
         const PatchBoundary<T, 2>& boundary,
         Index /*boundary_span*/,
-        const BasisValues<T, 1>& /*boundary_basis*/,
+        const std::vector<Matrix<T>>& /*boundary_basis*/,
         const IntrinsicGeometry<T, 1>& boundary_local,
         Index /*parent_flat_span*/,
-        const BasisValues<T, 2>& parent_basis,
+        const std::vector<Matrix<T>>& parent_basis,
         const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
         const Matrix<T> Nrot = element.rotation_shape_matrix(
@@ -357,10 +357,10 @@ public:
         const Element<T, 2>& element,
         const PatchBoundary<T, 2>& boundary,
         Index /*boundary_span*/,
-        const BasisValues<T, 1>& /*boundary_basis*/,
+        const std::vector<Matrix<T>>& /*boundary_basis*/,
         const IntrinsicGeometry<T, 1>& boundary_local,
         Index /*parent_flat_span*/,
-        const BasisValues<T, 2>& parent_basis,
+        const std::vector<Matrix<T>>& parent_basis,
         const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
         const Matrix<T> Nrot = element.rotation_shape_matrix(
@@ -401,10 +401,10 @@ public:
         const Element<T, 2>& element,
         const PatchBoundary<T, 2>& boundary,
         Index /*boundary_span*/,
-        const BasisValues<T, 1>& /*boundary_basis*/,
+        const std::vector<Matrix<T>>& /*boundary_basis*/,
         const IntrinsicGeometry<T, 1>& boundary_local,
         Index /*parent_flat_span*/,
-        const BasisValues<T, 2>& parent_basis,
+        const std::vector<Matrix<T>>& parent_basis,
         const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
         const Matrix<T> Nsigma = element.stress_matrix(
@@ -439,10 +439,10 @@ public:
         const Element<T, 2>& element,
         const PatchBoundary<T, 2>& boundary,
         Index /*boundary_span*/,
-        const BasisValues<T, 1>& /*boundary_basis*/,
+        const std::vector<Matrix<T>>& /*boundary_basis*/,
         const IntrinsicGeometry<T, 1>& boundary_local,
         Index /*parent_flat_span*/,
-        const BasisValues<T, 2>& parent_basis,
+        const std::vector<Matrix<T>>& parent_basis,
         const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
         const Matrix<T> Nsigma = element.stress_matrix(
@@ -483,10 +483,10 @@ public:
         const Element<T, 2>& element,
         const PatchBoundary<T, 2>& boundary,
         Index /*boundary_span*/,
-        const BasisValues<T, 1>& /*boundary_basis*/,
+        const std::vector<Matrix<T>>& /*boundary_basis*/,
         const IntrinsicGeometry<T, 1>& boundary_local,
         Index /*parent_flat_span*/,
-        const BasisValues<T, 2>& parent_basis,
+        const std::vector<Matrix<T>>& parent_basis,
         const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
         const Matrix<T> Nsigma = element.stress_matrix(

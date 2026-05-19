@@ -54,9 +54,9 @@ ColMatrix<T, 3> eval_physical_points(
         auto [mapped_pts, mapped_weights] = quadrature.map_to_domain(lo, hi);
         auto basis = eval_basis(patch, mapped_pts, static_cast<Index>(elem_idx), 0);
         auto act_pts = patch.active_control_pts(static_cast<Index>(elem_idx));
-        const Index N = basis.N();
+        const Index N = basis[0].rows();
         for (Index q = 0; q < Q; ++q) {
-            auto slab0 = basis.data()[0].col(q);
+            auto slab0 = basis[0].col(q);
             Eigen::Matrix<T, 1, 3> x_q = Eigen::Matrix<T, 1, 3>::Zero();
             for (Index i = 0; i < N; ++i) {
                 x_q.noalias() += slab0(i) * act_pts.row(i);
@@ -160,7 +160,7 @@ Vector<T> eval_integration_measures(
         auto [mapped_pts, mapped_weights] = quadrature.map_to_domain(lo, hi);
         auto basis   = eval_basis(patch, mapped_pts, static_cast<Index>(elem_idx), 1);
         auto act_pts = patch.active_control_pts(static_cast<Index>(elem_idx));
-        IntrinsicGeometry local(basis, act_pts);
+        IntrinsicGeometry<T, d> local(basis, act_pts);
 
         for (Index q = 0; q < Q; ++q)
             result(out + q) = mapped_weights(q) * local.jac(q);

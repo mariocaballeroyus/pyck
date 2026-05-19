@@ -7,12 +7,12 @@ namespace pyck
 {
 
 template <std::floating_point T, std::size_t d>
-IntrinsicGeometry<T, d>::IntrinsicGeometry(const BasisValues<T, d>& basis,
+IntrinsicGeometry<T, d>::IntrinsicGeometry(const std::vector<Matrix<T>>& basis,
                                            const ColMatrix<T, 3>& act_pts)
 {
-    const Index order_b = basis.order();
-    const Index Q_      = basis.Q();
-    const Index N_      = basis.N();
+    const Index order_b = static_cast<Index>(basis.size()) - 1;
+    const Index Q_      = basis[0].cols();
+    const Index N_      = basis[0].rows();
     constexpr Index n_metric = d * (d + 1) / 2;
 
     // --- Allocate position storage per order (data_[k] of shape (Q · n_k) × 3) ------
@@ -33,7 +33,7 @@ IntrinsicGeometry<T, d>::IntrinsicGeometry(const BasisValues<T, d>& basis,
         for (Index k = 0; k <= order_b; ++k)
         {
             const Index n_k = num_multi_indices<d>(k);
-            auto slab = basis.data()[k].col(q);     // length N · n_k
+            auto slab = basis[k].col(q);            // length N · n_k
             for (Index packed = 0; packed < n_k; ++packed) {
                 Eigen::Matrix<T, 1, 3> deriv_q = Eigen::Matrix<T, 1, 3>::Zero();
                 for (Index b = 0; b < N_; ++b) {

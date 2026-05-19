@@ -59,7 +59,7 @@ TensorProduct<T, d>::eval_on_span(const std::type_identity_t<ColMatrix<T, d>>& c
                                   const std::array<Index, d>& spans,
                                   Index order,
                                   Evaluator<T>& ev,
-                                  BasisValues<T, d>& out) const
+                                  std::vector<Matrix<T>>& out) const
 {
     if (order < 0 || order > 3) {
         throw std::invalid_argument("TensorProduct::eval_on_span: "
@@ -84,8 +84,8 @@ TensorProduct<T, d>::eval_on_span(const std::type_identity_t<ColMatrix<T, d>>& c
 
     // Resize the caller-owned output to (K · n_k) × Q per order. No-op when
     // shape is unchanged — repeated calls in an assembly loop are allocation-free.
-    out.reset_for(K, Q, order);
-    std::vector<Matrix<T>>& per_order = out.data();
+    resize_basis_buffer<T, d>(out, K, Q, order);
+    std::vector<Matrix<T>>& per_order = out;
 
     // Main fill loop
     for (Index q = 0; q < Q; ++q)
@@ -222,9 +222,8 @@ TensorProduct<T, d>::eval_on_span(const std::type_identity_t<ColMatrix<T, d>>& c
 }
 
 template <std::floating_point T, std::size_t d>
-BasisValues<T, d>
-TensorProduct<T, d>::eval(const std::type_identity_t<ColMatrix<T, d>>& coords,
-                          Index order) const
+std::vector<Matrix<T>>
+TensorProduct<T, d>::eval(const std::type_identity_t<ColMatrix<T, d>>& coords, Index order) const
 {
     if (order < 0 || order > 3) {
         throw std::invalid_argument("TensorProduct::eval: "
@@ -239,27 +238,25 @@ TensorProduct<T, d>::eval(const std::type_identity_t<ColMatrix<T, d>>& coords,
         K *= bases_[dim]->degree() + 1;
     }
 
-    BasisValues<T, d> out;
-    out.reset_for(K, Q, order);
+    std::vector<Matrix<T>> out;
+    resize_basis_buffer<T, d>(out, K, Q, order);
 
-    // Per-point dispatch: find spans, evaluate one point's worth via the
-    // span-local kernel, copy into column q. The scratch Evaluator and the
-    // single-point BasisValues buffer are reused across q so allocation is
-    // amortized after the first iteration.
-    Evaluator<T>            ev;
-    BasisValues<T, d>       single;
+    Evaluator<T>            eval;
+    std::vector<Matrix<T>>  results;
     ColMatrix<T, d>         single_pt(1, d);
     std::array<Index, d>    spans;
 
     for (Index q = 0; q < Q; ++q) {
-        single_pt.row(0) = coords.row(q);
+        // Find spans for this point
         for (std::size_t dim = 0; dim < d; ++dim) {
             spans[dim] = bases_[dim]->find_span(coords(q, dim));
         }
-        eval_on_span(single_pt, spans, order, ev, single);
-
+        // Evaluate basis values for this point
+        single_pt.row(0) = coords.row(q);
+        eval_on_span(single_pt, spans, order, eval, results);
+        // Copy into output
         for (Index k = 0; k <= order; ++k) {
-            out.data()[k].col(q) = single.data()[k].col(0);
+            out[k].col(q) = results[k].col(0);
         }
     }
 
@@ -272,18 +269,10 @@ template class TensorProduct<double, 1>;
 template class TensorProduct<double, 2>;
 template class TensorProduct<double, 3>;
 
-template class BasisValues<double, 1>;
-template class BasisValues<double, 2>;
-template class BasisValues<double, 3>;
-
 #ifdef PYCK_BUILD_SINGLE_PRECISION
 template class TensorProduct<float, 1>;
 template class TensorProduct<float, 2>;
 template class TensorProduct<float, 3>;
-
-template class BasisValues<float, 1>;
-template class BasisValues<float, 2>;
-template class BasisValues<float, 3>;
 #endif
 
 } // namespace pyck

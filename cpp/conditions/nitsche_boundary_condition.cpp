@@ -82,13 +82,13 @@ void NitscheBoundaryCondition<T, d>::apply(Matrix<T>& stiffness,
 
         auto boundary_basis  = eval_basis(boundary, mapped_pts, span, 2);
         auto boundary_act    = boundary.active_control_pts(span);
-        IntrinsicGeometry boundary_local(boundary_basis, boundary_act);
+        IntrinsicGeometry<T, d - 1> boundary_local(boundary_basis, boundary_act);
 
         const Index flat_parent = boundary.parent_flat_span(span);
         const ColMatrix<T, 2> parent_pts = boundary.lift_to_parent(mapped_pts);
         auto parent_basis  = eval_basis(parent, parent_pts, flat_parent, req_order);
         auto parent_act    = parent.active_control_pts(flat_parent);
-        IntrinsicGeometry parent_ig(parent_basis, parent_act);
+        IntrinsicGeometry<T, d> parent_ig(parent_basis, parent_act);
         parent_ig.compute_christoffels();
 
         auto elem_dofs = parent.dof_mapper().get_element_dofs(flat_parent);

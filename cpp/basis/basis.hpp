@@ -51,8 +51,9 @@ public:
      *          Each `results[k]` is resized to **(degree+1) × points.size()**
      *          column-major: column q holds the N = p+1 active basis values
      *          (k-th derivative) at parameter `points[q]`. This q-major layout
-     *          matches `BasisValues<T,d>` so downstream code reads contiguous
-     *          N-vectors per quadrature point.
+     *          matches the per-order packed buffer produced by
+     *          `TensorProduct::eval_on_span` so downstream code reads
+     *          contiguous N-vectors per quadrature point.
      *
      * @param points    Parameter values (all assumed to lie in the same knot span).
      * @param span_idx  Knot-span index (as returned by KnotVector::find_span).

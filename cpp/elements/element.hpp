@@ -44,7 +44,7 @@ public:
      * @return The generalised-stress shape matrix.
      */
     virtual Matrix<T> stress_matrix(const Patch<T, d>& patch,
-                                    const BasisValues<T, d>& basis,
+                                    const std::vector<Matrix<T>>& basis,
                                     const IntrinsicGeometry<T, d>& ig) const;
 
     /**
@@ -56,17 +56,12 @@ public:
      * @param mapped_pts The mapped quadrature points.
      * @param q_weights The quadrature weights.
      * @param stiffness The local stiffness matrix.
-     * @param basis Output buffer for basis-and-derivatives at this element;
-     *              reused across the assembly loop, allocation-free on repeats.
-     * @param eval Recurrence scratch workspace, also reused across the loop.
      */
     virtual void compute_local_stiffness(const Patch<T, d>& patch,
                                          Index elem_idx,
                                          const ColMatrix<T, d>& mapped_pts,
                                          const Vector<T>& q_weights,
-                                         Matrix<T>& stiffness,
-                                         BasisValues<T, d>& basis,
-                                         Evaluator<T>& eval) const;
+                                         Matrix<T>& stiffness) const;
 
     // === Matrix Operators (Element Formulation-Specific) ============================
 
@@ -79,7 +74,7 @@ public:
      * @return The strain-displacement operator.
      */
     virtual Matrix<T> strain_matrix(const Patch<T, d>& patch,
-                                    const BasisValues<T, d>& basis,
+                                    const std::vector<Matrix<T>>& basis,
                                     const IntrinsicGeometry<T, d>& ig) const = 0;
 
     /**
@@ -103,7 +98,7 @@ public:
      * @return The transverse-displacement shape matrix.
      */
     virtual Matrix<T> displacement_shape_matrix(const Patch<T, d>& patch,
-                                                const BasisValues<T, d>& basis,
+                                                const std::vector<Matrix<T>>& basis,
                                                 const IntrinsicGeometry<T, d>& ig) const = 0;
 
     /**
@@ -115,7 +110,7 @@ public:
      * @return The rotation shape matrix.
      */
     virtual Matrix<T> rotation_shape_matrix(const Patch<T, d>& patch,
-                                            const BasisValues<T, d>& basis,
+                                            const std::vector<Matrix<T>>& basis,
                                             const IntrinsicGeometry<T, d>& ig) const = 0;
 };
 
@@ -123,11 +118,11 @@ public:
 template <std::floating_point T, std::size_t d>
 Matrix<T>
 Element<T, d>::stress_matrix(const Patch<T, d>& patch,
-                             const BasisValues<T, d>& basis,
+                             const std::vector<Matrix<T>>& basis,
                              const IntrinsicGeometry<T, d>& ig) const
 {
     const Matrix<T> B = strain_matrix(patch, basis, ig);
-    const Index Q        = basis.Q();
+    const Index Q        = basis[0].cols();
     const Index n_strain = B.rows() / Q;
     const Index K        = B.cols();
 
@@ -146,13 +141,11 @@ Element<T, d>::compute_local_stiffness(const Patch<T, d>& patch,
                                        Index elem_idx,
                                        const ColMatrix<T, d>& mapped_pts,
                                        const Vector<T>& q_weights,
-                                       Matrix<T>& stiffness,
-                                       BasisValues<T, d>& basis,
-                                       Evaluator<T>& eval) const
+                                       Matrix<T>& stiffness) const
 {
-    eval_basis(patch, mapped_pts, elem_idx, min_order(), eval, basis);
+    auto basis = patch.tensor_product().eval(mapped_pts, static_cast<Index>(min_order()));
     auto act_pts = patch.active_control_pts(elem_idx);
-    IntrinsicGeometry ig(basis, act_pts);
+    IntrinsicGeometry<T, d> ig(basis, act_pts);
     ig.compute_christoffels();
 
     const Matrix<T> B    = strain_matrix(patch, basis, ig);

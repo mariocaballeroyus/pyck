@@ -113,7 +113,7 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
         std::size_t req_order = element.min_order();
         auto basis   = eval_basis(patch, mapped_pts, elem_idx, req_order);
         auto act_pts = patch.active_control_pts(elem_idx);
-        IntrinsicGeometry ig(basis, act_pts);
+        IntrinsicGeometry<T, d> ig(basis, act_pts);
         ig.compute_christoffels();
         Matrix<T> N_w = element.displacement_shape_matrix(patch, basis, ig);
 

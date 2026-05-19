@@ -12,6 +12,7 @@
 
 #include "basis.hpp"
 #include "evaluation.hpp"
+#include "../multi_index.hpp"
 #include "../types.hpp"
 
 namespace pyck
@@ -20,31 +21,34 @@ namespace pyck
 template <std::floating_point T, std::size_t d>
 class TensorProduct;
 
-// === BasisValues ====================================================================
+// === Packed basis-values buffer =====================================================
 
 /**
- * @brief Tensor-product shape functions and their derivatives on one element span,
- *        packed in Gismo-style per-order storage.
+ * @brief Tensor-product shape functions and their derivatives on one element
+ *        span, packed in Gismo-style per-order storage as a plain
+ *        `std::vector<Matrix<T>>`.
  *
- * Storage (returned by @ref TensorProduct::eval_on_span):
- *     data()[k]  is an (N · n_k) × Q col-major matrix, where
- *         N   = number of nonzero basis functions on the span
+ * Storage (produced by @ref TensorProduct::eval_on_span and
+ *          @ref TensorProduct::eval):
+ *     `buf[k]` is an (N · n_k) × Q col-major matrix, where
+ *         N   = number of nonzero basis functions per evaluation point
+ *               (= ∏(p_i + 1) on a tensor-product B-spline)
  *         n_k = number of upper-tri multi-indices of total order k
  *               = C(k + d - 1, d - 1)
  *         Q   = number of quadrature / evaluation points.
  *
- *     Row layout within data()[k]: for basis function `b ∈ [0, N)` and packed
+ *     Row layout within `buf[k]`: for basis function `b ∈ [0, N)` and packed
  *     multi-index `m ∈ [0, n_k)`, ∂_m B_b(u_q) is at row `b · n_k + m`,
  *     column `q`. Multi-indices use Voigt order for k = 2 (diagonals first)
  *     and lex order for k = 3.
  *
- * Consumer usage: column `q` of data()[k] is a contiguous (N · n_k)-length
+ * Consumer usage: column `q` of `buf[k]` is a contiguous (N · n_k)-length
  * slab containing every basis-and-derivative at one quadrature point. Element
  * kernels are written as q-outer loops reading from these slabs:
  *
  *     for (Index q = 0; q < Q; ++q) {
- *         auto slab1 = basis.data()[1].col(q);  // contiguous (N · d)-length
- *         auto slab2 = basis.data()[2].col(q);  // contiguous (N · n_2)-length
+ *         auto slab1 = basis[1].col(q);  // contiguous (N · d)-length
+ *         auto slab2 = basis[2].col(q);  // contiguous (N · n_2)-length
  *         for (Index b = 0; b < N; ++b) {
  *             const T N_u_b  = slab1(b * d + 0);
  *             const T N_v_b  = slab1(b * d + 1);
@@ -53,66 +57,25 @@ class TensorProduct;
  *         }
  *     }
  */
+
+/**
+ * @brief Resize a per-order packed buffer to hold `K` active basis functions
+ *        evaluated at `Q` points up to derivative @p order.
+ *
+ * @details Eigen's `Matrix::resize` is a no-op when shape is unchanged, so
+ *          reusing the same buffer across calls with identical (K, Q, order)
+ *          is allocation-free after warm-up.
+ */
 template <std::floating_point T, std::size_t d>
-class BasisValues
+inline void
+resize_basis_buffer(std::vector<Matrix<T>>& buf,
+                    Index K, Index Q, Index order)
 {
-public:
-
-    // === Constructors ===============================================================
-
-    BasisValues() = default;
-
-    /// @brief Wrap a per-order packed storage; takes ownership.
-    explicit BasisValues(std::vector<Matrix<T>> per_order)
-        : data_(std::move(per_order)) {}
-
-    // === Properties =================================================================
-
-    /// @brief Maximum derivative order present (0 if empty).
-    Index order() const
-    { return data_.empty() ? Index(0) : Index(data_.size()) - 1; }
-
-    /// @brief Number of evaluation / quadrature points.
-    Index Q() const { return data_[0].cols(); }
-
-    /// @brief Number of nonzero basis functions on the span.
-    Index N() const { return data_[0].rows(); }
-
-    // === Raw Access =================================================================
-
-    /// @brief Vector of per-order packed matrices (one per derivative order).
-    const std::vector<Matrix<T>>& data() const { return data_; }
-
-    /// @brief Mutable accessor; intended for fill kernels like
-    ///        `TensorProduct::eval_on_span` writing into a caller-owned buffer.
-    std::vector<Matrix<T>>& data() { return data_; }
-
-    /**
-     * @brief Resize the per-order matrices to hold N = K active basis functions
-     *        evaluated at Q points up to derivative @p order.
-     *
-     * @details Eigen's `Matrix::resize(rows, cols)` is a no-op when the shape
-     *          is unchanged, so reusing a `BasisValues` across calls with
-     *          identical (K, Q, order) skips all allocation after the first.
-     */
-    void reset_for(Index K, Index Q, Index order)
-    {
-        data_.resize(order + 1);
-        for (Index k = 0; k <= order; ++k) {
-            Index n_k = 0;
-            if constexpr (d == 1)      n_k = 1;
-            else if constexpr (d == 2) n_k = k + 1;
-            else if constexpr (d == 3) n_k = (k + 1) * (k + 2) / 2;
-            data_[k].resize(K * n_k, Q);
-        }
+    buf.resize(order + 1);
+    for (Index k = 0; k <= order; ++k) {
+        buf[k].resize(K * num_multi_indices<d>(k), Q);
     }
-
-private:
-
-    /// @brief Storage: data()[k] is (N · n_k) × Q; row `b · n_k + m` and
-    ///        column `q` holds ∂_m B_b(u_q).
-    std::vector<Matrix<T>> data_;
-};
+}
 
 // === TensorProduct ==================================================================
 
@@ -142,7 +105,7 @@ public:
     /**
      * @brief Evaluate the tensor-product basis and its derivatives up to total
      *        @p order on one element span, writing into a caller-owned
-     *        `BasisValues` in the packed layout described in @ref BasisValues.
+     *        per-order packed buffer (see the layout description above).
      *
      * @param coords (Q × d) parametric coordinates on the span.
      * @param spans  Per-direction knot-span indices.
@@ -150,8 +113,8 @@ public:
      * @param eval   Recurrence scratch workspace, shared with the 1D basis
      *               evaluators. Reused across calls to avoid per-call
      *               heap allocation of the scratch buffers.
-     * @param out    Output buffer; resized in place via `reset_for` (no-op if
-     *               shape unchanged). Reusing one `BasisValues` across an
+     * @param out    Output buffer; resized in place via `resize_basis_buffer`
+     *               (no-op if shape unchanged). Reusing one buffer across an
      *               assembly loop makes the steady-state path allocation-free.
      *
      * @throws std::invalid_argument if @p order is outside [0, 3].
@@ -161,25 +124,25 @@ public:
                  const std::array<Index, d>& spans,
                  Index order,
                  Evaluator<T>& eval,
-                 BasisValues<T, d>& out) const;
+                 std::vector<Matrix<T>>& out) const;
 
-    /// @brief Convenience overload that constructs the output `BasisValues`
+    /// @brief Convenience overload that constructs the output buffer
     ///        internally and returns it by move. Hot-path callers should pass
     ///        a reused output buffer to the primary overload above.
-    BasisValues<T, d>
+    std::vector<Matrix<T>>
     eval_on_span(const std::type_identity_t<ColMatrix<T, d>>& coords,
                  const std::array<Index, d>& spans,
                  Index order,
                  Evaluator<T>& eval) const
     {
-        BasisValues<T, d> out;
+        std::vector<Matrix<T>> out;
         eval_on_span(coords, spans, order, eval, out);
         return out;
     }
 
     /// @brief Convenience overload that constructs both the Evaluator and the
-    ///        output `BasisValues` internally. One-shot callers only.
-    BasisValues<T, d>
+    ///        output buffer internally. One-shot callers only.
+    std::vector<Matrix<T>>
     eval_on_span(const std::type_identity_t<ColMatrix<T, d>>& coords,
                  const std::array<Index, d>& spans,
                  Index order) const
@@ -212,7 +175,7 @@ public:
      *
      * @throws std::invalid_argument if @p order is outside [0, 3].
      */
-    BasisValues<T, d>
+    std::vector<Matrix<T>>
     eval(const std::type_identity_t<ColMatrix<T, d>>& coords,
          Index order) const;
 
