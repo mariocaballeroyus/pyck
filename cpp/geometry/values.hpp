@@ -1,0 +1,218 @@
+#ifndef PYCK_VALUES_HPP
+#define PYCK_VALUES_HPP
+
+#include <array>
+#include <cmath>
+#include <concepts>
+#include <cstddef>
+#include <vector>
+
+#include "../basis/evaluation.hpp"
+#include "../basis/tensor_product.hpp"
+#include "../elements/element.hpp"
+#include "../quadrature/quadrature.hpp"
+#include "intrinsic_geometry.hpp"
+#include "patch.hpp"
+#include "../types.hpp"
+
+// TODO: re-introduce ExtrinsicGeometry<T, d> as a member of PatchValues /
+// BoundaryPatchValues (parent side) once we resolve the d == 2 constraint —
+// either via specialization, [[no_unique_address]] with a placeholder for
+// d != 2, or by lifting the requires clause off ExtrinsicGeometry itself.
+// Removed for now so PatchValues<T, 1> (beams) instantiates cleanly.
+
+namespace pyck
+{
+
+/**
+ * @brief Per-element evaluation workspace for a Patch.
+ *
+ * @details Holds the basis-layer recurrence scratch, per-order packed basis
+ *          values, mapped quadrature data, and intrinsic geometry for one
+ *          element. A future reinit(elem_idx) will populate these by mapping
+ *          the element's quadrature points and calling the tensor-product
+ *          basis evaluator. ExtrinsicGeometry will be added back via
+ *          conditional inclusion (see file header TODO).
+ *
+ * @tparam T Scalar floating-point type.
+ * @tparam d Parametric dimension of the patch.
+ */
+template <std::floating_point T, std::size_t d>
+class PatchValues
+{
+public:
+
+    /**
+     * @brief Construct the workspace for a (patch, element, quadrature) triple.
+     *
+     * @details Stores const references to the patch, element kernel, and
+     *          quadrature rule. Sizes every per-element scratch buffer to one
+     *          element's worth: mapped_pts (Q × d), mapped_weights (Q),
+     *          basis_scratch (max N × order), basis_out (per-order packed
+     *          buffer for N = ∏(p_i+1), Q points, derivative order
+     *          element.min_order()). Subsequent reinit() calls reuse these
+     *          buffers in place — no allocation per element.
+     *
+     *          IntrinsicGeometry is left default-constructed for now; it will
+     *          be bound during reinit() once IntrinsicGeometry grows its own
+     *          reinit method.
+     */
+    PatchValues(const Patch<T, d>&          patch,
+                const Element<T, d>&        element,
+                const QuadratureRule<T, d>& quadrature)
+        : patch_(patch), element_(element), quadrature_(quadrature),
+          order_(static_cast<Index>(element.min_order()))
+    {
+        const Index Q = static_cast<Index>(quadrature.num_points());
+        mapped_pts.resize(Q, static_cast<Index>(d));
+        mapped_weights.resize(Q);
+
+        // N = ∏(p_i + 1) active basis functions per element; N_max = the
+        // largest 1D fan, which is what the Cox-de Boor scratch must hold.
+        Index N = 1;
+        Index N_max = 1;
+        for (std::size_t i = 0; i < d; ++i) {
+            const Index Ni = static_cast<Index>(patch.basis(i).degree()) + 1;
+            N *= Ni;
+            if (Ni > N_max) N_max = Ni;
+        }
+
+        basis_scratch.resize(N_max, order_);
+        resize_basis_buffer<T, d>(basis_out, N, Q, order_);
+    }
+
+    /**
+     * @brief Refresh per-element data for the given flat element index.
+     *
+     * @details Decodes elem_idx into per-direction span indices, looks up the
+     *          element's parametric bounds, maps the quadrature rule into
+     *          mapped_pts / mapped_weights, then evaluates the tensor-product
+     *          basis on this span into basis_out (using basis_scratch as the
+     *          recurrence workspace). Returns false for zero-volume spans
+     *          (e.g. clamped-knot multiplicity at patch boundaries) so the
+     *          caller can `continue` without paying for the basis evaluation.
+     *
+     *          IntrinsicGeometry binding will be added once it grows a
+     *          .reinit(basis, act_pts) method.
+     *
+     * @param elem_idx Flat element index in the patch's enumeration.
+     * @return true if the element has non-zero parametric volume, false otherwise.
+     */
+    bool reinit(std::size_t elem_idx)
+    {
+        std::array<std::size_t, d> intervals;
+        for (std::size_t i = 0; i < d; ++i) {
+            intervals[i] = patch_.basis(i).knot_vector().num_spans();
+        }
+
+        std::size_t temp_idx = elem_idx;
+        for (std::size_t i = 0; i < d; ++i) {
+            span_indices_[i] = static_cast<Index>(temp_idx % intervals[i]);
+            temp_idx /= intervals[i];
+        }
+
+        std::array<T, d> u_a, u_b;
+        for (std::size_t i = 0; i < d; ++i) {
+            auto [lo, hi] = patch_.basis(i).knot_vector().span_bounds(span_indices_[i]);
+            u_a[i] = lo;
+            u_b[i] = hi;
+            if (std::abs(hi - lo) < T(1e-14)) return false;
+        }
+
+        quadrature_.map_to_domain(u_a, u_b, mapped_pts, mapped_weights);
+
+        patch_.tensor_product().eval_on_span(mapped_pts, span_indices_,
+                                             order_, basis_scratch, basis_out);
+        return true;
+    }
+
+    // === Basis ======================================================================
+
+    /// @brief Cox-de Boor recurrence scratch (ndu_fn, ndu_kd, left, right, a, point_derivs).
+    Evaluator<T> basis_scratch;
+
+    /// @brief Basis values and derivatives at the current element's quadrature
+    ///        points, per-order packed (TensorProduct::eval_on_span layout).
+    std::vector<Matrix<T>> basis_out;
+
+    // === Quadrature =================================================================
+
+    /// @brief Quadrature points in parametric coordinates for the current
+    ///        element, shape (Q, d). Filled by QuadratureRule::map_to_domain.
+    ColMatrix<T, d> mapped_pts;
+
+    /// @brief Quadrature weights for the current element (length Q), scaled by
+    ///        the reference-to-parametric Jacobian.
+    Vector<T> mapped_weights;
+
+    // === Geometry ===================================================================
+
+    /// @brief Metric, Jacobians, Christoffel symbols at the current element's
+    ///        quadrature points.
+    IntrinsicGeometry<T, d> intrinsic_geometry;
+
+private:
+
+    const Patch<T, d>&          patch_;
+    const Element<T, d>&        element_;
+    const QuadratureRule<T, d>& quadrature_;
+    Index                       order_;
+    std::array<Index, d>        span_indices_;
+};
+
+/**
+ * @brief Per-span evaluation workspace for a PatchBoundary.
+ *
+ * @details Boundary integration is intrinsically a two-basis problem: the
+ *          integrand involves both the boundary's own (d-1)-dim basis (for
+ *          multipliers, the boundary measure, normal-traction terms) and
+ *          the parent's d-dim basis evaluated at the lifted boundary
+ *          quadrature points (because primary unknowns live on the parent).
+ *          This workspace holds the boundary side here; the parent-side
+ *          basis scratch, output buffer, and lifted points will be added
+ *          when reinit() is wired. ExtrinsicGeometry omitted for now (see
+ *          file header TODO).
+ *
+ * @tparam T Scalar floating-point type.
+ * @tparam d Parametric dimension of the parent patch.
+ */
+template <std::floating_point T, std::size_t d>
+requires (d > 1)
+class BoundaryPatchValues
+{
+public:
+
+    // === Boundary side ((d-1)-dimensional) ==========================================
+
+    /// @brief Cox-de Boor recurrence scratch for the boundary's own basis.
+    Evaluator<T> basis_scratch;
+
+    /// @brief Boundary basis values and derivatives at the current span's
+    ///        quadrature points, per-order packed.
+    std::vector<Matrix<T>> basis_out;
+
+    /// @brief Quadrature points in boundary parametric coordinates for the
+    ///        current span, shape (Q, d-1). Filled by QuadratureRule::map_to_domain.
+    ColMatrix<T, d - 1> mapped_pts;
+
+    /// @brief Boundary quadrature weights (length Q), scaled by the
+    ///        reference-to-parametric Jacobian on the boundary span.
+    Vector<T> mapped_weights;
+
+    /// @brief Metric and Jacobians on the (d-1)-dimensional boundary.
+    IntrinsicGeometry<T, d - 1> intrinsic_geometry;
+
+    // === Parent side (d-dimensional, at lifted boundary quadrature points) ==========
+    //
+    // Parent-side basis scratch / output / lifted points to be added when
+    // reinit() is wired. Parent intrinsic + extrinsic geometry live here now
+    // since they're cheap to declare and natural to mirror.
+
+    /// @brief Metric, Jacobians, Christoffel symbols on the parent patch at
+    ///        the lifted boundary quadrature points.
+    IntrinsicGeometry<T, d> parent_intrinsic_geometry;
+};
+
+} // namespace pyck
+
+#endif // PYCK_VALUES_HPP
