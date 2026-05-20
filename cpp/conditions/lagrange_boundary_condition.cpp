@@ -75,6 +75,9 @@ LagrangeBoundaryCondition<T, d>::apply(Matrix<T>& stiffness, Vector<T>& load,
     const Index ndof = static_cast<Index>(element_.num_node_dofs());
     const std::size_t req_order = element_.min_order();
     const Index num_spans_bdy = boundary_.basis(0).knot_vector().num_spans();
+    const Index Q = static_cast<Index>(quadrature_.num_points());
+    ColMatrix<T, 1> mapped_pts(Q, 1);
+    Vector<T>       mapped_weights(Q);
 
     for (Index s = 0; s < num_spans_bdy; ++s)
     {
@@ -82,8 +85,7 @@ LagrangeBoundaryCondition<T, d>::apply(Matrix<T>& stiffness, Vector<T>& load,
         if (std::abs(hi - lo) < T(1e-14)) continue;
 
         // Per-span scaffolding: shared across all fields.
-        auto [mapped_pts, mapped_weights] = quadrature_.map_to_domain(lo, hi);
-        const Index Q = static_cast<Index>(mapped_pts.rows());
+        quadrature_.map_to_domain({lo}, {hi}, mapped_pts, mapped_weights);
 
         auto boundary_basis  = boundary_.tensor_product().eval(mapped_pts, 2);
         auto boundary_act    = boundary_.active_control_pts(s);

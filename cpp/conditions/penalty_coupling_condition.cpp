@@ -80,14 +80,16 @@ void PenaltyCouplingCondition<T, d>::apply(
     const auto& kv_b = side_b_.basis(0).knot_vector();
     const T b_total = kv_b[0] + kv_b[kv_b.size() - 1];
 
+    const Index Q = static_cast<Index>(quadrature_.num_points());
+    ColMatrix<T, 1> pts_a(Q, 1);
+    Vector<T>       w_a(Q);
     for (Index span_a = 0; span_a < num_spans; ++span_a)
     {
         auto [lo, hi] = kv_a.span_bounds(span_a);
         if (std::abs(hi - lo) < T(1e-14)) continue;
 
         // Quadrature on side A's span.
-        auto [pts_a, w_a] = quadrature_.map_to_domain(lo, hi);
-        const Index Q = static_cast<Index>(pts_a.rows());
+        quadrature_.map_to_domain({lo}, {hi}, pts_a, w_a);
 
         // Side A: composable primitives on boundary and parent.
         auto basis_a   = side_a_.tensor_product().eval(pts_a, 2);

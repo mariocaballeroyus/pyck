@@ -27,25 +27,19 @@ QuadratureRule<T, d>::QuadratureRule(const QuadratureRule<T, 1>& rule)
 }
 
 template <std::floating_point T, std::size_t d>
-std::pair<ColMatrix<T, d>, Vector<T>> 
-QuadratureRule<T, d>::map_to_domain(const std::array<T, d>& lo, const std::array<T, d>& hi) const
+void
+QuadratureRule<T, d>::map_to_domain(const std::array<T, d>& lo,
+                                    const std::array<T, d>& hi,
+                                    Eigen::Ref<ColMatrix<T, d>, 0, Eigen::OuterStride<>> pts_out,
+                                    Eigen::Ref<Vector<T>> wts_out) const
 {
-    ColMatrix<T, d> mapped_pts = points_;
-    Vector<T> mapped_wts = weights_;
-    std::size_t Q = points_.rows();
-
+    T det_j_total = static_cast<T>(1);
     for (std::size_t i = 0; i < d; ++i) {
-        T a = lo[i];
-        T b = hi[i];
-        T det_j = static_cast<T>(0.5) * (b - a);
-        
-        for (std::size_t q = 0; q < Q; ++q) {
-            mapped_pts(q, i) = a + det_j * (points_(q, i) + static_cast<T>(1));
-        }
-        mapped_wts *= det_j;
+        const T det_j = static_cast<T>(0.5) * (hi[i] - lo[i]);
+        pts_out.col(i).array() = lo[i] + det_j * (points_.col(i).array() + static_cast<T>(1));
+        det_j_total *= det_j;
     }
-
-    return {mapped_pts, mapped_wts};
+    wts_out = weights_ * det_j_total;
 }
 
 template <std::floating_point T, std::size_t d>
@@ -83,34 +77,19 @@ QuadratureRule<T, 1>::QuadratureRule(const ColMatrix<T, 1>& pts, const Vector<T>
     : points_(pts), weights_(w) {}
 
 template <std::floating_point T>
-std::pair<ColMatrix<T, 1>, Vector<T>> 
-QuadratureRule<T, 1>::map_to_domain(const std::array<T, 1>& lo, const std::array<T, 1>& hi) const
+void
+QuadratureRule<T, 1>::map_to_domain(const std::array<T, 1>& lo,
+                                    const std::array<T, 1>& hi,
+                                    Eigen::Ref<ColMatrix<T, 1>, 0, Eigen::OuterStride<>> pts_out,
+                                    Eigen::Ref<Vector<T>> wts_out) const
 {
-    ColMatrix<T, 1> mapped_pts = points_;
-    Vector<T> mapped_wts = weights_;
-    std::size_t Q = points_.rows();
-
-    T a = lo[0];
-    T b = hi[0];
-    T det_j = static_cast<T>(0.5) * (b - a);
-    
-    for (std::size_t q = 0; q < Q; ++q) {
-        mapped_pts(q, 0) = a + det_j * (points_(q, 0) + static_cast<T>(1));
-    }
-    mapped_wts *= det_j;
-
-    return {mapped_pts, mapped_wts};
+    const T det_j = static_cast<T>(0.5) * (hi[0] - lo[0]);
+    pts_out.col(0).array() = lo[0] + det_j * (points_.col(0).array() + static_cast<T>(1));
+    wts_out = weights_ * det_j;
 }
 
 template <std::floating_point T>
-std::pair<Vector<T>, Vector<T>> QuadratureRule<T, 1>::map_to_domain(T lo, T hi) const
-{
-    auto [pts, wts] = this->map_to_domain(std::array<T, 1>{lo}, std::array<T, 1>{hi});
-    return {pts.col(0), wts};
-}
-
-template <std::floating_point T>
-std::pair<ColMatrix<T, 1>, Vector<T>> 
+std::pair<ColMatrix<T, 1>, Vector<T>>
 QuadratureRule<T, 1>::tensor_product(const std::array<const QuadratureRule<T, 1>*, 1>& rules)
 {
     return {rules[0]->points(), rules[0]->weights()};

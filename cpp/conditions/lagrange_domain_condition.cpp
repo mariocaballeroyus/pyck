@@ -68,6 +68,10 @@ void LagrangeDomainCondition<T, d>::apply(
         total_elements *= intervals[i];
     }
 
+    const Index Q = static_cast<Index>(quadrature_.num_points());
+    ColMatrix<T, d> mapped_pts(Q, static_cast<Index>(d));
+    Vector<T>       mapped_weights(Q);
+
     for (std::size_t elem_idx = 0; elem_idx < total_elements; ++elem_idx)
     {
         // Decode flat span index into per-dimension span indices (U-inner).
@@ -89,8 +93,7 @@ void LagrangeDomainCondition<T, d>::apply(
         }
         if (zero_volume) continue;
 
-        auto [mapped_pts, mapped_weights] = quadrature_.map_to_domain(u_a, u_b);
-        const Index Q = static_cast<Index>(mapped_pts.rows());
+        quadrature_.map_to_domain(u_a, u_b, mapped_pts, mapped_weights);
 
         auto basis   = patch_.tensor_product().eval(mapped_pts, req_order);
         auto act_pts = patch_.active_control_pts(elem_idx);

@@ -67,6 +67,10 @@ Vector<T> compute_l2_error(
     Vector<T> accum;
     bool initialised = false;
 
+    const Index Q = static_cast<Index>(quadrature.num_points());
+    ColMatrix<T, d> mapped_pts(Q, static_cast<Index>(d));
+    Vector<T>       mapped_weights(Q);
+
     for (std::size_t elem_idx = 0; elem_idx < total_elements; ++elem_idx)
     {
         std::array<std::size_t, d> span_indices;
@@ -89,7 +93,7 @@ Vector<T> compute_l2_error(
         }
         if (zero_volume) continue;
 
-        auto [mapped_pts, mapped_weights] = quadrature.map_to_domain(u_a, u_b);
+        quadrature.map_to_domain(u_a, u_b, mapped_pts, mapped_weights);
 
         auto basis   = patch.tensor_product().eval(mapped_pts, basis_order);
         auto act_pts = patch.active_control_pts(static_cast<Index>(elem_idx));

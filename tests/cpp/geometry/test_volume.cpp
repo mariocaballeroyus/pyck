@@ -163,6 +163,9 @@ TEST_CASE("Patch<double, 3>: Box factory volume integral", "[geometry][volume]")
         const Index total = intervals[0] * intervals[1] * intervals[2];
 
         double vol_int = 0.0;
+        const Eigen::Index Q = static_cast<Eigen::Index>(quad.num_points());
+        ColMatrix<double, 3> mp(Q, 3);
+        Vector<double>       mw(Q);
         for (Index e = 0; e < total; ++e)
         {
             const auto spans = vol.decode_span(e);
@@ -175,7 +178,7 @@ TEST_CASE("Patch<double, 3>: Box factory volume integral", "[geometry][volume]")
             }
             if (zero_vol) continue;
 
-            auto [mp, mw] = quad.map_to_domain(lo, hi);
+            quad.map_to_domain(lo, hi, mp, mw);
             const auto b     = vol.tensor_product().eval(mp, 1);
             const auto act   = vol.active_control_pts(e);
             IntrinsicGeometry<double, 3> local(b, act);

@@ -52,6 +52,9 @@ void PenaltyBoundaryCondition<T, d>::apply(Matrix<T>& stiffness,
     const std::size_t req_order = element.min_order();
 
     const Index num_spans = boundary.basis(0).knot_vector().num_spans();
+    const Index Q = static_cast<Index>(quadrature.num_points());
+    ColMatrix<T, 1> mapped_pts(Q, 1);
+    Vector<T>       mapped_weights(Q);
     for (Index span = 0; span < num_spans; ++span)
     {
         // Skip zero-length spans.
@@ -59,8 +62,7 @@ void PenaltyBoundaryCondition<T, d>::apply(Matrix<T>& stiffness,
         if (std::abs(hi - lo) < T(1e-14)) continue;
 
         // Per-span scaffolding: shared across all fields.
-        auto [mapped_pts, mapped_weights] = quadrature.map_to_domain(lo, hi);
-        const Index Q = static_cast<Index>(mapped_pts.rows());
+        quadrature.map_to_domain({lo}, {hi}, mapped_pts, mapped_weights);
 
         auto boundary_basis  = boundary.tensor_product().eval(mapped_pts, 2);
         auto boundary_act    = boundary.active_control_pts(span);

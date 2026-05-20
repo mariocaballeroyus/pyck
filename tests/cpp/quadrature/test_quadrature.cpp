@@ -39,7 +39,10 @@ TEST_CASE("GaussLegendre computation", "[quadrature][gauss_legendre]") {
 TEST_CASE("QuadratureRule1D map_to_domain", "[quadrature]") 
 {
     GaussLegendre<double, 1> gauss_rule(3);
-    auto [mapped_points, mapped_weights] = gauss_rule.map_to_domain(0.0, 2.0);
+    const Eigen::Index Q = static_cast<Eigen::Index>(gauss_rule.num_points());
+    ColMatrix<double, 1> mapped_points(Q, 1);
+    Vector<double>       mapped_weights(Q);
+    gauss_rule.map_to_domain({0.0}, {2.0}, mapped_points, mapped_weights);
     // Sum of mapped weights should equal the interval length
     REQUIRE(mapped_weights.sum() == Approx(2.0));
     // Points should be in [0, 2]
@@ -112,7 +115,10 @@ TEST_CASE("Multidimensional QuadratureRule class", "[quadrature][tensor_product]
     SECTION("2D mapping") {
         QuadratureRule<double, 2> tensor_rule(gauss_2pt);
         // Map to [0, 2] x [0, 1]
-        auto [points, weights] = tensor_rule.map_to_domain({0.0, 0.0}, {2.0, 1.0});
+        const Eigen::Index Q = static_cast<Eigen::Index>(tensor_rule.num_points());
+        ColMatrix<double, 2> points(Q, 2);
+        Vector<double>       weights(Q);
+        tensor_rule.map_to_domain({0.0, 0.0}, {2.0, 1.0}, points, weights);
         REQUIRE(weights.sum() == Approx(2.0)); // Volume = 2*1 = 2
         for (Eigen::Index i = 0; i < points.rows(); ++i) {
             REQUIRE(points(i, 0) >= 0.0);

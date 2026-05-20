@@ -81,6 +81,9 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
         per_elem_pts.reserve(total_elements);
 
         Index Q_total = 0;
+        const Index qp = static_cast<Index>(quadrature.num_points());
+        ColMatrix<T, d> mapped_pts(qp, static_cast<Index>(d));
+        Vector<T>       mapped_weights(qp);
 
         // Loop over finite elements
         for (std::size_t elem_idx = 0; elem_idx < total_elements; ++elem_idx) {
@@ -101,10 +104,9 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
             }
             if (zero_volume) continue;
 
-            auto [mapped_pts, mapped_weights] = quadrature.map_to_domain(u_a, u_b);
-            const Index qp = static_cast<Index>(mapped_pts.rows());
-            live.push_back({elem_idx, Q_total, qp, std::move(mapped_weights)});
-            per_elem_pts.push_back(std::move(mapped_pts));
+            quadrature.map_to_domain(u_a, u_b, mapped_pts, mapped_weights);
+            live.push_back({elem_idx, Q_total, qp, mapped_weights});
+            per_elem_pts.push_back(mapped_pts);
             Q_total += qp;
         }
 

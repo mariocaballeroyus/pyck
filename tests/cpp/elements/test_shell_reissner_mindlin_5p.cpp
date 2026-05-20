@@ -32,6 +32,9 @@ Matrix<T> assemble_global_K(const Patch<T, 2>& patch,
 
     GaussLegendre<T, 2> quad(gauss_p);
 
+    const Index Q = static_cast<Index>(quad.num_points());
+    ColMatrix<T, 2> pts(Q, 2);
+    Vector<T>       w(Q);
     for (Index e = 0; e < intervals[0] * intervals[1]; ++e) {
         auto spans = patch.decode_span(e);
         std::array<T, 2> lo, hi;
@@ -43,7 +46,7 @@ Matrix<T> assemble_global_K(const Patch<T, 2>& patch,
         }
         if (zero_vol) continue;
 
-        auto [pts, w] = quad.map_to_domain(lo, hi);
+        quad.map_to_domain(lo, hi, pts, w);
         auto basis = patch.tensor_product().eval(
             pts, static_cast<Index>(element.min_order()));
         Matrix<T> Ke;

@@ -76,9 +76,11 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
 
     // Track quadrature point offset into broadcasted_values
     std::size_t qp_offset = 0;
+    ColMatrix<T, d> mapped_pts(static_cast<Index>(Q), static_cast<Index>(d));
+    Vector<T>       mapped_weights(static_cast<Index>(Q));
 
     // Single linear loop over all possible multidimensional element indices
-    for (std::size_t elem_idx = 0; elem_idx < total_elements; ++elem_idx) 
+    for (std::size_t elem_idx = 0; elem_idx < total_elements; ++elem_idx)
     {
         // Decode linear index into multidimensional span_indices
         std::array<std::size_t, d> span_indices;
@@ -106,8 +108,8 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
 
         if (zero_volume) continue;
 
-        // Simplify: Map quadrature points using the rule's built-in multi-dimensional logic
-        auto [mapped_pts, mapped_weights] = quadrature.map_to_domain(u_a, u_b);
+        // Map quadrature points into the per-element scratch buffer.
+        quadrature.map_to_domain(u_a, u_b, mapped_pts, mapped_weights);
         
         // Composable geometric primitives.
         std::size_t req_order = element.min_order();

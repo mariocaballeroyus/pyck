@@ -143,6 +143,9 @@ TEST_CASE("Patch<double, 2>: Rectangle factory area integral", "[geometry][surfa
         const Index total = intervals[0] * intervals[1];
 
         double area = 0.0;
+        const Eigen::Index Q = static_cast<Eigen::Index>(quad.num_points());
+        ColMatrix<double, 2> mp(Q, 2);
+        Vector<double>       mw(Q);
         for (Index e = 0; e < total; ++e) {
             // U-inner flat span: e = su + sv * intervals[0].
             const auto spans = surf.decode_span(e);
@@ -155,7 +158,7 @@ TEST_CASE("Patch<double, 2>: Rectangle factory area integral", "[geometry][surfa
             }
             if (zero_vol) continue;
 
-            auto [mp, mw] = quad.map_to_domain(lo, hi);
+            quad.map_to_domain(lo, hi, mp, mw);
             const auto b     = surf.tensor_product().eval(mp, 1);
             const auto act   = surf.active_control_pts(e);
             IntrinsicGeometry<double, 2> local(b, act);

@@ -65,14 +65,21 @@ public:
     static std::pair<ColMatrix<T, d>, Vector<T>> tensor_product(const std::array<const QuadratureRule<T, 1>*, d>& rules);
 
     /**
-     * @brief Map the reference [-1, 1]^d quadrature points and weights to a box [lo, hi].
-     * 
-     * @param lo Lower bounds of the target interval in each dimension.
-     * @param hi Upper bounds of the target interval in each dimension.
-     * @return A pair (mapped_points, mapped_weights).
+     * @brief Map the reference [-1, 1]^d quadrature into caller-owned buffers.
+     *
+     * @details Writes Q mapped points (one per row) into @p pts_out
+     *          and Q mapped weights into @p wts_out, where Q is the number of integration 
+     *          points defined by the quadrature.
+     *
+     * @param lo      Lower bounds of the target interval in each dimension.
+     * @param hi      Upper bounds of the target interval in each dimension.
+     * @param pts_out Output buffer for mapped points, shape (Q, d).
+     * @param wts_out Output buffer for mapped weights, length Q.
      */
-    virtual std::pair<ColMatrix<T, d>, Vector<T>> map_to_domain(const std::array<T, d>& lo, 
-                                                                const std::array<T, d>& hi) const;
+    virtual void map_to_domain(const std::array<T, d>& lo,
+                               const std::array<T, d>& hi,
+                               Eigen::Ref<ColMatrix<T, d>, 0, Eigen::OuterStride<>> pts_out,
+                               Eigen::Ref<Vector<T>> wts_out) const;
 
     /// @brief Get the quadrature points as a matrix of size Q x d.
     const ColMatrix<T, d>& points() const { return points_; }
@@ -120,24 +127,21 @@ public:
     virtual ~QuadratureRule() = default;
 
     /**
-     * @brief Map the reference [-1, 1] quadrature points and weights to an interval [lo, hi].
-     * 
-     * @param lo Lower bound of the target interval.
-     * @param hi Upper bound of the target interval.
-     * @return A pair (mapped_points, mapped_weights).
+     * @brief Map the reference [-1, 1] quadrature into caller-owned buffers.
+     *
+     * @details Writes Q mapped points (one per row) into @p pts_out and Q mapped
+     *          weights into @p wts_out, where Q is the number of integration
+     *          points defined by the quadrature.
+     *
+     * @param lo      Lower bound of the target interval.
+     * @param hi      Upper bound of the target interval.
+     * @param pts_out Output buffer for mapped points, shape (Q, 1).
+     * @param wts_out Output buffer for mapped weights, length Q.
      */
-    virtual std::pair<ColMatrix<T, 1>, Vector<T>> map_to_domain(
-        const std::array<T, 1>& lo, 
-        const std::array<T, 1>& hi) const;
-
-    /**
-     * @brief 1D mapping helper taking scalars.
-     * 
-     * @param lo Lower bound of the target interval.
-     * @param hi Upper bound of the target interval.
-     * @return A pair (mapped_points_vector, mapped_weights_vector).
-     */
-    std::pair<Vector<T>, Vector<T>> map_to_domain(T lo, T hi) const;
+    virtual void map_to_domain(const std::array<T, 1>& lo,
+                               const std::array<T, 1>& hi,
+                               Eigen::Ref<ColMatrix<T, 1>, 0, Eigen::OuterStride<>> pts_out,
+                               Eigen::Ref<Vector<T>> wts_out) const;
 
     /**
      * @brief Form the tensor product of 1 one-dimensional quadrature rule (identity).

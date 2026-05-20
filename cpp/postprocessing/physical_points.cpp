@@ -26,6 +26,9 @@ ColMatrix<T, 3> eval_physical_points(
     ColMatrix<T, 3> result(total_elements * Q, 3);
     Index out = 0;
 
+    ColMatrix<T, d> mapped_pts(Q, static_cast<Index>(d));
+    Vector<T>       mapped_weights(Q);
+
     for (std::size_t elem_idx = 0; elem_idx < total_elements; ++elem_idx)
     {
         // Decode flat index into per-direction spans (u-fastest).
@@ -51,7 +54,7 @@ ColMatrix<T, 3> eval_physical_points(
         if (zero_volume) continue;
 
         // phys_pts(q) = sum_i N_i(u_q) · P_i, with basis evaluated at order 0.
-        auto [mapped_pts, mapped_weights] = quadrature.map_to_domain(lo, hi);
+        quadrature.map_to_domain(lo, hi, mapped_pts, mapped_weights);
         auto basis = patch.tensor_product().eval(mapped_pts, 0);
         auto act_pts = patch.active_control_pts(static_cast<Index>(elem_idx));
         const Index N = basis[0].rows();
@@ -87,6 +90,9 @@ ColMatrix<T, d> eval_parametric_points(
     ColMatrix<T, d> result(total_elements * Q, static_cast<Index>(d));
     Index out = 0;
 
+    ColMatrix<T, d> mapped_pts(Q, static_cast<Index>(d));
+    Vector<T>       mapped_weights(Q);
+
     for (std::size_t elem_idx = 0; elem_idx < total_elements; ++elem_idx)
     {
         std::array<std::size_t, d> spans;
@@ -109,7 +115,7 @@ ColMatrix<T, d> eval_parametric_points(
         }
         if (zero_volume) continue;
 
-        auto [mapped_pts, mapped_weights] = quadrature.map_to_domain(lo, hi);
+        quadrature.map_to_domain(lo, hi, mapped_pts, mapped_weights);
         result.block(out, 0, Q, static_cast<Index>(d)) = mapped_pts;
         out += Q;
     }
@@ -135,6 +141,9 @@ Vector<T> eval_integration_measures(
     Vector<T> result(total_elements * Q);
     Index out = 0;
 
+    ColMatrix<T, d> mapped_pts(Q, static_cast<Index>(d));
+    Vector<T>       mapped_weights(Q);
+
     for (std::size_t elem_idx = 0; elem_idx < total_elements; ++elem_idx)
     {
         std::array<std::size_t, d> spans;
@@ -157,7 +166,7 @@ Vector<T> eval_integration_measures(
         }
         if (zero_volume) continue;
 
-        auto [mapped_pts, mapped_weights] = quadrature.map_to_domain(lo, hi);
+        quadrature.map_to_domain(lo, hi, mapped_pts, mapped_weights);
         auto basis   = patch.tensor_product().eval(mapped_pts, 1);
         auto act_pts = patch.active_control_pts(static_cast<Index>(elem_idx));
         IntrinsicGeometry<T, d> local(basis, act_pts);
