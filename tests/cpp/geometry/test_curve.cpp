@@ -117,7 +117,7 @@ TEST_CASE("Patch<double, 1>: Analytical Push-Forward Verification", "[geometry][
                                   - 2.0 * Gamma * Gamma;
 
             // New-API evaluation.
-            auto b     = eval_basis(curve, params, span, 3);
+            auto b     = curve.tensor_product().eval(params, 3);
             auto act   = curve.active_control_pts(span);
             IntrinsicGeometry<double, 1> local(b, act);            auto md    = metric_derivs(b, local, 0);
 
@@ -159,7 +159,7 @@ TEST_CASE("Patch<double, 1>: External AD Numerical Validation", "[geometry][curv
 
     auto eval_at = [&](double u) {
         ColMatrix<double, 1> params(1, 1); params << u;
-        auto b     = eval_basis(curve, params, span, 3);
+        auto b     = curve.tensor_product().eval(params, 3);
         IntrinsicGeometry<double, 1> local(b, act);        return metric_derivs(b, local, 0);
     };
 

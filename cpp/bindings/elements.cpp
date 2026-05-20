@@ -76,7 +76,7 @@ Matrix<T> eval_global_shape(
         if constexpr (d >= 2)
             flat_span += span_idx[1] * n_spans[0];
 
-        auto bd      = eval_basis(patch, pt, flat_span, order);
+        auto bd      = patch.tensor_product().eval(pt, order);
         auto act_pts = patch.active_control_pts(flat_span);
         IntrinsicGeometry<T, d> lf(bd, act_pts);
         lf.compute_christoffels();

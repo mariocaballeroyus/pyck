@@ -91,7 +91,7 @@ Vector<T> compute_l2_error(
 
         auto [mapped_pts, mapped_weights] = quadrature.map_to_domain(u_a, u_b);
 
-        auto basis   = eval_basis(patch, mapped_pts, static_cast<Index>(elem_idx), basis_order);
+        auto basis   = patch.tensor_product().eval(mapped_pts, basis_order);
         auto act_pts = patch.active_control_pts(static_cast<Index>(elem_idx));
         IntrinsicGeometry<T, d> local(basis, act_pts);
 

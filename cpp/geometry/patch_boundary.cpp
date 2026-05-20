@@ -29,7 +29,11 @@ make_boundary_patch(const Ptr<Patch<T, d>>& parent,
         if (k != param_dim) free_bases[idx++] = parent->basis_ptr(k);
     }
 
-    return Patch<T, d - 1>(free_bases, cps);
+    if constexpr (d - 1 == 1) {
+        return Patch<T, 1>(free_bases[0], cps);
+    } else {
+        return Patch<T, 2>(free_bases[0], free_bases[1], cps);
+    }
 }
 
 /// sign convention for the outward boundary normal.

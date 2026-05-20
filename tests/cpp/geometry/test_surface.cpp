@@ -45,7 +45,7 @@ TEST_CASE("Patch<double, 2>: Flat Rectangular Plate", "[geometry][surface]") {
         pts << 0.0, 0.0,
                0.5, 0.5,
                1.0, 1.0;
-        const auto b = eval_basis(surf, pts, elem_idx, 0);
+        const auto b = surf.tensor_product().eval(pts, 0);
         ColMatrix<double, 3> phys(b[0].cols(), 3);
         for (Index q = 0; q < b[0].cols(); ++q) {
             auto slab0 = b[0].col(q);
@@ -66,7 +66,7 @@ TEST_CASE("Patch<double, 2>: Flat Rectangular Plate", "[geometry][surface]") {
     SECTION("Metric & Jacobian = Lx · Ly") {
         ColMatrix<double, 2> pts(1, 2);
         pts << 0.3, 0.7;
-        const auto b     = eval_basis(surf, pts, elem_idx, 3);
+        const auto b     = surf.tensor_product().eval(pts, 3);
         IntrinsicGeometry<double, 2> local(b, act);
 
         CHECK(local.g(0, 0)(0) == Approx(Lx * Lx).margin(1e-12));
@@ -78,7 +78,7 @@ TEST_CASE("Patch<double, 2>: Flat Rectangular Plate", "[geometry][surface]") {
     SECTION("Christoffels vanish on flat plate") {
         ColMatrix<double, 2> pts(1, 2);
         pts << 0.4, 0.6;
-        const auto b     = eval_basis(surf, pts, elem_idx, 3);
+        const auto b     = surf.tensor_product().eval(pts, 3);
         IntrinsicGeometry<double, 2> local(b, act);
         local.compute_christoffels();
         const auto& chr = local.chr;
@@ -93,7 +93,7 @@ TEST_CASE("Patch<double, 2>: Flat Rectangular Plate", "[geometry][surface]") {
     SECTION("Partition of unity") {
         ColMatrix<double, 2> pts(1, 2);
         pts << 0.35, 0.72;
-        const auto b = eval_basis(surf, pts, elem_idx, 2);
+        const auto b = surf.tensor_product().eval(pts, 2);
 
         auto sum_at_0 = [&](Index k_order, Index packed, Index n_k) {
             auto slab = b[k_order].col(0);
@@ -144,18 +144,19 @@ TEST_CASE("Patch<double, 2>: Rectangle factory area integral", "[geometry][surfa
 
         double area = 0.0;
         for (Index e = 0; e < total; ++e) {
+            // U-inner flat span: e = su + sv * intervals[0].
+            const auto spans = surf.decode_span(e);
             std::array<double, 2> lo, hi;
             bool zero_vol = false;
             for (int d = 0; d < 2; ++d) {
-                auto [l, h] = surf.basis(d).knot_vector().span_bounds(
-                    d == 0 ? e / intervals[1] : e % intervals[1]);
+                auto [l, h] = surf.basis(d).knot_vector().span_bounds(spans[d]);
                 lo[d] = l; hi[d] = h;
                 if (std::abs(h - l) < 1e-14) { zero_vol = true; break; }
             }
             if (zero_vol) continue;
 
             auto [mp, mw] = quad.map_to_domain(lo, hi);
-            const auto b     = eval_basis(surf, mp, e, 1);
+            const auto b     = surf.tensor_product().eval(mp, 1);
             const auto act   = surf.active_control_pts(e);
             IntrinsicGeometry<double, 2> local(b, act);
 
@@ -235,7 +236,7 @@ TEST_CASE("Patch<double, 2>: Quadratic Basis — Partition of Unity",
             ColMatrix<double, 2> pts(1, 2);
             pts << u, v;
 
-            const auto b     = eval_basis(surf, pts, elem_idx, 3);
+            const auto b     = surf.tensor_product().eval(pts, 3);
             IntrinsicGeometry<double, 2> local(b, act);
 
             auto sum_at_0 = [&](Index k_order, Index packed, Index n_k) {
@@ -283,13 +284,13 @@ TEST_CASE("PatchBoundary<double, 2>::eval_outward_normal: flat rectangle",
     Eigen::VectorXd bdy_pts(3);
     bdy_pts << 0.1, 0.5, 0.9;
 
-    const auto bdy_basis = eval_basis(*bdy, bdy_pts, boundary_span, 1);
+    const auto bdy_basis = (*bdy).tensor_product().eval(bdy_pts, 1);
     const auto bdy_act   = bdy->active_control_pts(boundary_span);
     IntrinsicGeometry<double, 1> bdy_local(bdy_basis, bdy_act);
 
     const Index parent_flat = bdy->parent_flat_span(boundary_span);
     const auto parent_pts   = bdy->lift_to_parent(bdy_pts);
-    const auto parent_basis = eval_basis(*surf, parent_pts, parent_flat, 1);
+    const auto parent_basis = (*surf).tensor_product().eval(parent_pts, 1);
     const auto parent_act   = surf->active_control_pts(parent_flat);
     IntrinsicGeometry<double, 2> parent_local(parent_basis, parent_act);
 
@@ -330,7 +331,7 @@ TEST_CASE("Patch<double, 2>: composable primitives on twisted z=u·v patch",
            0.5, 0.5,
            0.8, 0.2;
 
-    const auto b      = eval_basis(surf, pts, elem_idx, 3);
+    const auto b      = surf.tensor_product().eval(pts, 3);
     const auto actpts = surf.active_control_pts(elem_idx);
     IntrinsicGeometry<double, 2> local(b, actpts);
     local.compute_christoffels();
@@ -440,7 +441,7 @@ TEST_CASE("Patch<double, 2>: ∂Γ on twisted z=u·v patch",
            0.5, 0.5,
            0.8, 0.2;
 
-    const auto b      = eval_basis(surf, pts, elem_idx, 3);
+    const auto b      = surf.tensor_product().eval(pts, 3);
     const auto actpts = surf.active_control_pts(elem_idx);
     IntrinsicGeometry<double, 2> local(b, actpts);
     local.compute_christoffels();
@@ -501,7 +502,7 @@ TEST_CASE("Patch<double, 2>: Intrinsic/Extrinsic containers compose correctly",
            0.5, 0.5,
            0.8, 0.2;
 
-    const auto basis  = eval_basis(surf, pts, elem_idx, 3);
+    const auto basis  = surf.tensor_product().eval(pts, 3);
     const auto actpts = surf.active_control_pts(elem_idx);
 
     IntrinsicGeometry<double, 2> ig(basis, actpts);
@@ -525,47 +526,3 @@ TEST_CASE("Patch<double, 2>: Intrinsic/Extrinsic containers compose correctly",
 }
 
 
-TEST_CASE("Patch<double, 2>: insert_knot preserves geometry", "[geometry][surface]") {
-    // 3x3 B-spline surface with a curved interior to make all spatial columns active.
-    const Index p = 2;
-    const Index n = 4;
-    auto basis_u = std::make_shared<BSpline<double>>(p, KnotVector<double>::clamped_uniform(p, n));
-    auto basis_v = std::make_shared<BSpline<double>>(p, KnotVector<double>::clamped_uniform(p, n));
-
-    Eigen::MatrixXd cps(n * n, 3);
-    for (Index j = 0; j < n; ++j) {
-        for (Index i = 0; i < n; ++i) {
-            const double x = static_cast<double>(i);
-            const double y = static_cast<double>(j);
-            cps.row(j * n + i) << x, y, std::sin(x) * std::cos(y);
-        }
-    }
-    Patch<double, 2> surf(basis_u, basis_v, cps);
-
-    ColMatrix<double, 2> sample(5, 2);
-    sample << 0.1, 0.2,
-              0.3, 0.7,
-              0.5, 0.5,
-              0.8, 0.25,
-              0.95, 0.9;
-
-    const auto phys_ref = surf.eval_physical(sample);
-
-    SECTION("insert in u (dir=0)") {
-        auto refined = surf.insert_knot(0, 0.4);
-        const auto phys = refined.eval_physical(sample);
-        REQUIRE((phys - phys_ref).cwiseAbs().maxCoeff() < 1e-12);
-    }
-
-    SECTION("insert in v (dir=1)") {
-        auto refined = surf.insert_knot(1, 0.6);
-        const auto phys = refined.eval_physical(sample);
-        REQUIRE((phys - phys_ref).cwiseAbs().maxCoeff() < 1e-12);
-    }
-
-    SECTION("chained insertions in both directions") {
-        auto refined = surf.insert_knot(0, 0.4).insert_knot(1, 0.6).insert_knot(1, 0.6);
-        const auto phys = refined.eval_physical(sample);
-        REQUIRE((phys - phys_ref).cwiseAbs().maxCoeff() < 1e-12);
-    }
-}

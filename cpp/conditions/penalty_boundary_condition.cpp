@@ -62,13 +62,13 @@ void PenaltyBoundaryCondition<T, d>::apply(Matrix<T>& stiffness,
         auto [mapped_pts, mapped_weights] = quadrature.map_to_domain(lo, hi);
         const Index Q = static_cast<Index>(mapped_pts.rows());
 
-        auto boundary_basis  = eval_basis(boundary, mapped_pts, span, 2);
+        auto boundary_basis  = boundary.tensor_product().eval(mapped_pts, 2);
         auto boundary_act    = boundary.active_control_pts(span);
         IntrinsicGeometry<T, d - 1> boundary_local(boundary_basis, boundary_act);
 
         const Index flat_parent = boundary.parent_flat_span(span);
         const ColMatrix<T, 2> parent_pts = boundary.lift_to_parent(mapped_pts);
-        auto parent_basis  = eval_basis(parent, parent_pts, flat_parent, req_order);
+        auto parent_basis  = parent.tensor_product().eval(parent_pts, req_order);
         auto parent_act    = parent.active_control_pts(flat_parent);
         IntrinsicGeometry<T, d> parent_ig(parent_basis, parent_act);
         parent_ig.compute_christoffels();

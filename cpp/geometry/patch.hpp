@@ -30,35 +30,20 @@ public:
 
     // === Constructors ===============================================================
 
-    /**
-     * @brief Primary constructor: build from `d` univariate bases and a
-     *        control-point matrix in 3D physical space.
-     *
-     * The row count of `control_pts` must match ∏ basesᵢ->num_basis(), and
-     * it must have 3 columns. All other ctors below are one-line forwarders
-     * to this single algorithm.
-     */
-    Patch(const std::array<Ptr<const Basis<T>>, d>& bases,
-          const ColMatrix<T, 3>& control_pts);
-
-    /// @brief Ergonomic forwarder for curve patches (d = 1).
+    /// @brief Curve patch ctor (d = 1).
     Patch(Ptr<const Basis<T>> basis_u,
-          const ColMatrix<T, 3>& control_pts) requires (d == 1)
-        : Patch(std::array<Ptr<const Basis<T>>, 1>{basis_u}, control_pts) {}
+          const ColMatrix<T, 3>& control_pts) requires (d == 1);
 
-    /// @brief Ergonomic forwarder for surface patches (d = 2).
+    /// @brief Surface patch ctor (d = 2).
     Patch(Ptr<const Basis<T>> basis_u,
           Ptr<const Basis<T>> basis_v,
-          const ColMatrix<T, 3>& control_pts) requires (d == 2)
-        : Patch(std::array<Ptr<const Basis<T>>, 2>{basis_u, basis_v}, control_pts) {}
+          const ColMatrix<T, 3>& control_pts) requires (d == 2);
 
-    /// @brief Ergonomic forwarder for volume patches (d = 3).
+    /// @brief Volume patch ctor (d = 3).
     Patch(Ptr<const Basis<T>> basis_u,
           Ptr<const Basis<T>> basis_v,
           Ptr<const Basis<T>> basis_w,
-          const ColMatrix<T, 3>& control_pts) requires (d == 3)
-        : Patch(std::array<Ptr<const Basis<T>>, 3>{basis_u, basis_v, basis_w},
-                control_pts) {}
+          const ColMatrix<T, 3>& control_pts) requires (d == 3);
 
     /**
      * @brief Virtual destructor.
@@ -68,41 +53,33 @@ public:
     // === Getters ====================================================================
 
     /// @brief Basis in the given parametric direction.
-    const Basis<T>& basis(std::size_t dir) const 
-    { return tensor_product_.basis(dir); }
+    const Basis<T>& basis(std::size_t dir) const { return tensor_product_.basis(dir); }
 
     /// @brief Get a shared pointer to the 1D basis for a given parametric direction
-    Ptr<const Basis<T>> basis_ptr(std::size_t dir) const 
-    { return tensor_product_.basis_ptr(dir); }
+    Ptr<const Basis<T>> basis_ptr(std::size_t dir) const { return tensor_product_.basis_ptr(dir); }
 
     /// @brief Full tensor-product basis.
-    const TensorProduct<T, d>& tensor_product() const 
-    { return tensor_product_; }
+    const TensorProduct<T, d>& tensor_product() const { return tensor_product_; }
 
     /// @brief DOF mapper for this patch.
-    const DofMapper<d>& dof_mapper() const 
-    { return dof_mapper_; }
+    const DofMapper<d>& dof_mapper() const { return dof_mapper_; }
 
     /// @brief Get the geometric dimension (always 3 for now).
-    constexpr std::size_t gdim() const 
-    { return 3; }
+    constexpr std::size_t gdim() const { return 3; }
 
     /// @brief Get the topological dimension.
-    constexpr std::size_t tdim() const 
-    { return d; }
+    constexpr std::size_t tdim() const { return d; }
 
     /// @brief Get the control points matrix (const).
-    const ColMatrix<T, 3>& control_pts() const 
-    { return control_pts_; }
+    const ColMatrix<T, 3>& control_pts() const { return control_pts_; }
 
     /// @brief Get the control points matrix (non-const).
-    ColMatrix<T, 3>& control_pts() 
-    { return control_pts_; }
+    ColMatrix<T, 3>& control_pts() { return control_pts_; }
 
     /// @brief Get the number of control points.
-    std::size_t num_control_pts() const 
-    { return control_pts_.rows(); }
+    std::size_t num_control_pts() const { return control_pts_.rows(); }
 
+    /// @brief Get the active control points for a given vector of spans.
     ColMatrix<T, 3> active_control_pts(const std::array<Index, d>& spans) const;
 
     /// @brief Convenience overload: flat span index. Decodes internally.
@@ -113,7 +90,7 @@ public:
     ///        local indices (0, 1, …, N−1); overridden by PatchBoundary.
     virtual std::vector<Index> assembly_dofs() const;
 
-    // === Utility Functions ==========================================================
+    // === Utility ====================================================================
 
     /**
      * @brief Get the control points for a given vector of indices.
@@ -143,17 +120,6 @@ public:
      */
     std::array<Index, d> decode_span(Index flat_idx) const;
 
-    // === Physical Evaluation ========================================================
-
-    /**
-     * @brief Evaluate physical coordinates at parametric sample points.
-     *
-     * @param pts Parametric sample points, shape (n_pts, d). For d=1 this is a
-     *            column vector; for d=2 columns are (u, v); for d=3 (u, v, w).
-     * @return Physical coordinates, shape (n_pts, 3).
-     */
-    ColMatrix<T, 3> eval_physical(const ColMatrix<T, d>& pts) const;
-
     // === Refinement =================================================================
 
     /**
@@ -171,10 +137,6 @@ public:
      */
     Patch<T, d> insert_knot(std::size_t dir, T u) const;
 
-    /// @brief Convenience overload for 1D patches: direction is always 0.
-    Patch<T, d> insert_knot(T u) const requires(d == 1)
-    { return this->insert_knot(0, u); }
-
     /**
      * @brief Refine the patch by degree-elevating in direction `dir` by one.
      *
@@ -184,10 +146,6 @@ public:
      * method.
      */
     Patch<T, d> elevate_degree(std::size_t dir) const;
-
-    /// @brief Convenience overload for 1D patches: direction is always 0.
-    Patch<T, d> elevate_degree() const requires(d == 1)
-    { return this->elevate_degree(0); }
 
 protected:
 
@@ -200,66 +158,6 @@ protected:
     /// @brief Map from global DOF indices to local indices on this patch.
     DofMapper<d> dof_mapper_;
 };
-
-/**
- * @brief Evaluate basis functions and derivatives at the given coordinates
- *        within one element span of a patch, writing into a caller-owned
- *        per-order packed buffer (ergonomic Patch-level overload, fully
- *        allocation-free on repeated calls).
- *
- * @param patch       Source patch.
- * @param eval_coords (Q × d) parametric coordinates on the span.
- * @param span_idx    Flat element / span index; decoded internally.
- * @param order       Highest total derivative order (0, 1, 2 or 3).
- * @param eval        Recurrence scratch workspace; reuse across calls in
- *                    hot loops to avoid per-call heap allocation.
- * @param out         Output buffer; resized in place via
- *                    `resize_basis_buffer` (no-op if shape unchanged).
- */
-template <std::floating_point T, std::size_t d>
-inline void
-eval_basis(const Patch<T, d>& patch,
-           const std::type_identity_t<ColMatrix<T, d>>& eval_coords,
-           Index span_idx,
-           std::size_t order,
-           Evaluator<T>& eval,
-           std::vector<Matrix<T>>& out)
-{
-    patch.tensor_product().eval_on_span(
-        eval_coords,
-        patch.decode_span(span_idx),
-        static_cast<Index>(order),
-        eval,
-        out);
-}
-
-/// @brief Convenience overload that constructs the output buffer internally.
-///        Hot-path callers should use the out-param overload above.
-template <std::floating_point T, std::size_t d>
-inline std::vector<Matrix<T>>
-eval_basis(const Patch<T, d>& patch,
-           const std::type_identity_t<ColMatrix<T, d>>& eval_coords,
-           Index span_idx,
-           std::size_t order,
-           Evaluator<T>& eval)
-{
-    std::vector<Matrix<T>> out;
-    eval_basis(patch, eval_coords, span_idx, order, eval, out);
-    return out;
-}
-
-/// @brief Convenience overload that constructs both the Evaluator and the
-///        output buffer internally. One-shot callers only.
-template <std::floating_point T, std::size_t d>
-inline std::vector<Matrix<T>>
-eval_basis(const Patch<T, d>& patch,
-           const std::type_identity_t<ColMatrix<T, d>>& eval_coords,
-           Index span_idx,
-           std::size_t order = 0)
-{
-    Evaluator<T> eval;
-    return eval_basis(patch, eval_coords, span_idx, order, eval);
-}
 
 } // namespace pyck
 

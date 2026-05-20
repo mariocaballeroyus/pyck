@@ -192,7 +192,7 @@ TEST_CASE("PatchBoundary<double, 3>: outward normal on cube faces",
                 mapped(q, 1) = lv + probes(q, 1) * (hv - lv);
             }
 
-            const auto bbasis = eval_basis(*bdy, mapped, span, 1);
+            const auto bbasis = (*bdy).tensor_product().eval(mapped, 1);
             const auto bact   = bdy->active_control_pts(span);
             IntrinsicGeometry<double, 2> blocal(bbasis, bact);
 

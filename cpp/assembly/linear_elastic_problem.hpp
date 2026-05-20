@@ -42,6 +42,8 @@ public:
      */
     LinearElasticProblem() = default;
 
+    // Constructors ===================================================================
+
     /**
      * @brief Single-patch convenience constructor (backward compatible).
      *
@@ -72,6 +74,8 @@ public:
             add_patch(patches[p], elements[p], quadratures[p]);
         }
     }
+
+    // === Customizers ================================================================
 
     /**
      * @brief Append a patch with its own element formulation and quadrature.
@@ -129,6 +133,8 @@ public:
     void add_direct_constraint(const Ptr<DirectConstraint<T>>& constraint) {
         direct_constraints_.push_back(constraint);
     }
+
+    // === Properties =================================================================
 
     /**
      * @brief Number of patches currently registered.

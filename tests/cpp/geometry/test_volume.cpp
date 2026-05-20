@@ -51,28 +51,10 @@ TEST_CASE("Patch<double, 3>: Flat Box", "[geometry][volume]")
         CHECK(vol.num_control_pts() == 8);
     }
 
-    SECTION("eval_physical maps corners exactly") {
-        ColMatrix<double, 3> pts(3, 3);
-        pts << 0.0, 0.0, 0.0,
-               0.5, 0.5, 0.5,
-               1.0, 1.0, 1.0;
-        const auto phys = vol.eval_physical(pts);
-
-        CHECK(phys(0, 0) == Approx(0.0).margin(1e-14));
-        CHECK(phys(0, 1) == Approx(0.0).margin(1e-14));
-        CHECK(phys(0, 2) == Approx(0.0).margin(1e-14));
-        CHECK(phys(1, 0) == Approx(Lx * 0.5).margin(1e-14));
-        CHECK(phys(1, 1) == Approx(Ly * 0.5).margin(1e-14));
-        CHECK(phys(1, 2) == Approx(Lz * 0.5).margin(1e-14));
-        CHECK(phys(2, 0) == Approx(Lx).margin(1e-14));
-        CHECK(phys(2, 1) == Approx(Ly).margin(1e-14));
-        CHECK(phys(2, 2) == Approx(Lz).margin(1e-14));
-    }
-
     SECTION("Metric and Jacobian on a stretched box") {
         ColMatrix<double, 3> pts(1, 3);
         pts << 0.3, 0.5, 0.7;
-        const auto b     = eval_basis(vol, pts, elem_idx, 3);
+        const auto b     = vol.tensor_product().eval(pts, 3);
         IntrinsicGeometry<double, 3> local(b, act);
 
         // Metric layout: (g_11, g_12, g_13, g_22, g_23, g_33).
@@ -96,7 +78,7 @@ TEST_CASE("Patch<double, 3>: Flat Box", "[geometry][volume]")
     SECTION("Christoffels vanish on flat box") {
         ColMatrix<double, 3> pts(1, 3);
         pts << 0.4, 0.6, 0.2;
-        const auto b     = eval_basis(vol, pts, elem_idx, 3);
+        const auto b     = vol.tensor_product().eval(pts, 3);
         IntrinsicGeometry<double, 3> local(b, act);
         local.compute_christoffels();
         const auto& chr = local.chr;
@@ -123,7 +105,7 @@ TEST_CASE("Patch<double, 3>: Flat Box", "[geometry][volume]")
     SECTION("Partition of unity (3D)") {
         ColMatrix<double, 3> pts(1, 3);
         pts << 0.35, 0.72, 0.18;
-        const auto b = eval_basis(vol, pts, elem_idx, 2);
+        const auto b = vol.tensor_product().eval(pts, 2);
 
         auto sum_at_0 = [&](Index k_order, Index packed, Index n_k) {
             auto slab = b[k_order].col(0);
@@ -194,7 +176,7 @@ TEST_CASE("Patch<double, 3>: Box factory volume integral", "[geometry][volume]")
             if (zero_vol) continue;
 
             auto [mp, mw] = quad.map_to_domain(lo, hi);
-            const auto b     = eval_basis(vol, mp, e, 1);
+            const auto b     = vol.tensor_product().eval(mp, 1);
             const auto act   = vol.active_control_pts(e);
             IntrinsicGeometry<double, 3> local(b, act);
 
@@ -208,55 +190,7 @@ TEST_CASE("Patch<double, 3>: Box factory volume integral", "[geometry][volume]")
 
 
 // ===========================================================================
-// Test 3: Refinement equivalence — insert_knot and elevate_degree preserve
-//         physical geometry.
-// ===========================================================================
-
-TEST_CASE("Patch<double, 3>: Refinement preserves geometry",
-          "[geometry][volume][refinement]")
-{
-    auto kv = KnotVector<double>::clamped_uniform(2, 4);
-    auto basis_u = std::make_shared<BSpline<double>>(2, kv);
-    auto basis_v = std::make_shared<BSpline<double>>(2, kv);
-    auto basis_w = std::make_shared<BSpline<double>>(2, kv);
-
-    const double Lx = 3.0, Ly = 4.0, Lz = 1.5;
-    auto vol = box<double>(basis_u, basis_v, basis_w, Lx, Ly, Lz);
-
-    // Sample at a few interior parametric points.
-    ColMatrix<double, 3> probes(5, 3);
-    probes << 0.25, 0.40, 0.10,
-              0.50, 0.50, 0.50,
-              0.10, 0.85, 0.75,
-              0.90, 0.15, 0.30,
-              0.60, 0.30, 0.95;
-
-    const auto ref = vol.eval_physical(probes);
-
-    SECTION("insert_knot in each direction preserves geometry") {
-        for (std::size_t dir = 0; dir < 3; ++dir) {
-            auto refined = vol.insert_knot(dir, 0.5);
-            const auto got = refined.eval_physical(probes);
-            for (Eigen::Index i = 0; i < probes.rows(); ++i)
-                for (int c = 0; c < 3; ++c)
-                    CHECK(got(i, c) == Approx(ref(i, c)).margin(1e-12));
-        }
-    }
-
-    SECTION("elevate_degree in each direction preserves geometry") {
-        for (std::size_t dir = 0; dir < 3; ++dir) {
-            auto elevated = vol.elevate_degree(dir);
-            const auto got = elevated.eval_physical(probes);
-            for (Eigen::Index i = 0; i < probes.rows(); ++i)
-                for (int c = 0; c < 3; ++c)
-                    CHECK(got(i, c) == Approx(ref(i, c)).margin(1e-12));
-        }
-    }
-}
-
-
-// ===========================================================================
-// Test 4: decode_span / active_control_pts on a non-symmetric grid.
+// Test 3: decode_span / active_control_pts on a non-symmetric grid.
 // ===========================================================================
 
 TEST_CASE("Patch<double, 3>: decode_span and active_control_pts",

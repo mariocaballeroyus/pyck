@@ -63,11 +63,3 @@ class Patch(ABC):
     def num_control_pts(self) -> int:
         """Total number of control points."""
         return self.control_points.shape[0]
-
-    # === Physical Evaluation =========================================================
-
-    def eval_physical(self, pts: npt.ArrayLike) -> npt.NDArray[np.float64]:
-        """Evaluate physical coordinates at parametric sample points."""
-        return np.asarray(
-            self._cpp_object.eval_physical(np.asarray(pts, dtype=np.float64))
-        )

@@ -111,7 +111,7 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
         
         // Composable geometric primitives.
         std::size_t req_order = element.min_order();
-        auto basis   = eval_basis(patch, mapped_pts, elem_idx, req_order);
+        auto basis   = patch.tensor_product().eval(mapped_pts, req_order);
         auto act_pts = patch.active_control_pts(elem_idx);
         IntrinsicGeometry<T, d> ig(basis, act_pts);
         ig.compute_christoffels();

@@ -29,16 +29,13 @@ void bind_geometry(py::module_& m)
             static_cast<const ColMatrix<double, 3>& (Patch1d::*)() const>(&Patch1d::control_pts),
             py::return_value_policy::reference_internal)
 
-        .def("eval_physical",
-            static_cast<ColMatrix<double, 3> (Patch1d::*)(const ColMatrix<double, 1>&) const>(&Patch1d::eval_physical),
-            py::arg("pts"))
-
         .def("insert_knot",
-            static_cast<Patch1d (Patch1d::*)(double) const>(&Patch1d::insert_knot),
-            py::arg("u"))
+            static_cast<Patch1d (Patch1d::*)(std::size_t, double) const>(&Patch1d::insert_knot),
+            py::arg("dir"), py::arg("u"))
 
         .def("elevate_degree",
-            static_cast<Patch1d (Patch1d::*)() const>(&Patch1d::elevate_degree));
+            static_cast<Patch1d (Patch1d::*)(std::size_t) const>(&Patch1d::elevate_degree),
+            py::arg("dir"));
 
     using Patch2d = Patch<double, 2>;
 
@@ -53,10 +50,6 @@ void bind_geometry(py::module_& m)
         .def("control_pts",
             static_cast<const ColMatrix<double, 3>& (Patch2d::*)() const>(&Patch2d::control_pts),
             py::return_value_policy::reference_internal)
-
-        .def("eval_physical",
-            static_cast<ColMatrix<double, 3> (Patch2d::*)(const ColMatrix<double, 2>&) const>(&Patch2d::eval_physical),
-            py::arg("pts"))
 
         .def("insert_knot",
             static_cast<Patch2d (Patch2d::*)(std::size_t, double) const>(&Patch2d::insert_knot),
