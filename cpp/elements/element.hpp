@@ -53,13 +53,14 @@ public:
      *
      * @param patch The patch.
      * @param elem_idx The element index.
-     * @param mapped_pts The mapped quadrature points.
+     * @param basis Pre-evaluated basis-and-derivatives at this element's
+     *              quadrature points (per-order packed buffer).
      * @param q_weights The quadrature weights.
      * @param stiffness The local stiffness matrix.
      */
     virtual void compute_local_stiffness(const Patch<T, d>& patch,
                                          Index elem_idx,
-                                         const ColMatrix<T, d>& mapped_pts,
+                                         const std::vector<Matrix<T>>& basis,
                                          const Vector<T>& q_weights,
                                          Matrix<T>& stiffness) const;
 
@@ -139,11 +140,10 @@ template <std::floating_point T, std::size_t d>
 void
 Element<T, d>::compute_local_stiffness(const Patch<T, d>& patch,
                                        Index elem_idx,
-                                       const ColMatrix<T, d>& mapped_pts,
+                                       const std::vector<Matrix<T>>& basis,
                                        const Vector<T>& q_weights,
                                        Matrix<T>& stiffness) const
 {
-    auto basis = patch.tensor_product().eval(mapped_pts, static_cast<Index>(min_order()));
     auto act_pts = patch.active_control_pts(elem_idx);
     IntrinsicGeometry<T, d> ig(basis, act_pts);
     ig.compute_christoffels();

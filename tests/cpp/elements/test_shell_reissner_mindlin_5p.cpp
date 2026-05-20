@@ -44,8 +44,10 @@ Matrix<T> assemble_global_K(const Patch<T, 2>& patch,
         if (zero_vol) continue;
 
         auto [pts, w] = quad.map_to_domain(lo, hi);
+        auto basis = patch.tensor_product().eval(
+            pts, static_cast<Index>(element.min_order()));
         Matrix<T> Ke;
-        element.compute_local_stiffness(patch, e, pts, w, Ke);
+        element.compute_local_stiffness(patch, e, basis, w, Ke);
 
         const auto dofs = patch.dof_mapper().get_element_dofs(spans);
         for (Index i = 0; i < (Index)dofs.size(); ++i) {

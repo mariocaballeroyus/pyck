@@ -62,8 +62,7 @@ public:
      * @param rules Array of d 1D quadrature rule pointers.
      * @return A pair containing (points, weights) of the product rule.
      */
-    static std::pair<ColMatrix<T, d>, Vector<T>> tensor_product(
-        const std::array<const QuadratureRule<T, 1>*, d>& rules);
+    static std::pair<ColMatrix<T, d>, Vector<T>> tensor_product(const std::array<const QuadratureRule<T, 1>*, d>& rules);
 
     /**
      * @brief Map the reference [-1, 1]^d quadrature points and weights to a box [lo, hi].
@@ -72,27 +71,23 @@ public:
      * @param hi Upper bounds of the target interval in each dimension.
      * @return A pair (mapped_points, mapped_weights).
      */
-    virtual std::pair<ColMatrix<T, d>, Vector<T>> map_to_domain(
-        const std::array<T, d>& lo, 
-        const std::array<T, d>& hi) const;
+    virtual std::pair<ColMatrix<T, d>, Vector<T>> map_to_domain(const std::array<T, d>& lo, 
+                                                                const std::array<T, d>& hi) const;
 
     /// @brief Get the quadrature points as a matrix of size Q x d.
-    const ColMatrix<T, d>& points() const 
-    { return points_; }
+    const ColMatrix<T, d>& points() const { return points_; }
 
     /// @brief Get the quadrature weights as a vector of length Q.
-    const Vector<T>& weights() const 
-    { return weights_; }
+    const Vector<T>& weights() const { return weights_; }
 
     /// @brief Get the number of quadrature points.
-    std::size_t num_points() const 
-    { return weights_.size(); }
+    std::size_t num_points() const { return weights_.size(); }
 
     /// @brief Get the parametric dimension.
-    static constexpr std::size_t dim() 
-    { return d; }
+    static constexpr std::size_t dim() { return d; }
 
 protected:
+
     /// @brief Quadrature points in reference coordinates, matrix of size Q x d.
     ColMatrix<T, d> points_;
 

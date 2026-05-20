@@ -20,6 +20,12 @@ KnotVector<T>::KnotVector(std::vector<T> knots)
         throw std::invalid_argument("KnotVector<T>: "
                                     "knot sequence must be non-decreasing.");
     }
+
+    const int n = static_cast<int>(knots_.size()) - 1;
+    non_zero_spans_.reserve(n);
+    for (int i = 0; i < n; ++i) {
+        if (knots_[i + 1] > knots_[i]) non_zero_spans_.push_back(i);
+    }
 }
 
 // === Utility ========================================================================

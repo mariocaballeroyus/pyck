@@ -170,7 +170,9 @@ TEST_CASE("Reissner-Mindlin Plate Stiffness Matrix Size", "[RMPlate]")
     // Flat elem_idx = 2 * 5 + 2 = 12.
     Index elem_idx = 12;
 
-    element.compute_local_stiffness(*surface, elem_idx, q_points, q_weights, stiffness);
+    auto basis = surface->tensor_product().eval(
+        q_points, static_cast<Index>(element.min_order()));
+    element.compute_local_stiffness(*surface, elem_idx, basis, q_weights, stiffness);
 
     // 9 nodes * 3 DOFs/node = 27
     REQUIRE(stiffness.rows() == 27);

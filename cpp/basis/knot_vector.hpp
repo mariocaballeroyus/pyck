@@ -63,6 +63,9 @@ public:
     /// @brief Total number of knot spans (including zero-length clamped ones).
     int num_spans() const { return static_cast<int>(knots_.size()) - 1; }
 
+    /// @brief Indices of knot spans with non-zero length, in ascending order.
+    const std::vector<int>& non_zero_spans() const { return non_zero_spans_; }
+
     /// @brief Access the i-th knot value.
     T operator[](int i) const { return knots_[i]; }
 
@@ -129,6 +132,9 @@ private:
 
     /// @brief Non-decreasing sequence of knot values.
     std::vector<T> knots_;
+
+    /// @brief Indices of knot spans with non-zero length.
+    std::vector<int> non_zero_spans_;
 
 };
 
