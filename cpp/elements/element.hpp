@@ -138,7 +138,7 @@ Element<T, d>::compute_local_stiffness(const PatchValues<T, d>& pv,
                                        Matrix<T>& stiffness) const
 {
     const Patch<T, d>& patch = pv.patch();
-    const auto& basis        = pv.basis_out;
+    const auto& basis        = pv.results;
     const auto& q_weights    = pv.mapped_weights;
 
     auto act_pts = patch.active_control_pts(pv.elem_idx);

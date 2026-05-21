@@ -6,41 +6,6 @@
 namespace pyck
 {
 
-namespace
-{
-
-/**
- * @brief Convert a direction list (e.g., [0, 1, 1] meaning ∂_0 ∂_1 ∂_1)
- *        into a derivative-count multi-index (cc[i] = number of times
- *        direction i appears, e.g., [1, 2, 0] in d=3).
- */
-template <std::size_t d>
-inline std::array<Index, d>
-directions_to_counts(const std::vector<Index>& dirs)
-{
-    std::array<Index, d> cc{};
-    for (Index dir : dirs) ++cc[dir];
-    return cc;
-}
-
-/**
- * @brief Increment a multi-index lexicographically (leftmost varies slowest),
- *        returning true if more multi-indices remain.
- */
-template <std::size_t d>
-inline bool
-next_lex_multi_index(std::array<Index, d>& v,
-                     const std::array<Index, d>& bounds)
-{
-    for (int i = static_cast<int>(d) - 1; i >= 0; --i) {
-        if (++v[i] < bounds[i]) return true;
-        v[i] = 0;
-    }
-    return false;
-}
-
-} // anonymous namespace
-
 // === Constructors ===================================================================
 
 template <std::floating_point T, std::size_t d>
@@ -120,9 +85,9 @@ TensorProduct<T, d>::eval_on_span(const ColMatrix<T, d>& coords,
                                   std::array<std::vector<Matrix<T>>, d>& uni_results,
                                   std::vector<Matrix<T>>& results) const
 {
-    if (order < 0 || order > 3) {
+    if (order < 0 || order > MAX_DERIV_ORDER) {
         throw std::invalid_argument("TensorProduct::eval_on_span: "
-                                    "order must be in [0, 3].");
+                                    "order out of supported range.");
     }
 
     const Index Q = static_cast<Index>(coords.rows());
@@ -139,13 +104,11 @@ TensorProduct<T, d>::eval_on_span(const ColMatrix<T, d>& coords,
 
     resize_basis_buffer<T, d>(results, K, Q, order);
 
+    const auto& comps_all = compositions_by_order<d>();
+
     for (Index k = 0; k <= order; ++k) {
-        // Pre-convert pyck's direction-tuples to derivative-count multi-indices.
-        const auto direction_tuples = enumerate_direction_indices<d>(k);
-        const Index n_slots = static_cast<Index>(direction_tuples.size());
-        std::vector<std::array<Index, d>> compositions(n_slots);
-        for (Index m = 0; m < n_slots; ++m)
-            compositions[m] = directions_to_counts<d>(direction_tuples[m]);
+        const auto& compositions = comps_all[k];
+        const Index n_slots = static_cast<Index>(compositions.size());
 
         std::array<Index, d> v{};
         Index r = 0;
@@ -157,7 +120,7 @@ TensorProduct<T, d>::eval_on_span(const ColMatrix<T, d>& coords,
                     results[k].row(r).array() *= uni_results[i][cc[i]].row(v[i]).array();
                 ++r;
             }
-        } while (next_lex_multi_index(v, n_b));
+        } while (next_lexicographic(v, n_b));
     }
 }
 
@@ -165,9 +128,9 @@ template <std::floating_point T, std::size_t d>
 std::vector<Matrix<T>>
 TensorProduct<T, d>::eval_all(const ColMatrix<T, d>& coords, Index order) const
 {
-    if (order < 0 || order > 3) {
+    if (order < 0 || order > MAX_DERIV_ORDER) {
         throw std::invalid_argument("TensorProduct::eval_all: "
-                                    "order must be in [0, 3].");
+                                    "order out of supported range.");
     }
 
     const Index Q = static_cast<Index>(coords.rows());

@@ -1,6 +1,7 @@
 #ifndef PYCK_MULTI_INDEX_HPP
 #define PYCK_MULTI_INDEX_HPP
 
+#include <array>
 #include <concepts>
 #include <cstddef>
 #include <vector>
@@ -60,11 +61,16 @@ constexpr Index pack3(Index i, Index j, Index k)
     return offset + (k - j);
 }
 
+/// @brief Largest total derivative order supported by enumerate_direction_indices
+///        and the downstream tensor-product / basis evaluation machinery.
+inline constexpr Index MAX_DERIV_ORDER = 3;
+
 /**
  * @brief Enumerate the direction-index tuples for derivatives of total order
  *        @p k in @p d directions, in the canonical pack order used by
  *        symmetric-tensor packed storage (per-order basis buffers,
- *        IntrinsicGeometry, etc.).
+ *        IntrinsicGeometry, etc.). Supports `k ∈ [0, MAX_DERIV_ORDER]`;
+ *        higher orders return an empty list.
  *
  *        k = 1: [{0}, {1}, …, {d-1}]
  *        k = 2: Voigt — diagonals first, then off-diagonals (i < j lex).
@@ -96,6 +102,58 @@ enumerate_direction_indices(Index k)
         return out;
     }
     return out;
+}
+
+/**
+ * @brief Convert a direction list (e.g. [0, 1, 1] meaning ∂_0 ∂_1 ∂_1) into a
+ *        derivative-count multi-index (cc[i] = times direction i appears,
+ *        e.g. [1, 2, 0] in d=3).
+ */
+template <std::size_t d>
+inline std::array<Index, d>
+directions_to_counts(const std::vector<Index>& dirs)
+{
+    std::array<Index, d> cc{};
+    for (Index dir : dirs) ++cc[dir];
+    return cc;
+}
+
+/**
+ * @brief Increment a multi-index lexicographically (leftmost varies slowest),
+ *        returning true if more multi-indices remain.
+ */
+template <std::size_t d>
+inline bool
+next_lexicographic(std::array<Index, d>& v,
+                   const std::array<Index, d>& bounds)
+{
+    for (int i = static_cast<int>(d) - 1; i >= 0; --i) {
+        if (++v[i] < bounds[i]) return true;
+        v[i] = 0;
+    }
+    return false;
+}
+
+/**
+ * @brief Per-order derivative-count tables, indexed by total order
+ *        `k ∈ [0, MAX_DERIV_ORDER]`. Pure function of @p d, so cached once per
+ *        @p d at first call via a function-local static.
+ */
+template <std::size_t d>
+const std::array<std::vector<std::array<Index, d>>, MAX_DERIV_ORDER + 1>&
+compositions_by_order()
+{
+    static const auto table = []() {
+        std::array<std::vector<std::array<Index, d>>, MAX_DERIV_ORDER + 1> t;
+        for (Index k = 0; k <= MAX_DERIV_ORDER; ++k) {
+            const auto tuples = enumerate_direction_indices<d>(k);
+            t[k].resize(tuples.size());
+            for (std::size_t m = 0; m < tuples.size(); ++m)
+                t[k][m] = directions_to_counts<d>(tuples[m]);
+        }
+        return t;
+    }();
+    return table;
 }
 
 } // namespace pyck
