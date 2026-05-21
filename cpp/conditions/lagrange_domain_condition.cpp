@@ -95,7 +95,7 @@ void LagrangeDomainCondition<T, d>::apply(
 
         quadrature_.map_to_domain(u_a, u_b, mapped_pts, mapped_weights);
 
-        auto basis   = patch_.tensor_product().eval(mapped_pts, req_order);
+        auto basis   = patch_.tensor_product().eval_all(mapped_pts, req_order);
         auto act_pts = patch_.active_control_pts(elem_idx);
         IntrinsicGeometry<T, d> local(basis, act_pts);
         const Index n_basis = basis[0].rows();

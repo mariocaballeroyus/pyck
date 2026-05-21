@@ -55,7 +55,7 @@ ColMatrix<T, 3> eval_physical_points(
 
         // phys_pts(q) = sum_i N_i(u_q) · P_i, with basis evaluated at order 0.
         quadrature.map_to_domain(lo, hi, mapped_pts, mapped_weights);
-        auto basis = patch.tensor_product().eval(mapped_pts, 0);
+        auto basis = patch.tensor_product().eval_all(mapped_pts, 0);
         auto act_pts = patch.active_control_pts(static_cast<Index>(elem_idx));
         const Index N = basis[0].rows();
         for (Index q = 0; q < Q; ++q) {
@@ -167,7 +167,7 @@ Vector<T> eval_integration_measures(
         if (zero_volume) continue;
 
         quadrature.map_to_domain(lo, hi, mapped_pts, mapped_weights);
-        auto basis   = patch.tensor_product().eval(mapped_pts, 1);
+        auto basis   = patch.tensor_product().eval_all(mapped_pts, 1);
         auto act_pts = patch.active_control_pts(static_cast<Index>(elem_idx));
         IntrinsicGeometry<T, d> local(basis, act_pts);
 

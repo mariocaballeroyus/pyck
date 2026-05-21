@@ -7,7 +7,7 @@
 #include <cstddef>
 #include <vector>
 
-#include "../basis/evaluation.hpp"
+#include "../basis/bspline_algorithms.hpp"
 #include "../basis/tensor_product.hpp"
 #include "../quadrature/quadrature.hpp"
 #include "intrinsic_geometry.hpp"
@@ -49,7 +49,7 @@ public:
      *          caches the derivative order requested by the consumer (typically
      *          `element.min_order()`). Sizes every per-element scratch buffer
      *          to one element's worth: mapped_pts (Q × d), mapped_weights (Q),
-     *          basis_scratch (max N × order), basis_out (per-order packed
+     *          bspline_scratch (max N × order), basis_out (per-order packed
      *          buffer for N = ∏(p_i+1), Q points, derivative order). Subsequent
      *          reinit() calls reuse these buffers in place — no allocation per
      *          element.
@@ -74,11 +74,9 @@ public:
         // `TensorProduct::eval_on_span` see no-op Eigen resizes. Also cache
         // the per-axis num_spans for fast flat-index recovery in reinit().
         Index N = 1;
-        Index N_max = 1;
         for (std::size_t i = 0; i < d; ++i) {
             const Index Ni = static_cast<Index>(patch.basis(i).degree()) + 1;
             N *= Ni;
-            if (Ni > N_max) N_max = Ni;
             intervals_[i] = static_cast<Index>(patch.basis(i).knot_vector().num_spans());
 
             uni_scratch[i].resize(order_ + 1);
@@ -87,7 +85,6 @@ public:
             }
         }
 
-        basis_scratch.resize(N_max, order_);
         resize_basis_buffer<T, d>(basis_out, N, Q, order_);
 
         elem_nodes.reserve(static_cast<std::size_t>(N));
@@ -109,7 +106,7 @@ public:
      *          element's parametric bounds, maps the quadrature rule into
      *          `mapped_pts` / `mapped_weights`, then evaluates the
      *          tensor-product basis on this span into `basis_out` (using
-     *          `basis_scratch` as the recurrence workspace).
+     *          `bspline_scratch` as the recurrence workspace).
      *
      *          The flat element index over the full span enumeration is
      *          recovered in `elem_idx` for downstream consumers (DofMapper,
@@ -141,16 +138,12 @@ public:
         quadrature_.map_to_domain(u_a, u_b, mapped_pts, mapped_weights);
 
         patch_.tensor_product().eval_on_span(mapped_pts, span_indices_, order_,
-                                             basis_scratch, uni_scratch,
-                                             basis_out);
+                                             uni_scratch, basis_out);
 
         patch_.dof_mapper().get_element_dofs(span_indices_, elem_nodes);
     }
 
     // === Basis ======================================================================
-
-    /// @brief Cox-de Boor recurrence scratch (ndu_fn, ndu_kd, left, right, a, point_derivs).
-    Evaluator<T> basis_scratch;
 
     /// @brief Per-direction univariate basis values + derivatives at the
     ///        current element's quadrature points. `uni_scratch[dim][k]` is
@@ -225,9 +218,6 @@ class BoundaryPatchValues
 public:
 
     // === Boundary side ((d-1)-dimensional) ==========================================
-
-    /// @brief Cox-de Boor recurrence scratch for the boundary's own basis.
-    Evaluator<T> basis_scratch;
 
     /// @brief Boundary basis values and derivatives at the current span's
     ///        quadrature points, per-order packed.

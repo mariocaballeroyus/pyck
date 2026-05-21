@@ -15,7 +15,7 @@ namespace pyck
  *
  * @details The basis holds no mutable state; concurrent evaluation from
  *          multiple threads is safe provided each thread owns its own
- *          `Evaluator<T>` workspace.
+ *          Cox-de-Boor scratch (allocated on the stack inside eval_on_span).
  *
  * @tparam T Scalar type
  */
@@ -49,24 +49,21 @@ public:
      *          plus the derivative recurrence, then applies the rational
      *          quotient rule to obtain R_i^{(k)}.
      *
-     * @param points    Parameter values (all assumed to lie in the same knot span).
-     * @param span_idx  Knot-span index (as returned by KnotVector::find_span).
-     * @param results   Output buffer; the caller must size it to `order + 1`,
-     *                  where `order` is the maximum derivative order to compute.
-     *                  Inner matrices are sized to (m × (p+1)) on return.
-     * @param eval      Pre-allocated workspace for the evaluation.
+     * @param points      Parameter values (all assumed to lie in the same knot span).
+     * @param span_idx    Knot-span index (as returned by KnotVector::find_span).
+     * @param uni_results Output buffer; the caller must size it to `order + 1`,
+     *                    where `order` is the maximum derivative order to compute.
+     *                    Inner matrices are sized to (m × (p+1)) on return.
      */
     void eval_on_span(const Vector<T>& points,
-                      Index span_idx,
-                      std::vector<Matrix<T>>& results,
-                      Evaluator<T>& eval) const override;
+                      Index span_idx, Index order,
+                      std::vector<Matrix<T>>& uni_results) const override;
 
     // === Refinement =================================================================
 
     /**
-     * @brief Knot insertion (Piegl-Tiller §5.3 rational variant, single step).
-     *
-     * The refined weights are baked into the returned NURBS basis.
+     * @brief Knot insertion. The refined weights are baked into the returned NURBS basis.
+     * 
      *
      * @param u Knot value to insert.
      * @return A pair of (refined basis, transform matrix).

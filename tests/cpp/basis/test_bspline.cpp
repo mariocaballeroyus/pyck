@@ -2,7 +2,6 @@
 
 #include "bspline.hpp"
 #include "knot_vector.hpp"
-#include "evaluation.hpp"
 
 using namespace pyck;
 
@@ -66,12 +65,11 @@ static Eigen::MatrixXd eval_dense(const Basis<double>& basis,
     const int n = basis.num_basis();
     const int p = basis.degree();
     Eigen::MatrixXd N = Eigen::MatrixXd::Zero(pts.size(), n);
-    Evaluator<double> ev;
     std::vector<Eigen::MatrixXd> local(1);
     for (int i = 0; i < pts.size(); ++i) {
         int span = basis.find_span(pts[i]);
         Eigen::VectorXd pt(1); pt << pts[i];
-        basis.eval_on_span(pt, span, local, ev);
+        basis.eval_on_span(pt, span, 0, local);
         N.row(i).segment(span - p, p + 1) = local[0].col(0).transpose();
     }
     return N;
@@ -90,7 +88,6 @@ static Eigen::MatrixXd eval_dense(const Basis<double>& basis,
  * We verify this for polynomial degrees 1 through 3.
  */
 TEST_CASE("BSpline: partition of unity", "[basis][bspline]") {
-    Evaluator<double> ev;
     for (std::size_t p = 1; p <= 3; ++p) {
         auto kv = KnotVector<double>::clamped_uniform(p, p + 3);
         BSpline<double> bs(p, kv);
@@ -100,7 +97,7 @@ TEST_CASE("BSpline: partition of unity", "[basis][bspline]") {
             Eigen::VectorXd pt(1);
             pt << u(i);
             auto span = bs.find_span(u(i));
-            std::vector<Eigen::MatrixXd> _bufN(1); bs.eval_on_span(pt, span, _bufN, ev); auto N = _bufN[0];
+            std::vector<Eigen::MatrixXd> _bufN(1); bs.eval_on_span(pt, span, 0, _bufN); auto N = _bufN[0];
             REQUIRE(N.col(0).sum() == Approx(1.0).margin(1e-12));
         }
     }
@@ -114,7 +111,6 @@ TEST_CASE("BSpline: partition of unity", "[basis][bspline]") {
  *   N_{i,p}(u) ≥ 0   for all i, p, u
  */
 TEST_CASE("BSpline: non-negativity", "[basis][bspline]") {
-    Evaluator<double> ev;
     auto kv = KnotVector<double>::clamped_uniform(3, 8);
     BSpline<double> bs(3, kv);
 
@@ -123,7 +119,7 @@ TEST_CASE("BSpline: non-negativity", "[basis][bspline]") {
         Eigen::VectorXd pt(1);
         pt << u(i);
         auto span = bs.find_span(u(i));
-        std::vector<Eigen::MatrixXd> _bufN(1); bs.eval_on_span(pt, span, _bufN, ev); auto N = _bufN[0];
+        std::vector<Eigen::MatrixXd> _bufN(1); bs.eval_on_span(pt, span, 0, _bufN); auto N = _bufN[0];
         for (int j = 0; j < N.rows(); ++j)
             REQUIRE(N(j, 0) >= -1e-15);
     }
@@ -141,7 +137,6 @@ TEST_CASE("BSpline: non-negativity", "[basis][bspline]") {
  * and verify that each basis function vanishes outside its support.
  */
 TEST_CASE("BSpline: local support", "[basis][bspline]") {
-    Evaluator<double> ev;
     std::vector<double> raw_knots{0, 0, 0, 0.3, 0.7, 1, 1, 1};
     KnotVector<double> kv(raw_knots);
     BSpline<double> bs(2, kv);
@@ -155,7 +150,7 @@ TEST_CASE("BSpline: local support", "[basis][bspline]") {
         Eigen::VectorXd pt(1);
         pt << u(i);
         auto span = bs.find_span(u(i));
-        std::vector<Eigen::MatrixXd> _bufN_local(1); bs.eval_on_span(pt, span, _bufN_local, ev); auto N_local = _bufN_local[0];
+        std::vector<Eigen::MatrixXd> _bufN_local(1); bs.eval_on_span(pt, span, 0, _bufN_local); auto N_local = _bufN_local[0];
         for (int j = 0; j <= 2; ++j) {
             int global = static_cast<int>(span) - 2 + j;
             if (global >= 0 && global < static_cast<int>(n))
@@ -187,7 +182,6 @@ TEST_CASE("BSpline: local support", "[basis][bspline]") {
  * We verify this for derivatives of order 1 and 2.
  */
 TEST_CASE("BSpline: derivative sum to zero", "[basis][bspline]") {
-    Evaluator<double> ev;
     auto kv = KnotVector<double>::clamped_uniform(3, 6);
     BSpline<double> bs(3, kv);
 
@@ -196,7 +190,7 @@ TEST_CASE("BSpline: derivative sum to zero", "[basis][bspline]") {
         Eigen::VectorXd pt(1);
         pt << u(i);
         auto span = bs.find_span(u(i));
-        std::vector<Eigen::MatrixXd> derivs(3); bs.eval_on_span(pt, span, derivs, ev);
+        std::vector<Eigen::MatrixXd> derivs(3); bs.eval_on_span(pt, span, 2, derivs);
         for (int k = 1; k <= 2; ++k)
             REQUIRE(derivs[k].col(0).sum() == Approx(0.0).margin(1e-10));
     }
@@ -213,7 +207,6 @@ TEST_CASE("BSpline: derivative sum to zero", "[basis][bspline]") {
  * that the third derivative can exhibit a jump (C^{p-k} = C^2).
  */
 TEST_CASE("BSpline: C-continuity at internal knot", "[basis][bspline]") {
-    Evaluator<double> ev;
     // p = 3, 7 basis → knots = {0,0,0,0, 0.25, 0.5, 0.75, 1,1,1,1}
     auto kv = KnotVector<double>::clamped_uniform(3, 7);
     BSpline<double> bs(3, kv);
@@ -231,8 +224,8 @@ TEST_CASE("BSpline: C-continuity at internal knot", "[basis][bspline]") {
     auto span_right = bs.find_span(xi + eps);
 
     // Evaluate up to 3rd derivative on both sides
-    std::vector<Eigen::MatrixXd> left(4);  bs.eval_on_span(u_left,  span_left,  left,  ev);
-    std::vector<Eigen::MatrixXd> right(4); bs.eval_on_span(u_right, span_right, right, ev);
+    std::vector<Eigen::MatrixXd> left(4);  bs.eval_on_span(u_left,  span_left,  3, left);
+    std::vector<Eigen::MatrixXd> right(4); bs.eval_on_span(u_right, span_right, 3, right);
 
     // Reconstruct full basis vectors and compare overlapping functions
     // Orders 0, 1, 2 must be continuous (C^2 for a simple knot with p=3)
@@ -265,7 +258,6 @@ TEST_CASE("BSpline: C-continuity at internal knot", "[basis][bspline]") {
  *   N_0(u) = (1-u)²,   N_1(u) = 2u(1-u),   N_2(u) = u²
  */
 TEST_CASE("BSpline: analytical values", "[basis][bspline]") {
-    Evaluator<double> ev;
     Eigen::VectorXd u(5);
     u << 0.0, 0.25, 0.5, 0.75, 1.0;
 
@@ -273,7 +265,7 @@ TEST_CASE("BSpline: analytical values", "[basis][bspline]") {
         KnotVector<double> kv_1(std::vector<double>{0, 0, 1, 1});
         BSpline<double> bs(1, kv_1);
         auto span = bs.find_span(0.5);
-        std::vector<Eigen::MatrixXd> _bufN(1); bs.eval_on_span(u, span, _bufN, ev); auto N = _bufN[0];
+        std::vector<Eigen::MatrixXd> _bufN(1); bs.eval_on_span(u, span, 0, _bufN); auto N = _bufN[0];
 
         for (int i = 0; i < 5; ++i) {
             REQUIRE(N(0, i) == Approx(1.0 - u(i)).margin(1e-14));
@@ -285,7 +277,7 @@ TEST_CASE("BSpline: analytical values", "[basis][bspline]") {
         KnotVector<double> kv_2(std::vector<double>{0, 0, 0, 1, 1, 1});
         BSpline<double> bs(2, kv_2);
         auto span = bs.find_span(0.5);
-        std::vector<Eigen::MatrixXd> _bufN(1); bs.eval_on_span(u, span, _bufN, ev); auto N = _bufN[0];
+        std::vector<Eigen::MatrixXd> _bufN(1); bs.eval_on_span(u, span, 0, _bufN); auto N = _bufN[0];
 
         for (int i = 0; i < 5; ++i) {
             double t = u(i);
@@ -310,7 +302,6 @@ TEST_CASE("BSpline: analytical values", "[basis][bspline]") {
  *   Orders > p are zero identically.
  */
 TEST_CASE("BSpline: analytical derivatives", "[basis][bspline]") {
-    Evaluator<double> ev;
     Eigen::VectorXd u(3);
     u << 0.0, 0.5, 1.0;
 
@@ -318,7 +309,7 @@ TEST_CASE("BSpline: analytical derivatives", "[basis][bspline]") {
         KnotVector<double> kv_1(std::vector<double>{0, 0, 1, 1});
         BSpline<double> bs(1, kv_1);
         auto span = bs.find_span(0.5);
-        std::vector<Eigen::MatrixXd> _bufdN(2); bs.eval_on_span(u, span, _bufdN, ev); auto dN = _bufdN[1];
+        std::vector<Eigen::MatrixXd> _bufdN(2); bs.eval_on_span(u, span, 1, _bufdN); auto dN = _bufdN[1];
 
         for (int i = 0; i < 3; ++i) {
             REQUIRE(dN(0, i) == Approx(-1.0).margin(1e-12));
@@ -330,7 +321,7 @@ TEST_CASE("BSpline: analytical derivatives", "[basis][bspline]") {
         KnotVector<double> kv_2(std::vector<double>{0, 0, 0, 1, 1, 1});
         BSpline<double> bs(2, kv_2);
         auto span = bs.find_span(0.5);
-        std::vector<Eigen::MatrixXd> _bufdN(2); bs.eval_on_span(u, span, _bufdN, ev); auto dN = _bufdN[1];
+        std::vector<Eigen::MatrixXd> _bufdN(2); bs.eval_on_span(u, span, 1, _bufdN); auto dN = _bufdN[1];
 
         for (int i = 0; i < 3; ++i) {
             double t = u(i);
@@ -344,7 +335,7 @@ TEST_CASE("BSpline: analytical derivatives", "[basis][bspline]") {
         KnotVector<double> kv_2(std::vector<double>{0, 0, 0, 1, 1, 1});
         BSpline<double> bs(2, kv_2);
         auto span = bs.find_span(0.5);
-        std::vector<Eigen::MatrixXd> _bufd2N(3); bs.eval_on_span(u, span, _bufd2N, ev); auto d2N = _bufd2N[2];
+        std::vector<Eigen::MatrixXd> _bufd2N(3); bs.eval_on_span(u, span, 2, _bufd2N); auto d2N = _bufd2N[2];
 
         for (int i = 0; i < 3; ++i) {
             REQUIRE(d2N(0, i) == Approx( 2.0).margin(1e-10));
@@ -357,7 +348,7 @@ TEST_CASE("BSpline: analytical derivatives", "[basis][bspline]") {
         KnotVector<double> kv_2(std::vector<double>{0, 0, 0, 1, 1, 1});
         BSpline<double> bs(2, kv_2);
         auto span = bs.find_span(0.5);
-        std::vector<Eigen::MatrixXd> _bufd3N(4); bs.eval_on_span(u, span, _bufd3N, ev); auto d3N = _bufd3N[3];
+        std::vector<Eigen::MatrixXd> _bufd3N(4); bs.eval_on_span(u, span, 3, _bufd3N); auto d3N = _bufd3N[3];
 
         for (int i = 0; i < d3N.rows(); ++i)
             for (int j = 0; j < d3N.cols(); ++j)
@@ -376,7 +367,6 @@ TEST_CASE("BSpline: analytical derivatives", "[basis][bspline]") {
  * This is a general sanity check for arbitrary knot vectors and degrees.
  */
 TEST_CASE("BSpline: finite-difference derivative check", "[basis][bspline][deriv]") {
-    Evaluator<double> ev;
     auto kv = KnotVector<double>::clamped_uniform(3, 6);
     BSpline<double> bs(3, kv);
     std::size_t n = bs.num_basis();
@@ -395,9 +385,9 @@ TEST_CASE("BSpline: finite-difference derivative check", "[basis][bspline][deriv
         auto span_fwd = bs.find_span(u(i) + h);
         auto span_bwd = bs.find_span(u(i) - h);
 
-        std::vector<Eigen::MatrixXd> _bufdN_local(2); bs.eval_on_span(pt, span, _bufdN_local, ev); auto dN_local = _bufdN_local[1];
-        std::vector<Eigen::MatrixXd> _bufN_fwd(1); bs.eval_on_span(u_fwd, span_fwd, _bufN_fwd, ev); auto N_fwd = _bufN_fwd[0];
-        std::vector<Eigen::MatrixXd> _bufN_bwd(1); bs.eval_on_span(u_bwd, span_bwd, _bufN_bwd, ev); auto N_bwd = _bufN_bwd[0];
+        std::vector<Eigen::MatrixXd> _bufdN_local(2); bs.eval_on_span(pt, span, 1, _bufdN_local); auto dN_local = _bufdN_local[1];
+        std::vector<Eigen::MatrixXd> _bufN_fwd(1); bs.eval_on_span(u_fwd, span_fwd, 0, _bufN_fwd); auto N_fwd = _bufN_fwd[0];
+        std::vector<Eigen::MatrixXd> _bufN_bwd(1); bs.eval_on_span(u_bwd, span_bwd, 0, _bufN_bwd); auto N_bwd = _bufN_bwd[0];
 
         // Reconstruct full basis vectors for comparison
         Eigen::VectorXd dN_full      = Eigen::VectorXd::Zero(n);
@@ -425,7 +415,6 @@ TEST_CASE("BSpline: finite-difference derivative check", "[basis][bspline][deriv
  * standard Cox-de Boor recursion formula.
  */
 TEST_CASE("BSpline: compare with naive Cox-de Boor", "[basis][bspline]") {
-    Evaluator<double> ev;
     for (int p = 1; p <= 3; ++p) {
         // Create a non-uniform knot vector
         std::vector<double> knots;
@@ -447,7 +436,7 @@ TEST_CASE("BSpline: compare with naive Cox-de Boor", "[basis][bspline]") {
             
             Eigen::VectorXd pt(1);
             pt << val;
-            std::vector<Eigen::MatrixXd> _bufN_fast(1); bs.eval_on_span(pt, span, _bufN_fast, ev); auto N_fast = _bufN_fast[0];
+            std::vector<Eigen::MatrixXd> _bufN_fast(1); bs.eval_on_span(pt, span, 0, _bufN_fast); auto N_fast = _bufN_fast[0];
             
             for (int k = 0; k <= p; ++k) {
                 int global_idx = static_cast<int>(span) - p + k;
@@ -466,7 +455,6 @@ TEST_CASE("BSpline: compare with naive Cox-de Boor", "[basis][bspline]") {
  * In this case, the valid domain is [xi_p, xi_{n+1}].
  */
 TEST_CASE("BSpline: non-clamped knot vector", "[basis][bspline]") {
-    Evaluator<double> ev;
     for (int p = 1; p <= 3; ++p) {
         // Create a uniform, non-clamped knot vector: {0, 1, 2, 3, 4, 5, ...}
         int n = 7; // Number of basis functions
@@ -489,7 +477,7 @@ TEST_CASE("BSpline: non-clamped knot vector", "[basis][bspline]") {
             
             Eigen::VectorXd pt(1);
             pt << val;
-            std::vector<Eigen::MatrixXd> _bufN_fast(1); bs.eval_on_span(pt, span, _bufN_fast, ev); auto N_fast = _bufN_fast[0];
+            std::vector<Eigen::MatrixXd> _bufN_fast(1); bs.eval_on_span(pt, span, 0, _bufN_fast); auto N_fast = _bufN_fast[0];
             
             for (int k = 0; k <= p; ++k) {
                 int global_idx = static_cast<int>(span) - p + k;
@@ -507,7 +495,6 @@ TEST_CASE("BSpline: non-clamped knot vector", "[basis][bspline]") {
  * standard Cox-de Boor derivative recursion formula.
  */
 TEST_CASE("BSpline: compare eval_on_span with naive", "[basis][bspline][deriv]") {
-    Evaluator<double> ev;
     for (int p = 1; p <= 3; ++p) {
         auto kv = KnotVector<double>::clamped_uniform(p, p + 5);
         BSpline<double> bs(p, kv);
@@ -521,7 +508,7 @@ TEST_CASE("BSpline: compare eval_on_span with naive", "[basis][bspline][deriv]")
             
             Eigen::VectorXd pt(1);
             pt << val;
-            std::vector<Eigen::MatrixXd> derivs(max_order + 1); bs.eval_on_span(pt, span, derivs, ev);
+            std::vector<Eigen::MatrixXd> derivs(max_order + 1); bs.eval_on_span(pt, span, max_order, derivs);
             
             for (int k = 0; k <= max_order; ++k) {
                 for (int j = 0; j <= p; ++j) {
@@ -541,7 +528,6 @@ TEST_CASE("BSpline: compare eval_on_span with naive", "[basis][bspline][deriv]")
  * the refined c'(u) = N_new(u) · (T · P) at every parameter sample.
  */
 TEST_CASE("BSpline: insert_knot preserves geometry", "[basis][bspline]") {
-    Evaluator<double> ev;
     const Index p = 3;
     const Index n = 6;
     BSpline<double> bs(p, KnotVector<double>::clamped_uniform(p, n));

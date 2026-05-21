@@ -246,7 +246,7 @@ TEST_CASE("RM 1P Plate: thin plate matches KL", "[RM1P]")
     auto intervals = surf->tensor_product().num_intervals();
     Index flat = span_u + span_v * intervals[0];   // u-fastest
 
-    const auto basis_d = (*surf).tensor_product().eval(pt, element.min_order());
+    const auto basis_d = (*surf).tensor_product().eval_all(pt, element.min_order());
     const auto act_pts = surf->active_control_pts(flat);
     IntrinsicGeometry<double, 2> ig(basis_d, act_pts);
     ig.compute_christoffels();   auto N_eff = element.displacement_shape_matrix(*surf, basis_d, ig);
@@ -305,7 +305,7 @@ TEST_CASE("RM 1P Plate: thick plate — captures shear deformation", "[RM1P]")
         auto intervals = surf->tensor_product().num_intervals();
         Index flat = span_u + span_v * intervals[0];   // u-fastest
 
-        const auto basis_d = (*surf).tensor_product().eval(pt, element.min_order());
+        const auto basis_d = (*surf).tensor_product().eval_all(pt, element.min_order());
         const auto act_pts = surf->active_control_pts(flat);
         IntrinsicGeometry<double, 2> ig(basis_d, act_pts);
         ig.compute_christoffels();       auto N_eff = element.displacement_shape_matrix(*surf, basis_d, ig);

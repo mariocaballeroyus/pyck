@@ -5,44 +5,11 @@
 #include "knot_vector.hpp"
 #include "bspline.hpp"
 #include "nurbs.hpp"
-#include "evaluation.hpp"
 
 namespace py = pybind11;
 
 namespace pyck
 {
-
-// Helper function: evaluate all n basis functions at m points via eval_on_span loop.
-// Returns (m × n) dense matrix by scattering span-local results.
-template <std::floating_point T>
-static std::vector<Matrix<T>> eval_all_aux(const Basis<T>& basis,
-                                           const Vector<T>& pts,
-                                           Index order)
-{
-    const Index n_pts = pts.size();
-    const Index n = basis.num_basis();
-    const Index p = basis.degree();
-
-    std::vector<Matrix<T>> results(order + 1);
-    for (Index k = 0; k <= order; ++k)
-        results[k] = Matrix<T>::Zero(n_pts, n);
-
-    Evaluator<T> eval;
-    std::vector<Matrix<T>> local(order + 1);
-    for (Index i = 0; i < n_pts; ++i) {
-        const Index span = basis.find_span(pts[i]);
-        Vector<T> pt(1);
-        pt << pts[i];
-        basis.eval_on_span(pt, span, local, eval);
-        // local[k] is (p+1) x 1 col-major (N x Q with Q=1); transpose its
-        // single column into the row-segment of the global (m x n) matrix.
-        for (Index k = 0; k <= order; ++k) {
-            results[k].row(i).segment(span - p, p + 1) = local[k].col(0).transpose();
-        }
-    }
-
-    return results;
-}
 
 void bind_basis(py::module_& m)
 {
@@ -66,19 +33,9 @@ void bind_basis(py::module_& m)
           .def("find_span", &Basis<double>::find_span,
                py::arg("u"))
 
-          .def("eval_on_span",
-               [](const Basis<double>& b, py::array_t<double> pts, Index span, Index order) {
-                   std::vector<Matrix<double>> results(order + 1);
-                   Evaluator<double> eval;
-                   b.eval_on_span(pts.cast<Vector<double>>(), span, results, eval);
-                   return results;
-               },
-               py::arg("pts"), py::arg("span"), py::arg("order") = 0)
-
           .def("eval_all",
                [](const Basis<double>& b, py::array_t<double> pts, Index order) {
-                   auto r = pts.cast<Vector<double>>();
-                   return eval_all_aux(b, r, order);
+                   return b.eval_all(pts.cast<Vector<double>>(), order);
                },
                py::arg("u"), py::arg("order") = 0)
 

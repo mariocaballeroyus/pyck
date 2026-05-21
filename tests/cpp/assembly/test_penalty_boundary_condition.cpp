@@ -110,7 +110,7 @@ static double eval_w_centre(const Ptr<Patch<double,2>>& surf,
     Index num_su = surf->tensor_product().num_intervals()[0];
     Index flat   = su + sv * num_su;   // u-fastest
 
-    const auto b = (*surf).tensor_product().eval(pt, 0);
+    const auto b = (*surf).tensor_product().eval_all(pt, 0);
     std::vector<Index> active;
     surf->dof_mapper().get_element_dofs(flat, active);
 
@@ -273,7 +273,7 @@ TEST_CASE("PenaltyBoundaryCondition KL plate: SS via penalty matches Navier", "[
             Index ni_u = surface->tensor_product().num_intervals()[0];
             Index flat = su + sv * ni_u;
 
-            const auto b = (*surface).tensor_product().eval(pt, 0);
+            const auto b = (*surface).tensor_product().eval_all(pt, 0);
             std::vector<Index> active;
             surface->dof_mapper().get_element_dofs(flat, active);
             Vector<double> u_a(active.size());

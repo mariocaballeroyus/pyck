@@ -87,7 +87,7 @@ LagrangeBoundaryCondition<T, d>::apply(Matrix<T>& stiffness, Vector<T>& load,
         // Per-span scaffolding: shared across all fields.
         quadrature_.map_to_domain({lo}, {hi}, mapped_pts, mapped_weights);
 
-        auto boundary_basis  = boundary_.tensor_product().eval(mapped_pts, 2);
+        auto boundary_basis  = boundary_.tensor_product().eval_all(mapped_pts, 2);
         auto boundary_act    = boundary_.active_control_pts(s);
         IntrinsicGeometry<T, d - 1> boundary_local(boundary_basis, boundary_act);
 
@@ -96,7 +96,7 @@ LagrangeBoundaryCondition<T, d>::apply(Matrix<T>& stiffness, Vector<T>& load,
 
         const Index flat_parent = boundary_.parent_flat_span(s);
         const ColMatrix<T, 2> parent_pts = boundary_.lift_to_parent(mapped_pts);
-        auto parent_basis  = parent.tensor_product().eval(parent_pts, req_order);
+        auto parent_basis  = parent.tensor_product().eval_all(parent_pts, req_order);
         auto parent_act    = parent.active_control_pts(flat_parent);
         IntrinsicGeometry<T, d> parent_ig(parent_basis, parent_act);
         parent_ig.compute_christoffels();

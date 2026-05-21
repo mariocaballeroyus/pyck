@@ -6,7 +6,6 @@
 #include "nurbs.hpp"
 #include "bspline.hpp"
 #include "knot_vector.hpp"
-#include "evaluation.hpp"
 
 using namespace pyck;
 
@@ -24,12 +23,11 @@ static std::vector<Eigen::MatrixXd> eval_all_dense(const Basis<double>& basis,
     for (Index k = 0; k <= order; ++k)
         results[k] = Eigen::MatrixXd::Zero(m, n);
 
-    Evaluator<double> ev;
     std::vector<Eigen::MatrixXd> local(order + 1);
     for (int i = 0; i < m; ++i) {
         int span = basis.find_span(pts[i]);
         Eigen::VectorXd pt(1); pt << pts[i];
-        basis.eval_on_span(pt, span, local, ev);
+        basis.eval_on_span(pt, span, order, local);
         // local[k] is (p+1) x 1 col-major (N x Q with Q=1).
         for (Index k = 0; k <= order; ++k) {
             results[k].row(i).segment(span - p, p + 1) = local[k].col(0).transpose();
@@ -51,13 +49,12 @@ TEST_CASE("NURBS: partition of unity", "[basis][nurbs]") {
     NURBS<double> nb(3, kv,
         (Vector<double>(7) << 1.0, 0.5, 2.0, 1.5, 0.8, 1.2, 1.0).finished());
 
-    Evaluator<double> ev;
     Eigen::VectorXd u = Eigen::VectorXd::LinSpaced(30, 0.0, 1.0);
     for (int i = 0; i < u.size(); ++i) {
         Eigen::VectorXd pt(1);
         pt << u(i);
         auto span = nb.find_span(u(i));
-        std::vector<Eigen::MatrixXd> _bufR(1); nb.eval_on_span(pt, span, _bufR, ev); auto R = _bufR[0];
+        std::vector<Eigen::MatrixXd> _bufR(1); nb.eval_on_span(pt, span, 0, _bufR); auto R = _bufR[0];
         REQUIRE(R.col(0).sum() == Approx(1.0).margin(1e-12));
     }
 }
@@ -73,7 +70,6 @@ TEST_CASE("NURBS: equal weights ⇒ B-spline", "[basis][nurbs]") {
     BSpline<double> bs(2, kv);
     NURBS<double> nb(2, kv, Vector<double>::Constant(5, 2.7));
 
-    Evaluator<double> ev;
     Eigen::VectorXd u = Eigen::VectorXd::LinSpaced(20, 0.0, 1.0);
     for (int i = 0; i < u.size(); ++i) {
         Eigen::VectorXd pt(1);
@@ -82,8 +78,8 @@ TEST_CASE("NURBS: equal weights ⇒ B-spline", "[basis][nurbs]") {
         auto span_n = nb.find_span(u(i));
         REQUIRE(span_b == span_n);
 
-        std::vector<Eigen::MatrixXd> N(3); bs.eval_on_span(pt, span_b, N, ev);
-        std::vector<Eigen::MatrixXd> R(3); nb.eval_on_span(pt, span_n, R, ev);
+        std::vector<Eigen::MatrixXd> N(3); bs.eval_on_span(pt, span_b, 2, N);
+        std::vector<Eigen::MatrixXd> R(3); nb.eval_on_span(pt, span_n, 2, R);
         for (std::size_t k = 0; k < 3; ++k) {
             for (int j = 0; j < N[k].rows(); ++j) {
                 REQUIRE(R[k](j, 0) == Approx(N[k](j, 0)).margin(1e-10));
@@ -118,13 +114,12 @@ TEST_CASE("NURBS: exact unit circle", "[basis][nurbs]") {
         {-1, -1}, { 0, -1}, { 1, -1}, { 1,  0},
     };
 
-    Evaluator<double> ev;
     Eigen::VectorXd u = Eigen::VectorXd::LinSpaced(50, 0.0, 1.0);
     for (int i = 0; i < u.size(); ++i) {
         Eigen::VectorXd pt(1);
         pt << u(i);
         auto span = nb.find_span(u(i));
-        std::vector<Eigen::MatrixXd> _bufR(1); nb.eval_on_span(pt, span, _bufR, ev); auto R = _bufR[0]; // (3 × 1)
+        std::vector<Eigen::MatrixXd> _bufR(1); nb.eval_on_span(pt, span, 0, _bufR); auto R = _bufR[0];
 
         double x = 0.0, y = 0.0;
         for (int j = 0; j <= 2; ++j) {

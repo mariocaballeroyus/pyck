@@ -1,5 +1,5 @@
-#ifndef PYCK_REFINEMENT_HPP
-#define PYCK_REFINEMENT_HPP
+#ifndef PYCK_REFINEMENT_ALGORITHMS_HPP
+#define PYCK_REFINEMENT_ALGORITHMS_HPP
 
 #include <concepts>
 #include <utility>
@@ -47,4 +47,4 @@ elevate_degree(Index degree, const KnotVector<T>& knots);
 
 } // namespace pyck::basis
 
-#endif // PYCK_REFINEMENT_HPP
+#endif // PYCK_REFINEMENT_ALGORITHMS_HPP

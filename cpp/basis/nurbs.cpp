@@ -4,8 +4,10 @@
 #include <cmath>
 #include <stdexcept>
 
-#include "evaluation.hpp"
-#include "refinement.hpp"
+#include "bspline_algorithms.hpp"
+#include "nurbs_algorithms.hpp"
+#include "refinement_algorithms.hpp"
+#include "../memory.hpp"
 
 namespace pyck
 {
@@ -30,35 +32,44 @@ NURBS<T>::NURBS(Index degree, KnotVector<T> knots, Vector<T> weights)
 
 template <std::floating_point T>
 void NURBS<T>::eval_on_span(const Vector<T>& points,
-                            Index span_idx,
-                            std::vector<Matrix<T>>& results,
-                            Evaluator<T>& eval) const
+                            Index span_idx, Index order,
+                            std::vector<Matrix<T>>& uni_results) const
 {
     const Index p = this->degree_;
     const Index Q = points.size();
     const Index N = p + 1;
-    const Index order = static_cast<Index>(results.size()) - 1;
 
-    eval.resize(N, order);
-    for (Index k = 0; k <= order; ++k) results[k].resize(N, Q);
+    for (Index k = 0; k <= order; ++k) uni_results[k].resize(N, Q);
 
     // The (p+1) active basis indices on this span are span_idx-p .. span_idx.
     Vector<T> active = weights_.segment(span_idx - p, N);
 
-    // Q-loop: for each point we compute the B-spline derivs into
-    // eval.point_derivs, then apply the rational quotient at that q,
-    // writing R[k].col(q) directly.
+    STACK_ARRAY(T, ndu_fn, N * N);
+    STACK_ARRAY(T, ndu_kd, N * N);
+    STACK_ARRAY(T, left,   N);
+    STACK_ARRAY(T, right,  N);
+    STACK_ARRAY(T, a,      2 * N);
+
+    // Loop over quadrature points
     for (Index q = 0; q < Q; ++q) {
-        basis::eval::cox_de_boor_at<T>(
-            p, this->knots_, points(q), span_idx,
-            eval.point_derivs.col(0), eval);
+        // --- Cox-de Boor ------------------------------------------------------------
+        // uni_results[0].col(q): N bsp values at points(q), filled in-place
+        basis::eval::cox_de_boor_at<T>(this->degree_, this->knots_,
+                                       points(q), span_idx, q,
+                                       uni_results,
+                                       ndu_fn, ndu_kd, left, right);
 
-        if (order > 0)
-            basis::eval::derivative_recurrence_at<T>(
-                p, order, eval.point_derivs, eval);
+        // --- Derivative Recurrence --------------------------------------------------
+        // uni_results[k].col(q) (k = 1 .. order): N bsp derivatives, filled in-place
+        if (order > 0) {
+            basis::eval::derivative_recurrence_at<T>(this->degree_, order, q,
+                                                     uni_results,
+                                                     ndu_fn, ndu_kd, a);
+        }
 
-        basis::eval::apply_rational_quotient_at<T>(
-            eval.point_derivs, active, order, q, results);
+        // --- Rational Quotient ------------------------------------------------------
+        // uni_results[k].col(q): N transformed in place, bsp -> rational
+        basis::eval::apply_rational_quotient_at<T>(active, order, q, uni_results);
     }
 }
 

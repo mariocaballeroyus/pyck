@@ -93,7 +93,7 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load", "[assembly][eul
     ColMatrix<double, 1> param(1, 1);
     param(0, 0) = 0.5;
     Index span = basis->find_span(0.5);
-    const auto b = (*curve).tensor_product().eval(param, 0);
+    const auto b = (*curve).tensor_product().eval_all(param, 0);
 
     std::vector<Index> active;
     curve->dof_mapper().get_element_dofs(span, active);
@@ -180,7 +180,7 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load (Cubic Approximat
     ColMatrix<double, 1> param(1, 1);
     param(0, 0) = 0.5;
     Index span2 = basis->find_span(0.5);
-    const auto b = (*curve).tensor_product().eval(param, 0);
+    const auto b = (*curve).tensor_product().eval_all(param, 0);
 
     std::vector<Index> active;
     curve->dof_mapper().get_element_dofs(span2, active);

@@ -204,7 +204,7 @@ TEST_CASE("RM Plate: SS uniform load — thin plate convergence", "[RMPlate]")
     auto intervals = surf->tensor_product().num_intervals();
     Index flat = span_u + span_v * intervals[0];   // u-fastest
 
-    const auto b = (*surf).tensor_product().eval(pt, 0);
+    const auto b = (*surf).tensor_product().eval_all(pt, 0);
     std::vector<Index> active;
     surf->dof_mapper().get_element_dofs(flat, active);
 
@@ -255,7 +255,7 @@ TEST_CASE("RM Plate: thick plate — RM > KL deflection coefficient", "[RMPlate]
     auto intervals = surf->tensor_product().num_intervals();
     Index flat = span_u + span_v * intervals[0];   // u-fastest
 
-    const auto b = (*surf).tensor_product().eval(pt, 0);
+    const auto b = (*surf).tensor_product().eval_all(pt, 0);
     std::vector<Index> active;
     surf->dof_mapper().get_element_dofs(flat, active);
 

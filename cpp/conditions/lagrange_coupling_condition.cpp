@@ -111,12 +111,12 @@ LagrangeCouplingCondition<T, d>::apply(Matrix<T>& stiffness,
         quadrature_.map_to_domain({lo}, {hi}, pts_a, w_a);
 
         // Side A: composable primitives on boundary and parent.
-        auto basis_a   = side_a_.tensor_product().eval(pts_a, 2);
+        auto basis_a   = side_a_.tensor_product().eval_all(pts_a, 2);
         auto act_a     = side_a_.active_control_pts(span_a);
         IntrinsicGeometry<T, d - 1> local_a(basis_a, act_a);
         const Index flat_a = side_a_.parent_flat_span(span_a);
         const ColMatrix<T, 2> par_pts_a = side_a_.lift_to_parent(pts_a);
-        auto parent_basis_a = parent_a.tensor_product().eval(par_pts_a, req_order_a);
+        auto parent_basis_a = parent_a.tensor_product().eval_all(par_pts_a, req_order_a);
         auto parent_act_a   = parent_a.active_control_pts(flat_a);
         IntrinsicGeometry<T, d> parent_ig_a(parent_basis_a, parent_act_a);
         parent_ig_a.compute_christoffels();
@@ -130,13 +130,13 @@ LagrangeCouplingCondition<T, d>::apply(Matrix<T>& stiffness,
             pts_b = pts_a;
         }
 
-        auto basis_b   = side_b_.tensor_product().eval(pts_b, 2);
+        auto basis_b   = side_b_.tensor_product().eval_all(pts_b, 2);
         auto act_b     = side_b_.active_control_pts(span_b);
         IntrinsicGeometry<T, d - 1> local_b(basis_b, act_b);
         // local_a.jac is the surface measure dΓ; local_b.jac agrees up to round-off.
         const Index flat_b = side_b_.parent_flat_span(span_b);
         const ColMatrix<T, 2> par_pts_b = side_b_.lift_to_parent(pts_b);
-        auto parent_basis_b = parent_b.tensor_product().eval(par_pts_b, req_order_b);
+        auto parent_basis_b = parent_b.tensor_product().eval_all(par_pts_b, req_order_b);
         auto parent_act_b   = parent_b.active_control_pts(flat_b);
         IntrinsicGeometry<T, d> parent_ig_b(parent_basis_b, parent_act_b);
         parent_ig_b.compute_christoffels();

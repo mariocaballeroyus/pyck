@@ -38,16 +38,14 @@ public:
      * @brief Evaluate non-zero basis functions and mixed partial derivatives for the
      *        tensor product space within a given knot span.
      *
-     * @param params  A matrix of size (m × d) containing parametric points.
-     * @param spans   Per-direction knot-span indices.
-     * @param results Output buffer; the caller must size it to `order + 1`, where
-     *                `order` is the maximum derivative order to compute. The
-     *                function resizes the inner matrices to (m × (p+1)).
-     * @param evaluator Pre-allocated workspace for the evaluation.
+     * @param points      Parameter values on a single knot span.
+     * @param span_idx    Knot-span index.
+     * @param order       Maximum derivative order.
+     * @param uni_results Output buffer, caller-sized to `order + 1`. Inner
+     *                    matrices are resized to ((p+1) × m).
      */
-    void eval_on_span(const Vector<T>& points, Index span_idx,
-                      std::vector<Matrix<T>>& results,
-                      Evaluator<T>& eval) const override;
+    void eval_on_span(const Vector<T>& points, Index span_idx, Index order,
+                      std::vector<Matrix<T>>& uni_results) const override;
 
     // === Refinement =================================================================
 

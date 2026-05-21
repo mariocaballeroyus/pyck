@@ -111,13 +111,13 @@ void LoadBoundaryCondition<T, d>::apply(
         // Per-span scaffolding: shared across all fields.
         quadrature.map_to_domain({lo}, {hi}, mapped_pts, mapped_weights);
 
-        auto boundary_basis  = boundary.tensor_product().eval(mapped_pts, 2);
+        auto boundary_basis  = boundary.tensor_product().eval_all(mapped_pts, 2);
         auto boundary_act    = boundary.active_control_pts(span);
         IntrinsicGeometry<T, d - 1> boundary_local(boundary_basis, boundary_act);
 
         const Index flat_parent = boundary.parent_flat_span(span);
         const ColMatrix<T, 2> parent_pts = boundary.lift_to_parent(mapped_pts);
-        auto parent_basis  = parent.tensor_product().eval(parent_pts, req_order);
+        auto parent_basis  = parent.tensor_product().eval_all(parent_pts, req_order);
         auto parent_act    = parent.active_control_pts(flat_parent);
         IntrinsicGeometry<T, d> parent_ig(parent_basis, parent_act);
         parent_ig.compute_christoffels();

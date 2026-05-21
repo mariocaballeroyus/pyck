@@ -1,7 +1,8 @@
 #include "bspline.hpp"
 
-#include "evaluation.hpp"
-#include "refinement.hpp"
+#include "bspline_algorithms.hpp"
+#include "refinement_algorithms.hpp"
+#include "../memory.hpp"
 
 namespace pyck
 {
@@ -9,30 +10,36 @@ namespace pyck
 // === Evaluation =====================================================================
 
 template <std::floating_point T>
-void BSpline<T>::eval_on_span(const Vector<T>& points, Index span_idx,
-                              std::vector<Matrix<T>>& results,
-                              Evaluator<T>& eval) const
+void BSpline<T>::eval_on_span(const Vector<T>& points, Index span_idx, Index order,
+                              std::vector<Matrix<T>>& uni_results) const
 {
     const Index Q = points.size();
     const Index N = this->degree_ + 1;
-    const Index order = static_cast<Index>(results.size()) - 1;
 
-    eval.resize(N, order);
-    for (Index k = 0; k <= order; ++k) results[k].resize(N, Q);
+    for (Index k = 0; k <= order; ++k) uni_results[k].resize(N, Q);
 
-    // Q-loop over single-point P&T A2.2 / A2.3 kernels; each iteration fills
-    // one contiguous column of every results[k].
+    STACK_ARRAY(T, ndu_fn, N * N);
+    STACK_ARRAY(T, ndu_kd, N * N);
+    STACK_ARRAY(T, left,   N);
+    STACK_ARRAY(T, right,  N);
+    STACK_ARRAY(T, a,      2 * N);
+
+    // Loop over quadrature points
     for (Index q = 0; q < Q; ++q) {
-        basis::eval::cox_de_boor_at<T>(
-            this->degree_, this->knots_, points(q), span_idx,
-            eval.point_derivs.col(0), eval);
+        // --- Cox-de Boor ------------------------------------------------------------
+        // uni_results[0].col(q), N bsp values at points(q), filled in-place
+        basis::eval::cox_de_boor_at<T>(this->degree_, this->knots_,
+                                       points(q), span_idx, q,
+                                       uni_results,
+                                       ndu_fn, ndu_kd, left, right);
 
-        if (order > 0)
-            basis::eval::derivative_recurrence_at<T>(
-                this->degree_, order, eval.point_derivs, eval);
-
-        for (Index k = 0; k <= order; ++k)
-            results[k].col(q) = eval.point_derivs.col(k);
+        // --- Derivative Recurrence --------------------------------------------------
+        // uni_results[k].col(q) (k = 1 .. order), N bsp derivatives, filled in-place
+        if (order > 0) {
+            basis::eval::derivative_recurrence_at<T>(this->degree_, order, q,
+                                                     uni_results,
+                                                     ndu_fn, ndu_kd, a);
+        }
     }
 }
 

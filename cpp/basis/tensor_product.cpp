@@ -1,10 +1,45 @@
 #include "tensor_product.hpp"
 
 #include "bspline.hpp"
-#include "evaluation.hpp"
+#include "bspline_algorithms.hpp"
 
 namespace pyck
 {
+
+namespace
+{
+
+/**
+ * @brief Convert a direction list (e.g., [0, 1, 1] meaning ∂_0 ∂_1 ∂_1)
+ *        into a derivative-count multi-index (cc[i] = number of times
+ *        direction i appears, e.g., [1, 2, 0] in d=3).
+ */
+template <std::size_t d>
+inline std::array<Index, d>
+directions_to_counts(const std::vector<Index>& dirs)
+{
+    std::array<Index, d> cc{};
+    for (Index dir : dirs) ++cc[dir];
+    return cc;
+}
+
+/**
+ * @brief Increment a multi-index lexicographically (leftmost varies slowest),
+ *        returning true if more multi-indices remain.
+ */
+template <std::size_t d>
+inline bool
+next_lex_multi_index(std::array<Index, d>& v,
+                     const std::array<Index, d>& bounds)
+{
+    for (int i = static_cast<int>(d) - 1; i >= 0; --i) {
+        if (++v[i] < bounds[i]) return true;
+        v[i] = 0;
+    }
+    return false;
+}
+
+} // anonymous namespace
 
 // === Constructors ===================================================================
 
@@ -79,12 +114,11 @@ const Basis<T>& TensorProduct<T, d>::basis(Index dir) const
 
 template <std::floating_point T, std::size_t d>
 void
-TensorProduct<T, d>::eval_on_span(const std::type_identity_t<ColMatrix<T, d>>& coords,
+TensorProduct<T, d>::eval_on_span(const ColMatrix<T, d>& coords,
                                   const std::array<Index, d>& spans,
                                   Index order,
-                                  Evaluator<T>& ev,
-                                  std::array<std::vector<Matrix<T>>, d>& uni,
-                                  std::vector<Matrix<T>>& out) const
+                                  std::array<std::vector<Matrix<T>>, d>& uni_results,
+                                  std::vector<Matrix<T>>& results) const
 {
     if (order < 0 || order > 3) {
         throw std::invalid_argument("TensorProduct::eval_on_span: "
@@ -93,166 +127,46 @@ TensorProduct<T, d>::eval_on_span(const std::type_identity_t<ColMatrix<T, d>>& c
 
     const Index Q = static_cast<Index>(coords.rows());
 
-    // Univariate factors. Both `ev` (recurrence scratch) and `uni` (per-direction
-    // value buffers) are caller-owned, so pre-sized reuse across an assembly
-    // loop avoids per-call heap allocation. `Basis::eval_on_span` infers the
-    // derivative order from `uni[dim].size()`, so the caller must size each
-    // direction's vector to `order + 1` matrices.
     std::array<Index, d> n_b{};
 
     Index K = 1;
     for (std::size_t dim = 0; dim < d; ++dim) {
-        uni[dim].resize(order + 1);
-        bases_[dim]->eval_on_span(coords.col(dim), spans[dim], uni[dim], ev);
-        n_b[dim] = static_cast<Index>(uni[dim][0].rows());
+        uni_results[dim].resize(order + 1);
+        bases_[dim]->eval_on_span(coords.col(dim), spans[dim], order, uni_results[dim]);
+        n_b[dim] = static_cast<Index>(uni_results[dim][0].rows());
         K *= n_b[dim];
     }
 
-    // Resize the caller-owned output to (K · n_k) × Q per order. No-op when
-    // shape is unchanged — repeated calls in an assembly loop are allocation-free.
-    resize_basis_buffer<T, d>(out, K, Q, order);
-    std::vector<Matrix<T>>& per_order = out;
+    resize_basis_buffer<T, d>(results, K, Q, order);
 
-    // Main fill loop
-    for (Index q = 0; q < Q; ++q)
-    {
-        if constexpr (d == 1)
-        {
-            for (Index k = 0; k <= order; ++k) {
-                T*       pk = per_order[k].col(q).data();
-                const T* uk = uni[0][k].col(q).data();
-                for (Index bu = 0; bu < n_b[0]; ++bu)
-                    *pk++ = uk[bu];
+    for (Index k = 0; k <= order; ++k) {
+        // Pre-convert pyck's direction-tuples to derivative-count multi-indices.
+        const auto direction_tuples = enumerate_direction_indices<d>(k);
+        const Index n_slots = static_cast<Index>(direction_tuples.size());
+        std::vector<std::array<Index, d>> compositions(n_slots);
+        for (Index m = 0; m < n_slots; ++m)
+            compositions[m] = directions_to_counts<d>(direction_tuples[m]);
+
+        std::array<Index, d> v{};
+        Index r = 0;
+        do {
+            for (Index m = 0; m < n_slots; ++m) {
+                const auto& cc = compositions[m];
+                results[k].row(r) = uni_results[0][cc[0]].row(v[0]);
+                for (std::size_t i = 1; i < d; ++i)
+                    results[k].row(r).array() *= uni_results[i][cc[i]].row(v[i]).array();
+                ++r;
             }
-        }
-        else if constexpr (d == 2)
-        {
-            T* p0 =                per_order[0].col(q).data();
-            T* p1 = (order >= 1) ? per_order[1].col(q).data() : nullptr;
-            T* p2 = (order >= 2) ? per_order[2].col(q).data() : nullptr;
-            T* p3 = (order >= 3) ? per_order[3].col(q).data() : nullptr;
-
-            const T* u0d =                uni[0][0].col(q).data();
-            const T* u1d = (order >= 1) ? uni[0][1].col(q).data() : nullptr;
-            const T* u2d = (order >= 2) ? uni[0][2].col(q).data() : nullptr;
-            const T* u3d = (order >= 3) ? uni[0][3].col(q).data() : nullptr;
-            const T* v0d =                uni[1][0].col(q).data();
-            const T* v1d = (order >= 1) ? uni[1][1].col(q).data() : nullptr;
-            const T* v2d = (order >= 2) ? uni[1][2].col(q).data() : nullptr;
-            const T* v3d = (order >= 3) ? uni[1][3].col(q).data() : nullptr;
-
-            for (Index bu = 0; bu < n_b[0]; ++bu)
-            {
-                const T u0 =                u0d[bu];
-                const T u1 = (order >= 1) ? u1d[bu] : T(0);
-                const T u2 = (order >= 2) ? u2d[bu] : T(0);
-                const T u3 = (order >= 3) ? u3d[bu] : T(0);
-
-                for (Index bv = 0; bv < n_b[1]; ++bv)
-                {
-                    const T v0 = v0d[bv];
-                    *p0++ = u0 * v0;
-                    if (order < 1) continue;
-
-                    const T v1 = v1d[bv];
-                    *p1++ = u1 * v0;   // ∂u
-                    *p1++ = u0 * v1;   // ∂v
-                    if (order < 2) continue;
-
-                    const T v2 = v2d[bv];
-                    *p2++ = u2 * v0;   // ∂uu   Voigt slot 0
-                    *p2++ = u0 * v2;   // ∂vv   slot 1
-                    *p2++ = u1 * v1;   // ∂uv   slot 2
-                    if (order < 3) continue;
-
-                    const T v3 = v3d[bv];
-                    *p3++ = u3 * v0;   // ∂uuu  sorted-lex slot 0
-                    *p3++ = u2 * v1;   // ∂uuv  slot 1
-                    *p3++ = u1 * v2;   // ∂uvv  slot 2
-                    *p3++ = u0 * v3;   // ∂vvv  slot 3
-                }
-            }
-        }
-        else if constexpr (d == 3)
-        {
-            T* p0 =                per_order[0].col(q).data();
-            T* p1 = (order >= 1) ? per_order[1].col(q).data() : nullptr;
-            T* p2 = (order >= 2) ? per_order[2].col(q).data() : nullptr;
-            T* p3 = (order >= 3) ? per_order[3].col(q).data() : nullptr;
-
-            const T* u0d =                uni[0][0].col(q).data();
-            const T* u1d = (order >= 1) ? uni[0][1].col(q).data() : nullptr;
-            const T* u2d = (order >= 2) ? uni[0][2].col(q).data() : nullptr;
-            const T* u3d = (order >= 3) ? uni[0][3].col(q).data() : nullptr;
-            const T* v0d =                uni[1][0].col(q).data();
-            const T* v1d = (order >= 1) ? uni[1][1].col(q).data() : nullptr;
-            const T* v2d = (order >= 2) ? uni[1][2].col(q).data() : nullptr;
-            const T* v3d = (order >= 3) ? uni[1][3].col(q).data() : nullptr;
-            const T* w0d =                uni[2][0].col(q).data();
-            const T* w1d = (order >= 1) ? uni[2][1].col(q).data() : nullptr;
-            const T* w2d = (order >= 2) ? uni[2][2].col(q).data() : nullptr;
-            const T* w3d = (order >= 3) ? uni[2][3].col(q).data() : nullptr;
-
-            for (Index bu = 0; bu < n_b[0]; ++bu)
-            {
-                const T u0 =                u0d[bu];
-                const T u1 = (order >= 1) ? u1d[bu] : T(0);
-                const T u2 = (order >= 2) ? u2d[bu] : T(0);
-                const T u3 = (order >= 3) ? u3d[bu] : T(0);
-
-                for (Index bv = 0; bv < n_b[1]; ++bv)
-                {
-                    const T v0 =                v0d[bv];
-                    const T v1 = (order >= 1) ? v1d[bv] : T(0);
-                    const T v2 = (order >= 2) ? v2d[bv] : T(0);
-                    const T v3 = (order >= 3) ? v3d[bv] : T(0);
-
-                    for (Index bw = 0; bw < n_b[2]; ++bw)
-                    {
-                        const T w0 = w0d[bw];
-                        *p0++ = u0 * v0 * w0;
-                        if (order < 1) continue;
-
-                        const T w1 = w1d[bw];
-                        *p1++ = u1 * v0 * w0;   // ∂u
-                        *p1++ = u0 * v1 * w0;   // ∂v
-                        *p1++ = u0 * v0 * w1;   // ∂w
-                        if (order < 2) continue;
-
-                        const T w2 = w2d[bw];
-                        *p2++ = u2 * v0 * w0;   // ∂uu   Voigt slot 0
-                        *p2++ = u0 * v2 * w0;   // ∂vv   slot 1
-                        *p2++ = u0 * v0 * w2;   // ∂ww   slot 2
-                        *p2++ = u1 * v1 * w0;   // ∂uv   slot 3
-                        *p2++ = u1 * v0 * w1;   // ∂uw   slot 4
-                        *p2++ = u0 * v1 * w1;   // ∂vw   slot 5
-                        if (order < 3) continue;
-
-                        const T w3 = w3d[bw];
-                        *p3++ = u3 * v0 * w0;   // ∂uuu  sorted-lex slot 0
-                        *p3++ = u2 * v1 * w0;   // ∂uuv  slot 1
-                        *p3++ = u2 * v0 * w1;   // ∂uuw  slot 2
-                        *p3++ = u1 * v2 * w0;   // ∂uvv  slot 3
-                        *p3++ = u1 * v1 * w1;   // ∂uvw  slot 4
-                        *p3++ = u1 * v0 * w2;   // ∂uww  slot 5
-                        *p3++ = u0 * v3 * w0;   // ∂vvv  slot 6
-                        *p3++ = u0 * v2 * w1;   // ∂vvw  slot 7
-                        *p3++ = u0 * v1 * w2;   // ∂vww  slot 8
-                        *p3++ = u0 * v0 * w3;   // ∂www  slot 9
-                    }
-                }
-            }
-        }
+        } while (next_lex_multi_index(v, n_b));
     }
-    
 }
 
 template <std::floating_point T, std::size_t d>
 std::vector<Matrix<T>>
-TensorProduct<T, d>::eval(const std::type_identity_t<ColMatrix<T, d>>& coords, Index order) const
+TensorProduct<T, d>::eval_all(const ColMatrix<T, d>& coords, Index order) const
 {
     if (order < 0 || order > 3) {
-        throw std::invalid_argument("TensorProduct::eval: "
+        throw std::invalid_argument("TensorProduct::eval_all: "
                                     "order must be in [0, 3].");
     }
 
@@ -264,30 +178,53 @@ TensorProduct<T, d>::eval(const std::type_identity_t<ColMatrix<T, d>>& coords, I
         K *= bases_[dim]->degree() + 1;
     }
 
-    std::vector<Matrix<T>> out;
-    resize_basis_buffer<T, d>(out, K, Q, order);
+    std::vector<Matrix<T>> results;
+    resize_basis_buffer<T, d>(results, K, Q, order);
 
-    Evaluator<T>                          eval;
-    std::array<std::vector<Matrix<T>>, d> uni;
-    std::vector<Matrix<T>>                results;
-    ColMatrix<T, d>                       single_pt(1, d);
-    std::array<Index, d>                  spans;
+    if (Q == 0) return results;
 
-    for (Index q = 0; q < Q; ++q) {
-        // Find spans for this point
-        for (std::size_t dim = 0; dim < d; ++dim) {
-            spans[dim] = bases_[dim]->find_span(coords(q, dim));
-        }
-        // Evaluate basis values for this point
-        single_pt.row(0) = coords.row(q);
-        eval_on_span(single_pt, spans, order, eval, uni, results);
-        // Copy into output
-        for (Index k = 0; k <= order; ++k) {
-            out[k].col(q) = results[k].col(0);
-        }
+    std::array<std::vector<Matrix<T>>, d> uni_results;
+    std::vector<Matrix<T>>                batch_results;
+    std::array<Index, d>                  current_spans;
+
+    // Seed current_spans from the first point.
+    for (std::size_t dim = 0; dim < d; ++dim) {
+        current_spans[dim] = bases_[dim]->find_span(coords(0, dim));
     }
 
-    return out;
+    Index batch_start = 0;
+
+    auto flush_batch = [&](Index end) {
+        const Index Qb = end - batch_start;
+        ColMatrix<T, d> batch_coords = coords.middleRows(batch_start, Qb);
+        eval_on_span(batch_coords, current_spans, order, uni_results, batch_results);
+        for (Index k = 0; k <= order; ++k) {
+            results[k].middleCols(batch_start, Qb) = batch_results[k];
+        }
+    };
+
+    for (Index q = 1; q < Q; ++q) {
+        std::array<Index, d> new_spans = current_spans;
+        bool changed = false;
+        for (std::size_t dim = 0; dim < d; ++dim) {
+            const T u = coords(q, dim);
+            const auto& kv = bases_[dim]->knot_vector();
+            // Cache: stay in the current span if u is still within its bounds;
+            // only call find_span when crossing a knot boundary.
+            if (u < kv[current_spans[dim]] || u >= kv[current_spans[dim] + 1]) {
+                new_spans[dim] = bases_[dim]->find_span(u);
+                changed = true;
+            }
+        }
+        if (changed) {
+            flush_batch(q);
+            current_spans = new_spans;
+            batch_start   = q;
+        }
+    }
+    flush_batch(Q);
+
+    return results;
 }
 
 // === Template Instantiations ========================================================

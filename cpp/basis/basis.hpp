@@ -5,7 +5,7 @@
 #include <vector>
 #include <concepts>
 
-#include "evaluation.hpp"
+#include "bspline_algorithms.hpp"
 #include "knot_vector.hpp"
 #include "../types.hpp"
 
@@ -44,33 +44,51 @@ public:
      * @brief Evaluate the non-zero (p+1) basis functions and their derivatives
      *        at given parameter values within a single knot span.
      *
-     * @details The caller supplies an `Evaluator` that owns the scratch buffers;
-     *          this method resizes them as needed and writes into `results`.
-     *          The maximum derivative order is taken to be `results.size() - 1`,
-     *          so the caller must size `results` to `order + 1` before calling.
-     *          Each `results[k]` is resized to **(degree+1) × points.size()**
-     *          column-major: column q holds the N = p+1 active basis values
-     *          (k-th derivative) at parameter `points[q]`. This q-major layout
-     *          matches the per-order packed buffer produced by
-     *          `TensorProduct::eval_on_span` so downstream code reads
-     *          contiguous N-vectors per quadrature point.
-     *
-     * @param points    Parameter values (all assumed to lie in the same knot span).
-     * @param span_idx  Knot-span index (as returned by KnotVector::find_span).
-     * @param results   Output buffer, pre-sized to `order + 1`. Each entry is
-     *                  resized to N × Q (col-major) and overwritten.
-     * @param eval      Evaluator class containing the scratch buffers for evaluation.
+     * @param points      Parameter values (all assumed to lie in the same knot span).
+     * @param span_idx    Knot-span index (as returned by KnotVector::find_span).
+     * @param order       Maximum derivative order.
+     * @param uni_results Output buffer, pre-sized to `order + 1`. Each entry is
+     *                    resized to N × Q (col-major) and overwritten.
      */
-    virtual void eval_on_span(const Vector<T>& points, Index span_idx,
-                              std::vector<Matrix<T>>& results,
-                              Evaluator<T>& eval) const = 0;
+    virtual void eval_on_span(const Vector<T>& points, Index span_idx, Index order,
+                              std::vector<Matrix<T>>& uni_results) const = 0;
+
+    /**
+     * @brief Evaluate basis functions and derivatives up to @p order at @p points,
+     *        scattering the active span-local values into the global (m × n) layout.
+     *
+     * @param points Parameter values; each may lie in a different knot span.
+     * @param order  Maximum derivative order.
+     * @return Per-order matrices, each sized (points.size() × num_basis()),
+     *         with zeros outside the active (p+1) functions for each point.
+     */
+    std::vector<Matrix<T>> eval_all(const Vector<T>& points, Index order) const
+    {
+        const Index m = static_cast<Index>(points.size());
+        const Index n = num_basis();
+        const Index p = degree_;
+
+        std::vector<Matrix<T>> results(order + 1);
+        for (Index k = 0; k <= order; ++k)
+            results[k] = Matrix<T>::Zero(m, n);
+
+        std::vector<Matrix<T>> local(order + 1);
+        Vector<T> pt(1);
+        for (Index i = 0; i < m; ++i) {
+            const Index span = find_span(points[i]);
+            pt[0] = points[i];
+            eval_on_span(pt, span, order, local);
+            for (Index k = 0; k <= order; ++k) {
+                results[k].row(i).segment(span - p, p + 1) = local[k].col(0).transpose();
+            }
+        }
+        return results;
+    }
 
     // === Utility Methods ============================================================
 
     /**
      * @brief Find the knot span containing the given parameter value.
-     *
-     * Convenience wrapper for knot_vector().find_span(degree(), param).
      *
      * @param param Parameter value.
      * @return Span index.
@@ -79,13 +97,6 @@ public:
 
     /**
      * @brief Compute the Greville abscissae for this basis.
-     *
-     * @details The Greville abscissa of basis function `N_{i,p}` is the
-     *          average of its `p` interior knots,
-     *          `xi_i = (1/p) Σ_{j=1..p} knots[i+j]`. They satisfy linear
-     *          precision and serve as natural node points for interpolation
-     *          and collocation. Independent of weights — same formula for
-     *          B-splines and NURBS, hence implemented here on the base class.
      *
      * @return A vector of parameter values corresponding to the Greville points.
      */
@@ -151,6 +162,7 @@ protected:
 
     /// @brief Knot vector defining the basis functions
     KnotVector<T> knots_;
+
 };
 
 } // namespace pyck

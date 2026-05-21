@@ -54,7 +54,7 @@ TEST_CASE("Patch<double, 3>: Flat Box", "[geometry][volume]")
     SECTION("Metric and Jacobian on a stretched box") {
         ColMatrix<double, 3> pts(1, 3);
         pts << 0.3, 0.5, 0.7;
-        const auto b     = vol.tensor_product().eval(pts, 3);
+        const auto b     = vol.tensor_product().eval_all(pts, 3);
         IntrinsicGeometry<double, 3> local(b, act);
 
         // Metric layout: (g_11, g_12, g_13, g_22, g_23, g_33).
@@ -78,7 +78,7 @@ TEST_CASE("Patch<double, 3>: Flat Box", "[geometry][volume]")
     SECTION("Christoffels vanish on flat box") {
         ColMatrix<double, 3> pts(1, 3);
         pts << 0.4, 0.6, 0.2;
-        const auto b     = vol.tensor_product().eval(pts, 3);
+        const auto b     = vol.tensor_product().eval_all(pts, 3);
         IntrinsicGeometry<double, 3> local(b, act);
         local.compute_christoffels();
         const auto& chr = local.chr;
@@ -105,7 +105,7 @@ TEST_CASE("Patch<double, 3>: Flat Box", "[geometry][volume]")
     SECTION("Partition of unity (3D)") {
         ColMatrix<double, 3> pts(1, 3);
         pts << 0.35, 0.72, 0.18;
-        const auto b = vol.tensor_product().eval(pts, 2);
+        const auto b = vol.tensor_product().eval_all(pts, 2);
 
         auto sum_at_0 = [&](Index k_order, Index packed, Index n_k) {
             auto slab = b[k_order].col(0);
@@ -179,7 +179,7 @@ TEST_CASE("Patch<double, 3>: Box factory volume integral", "[geometry][volume]")
             if (zero_vol) continue;
 
             quad.map_to_domain(lo, hi, mp, mw);
-            const auto b     = vol.tensor_product().eval(mp, 1);
+            const auto b     = vol.tensor_product().eval_all(mp, 1);
             const auto act   = vol.active_control_pts(e);
             IntrinsicGeometry<double, 3> local(b, act);
 

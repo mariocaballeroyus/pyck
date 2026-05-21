@@ -3,8 +3,6 @@
 #include <stdexcept>
 #include <utility>
 
-#include "evaluation.hpp"
-
 namespace pyck
 {
 
