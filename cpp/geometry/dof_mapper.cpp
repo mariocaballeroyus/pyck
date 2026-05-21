@@ -75,7 +75,7 @@ std::vector<Index> DofMapper<d>::get_layer_dofs(Index param_dim,
 }
 
 template <std::size_t d>
-void DofMapper<d>::get_element_dofs(Index elem_idx, std::vector<Index>& out) const
+void DofMapper<d>::get_element_cps(Index elem_idx, std::vector<Index>& out) const
 {
     std::array<Index, d> intervals;
     Index total_elements = 1;
@@ -97,11 +97,11 @@ void DofMapper<d>::get_element_dofs(Index elem_idx, std::vector<Index>& out) con
         temp /= intervals[i];
     }
 
-    get_element_dofs(span_indices, out);
+    get_element_cps(span_indices, out);
 }
 
 template <std::size_t d>
-void DofMapper<d>::get_element_dofs(const std::array<Index, d>& span_indices,
+void DofMapper<d>::get_element_cps(const std::array<Index, d>& span_indices,
                                     std::vector<Index>& out) const
 {
     // Active 1D indices in direction i are [lo_i, hi_i] with

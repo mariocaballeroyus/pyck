@@ -45,7 +45,7 @@ BeamTimoshenko2p<T>::strain_matrix(const Patch<T, 1>& /*patch*/,
         auto slab0 = basis[0].col(q);
         auto slab1 = basis[1].col(q);
 
-        const T G = ig.chr.Gamma(0, 0, 0)(q);
+        const T G = ig.Gamma(0, 0, 0)(q);
 
         for (Index i = 0; i < N; ++i)
         {

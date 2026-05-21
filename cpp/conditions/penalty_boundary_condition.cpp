@@ -73,10 +73,10 @@ void PenaltyBoundaryCondition<T, d>::apply(Matrix<T>& stiffness,
         auto parent_basis  = parent.tensor_product().eval_all(parent_pts, req_order);
         auto parent_act    = parent.active_control_pts(flat_parent);
         IntrinsicGeometry<T, d> parent_ig(parent_basis, parent_act);
-        parent_ig.compute_christoffels();
+
 
         std::vector<Index> elem_dofs;
-        parent.dof_mapper().get_element_dofs(flat_parent, elem_dofs);
+        parent.dof_mapper().get_element_cps(flat_parent, elem_dofs);
         const Index n_elem = static_cast<Index>(elem_dofs.size());
         const Index K_elem = n_elem * ndof;
 

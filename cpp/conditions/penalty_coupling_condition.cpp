@@ -100,7 +100,7 @@ void PenaltyCouplingCondition<T, d>::apply(
         auto parent_basis_a = parent_a.tensor_product().eval_all(par_pts_a, req_order_a);
         auto parent_act_a   = parent_a.active_control_pts(flat_a);
         IntrinsicGeometry<T, d> parent_ig_a(parent_basis_a, parent_act_a);
-        parent_ig_a.compute_christoffels();
+
 
         // Side B: corresponding span and parametric points.
         const Index span_b = reverse_ ? (num_spans - 1 - span_a) : span_a;
@@ -120,12 +120,12 @@ void PenaltyCouplingCondition<T, d>::apply(
         auto parent_basis_b = parent_b.tensor_product().eval_all(par_pts_b, req_order_b);
         auto parent_act_b   = parent_b.active_control_pts(flat_b);
         IntrinsicGeometry<T, d> parent_ig_b(parent_basis_b, parent_act_b);
-        parent_ig_b.compute_christoffels();
+
 
         // DOFs on each side.
         std::vector<Index> cps_a, cps_b;
-        parent_a.dof_mapper().get_element_dofs(flat_a, cps_a);
-        parent_b.dof_mapper().get_element_dofs(flat_b, cps_b);
+        parent_a.dof_mapper().get_element_cps(flat_a, cps_a);
+        parent_b.dof_mapper().get_element_cps(flat_b, cps_b);
         std::vector<Index> dofs_a, dofs_b;
         layout.scatter_primal(block_a, cps_a, dofs_a);
         layout.scatter_primal(block_b, cps_b, dofs_b);

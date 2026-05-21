@@ -107,10 +107,10 @@ public:
     /**
      * @brief Decode a live-element index into per-direction knot-span indices.
      *
-     * @param live_idx Live element index. No bounds check; the caller is
+     * @param elem_idx Live element index. No bounds check; the caller is
      *                 responsible for staying in `[0, num_elements())`.
      */
-    std::array<Index, d> decode_element(Index live_idx) const;
+    std::array<Index, d> decode_element(Index elem_idx) const;
 
     /// @brief Get the 1D basis for a given parametric direction (runtime index)
     const Basis<T>& basis(Index dir) const;

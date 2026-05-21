@@ -92,17 +92,17 @@ LagrangeBoundaryCondition<T, d>::apply(Matrix<T>& stiffness, Vector<T>& load,
         IntrinsicGeometry<T, d - 1> boundary_local(boundary_basis, boundary_act);
 
         std::vector<Index> multiplier_basis_ids;
-        boundary_.dof_mapper().get_element_dofs(s, multiplier_basis_ids);
+        boundary_.dof_mapper().get_element_cps(s, multiplier_basis_ids);
 
         const Index flat_parent = boundary_.parent_flat_span(s);
         const ColMatrix<T, 2> parent_pts = boundary_.lift_to_parent(mapped_pts);
         auto parent_basis  = parent.tensor_product().eval_all(parent_pts, req_order);
         auto parent_act    = parent.active_control_pts(flat_parent);
         IntrinsicGeometry<T, d> parent_ig(parent_basis, parent_act);
-        parent_ig.compute_christoffels();
+
 
         std::vector<Index> elem_dofs;
-        parent.dof_mapper().get_element_dofs(flat_parent, elem_dofs);
+        parent.dof_mapper().get_element_cps(flat_parent, elem_dofs);
         const Index n_elem = static_cast<Index>(elem_dofs.size());
         const Index K_elem = n_elem * ndof;
 

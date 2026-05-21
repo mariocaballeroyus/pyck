@@ -112,7 +112,7 @@ static double eval_w_centre(const Ptr<Patch<double,2>>& surf,
 
     const auto b = (*surf).tensor_product().eval_all(pt, 0);
     std::vector<Index> active;
-    surf->dof_mapper().get_element_dofs(flat, active);
+    surf->dof_mapper().get_element_cps(flat, active);
 
     Vector<double> w_active(active.size());
     for (std::size_t i = 0; i < active.size(); ++i)
@@ -275,7 +275,7 @@ TEST_CASE("PenaltyBoundaryCondition KL plate: SS via penalty matches Navier", "[
 
             const auto b = (*surface).tensor_product().eval_all(pt, 0);
             std::vector<Index> active;
-            surface->dof_mapper().get_element_dofs(flat, active);
+            surface->dof_mapper().get_element_cps(flat, active);
             Vector<double> u_a(active.size());
             for (std::size_t i = 0; i < active.size(); ++i)
                 u_a(i) = u(active[i]);

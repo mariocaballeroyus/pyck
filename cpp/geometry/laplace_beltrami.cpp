@@ -70,7 +70,7 @@ compute_laplace_grad_aux(const IntrinsicGeometry<T, d>& ig)
         };
         auto Gam = [&](std::size_t e, std::size_t i, std::size_t j) {
             auto [lo, hi] = sym2(i, j);
-            return ig.chr.Gamma(e, lo, hi)(q);
+            return ig.Gamma(e, lo, hi)(q);
         };
 
         // ---- Precompute unique dot products once per q ---------------------

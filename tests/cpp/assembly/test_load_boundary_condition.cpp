@@ -144,7 +144,7 @@ TEST_CASE("LoadBoundaryCondition: cantilever tip deflection matches closed form"
 
     const auto b = (*surface).tensor_product().eval_all(pt, 0);
     std::vector<Index> active;
-    surface->dof_mapper().get_element_dofs(flat, active);
+    surface->dof_mapper().get_element_cps(flat, active);
     Vector<double> w_active(active.size());
     for (std::size_t i = 0; i < active.size(); ++i) {
         w_active(i) = u(active[i] * 3 + 0);

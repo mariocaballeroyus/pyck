@@ -80,8 +80,8 @@ TEST_CASE("Patch<double, 3>: Flat Box", "[geometry][volume]")
         pts << 0.4, 0.6, 0.2;
         const auto b     = vol.tensor_product().eval_all(pts, 3);
         IntrinsicGeometry<double, 3> local(b, act);
-        local.compute_christoffels();
-        const auto& chr = local.chr;
+
+        const auto& chr = local;
         CHECK(chr.Gamma(0, 0, 0)(0) == Approx(0.0).margin(1e-14));
         CHECK(chr.Gamma(0, 0, 1)(0) == Approx(0.0).margin(1e-14));
         CHECK(chr.Gamma(0, 0, 2)(0) == Approx(0.0).margin(1e-14));

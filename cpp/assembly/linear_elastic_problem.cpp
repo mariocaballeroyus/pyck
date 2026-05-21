@@ -2,7 +2,7 @@
 #include "bspline.hpp"
 #include "direct_constraint.hpp"
 #include "patch.hpp"
-#include "values.hpp"
+#include "element_values.hpp"
 
 #include <stdexcept>
 #include <string>
@@ -56,7 +56,7 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
         const auto& quadrature = *quadratures_[p];
         const DofLayout::BlockId primal_block = primal_blocks[p];
 
-        PatchValues<T, d> patch_values(patch,
+        ElementValues<T, d> patch_values(patch,
                                        static_cast<Index>(element.min_order()),
                                        quadrature);
         const std::size_t num_live = static_cast<std::size_t>(patch_values.num_elements());
@@ -67,9 +67,9 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
 
             element.compute_local_stiffness(patch_values, Ke);
 
-            layout_.scatter_primal(primal_block, patch_values.elem_nodes,
-                                   patch_values.elem_dofs);
-            const auto& elem_dofs = patch_values.elem_dofs;
+            layout_.scatter_primal(primal_block, patch_values.elem_cps_,
+                                   patch_values.elem_dofs_);
+            const auto& elem_dofs = patch_values.elem_dofs_;
             const std::size_t Ne = elem_dofs.size();
 
             // Write into global matrix

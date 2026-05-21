@@ -101,7 +101,7 @@ void LagrangeDomainCondition<T, d>::apply(
         const Index n_basis = basis[0].rows();
 
         std::vector<Index> elem_cps;
-        patch_.dof_mapper().get_element_dofs(elem_idx, elem_cps);
+        patch_.dof_mapper().get_element_cps(elem_idx, elem_cps);
         std::vector<Index> primal_dofs;
         layout.scatter_primal(primal_block, elem_cps, primal_dofs);
         // primal_dofs is CP-major, ndof-inner: primal_dofs[i*ndof + v].

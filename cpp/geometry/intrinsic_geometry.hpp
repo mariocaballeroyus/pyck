@@ -15,41 +15,26 @@ namespace pyck
 {
 
 /**
- * @brief Christoffel symbols of the second kind and their first derivatives,
- *        stored in packed column-major matrices indexed by (k, i, j[, γ]).
+ * @brief Per-quantity update flags for @ref IntrinsicGeometry. Each flag gates
+ *        both the storage allocation and the per-element computation of the
+ *        associated quantity, mirroring deal.II's `UpdateFlags` pattern.
  *
- * Storage layout:
- *   - @ref Gamma_data: shape Q × (d · n_d2), col-major. Column index packed as
- *     `k · n_d2 + pack2<d>(i, j)`, where n_d2 = d(d+1)/2.
- *   - @ref Gamma_d1_data: shape Q × (d · n_d2 · d). Column index packed as
- *     `k · (n_d2 · d) + pack2<d>(i, j) · d + γ`.
- *
- * Element / interior-geometry code accesses via the named methods, which
- * canonicalise the (i, j) pair to upper-triangular form. Empty if
- * @ref IntrinsicGeometry::compute_christoffels was not called.
+ * Flags are interpreted on a best-effort basis: `reinit` silently clamps each
+ * flag against the basis's available derivative orders (`metric` needs order
+ * ≥ 1, `christoffels` ≥ 2, `christoffels_d1` ≥ 3). Default-constructed flags
+ * therefore yield the maximum the basis supports — preserving the previous
+ * "always compute Christoffels" semantics.
  */
-template <std::floating_point T, std::size_t d>
-struct Christoffels
+struct IntrinsicGeometryFlags
 {
-    /// Packed Γ^k_{ij}(q) data. Empty until compute_christoffels.
-    Matrix<T> Gamma_data;
+    /// Compute covariant metric, contravariant metric and Jacobian.
+    bool metric          = true;
 
-    /// Packed ∂_γ Γ^k_{ij}(q) data. Empty unless basis order ≥ 3.
-    Matrix<T> Gamma_d1_data;
+    /// Compute Christoffel symbols Γ^k_{ij}.
+    bool christoffels    = true;
 
-    /// Γ^k_{ij}(q) — Q-length view; symmetric in (i, j).
-    auto Gamma(Index k, Index i, Index j) const
-    {
-        constexpr Index n_d2 = d * (d + 1) / 2;
-        return Gamma_data.col(k * n_d2 + pack2<d>(i, j));
-    }
-
-    /// ∂_γ Γ^k_{ij}(q) — Q-length view; symmetric in (i, j), free in γ.
-    auto Gamma_d1(Index k, Index i, Index j, Index gam) const
-    {
-        constexpr Index n_d2 = d * (d + 1) / 2;
-        return Gamma_d1_data.col(k * (n_d2 * d) + pack2<d>(i, j) * d + gam);
-    }
+    /// Compute first derivatives of Christoffel symbols ∂_γ Γ^k_{ij}.
+    bool christoffels_d1 = true;
 };
 
 /**
@@ -62,9 +47,14 @@ struct Christoffels
  *   `0 ≤ k ≤ (basis.size() - 1)`. Within each order, the multi-index slice
  *   for packed-index `m` lives at rows `m·Q .. (m+1)·Q - 1`.
  *
- * Metric and Jacobian are always populated. `position_data` has size
- *   `basis.size()`; accessing higher-order derivatives is undefined
- *   behaviour. Christoffels are populated by an explicit call.
+ * Population of metric, Christoffels and Γ_d1 is controlled by
+ * `IntrinsicGeometryFlags` passed to `reinit`.
+ *
+ * Christoffels storage:
+ *   - @ref Gamma_data: shape Q × (d · n_d2), col-major. Column index packed as
+ *     `k · n_d2 + pack2<d>(i, j)`, where n_d2 = d(d+1)/2.
+ *   - @ref Gamma_d1_data: shape Q × (d · n_d2 · d). Column index packed as
+ *     `k · (n_d2 · d) + pack2<d>(i, j) · d + γ`.
  *
  * @tparam T Floating point type.
  * @tparam d Parametric dimension.
@@ -85,32 +75,46 @@ struct IntrinsicGeometry
     /// Jacobian √det g, Q-length.
     Vector<T> jac;
 
-    /// Christoffel symbols (populated by compute_christoffels()).
-    Christoffels<T, d> chr;
+    /// Packed Γ^k_{ij}(q) data, populated when `flags.christoffels`.
+    Matrix<T> Gamma_data;
+
+    /// Packed ∂_γ Γ^k_{ij}(q) data, populated when `flags.christoffels_d1`.
+    Matrix<T> Gamma_d1_data;
 
     // === Constructors ===============================================================
 
     IntrinsicGeometry() = default;
 
     /**
-     * @brief Populate position, metric, inverse metric, Jacobian and position
-     *        derivatives up to the basis buffer's maximum order
-     *        (= `basis.size() - 1`).
+     * @brief Populate position derivatives and the quantities selected by
+     *        @p flags. Delegates to @ref reinit.
      */
     IntrinsicGeometry(const std::vector<Matrix<T>>& basis,
-                      const ColMatrix<T, 3>& act_pts);
+                      const ColMatrix<T, 3>& act_pts,
+                      IntrinsicGeometryFlags flags = {})
+    {
+        reinit(basis, act_pts, flags);
+    }
 
     // === Methods ====================================================================
 
     /**
-     * @brief Populate @ref chr from the position derivatives and metric data.
-     *        Idempotent (re-calls overwrite).
+     * @brief Refresh position derivatives (up to the basis buffer's maximum
+     *        order) and the quantities selected by @p flags on existing
+     *        storage.
      *
-     * Requires position derivatives of at least order 2 for @c chr.Gamma; if
-     * the underlying basis order is at least 3, @c chr.Gamma_d1 is also
-     * populated.
+     * Internal `resize` calls are no-ops once the buffers have been sized by
+     * a prior `reinit` call with matching Q, order and flags, making
+     * subsequent refreshes allocation-free.
+     *
+     * @param basis    Per-order packed basis values + derivatives.
+     * @param act_pts  Active control points (one row per active basis fn).
+     * @param flags    Which derived quantities to compute. The basis must
+     *                 carry enough orders to satisfy them (debug-asserted).
      */
-    void compute_christoffels();
+    void reinit(const std::vector<Matrix<T>>& basis,
+                const ColMatrix<T, 3>& act_pts,
+                IntrinsicGeometryFlags flags = {});
 
     // === Properties =================================================================
 
@@ -145,6 +149,22 @@ struct IntrinsicGeometry
 
     /// Contravariant metric g^{αβ}(q). Symmetric in (α, β).
     auto g_inv(Index i, Index j) const { return g_inv_data.col(pack2<d>(i, j)); }
+
+    // === Christoffel Accessors (Q-length views) =====================================
+
+    /// Γ^k_{ij}(q) — Q-length view; symmetric in (i, j).
+    auto Gamma(Index k, Index i, Index j) const
+    {
+        constexpr Index n_d2 = d * (d + 1) / 2;
+        return Gamma_data.col(k * n_d2 + pack2<d>(i, j));
+    }
+
+    /// ∂_γ Γ^k_{ij}(q) — Q-length view; symmetric in (i, j), free in γ.
+    auto Gamma_d1(Index k, Index i, Index j, Index gam) const
+    {
+        constexpr Index n_d2 = d * (d + 1) / 2;
+        return Gamma_d1_data.col(k * (n_d2 * d) + pack2<d>(i, j) * d + gam);
+    }
 
 private:
 

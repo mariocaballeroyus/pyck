@@ -32,8 +32,8 @@ CurveDerivs metric_derivs(const std::vector<Matrix<double>>& basis,
     const double g11      = local.g(0, 0)(q);
     const double sqrt_g11 = std::sqrt(g11);
     const double g11_15   = g11 * sqrt_g11;
-    local.compute_christoffels();
-    const auto& chr = local.chr;
+
+    const auto& chr = local;
     const double Gamma    = chr.Gamma(0, 0, 0)(q);
 
     const double a11_dot_a11 = local.a_d1(0, 0).row(q).squaredNorm();

@@ -69,27 +69,31 @@ public:
     std::vector<Index> get_layer_dofs(Index param_dim, bool at_start, Index layer_idx) const;
 
     /**
-     * @brief Write active global DOF indices for an element into a caller-owned buffer.
+     * @brief Write active control-point indices for an element into a
+     *        caller-owned buffer.
      *
      * Decodes elem_idx into per-direction spans and forwards to the
-     * span-overload. Prefer the span-overload when spans are known.
+     * span-overload. Prefer the span-overload when spans are known. The
+     * per-node DOF expansion is performed downstream by `DofLayout::scatter_primal`.
      *
      * @param elem_idx Flat element index.
      * @param out      Resized in place; pre-size in a workspace to avoid allocation.
      */
-    void get_element_dofs(Index elem_idx, std::vector<Index>& out) const;
+    void get_element_cps(Index elem_idx, std::vector<Index>& out) const;
 
     /**
-     * @brief Write active global DOF indices for an element into a caller-owned buffer.
+     * @brief Write active control-point indices for an element into a
+     *        caller-owned buffer.
      *
      * Ordering matches TensorProduct::eval_on_span's tensor-product column
      * layout (dim-0 outer, dim-(d-1) inner) so basis column k pairs with
-     * control-point entry k.
+     * control-point entry k. The per-node DOF expansion is performed downstream
+     * by `DofLayout::scatter_primal`.
      *
      * @param span_indices Per-direction knot-span indices.
      * @param out          Resized in place; pre-size in a workspace to avoid allocation.
      */
-    void get_element_dofs(const std::array<Index, d>& span_indices,
+    void get_element_cps(const std::array<Index, d>& span_indices,
                           std::vector<Index>& out) const;
 
     /**

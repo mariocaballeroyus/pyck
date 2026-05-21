@@ -40,12 +40,12 @@ ShellReissnerMindlin5p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
         const auto a2_q = ig.a(1).row(q);
         const auto a3_q = a_3.row(q);
 
-        const T Gam1_11 = ig.chr.Gamma(0, 0, 0)(q);
-        const T Gam1_12 = ig.chr.Gamma(0, 0, 1)(q);
-        const T Gam1_22 = ig.chr.Gamma(0, 1, 1)(q);
-        const T Gam2_11 = ig.chr.Gamma(1, 0, 0)(q);
-        const T Gam2_12 = ig.chr.Gamma(1, 0, 1)(q);
-        const T Gam2_22 = ig.chr.Gamma(1, 1, 1)(q);
+        const T Gam1_11 = ig.Gamma(0, 0, 0)(q);
+        const T Gam1_12 = ig.Gamma(0, 0, 1)(q);
+        const T Gam1_22 = ig.Gamma(0, 1, 1)(q);
+        const T Gam2_11 = ig.Gamma(1, 0, 0)(q);
+        const T Gam2_12 = ig.Gamma(1, 0, 1)(q);
+        const T Gam2_22 = ig.Gamma(1, 1, 1)(q);
 
         for (Index i = 0; i < N; ++i)
         {

@@ -101,7 +101,7 @@ TEST_CASE("DofMapper bounds checking", "[geometry][dof_mapper]") {
     REQUIRE_THROWS_AS(mapper.get_layer_dofs(0, true, 3), std::invalid_argument);
 }
 
-TEST_CASE("DofMapper 1D get_element_dofs", "[geometry][dof_mapper]") {
+TEST_CASE("DofMapper 1D get_element_cps", "[geometry][dof_mapper]") {
     // degree=2, 5 basis functions -> 7 knot spans (intervals)
     // Clamped knot vector: {0, 0, 0, 0.33, 0.67, 1, 1, 1}
     // Span 0: [0, 0)     zero-length
@@ -116,7 +116,7 @@ TEST_CASE("DofMapper 1D get_element_dofs", "[geometry][dof_mapper]") {
     std::vector<Index> dofs;
 
     SECTION("Interior element (span 2)") {
-        mapper.get_element_dofs(2, dofs);
+        mapper.get_element_cps(2, dofs);
         REQUIRE(dofs.size() == 3);
         REQUIRE(dofs[0] == 0);
         REQUIRE(dofs[1] == 1);
@@ -124,7 +124,7 @@ TEST_CASE("DofMapper 1D get_element_dofs", "[geometry][dof_mapper]") {
     }
 
     SECTION("Interior element (span 3)") {
-        mapper.get_element_dofs(3, dofs);
+        mapper.get_element_cps(3, dofs);
         REQUIRE(dofs.size() == 3);
         REQUIRE(dofs[0] == 1);
         REQUIRE(dofs[1] == 2);
@@ -132,7 +132,7 @@ TEST_CASE("DofMapper 1D get_element_dofs", "[geometry][dof_mapper]") {
     }
 
     SECTION("Interior element (span 4)") {
-        mapper.get_element_dofs(4, dofs);
+        mapper.get_element_cps(4, dofs);
         REQUIRE(dofs.size() == 3);
         REQUIRE(dofs[0] == 2);
         REQUIRE(dofs[1] == 3);
@@ -141,17 +141,17 @@ TEST_CASE("DofMapper 1D get_element_dofs", "[geometry][dof_mapper]") {
 
     SECTION("Zero-length span at start (span 0)") {
         // span=0, degree=2 -> active = max(0,0-2)..min(0,4) = 0..0
-        mapper.get_element_dofs(0, dofs);
+        mapper.get_element_cps(0, dofs);
         REQUIRE(dofs.size() == 1);
         REQUIRE(dofs[0] == 0);
     }
 
     SECTION("Out of bounds element") {
-        REQUIRE_THROWS_AS(mapper.get_element_dofs(7, dofs), std::invalid_argument);
+        REQUIRE_THROWS_AS(mapper.get_element_cps(7, dofs), std::invalid_argument);
     }
 }
 
-TEST_CASE("DofMapper 2D get_element_dofs", "[geometry][dof_mapper]") {
+TEST_CASE("DofMapper 2D get_element_cps", "[geometry][dof_mapper]") {
     // 3 basis funcs in u (degree 1), 3 basis funcs in v (degree 1)
     // intervals per direction = 3 + 1 = 4
     // Total elements = 16
@@ -170,7 +170,7 @@ TEST_CASE("DofMapper 2D get_element_dofs", "[geometry][dof_mapper]") {
         // v-span=1, degree=1: active v-basis = {0, 1}
         // DOFs in tensor-product order (u outer, v inner):
         //   (0,0)=0, (0,1)=3, (1,0)=1, (1,1)=4
-        mapper.get_element_dofs(5, dofs);
+        mapper.get_element_cps(5, dofs);
         REQUIRE(dofs.size() == 4);
         REQUIRE(dofs[0] == 0);
         REQUIRE(dofs[1] == 3);
@@ -184,7 +184,7 @@ TEST_CASE("DofMapper 2D get_element_dofs", "[geometry][dof_mapper]") {
         // v-span=2, degree=1: active v-basis = {1, 2}
         // DOFs in tensor-product order (u outer, v inner):
         //   (1,1)=4, (1,2)=7, (2,1)=5, (2,2)=8
-        mapper.get_element_dofs(10, dofs);
+        mapper.get_element_cps(10, dofs);
         REQUIRE(dofs.size() == 4);
         REQUIRE(dofs[0] == 4);
         REQUIRE(dofs[1] == 7);

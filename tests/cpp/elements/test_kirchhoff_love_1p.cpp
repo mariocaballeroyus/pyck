@@ -120,7 +120,7 @@ TEST_CASE("Kirchhoff-Love 1P Plate: Navier Bi-Sinusoidal Load",
 
             const auto b = (*surface).tensor_product().eval_all(pt, 0);
             std::vector<Index> active;
-            surface->dof_mapper().get_element_dofs(flat, active);
+            surface->dof_mapper().get_element_cps(flat, active);
             Vector<double> u_active(active.size());
             for (std::size_t i = 0; i < active.size(); ++i)
                 u_active(i) = u(active[i]);

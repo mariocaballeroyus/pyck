@@ -30,7 +30,7 @@ Matrix<T> assemble_global_K(const Patch<T, 2>& patch,
     Matrix<T> K = Matrix<T>::Zero(ndof * ncps, ndof * ncps);
 
     GaussLegendre<T, 2> quad(gauss_p);
-    PatchValues<T, 2> pv(patch,
+    ElementValues<T, 2> pv(patch,
                          static_cast<Index>(element.min_order()), quad);
     const std::size_t num_live = static_cast<std::size_t>(pv.num_elements());
 
@@ -39,7 +39,7 @@ Matrix<T> assemble_global_K(const Patch<T, 2>& patch,
         pv.reinit(e);
         element.compute_local_stiffness(pv, Ke);
 
-        const auto& dofs = pv.elem_nodes;
+        const auto& dofs = pv.elem_cps_;
         for (Index i = 0; i < (Index)dofs.size(); ++i) {
             for (Index j = 0; j < (Index)dofs.size(); ++j) {
                 for (Index a = 0; a < ndof; ++a) {

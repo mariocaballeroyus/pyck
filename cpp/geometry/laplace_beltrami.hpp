@@ -35,7 +35,7 @@ struct LaplaceGradAux
  * @brief Build a LaplaceGradAux<T, d> at all quadrature points from a
  *        precomputed IntrinsicGeometry. `ig` must have Order 2 populated
  *        (third derivatives required: the basis must have been evaluated at
- *        order ≥ 3). Christoffels are read from `ig.chr` — caller chooses
+ *        order ≥ 3). Christoffels are read from `ig` — caller chooses
  *        the level when building the intrinsic geometry.
  */
 template <std::floating_point T, std::size_t d>

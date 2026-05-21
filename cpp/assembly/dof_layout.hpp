@@ -87,7 +87,7 @@ public:
      * @brief Expand control-point indices to global DOF indices.
      *
      * Writes the expanded list into a caller-owned buffer (resized in place);
-     * pre-sized workspaces (e.g. `PatchValues::elem_dofs`) make this
+     * pre-sized workspaces (e.g. `ElementValues::elem_dofs`) make this
      * allocation-free.
      */
     void scatter_primal(BlockId block,

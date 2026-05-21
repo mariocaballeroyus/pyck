@@ -192,9 +192,9 @@ TEST_CASE("RM 1P Plate: stiffness matrix size and symmetry", "[RM1P]")
     auto material = std::make_shared<PlaneStress2d<double>>(1.0e6, 0.3, 0.1);
     PlateReissnerMindlin1p<double> element(material);
 
-    // Bind a (p+2)-point Gauss rule to a central live element via PatchValues.
+    // Bind a (p+2)-point Gauss rule to a central live element via ElementValues.
     GaussLegendre<double, 2> gauss(p + 2);
-    PatchValues<double, 2> pv(*surface,
+    ElementValues<double, 2> pv(*surface,
                               static_cast<Index>(element.min_order()), gauss);
     const std::size_t num_live = static_cast<std::size_t>(pv.num_elements());
     pv.reinit(num_live / 2);
@@ -249,9 +249,9 @@ TEST_CASE("RM 1P Plate: thin plate matches KL", "[RM1P]")
     const auto basis_d = (*surf).tensor_product().eval_all(pt, element.min_order());
     const auto act_pts = surf->active_control_pts(flat);
     IntrinsicGeometry<double, 2> ig(basis_d, act_pts);
-    ig.compute_christoffels();   auto N_eff = element.displacement_shape_matrix(*surf, basis_d, ig);
+   auto N_eff = element.displacement_shape_matrix(*surf, basis_d, ig);
     std::vector<Index> active;
-    surf->dof_mapper().get_element_dofs(flat, active);
+    surf->dof_mapper().get_element_cps(flat, active);
 
     Vector<double> u_active(active.size());
     for (std::size_t i = 0; i < active.size(); ++i)
@@ -308,9 +308,9 @@ TEST_CASE("RM 1P Plate: thick plate — captures shear deformation", "[RM1P]")
         const auto basis_d = (*surf).tensor_product().eval_all(pt, element.min_order());
         const auto act_pts = surf->active_control_pts(flat);
         IntrinsicGeometry<double, 2> ig(basis_d, act_pts);
-        ig.compute_christoffels();       auto N_eff = element.displacement_shape_matrix(*surf, basis_d, ig);
+       auto N_eff = element.displacement_shape_matrix(*surf, basis_d, ig);
         std::vector<Index> active;
-    surf->dof_mapper().get_element_dofs(flat, active);
+    surf->dof_mapper().get_element_cps(flat, active);
 
         Vector<double> u_active(active.size());
         for (std::size_t i = 0; i < active.size(); ++i)

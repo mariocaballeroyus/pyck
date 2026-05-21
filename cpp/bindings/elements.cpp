@@ -53,7 +53,7 @@ Matrix<T> eval_global_shape(
     const std::size_t order = element.min_order();
 
     // Number of knot spans per direction — matches the U-inner convention
-    // used by Patch::decode_span and DofMapper::get_element_dofs.
+    // used by Patch::decode_span and DofMapper::get_element_cps.
     std::array<Index, d> n_spans;
     for (std::size_t dir = 0; dir < d; ++dir)
         n_spans[dir] = static_cast<Index>(
@@ -79,7 +79,7 @@ Matrix<T> eval_global_shape(
         auto bd      = patch.tensor_product().eval_all(pt, order);
         auto act_pts = patch.active_control_pts(flat_span);
         IntrinsicGeometry<T, d> lf(bd, act_pts);
-        lf.compute_christoffels();
+
 
         const Matrix<T> N_span = (element.*mem_fn)(patch, bd, lf);
 
@@ -91,7 +91,7 @@ Matrix<T> eval_global_shape(
         }
 
         std::vector<Index> active_cp;
-        patch.dof_mapper().get_element_dofs(flat_span, active_cp);
+        patch.dof_mapper().get_element_cps(flat_span, active_cp);
         const Index n_active = static_cast<Index>(active_cp.size());
 
         const Index row_start = i * n_rows_per_pt;

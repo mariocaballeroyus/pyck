@@ -157,7 +157,7 @@ TEST_CASE("Reissner-Mindlin Plate Stiffness Matrix Size", "[RMPlate]")
 
     // Single-point Gauss on the patch's only non-zero span (live element 0).
     GaussLegendre<double, 2> gauss(1);
-    PatchValues<double, 2> pv(*surface,
+    ElementValues<double, 2> pv(*surface,
                               static_cast<Index>(element.min_order()), gauss);
     pv.reinit(0);
 
@@ -206,7 +206,7 @@ TEST_CASE("RM Plate: SS uniform load — thin plate convergence", "[RMPlate]")
 
     const auto b = (*surf).tensor_product().eval_all(pt, 0);
     std::vector<Index> active;
-    surf->dof_mapper().get_element_dofs(flat, active);
+    surf->dof_mapper().get_element_cps(flat, active);
 
     const Index ndof = 3;
     Vector<double> w_active(active.size());
@@ -257,7 +257,7 @@ TEST_CASE("RM Plate: thick plate — RM > KL deflection coefficient", "[RMPlate]
 
     const auto b = (*surf).tensor_product().eval_all(pt, 0);
     std::vector<Index> active;
-    surf->dof_mapper().get_element_dofs(flat, active);
+    surf->dof_mapper().get_element_cps(flat, active);
 
     const Index ndof = 3;
     auto get_w = [&](const Eigen::VectorXd& u) {

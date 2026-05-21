@@ -35,7 +35,7 @@ BeamTimoshenko1p<T>::strain_matrix(const Patch<T, 1>& /*patch*/,
         auto slab3 = basis[3].col(q);
 
         const T gi          = ig.g_inv(0, 0)(q);
-        const T G           = ig.chr.Gamma(0, 0, 0)(q);
+        const T G           = ig.Gamma(0, 0, 0)(q);
         const T G2          = G * G;
         const T a11_dot_a11 = ig.a_d1(0, 0).row(q).squaredNorm();
         const T a1_dot_a111 = ig.a(0).row(q).dot(ig.a_d2(0, 0, 0).row(q));
@@ -91,7 +91,7 @@ BeamTimoshenko1p<T>::displacement_shape_matrix(const Patch<T, 1>& /*patch*/,
         auto slab2 = basis[2].col(q);
 
         const T gi  = ig.g_inv(0, 0)(q);
-        const T Gam = ig.chr.Gamma(0, 0, 0)(q);
+        const T Gam = ig.Gamma(0, 0, 0)(q);
         const T coef = -ratio * gi;
 
         for (Index i = 0; i < N; ++i)

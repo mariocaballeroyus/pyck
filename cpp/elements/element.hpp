@@ -7,7 +7,7 @@
 #include "patch.hpp"
 #include "tensor_product.hpp"
 #include "intrinsic_geometry.hpp"
-#include "values.hpp"
+#include "element_values.hpp"
 #include "../types.hpp"
 
 namespace pyck
@@ -52,12 +52,12 @@ public:
      * @brief Local stiffness matrix \
      *        K = \int_{\Omega}{ B^T D B dV }.
      *
-     * @param pv Per-element workspace bound via `PatchValues::reinit`. Carries
+     * @param pv Per-element workspace bound via `ElementValues::reinit`. Carries
      *           the patch reference, basis values + derivatives, mapped
      *           quadrature weights, and flat element index.
      * @param stiffness The local stiffness matrix.
      */
-    virtual void compute_local_stiffness(const PatchValues<T, d>& pv,
+    virtual void compute_local_stiffness(const ElementValues<T, d>& pv,
                                          Matrix<T>& stiffness) const;
 
     // === Matrix Operators (Element Formulation-Specific) ============================
@@ -77,8 +77,8 @@ public:
     /**
      * @brief Constitutive operator D at quadrature point q.
      *
-     * @param local The local geometry.
-     * @param q Quadrature point index.
+     * @param ig The intrinsic geometry.
+     * @param q  Quadrature point index.
      * @return The constitutive operator.
      */
     virtual Matrix<T> constitutive_matrix(const IntrinsicGeometry<T, d>& ig,
@@ -134,16 +134,13 @@ Element<T, d>::stress_matrix(const Patch<T, d>& patch,
 
 template <std::floating_point T, std::size_t d>
 void
-Element<T, d>::compute_local_stiffness(const PatchValues<T, d>& pv,
+Element<T, d>::compute_local_stiffness(const ElementValues<T, d>& pv,
                                        Matrix<T>& stiffness) const
 {
-    const Patch<T, d>& patch = pv.patch();
-    const auto& basis        = pv.results;
-    const auto& q_weights    = pv.mapped_weights;
-
-    auto act_pts = patch.active_control_pts(pv.elem_idx);
-    IntrinsicGeometry<T, d> ig(basis, act_pts);
-    ig.compute_christoffels();
+    const Patch<T, d>& patch          = pv.patch();
+    const auto& basis                 = pv.results_;
+    const auto& q_weights             = pv.mapped_weights_;
+    const IntrinsicGeometry<T, d>& ig = pv.intrinsic_geometry_;
 
     const Matrix<T> B    = strain_matrix(patch, basis, ig);
     const Index Q        = q_weights.size();

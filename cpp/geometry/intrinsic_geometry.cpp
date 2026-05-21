@@ -1,37 +1,48 @@
 #include "intrinsic_geometry.hpp"
 
 #include <Eigen/Core>
+#include <cassert>
 #include <cmath>
 
 namespace pyck
 {
 
 template <std::floating_point T, std::size_t d>
-IntrinsicGeometry<T, d>::IntrinsicGeometry(const std::vector<Matrix<T>>& basis,
-                                           const ColMatrix<T, 3>& act_pts)
+void IntrinsicGeometry<T, d>::reinit(const std::vector<Matrix<T>>& basis,
+                                     const ColMatrix<T, 3>& act_pts,
+                                     IntrinsicGeometryFlags flags)
 {
     const Index order_b = static_cast<Index>(basis.size()) - 1;
     const Index Q_      = basis[0].cols();
     const Index N_      = basis[0].rows();
     constexpr Index n_metric = d * (d + 1) / 2;
+    constexpr Index n_d2     = n_metric;
 
-    // --- Allocate position storage per order (data_[k] of shape (Q · n_k) × 3) ------
+    // Best-effort: clamp flags to what the basis can provide. Callers using
+    // default flags get the maximum available; explicit opt-outs still apply.
+    if (order_b < 1) flags.metric          = false;
+    if (order_b < 2) flags.christoffels    = false;
+    if (order_b < 3) flags.christoffels_d1 = false;
+
+    // --- Allocations (flag-gated; no-op when already sized) ---------------------------
 
     position_data.resize(order_b + 1);
     for (Index k = 0; k <= order_b; ++k) {
         const Index n_k = num_multi_indices<d>(k);
         position_data[k].resize(Q_ * n_k, 3);
     }
-    g_data.resize(Q_, n_metric);
-    g_inv_data.resize(Q_, n_metric);
-    jac.resize(Q_);
+    if (flags.metric) {
+        g_data.resize(Q_, n_metric);
+        g_inv_data.resize(Q_, n_metric);
+        jac.resize(Q_);
+    }
+    if (flags.christoffels)    Gamma_data.resize(Q_, d * n_d2);
+    if (flags.christoffels_d1) Gamma_d1_data.resize(Q_, d * n_d2 * d);
 
-    for (Index q = 0; q < Q_; ++q)
-    {
-        // --- Position + all derivatives at q ----------------------------------------
+    // --- Pass 1: position derivatives (always) ----------------------------------------
 
-        for (Index k = 0; k <= order_b; ++k)
-        {
+    for (Index q = 0; q < Q_; ++q) {
+        for (Index k = 0; k <= order_b; ++k) {
             const Index n_k = num_multi_indices<d>(k);
             auto slab = basis[k].col(q);            // length N · n_k
             for (Index packed = 0; packed < n_k; ++packed) {
@@ -40,13 +51,16 @@ IntrinsicGeometry<T, d>::IntrinsicGeometry(const std::vector<Matrix<T>>& basis,
                     deriv_q.noalias() += slab(b * n_k + packed) * act_pts.row(b);
                 }
                 position_data[k].row(packed * Q_ + q) = deriv_q;
-            }
-        }
+            } // derivative indices
+        } // derivative orders
+    } // quadrature pts
 
-        // --- Metric + jacobian (requires order ≥ 1; uses position_data[1]) ----------
+    // --- Pass 2: metric + jacobian ----------------------------------------------------
 
-        if (order_b < 1) continue;
+    if (!flags.metric) return;
 
+    for (Index q = 0; q < Q_; ++q)
+    {
         Eigen::Matrix<T, d, d> g_mat;
         for (Index i = 0; i < d; ++i)
             for (Index j = i; j < d; ++j) {
@@ -64,23 +78,10 @@ IntrinsicGeometry<T, d>::IntrinsicGeometry(const std::vector<Matrix<T>>& basis,
             }
         jac(q) = std::sqrt(det_g);
     }
-}
 
-// === Christoffel Symbols of the Second Kind =========================================
+    // --- Pass 3: Christoffels (+ Γ_d1 in the same loop iff requested) -----------------
 
-template <std::floating_point T, std::size_t d>
-void IntrinsicGeometry<T, d>::compute_christoffels()
-{
-    const Index ord = order();
-    if (ord < 2) return;
-
-    const Index Q_ = Q();
-    constexpr Index n_d2 = d * (d + 1) / 2;
-
-    chr.Gamma_data.resize(Q_, d * n_d2);
-    if (ord >= 3) {
-        chr.Gamma_d1_data.resize(Q_, d * n_d2 * d);
-    }
+    if (!flags.christoffels) return;
 
     for (Index q = 0; q < Q_; ++q)
     {
@@ -108,10 +109,10 @@ void IntrinsicGeometry<T, d>::compute_christoffels()
                 for (std::size_t j = i; j < d; ++j)
                 {
                     const Index packed = m * n_d2 + pack2<d>(i, j);
-                    chr.Gamma_data(q, packed) = aup[m].dot(a_d1(i, j).row(q));
+                    Gamma_data(q, packed) = aup[m].dot(a_d1(i, j).row(q));
                 }
 
-        if (ord < 3) continue;
+        if (!flags.christoffels_d1) continue;
 
         // ∂_w g_{uv}: stored densely in dg[w], symmetric in (u, v).
         std::array<Eigen::Matrix<T, d, d>, d> dg;
@@ -154,7 +155,7 @@ void IntrinsicGeometry<T, d>::compute_christoffels()
                     for (std::size_t gam = 0; gam < d; ++gam)
                     {
                         const Index packed = m * (n_d2 * d) + pack2<d>(i, j) * d + gam;
-                        chr.Gamma_d1_data(q, packed) =
+                        Gamma_d1_data(q, packed) =
                             daup[m][gam].dot(a_d1(i, j).row(q))
                           + aup[m].dot(a_d2(i, j, gam).row(q));
                     }

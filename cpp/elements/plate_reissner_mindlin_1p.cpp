@@ -49,12 +49,12 @@ PlateReissnerMindlin1p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
         auto slab2 = basis[2].col(q);  // (N · 3) Voigt: ∂uu, ∂vv, ∂uv
         auto slab3 = basis[3].col(q);  // (N · 4) lex: ∂uuu, ∂uuv, ∂uvv, ∂vvv
 
-        const T Gam1_11 = ig.chr.Gamma(0, 0, 0)(q);
-        const T Gam1_12 = ig.chr.Gamma(0, 0, 1)(q);
-        const T Gam1_22 = ig.chr.Gamma(0, 1, 1)(q);
-        const T Gam2_11 = ig.chr.Gamma(1, 0, 0)(q);
-        const T Gam2_12 = ig.chr.Gamma(1, 0, 1)(q);
-        const T Gam2_22 = ig.chr.Gamma(1, 1, 1)(q);
+        const T Gam1_11 = ig.Gamma(0, 0, 0)(q);
+        const T Gam1_12 = ig.Gamma(0, 0, 1)(q);
+        const T Gam1_22 = ig.Gamma(0, 1, 1)(q);
+        const T Gam2_11 = ig.Gamma(1, 0, 0)(q);
+        const T Gam2_12 = ig.Gamma(1, 0, 1)(q);
+        const T Gam2_22 = ig.Gamma(1, 1, 1)(q);
         const T G11 = ig.g_inv(0, 0)(q);
         const T G12 = ig.g_inv(0, 1)(q);
         const T G22 = ig.g_inv(1, 1)(q);
@@ -128,12 +128,12 @@ PlateReissnerMindlin1p<T>::displacement_shape_matrix(const Patch<T, 2>& /*patch*
         const T gi11 = ig.g_inv(0, 0)(q);
         const T gi12 = ig.g_inv(0, 1)(q);
         const T gi22 = ig.g_inv(1, 1)(q);
-        const T Gam1_11 = ig.chr.Gamma(0, 0, 0)(q);
-        const T Gam1_12 = ig.chr.Gamma(0, 0, 1)(q);
-        const T Gam1_22 = ig.chr.Gamma(0, 1, 1)(q);
-        const T Gam2_11 = ig.chr.Gamma(1, 0, 0)(q);
-        const T Gam2_12 = ig.chr.Gamma(1, 0, 1)(q);
-        const T Gam2_22 = ig.chr.Gamma(1, 1, 1)(q);
+        const T Gam1_11 = ig.Gamma(0, 0, 0)(q);
+        const T Gam1_12 = ig.Gamma(0, 0, 1)(q);
+        const T Gam1_22 = ig.Gamma(0, 1, 1)(q);
+        const T Gam2_11 = ig.Gamma(1, 0, 0)(q);
+        const T Gam2_12 = ig.Gamma(1, 0, 1)(q);
+        const T Gam2_22 = ig.Gamma(1, 1, 1)(q);
 
         for (Index i = 0; i < N; ++i)
         {

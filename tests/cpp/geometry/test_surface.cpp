@@ -80,8 +80,8 @@ TEST_CASE("Patch<double, 2>: Flat Rectangular Plate", "[geometry][surface]") {
         pts << 0.4, 0.6;
         const auto b     = surf.tensor_product().eval_all(pts, 3);
         IntrinsicGeometry<double, 2> local(b, act);
-        local.compute_christoffels();
-        const auto& chr = local.chr;
+
+        const auto& chr = local;
         CHECK(chr.Gamma(0, 0, 0)(0) == Approx(0.0).margin(1e-14));
         CHECK(chr.Gamma(0, 0, 1)(0) == Approx(0.0).margin(1e-14));
         CHECK(chr.Gamma(0, 1, 1)(0) == Approx(0.0).margin(1e-14));
@@ -337,8 +337,8 @@ TEST_CASE("Patch<double, 2>: composable primitives on twisted z=u·v patch",
     const auto b      = surf.tensor_product().eval_all(pts, 3);
     const auto actpts = surf.active_control_pts(elem_idx);
     IntrinsicGeometry<double, 2> local(b, actpts);
-    local.compute_christoffels();
-    const auto& chr = local.chr;
+
+    const auto& chr = local;
     const ExtrinsicGeometry<double, 2> eg_local(local);
     const auto& a3     = eg_local.n;
     const auto& nd_a31 = eg_local.n_d1(0);
@@ -447,8 +447,8 @@ TEST_CASE("Patch<double, 2>: ∂Γ on twisted z=u·v patch",
     const auto b      = surf.tensor_product().eval_all(pts, 3);
     const auto actpts = surf.active_control_pts(elem_idx);
     IntrinsicGeometry<double, 2> local(b, actpts);
-    local.compute_christoffels();
-    const auto& chr = local.chr;
+
+    const auto& chr = local;
 
     for (Eigen::Index q = 0; q < pts.rows(); ++q) {
         const double u  = pts(q, 0);
@@ -509,22 +509,22 @@ TEST_CASE("Patch<double, 2>: Intrinsic/Extrinsic containers compose correctly",
     const auto actpts = surf.active_control_pts(elem_idx);
 
     IntrinsicGeometry<double, 2> ig(basis, actpts);
-    ig.compute_christoffels();
+
     ExtrinsicGeometry<double, 2> eg(ig);
-    eg.compute_curvature(ig);
+
 
     for (Eigen::Index q = 0; q < pts.rows(); ++q) {
         // Christoffels: the one non-zero on this patch.
-        CHECK(ig.chr.Gamma(0, 0, 1)(q) != 0.0);
-        CHECK(ig.chr.Gamma(1, 0, 1)(q) != 0.0);
+        CHECK(ig.Gamma(0, 0, 1)(q) != 0.0);
+        CHECK(ig.Gamma(1, 0, 1)(q) != 0.0);
 
         // Normal.
         for (Eigen::Index c = 0; c < 3; ++c)
             CHECK(std::isfinite(eg.n(q, c)));
 
         // Curvature: b_{12} = 1/√D on this patch (the non-zero one).
-        CHECK(std::isfinite(eg.curv.b      (0, 1)(q)));
-        CHECK(std::isfinite(eg.curv.b_mixed(0, 1)(q)));
+        CHECK(std::isfinite(eg.b(0, 1)(q)));
+        CHECK(std::isfinite(eg.b_mixed(0, 1)(q)));
     }
 }
 

@@ -31,7 +31,7 @@ BeamEulerBernoulli1p<T>::strain_matrix(const Patch<T, 1>& /*patch*/,
         auto slab1 = basis[1].col(q);  // N
         auto slab2 = basis[2].col(q);  // N
 
-        const T Gam = ig.chr.Gamma(0, 0, 0)(q);
+        const T Gam = ig.Gamma(0, 0, 0)(q);
 
         for (Index i = 0; i < N; ++i)
         {

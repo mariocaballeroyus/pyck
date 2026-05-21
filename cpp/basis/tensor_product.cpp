@@ -53,10 +53,10 @@ Index TensorProduct<T, d>::num_elements() const
 }
 
 template <std::floating_point T, std::size_t d>
-std::array<Index, d> TensorProduct<T, d>::decode_element(Index live_idx) const
+std::array<Index, d> TensorProduct<T, d>::decode_element(Index elem_idx) const
 {
     std::array<Index, d> spans;
-    Index t = live_idx;
+    Index t = elem_idx;
     for (std::size_t i = 0; i < d; ++i) {
         const auto& nz = bases_[i]->knot_vector().non_zero_spans();
         const Index n_i = static_cast<Index>(nz.size());
