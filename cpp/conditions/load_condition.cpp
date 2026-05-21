@@ -130,7 +130,8 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
         Vector<T> local_load = N_w.transpose() * W_J_T;
 
         // Scatter into the element's global DOFs (node-major layout).
-        auto elem_nodes = patch.dof_mapper().get_element_dofs(elem_idx);
+        std::vector<Index> elem_nodes;
+        patch.dof_mapper().get_element_dofs(elem_idx, elem_nodes);
         for (std::size_t k = 0; k < elem_nodes.size(); ++k) {
             for (Index v = 0; v < ndof; ++v) {
                 element_load_(elem_nodes[k] * ndof + v) += local_load(k * ndof + v);

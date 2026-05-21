@@ -113,8 +113,10 @@ TEST_CASE("DofMapper 1D get_element_dofs", "[geometry][dof_mapper]") {
     // Span 6: [1, 1)     zero-length
     DofMapper<1> mapper({5}, {2});
 
+    std::vector<Index> dofs;
+
     SECTION("Interior element (span 2)") {
-        auto dofs = mapper.get_element_dofs(2);
+        mapper.get_element_dofs(2, dofs);
         REQUIRE(dofs.size() == 3);
         REQUIRE(dofs[0] == 0);
         REQUIRE(dofs[1] == 1);
@@ -122,7 +124,7 @@ TEST_CASE("DofMapper 1D get_element_dofs", "[geometry][dof_mapper]") {
     }
 
     SECTION("Interior element (span 3)") {
-        auto dofs = mapper.get_element_dofs(3);
+        mapper.get_element_dofs(3, dofs);
         REQUIRE(dofs.size() == 3);
         REQUIRE(dofs[0] == 1);
         REQUIRE(dofs[1] == 2);
@@ -130,7 +132,7 @@ TEST_CASE("DofMapper 1D get_element_dofs", "[geometry][dof_mapper]") {
     }
 
     SECTION("Interior element (span 4)") {
-        auto dofs = mapper.get_element_dofs(4);
+        mapper.get_element_dofs(4, dofs);
         REQUIRE(dofs.size() == 3);
         REQUIRE(dofs[0] == 2);
         REQUIRE(dofs[1] == 3);
@@ -139,13 +141,13 @@ TEST_CASE("DofMapper 1D get_element_dofs", "[geometry][dof_mapper]") {
 
     SECTION("Zero-length span at start (span 0)") {
         // span=0, degree=2 -> active = max(0,0-2)..min(0,4) = 0..0
-        auto dofs = mapper.get_element_dofs(0);
+        mapper.get_element_dofs(0, dofs);
         REQUIRE(dofs.size() == 1);
         REQUIRE(dofs[0] == 0);
     }
 
     SECTION("Out of bounds element") {
-        REQUIRE_THROWS_AS(mapper.get_element_dofs(7), std::invalid_argument);
+        REQUIRE_THROWS_AS(mapper.get_element_dofs(7, dofs), std::invalid_argument);
     }
 }
 
@@ -160,6 +162,7 @@ TEST_CASE("DofMapper 2D get_element_dofs", "[geometry][dof_mapper]") {
     //  j=0: 0  1  2
     //       i=0 i=1 i=2
     DofMapper<2> mapper({3, 3}, {1, 1});
+    std::vector<Index> dofs;
 
     SECTION("First non-zero span (1,1)") {
         // elem_idx for span (1,1): 1*4 + 1 = 5
@@ -167,7 +170,7 @@ TEST_CASE("DofMapper 2D get_element_dofs", "[geometry][dof_mapper]") {
         // v-span=1, degree=1: active v-basis = {0, 1}
         // DOFs in tensor-product order (u outer, v inner):
         //   (0,0)=0, (0,1)=3, (1,0)=1, (1,1)=4
-        auto dofs = mapper.get_element_dofs(5);
+        mapper.get_element_dofs(5, dofs);
         REQUIRE(dofs.size() == 4);
         REQUIRE(dofs[0] == 0);
         REQUIRE(dofs[1] == 3);
@@ -181,7 +184,7 @@ TEST_CASE("DofMapper 2D get_element_dofs", "[geometry][dof_mapper]") {
         // v-span=2, degree=1: active v-basis = {1, 2}
         // DOFs in tensor-product order (u outer, v inner):
         //   (1,1)=4, (1,2)=7, (2,1)=5, (2,2)=8
-        auto dofs = mapper.get_element_dofs(10);
+        mapper.get_element_dofs(10, dofs);
         REQUIRE(dofs.size() == 4);
         REQUIRE(dofs[0] == 4);
         REQUIRE(dofs[1] == 7);

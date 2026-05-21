@@ -75,7 +75,8 @@ void PenaltyBoundaryCondition<T, d>::apply(Matrix<T>& stiffness,
         IntrinsicGeometry<T, d> parent_ig(parent_basis, parent_act);
         parent_ig.compute_christoffels();
 
-        auto elem_dofs = parent.dof_mapper().get_element_dofs(flat_parent);
+        std::vector<Index> elem_dofs;
+        parent.dof_mapper().get_element_dofs(flat_parent, elem_dofs);
         const Index n_elem = static_cast<Index>(elem_dofs.size());
         const Index K_elem = n_elem * ndof;
 
@@ -100,8 +101,8 @@ void PenaltyBoundaryCondition<T, d>::apply(Matrix<T>& stiffness,
         }
 
         // Scatter once per span.
-        std::vector<Index> cps(elem_dofs.begin(), elem_dofs.end());
-        auto dofs = layout.scatter_primal(primal_block, cps);
+        std::vector<Index> dofs;
+        layout.scatter_primal(primal_block, elem_dofs, dofs);
         const Index n = static_cast<Index>(dofs.size());
         for (Index i = 0; i < n; ++i)
         {

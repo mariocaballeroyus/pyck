@@ -7,6 +7,7 @@
 #include "patch.hpp"
 #include "tensor_product.hpp"
 #include "intrinsic_geometry.hpp"
+#include "values.hpp"
 #include "../types.hpp"
 
 namespace pyck
@@ -51,17 +52,12 @@ public:
      * @brief Local stiffness matrix \
      *        K = \int_{\Omega}{ B^T D B dV }.
      *
-     * @param patch The patch.
-     * @param elem_idx The element index.
-     * @param basis Pre-evaluated basis-and-derivatives at this element's
-     *              quadrature points (per-order packed buffer).
-     * @param q_weights The quadrature weights.
+     * @param pv Per-element workspace bound via `PatchValues::reinit`. Carries
+     *           the patch reference, basis values + derivatives, mapped
+     *           quadrature weights, and flat element index.
      * @param stiffness The local stiffness matrix.
      */
-    virtual void compute_local_stiffness(const Patch<T, d>& patch,
-                                         Index elem_idx,
-                                         const std::vector<Matrix<T>>& basis,
-                                         const Vector<T>& q_weights,
+    virtual void compute_local_stiffness(const PatchValues<T, d>& pv,
                                          Matrix<T>& stiffness) const;
 
     // === Matrix Operators (Element Formulation-Specific) ============================
@@ -138,13 +134,14 @@ Element<T, d>::stress_matrix(const Patch<T, d>& patch,
 
 template <std::floating_point T, std::size_t d>
 void
-Element<T, d>::compute_local_stiffness(const Patch<T, d>& patch,
-                                       Index elem_idx,
-                                       const std::vector<Matrix<T>>& basis,
-                                       const Vector<T>& q_weights,
+Element<T, d>::compute_local_stiffness(const PatchValues<T, d>& pv,
                                        Matrix<T>& stiffness) const
 {
-    auto act_pts = patch.active_control_pts(elem_idx);
+    const Patch<T, d>& patch = pv.patch();
+    const auto& basis        = pv.basis_out;
+    const auto& q_weights    = pv.mapped_weights;
+
+    auto act_pts = patch.active_control_pts(pv.elem_idx);
     IntrinsicGeometry<T, d> ig(basis, act_pts);
     ig.compute_christoffels();
 

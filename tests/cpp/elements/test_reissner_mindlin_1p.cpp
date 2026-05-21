@@ -192,19 +192,15 @@ TEST_CASE("RM 1P Plate: stiffness matrix size and symmetry", "[RM1P]")
     auto material = std::make_shared<PlaneStress2d<double>>(1.0e6, 0.3, 0.1);
     PlateReissnerMindlin1p<double> element(material);
 
-    auto gauss = std::make_shared<GaussLegendre<double, 2>>(p + 2);
-
-    // Pick a central element
-    Index num_sp = knots->knot_vector().num_spans();
-    Index elem_idx = (num_sp / 2) * num_sp + (num_sp / 2);
-
-    ColMatrix<double, 2> q_points = gauss->points();
-    Vector<double> q_weights = gauss->weights();
+    // Bind a (p+2)-point Gauss rule to a central live element via PatchValues.
+    GaussLegendre<double, 2> gauss(p + 2);
+    PatchValues<double, 2> pv(*surface,
+                              static_cast<Index>(element.min_order()), gauss);
+    const std::size_t num_live = static_cast<std::size_t>(pv.num_elements());
+    pv.reinit(num_live / 2);
 
     Matrix<double> stiffness;
-    auto basis = surface->tensor_product().eval(
-        q_points, static_cast<Index>(element.min_order()));
-    element.compute_local_stiffness(*surface, elem_idx, basis, q_weights, stiffness);
+    element.compute_local_stiffness(pv, stiffness);
 
     // n*n = 36 total, but element-level is (p+1)^2 = 16 for p=3
     Index local_n = (p + 1) * (p + 1);
@@ -254,7 +250,8 @@ TEST_CASE("RM 1P Plate: thin plate matches KL", "[RM1P]")
     const auto act_pts = surf->active_control_pts(flat);
     IntrinsicGeometry<double, 2> ig(basis_d, act_pts);
     ig.compute_christoffels();   auto N_eff = element.displacement_shape_matrix(*surf, basis_d, ig);
-    auto active = surf->dof_mapper().get_element_dofs(flat);
+    std::vector<Index> active;
+    surf->dof_mapper().get_element_dofs(flat, active);
 
     Vector<double> u_active(active.size());
     for (std::size_t i = 0; i < active.size(); ++i)
@@ -312,7 +309,8 @@ TEST_CASE("RM 1P Plate: thick plate — captures shear deformation", "[RM1P]")
         const auto act_pts = surf->active_control_pts(flat);
         IntrinsicGeometry<double, 2> ig(basis_d, act_pts);
         ig.compute_christoffels();       auto N_eff = element.displacement_shape_matrix(*surf, basis_d, ig);
-        auto active = surf->dof_mapper().get_element_dofs(flat);
+        std::vector<Index> active;
+    surf->dof_mapper().get_element_dofs(flat, active);
 
         Vector<double> u_active(active.size());
         for (std::size_t i = 0; i < active.size(); ++i)

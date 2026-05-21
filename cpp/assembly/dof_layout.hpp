@@ -86,21 +86,23 @@ public:
     /**
      * @brief Expand control-point indices to global DOF indices.
      *
-     * For each control point, returns all its DOF indices (accounting for stride).
+     * Writes the expanded list into a caller-owned buffer (resized in place);
+     * pre-sized workspaces (e.g. `PatchValues::elem_dofs`) make this
+     * allocation-free.
      */
-    std::vector<Index> scatter_primal(BlockId block,
-                                      const std::vector<Index>& control_pts) const
+    void scatter_primal(BlockId block,
+                        const std::vector<Index>& control_pts,
+                        std::vector<Index>& out) const
     {
         const auto& b = blocks_[block];
-        std::vector<Index> out;
-        out.reserve(control_pts.size() * b.stride);
+        out.resize(control_pts.size() * static_cast<std::size_t>(b.stride));
+        std::size_t w = 0;
         for (auto cp : control_pts) {
             const Index base_cp = b.base + cp * b.stride;
             for (Index v = 0; v < b.stride; ++v) {
-                out.push_back(base_cp + v);
+                out[w++] = base_cp + v;
             }
         }
-        return out;
     }
 
     /// @brief Total number of DOFs declared so far.

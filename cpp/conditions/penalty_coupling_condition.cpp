@@ -123,12 +123,12 @@ void PenaltyCouplingCondition<T, d>::apply(
         parent_ig_b.compute_christoffels();
 
         // DOFs on each side.
-        auto cps_a = parent_a.dof_mapper().get_element_dofs(flat_a);
-        auto cps_b = parent_b.dof_mapper().get_element_dofs(flat_b);
-        std::vector<Index> cps_a_v(cps_a.begin(), cps_a.end());
-        std::vector<Index> cps_b_v(cps_b.begin(), cps_b.end());
-        auto dofs_a = layout.scatter_primal(block_a, cps_a_v);
-        auto dofs_b = layout.scatter_primal(block_b, cps_b_v);
+        std::vector<Index> cps_a, cps_b;
+        parent_a.dof_mapper().get_element_dofs(flat_a, cps_a);
+        parent_b.dof_mapper().get_element_dofs(flat_b, cps_b);
+        std::vector<Index> dofs_a, dofs_b;
+        layout.scatter_primal(block_a, cps_a, dofs_a);
+        layout.scatter_primal(block_b, cps_b, dofs_b);
         const Index Na = static_cast<Index>(dofs_a.size());
         const Index Nb = static_cast<Index>(dofs_b.size());
 

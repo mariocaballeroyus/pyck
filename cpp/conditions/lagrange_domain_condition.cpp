@@ -100,9 +100,10 @@ void LagrangeDomainCondition<T, d>::apply(
         IntrinsicGeometry<T, d> local(basis, act_pts);
         const Index n_basis = basis[0].rows();
 
-        auto elem_cps = patch_.dof_mapper().get_element_dofs(elem_idx);
-        std::vector<Index> elem_cps_v(elem_cps.begin(), elem_cps.end());
-        auto primal_dofs = layout.scatter_primal(primal_block, elem_cps_v);
+        std::vector<Index> elem_cps;
+        patch_.dof_mapper().get_element_dofs(elem_idx, elem_cps);
+        std::vector<Index> primal_dofs;
+        layout.scatter_primal(primal_block, elem_cps, primal_dofs);
         // primal_dofs is CP-major, ndof-inner: primal_dofs[i*ndof + v].
 
         // Element-wise integrated measure dω = w_q · |J|_q, used for the load

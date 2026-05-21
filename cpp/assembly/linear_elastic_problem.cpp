@@ -54,30 +54,25 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
         const auto& patch = *patches_[p];
         const auto& element = *elements_[p];
         const auto& quadrature = *quadratures_[p];
-        const auto& mapper = patch.dof_mapper();
         const DofLayout::BlockId primal_block = primal_blocks[p];
 
-        // Total number of candidate elements in the patch (includes zero-volume
-        // spans; PatchValues::reinit filters them).
-        std::size_t total_elements = 1;
-        const auto& tp_intervals = patch.tensor_product().num_intervals();
-        for (std::size_t i = 0; i < d; ++i) {
-            total_elements *= tp_intervals[i];
-        }
-
-        PatchValues<T, d> patch_values(patch, element, quadrature);
+        PatchValues<T, d> patch_values(patch,
+                                       static_cast<Index>(element.min_order()),
+                                       quadrature);
+        const std::size_t num_live = static_cast<std::size_t>(patch_values.num_elements());
 
         // === Element Loop ===========================================================
-        for (std::size_t elem_idx = 0; elem_idx < total_elements; ++elem_idx) {
-            if (!patch_values.reinit(elem_idx)) continue;
+        for (std::size_t e = 0; e < num_live; ++e) {
+            patch_values.reinit(e);
 
-            element.compute_local_stiffness(patch, elem_idx,
-                                            patch_values.basis_out,
-                                            patch_values.mapped_weights, Ke);
+            element.compute_local_stiffness(patch_values, Ke);
 
-            auto elem_nodes = mapper.get_element_dofs(elem_idx);
-            auto elem_dofs  = layout_.scatter_primal(primal_block, elem_nodes);
+            layout_.scatter_primal(primal_block, patch_values.elem_nodes,
+                                   patch_values.elem_dofs);
+            const auto& elem_dofs = patch_values.elem_dofs;
             const std::size_t Ne = elem_dofs.size();
+
+            // Write into global matrix
             for (std::size_t i = 0; i < Ne; ++i) {
                 for (std::size_t j = 0; j < Ne; ++j) {
                     K(elem_dofs[i], elem_dofs[j]) += Ke(i, j);
@@ -86,16 +81,14 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
         }
     }
 
-    // Apply per-patch conditions (loads, penalty/Nitsche/Lagrange BCs, etc.).
-    // Conditions receive the full primal_blocks vector and use their stored
-    // patch_idx_ (or interface info, for coupling) to pick the relevant blocks.
+    // --- Conditions -----------------------------------------------------------------
     for (std::size_t p = 0; p < patches_.size(); ++p) {
         for (const auto& cond : conditions_per_patch_[p]) {
             cond->apply(K, F, layout_, primal_blocks);
         }
     }
 
-    // Apply exact constraints (Master-Slave first, Dirichlet last).
+    // --- Constraints ----------------------------------------------------------------
     for (const auto& constraint : constraints_) {
         constraint->apply(K, F);
     }

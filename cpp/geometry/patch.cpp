@@ -73,7 +73,8 @@ template <std::floating_point T, std::size_t d>
 ColMatrix<T, 3>
 Patch<T, d>::active_control_pts(const std::array<Index, d>& spans) const
 {
-    auto dofs = dof_mapper_.get_element_dofs(spans);
+    std::vector<Index> dofs;
+    dof_mapper_.get_element_dofs(spans, dofs);
     ColMatrix<T, 3> pts(dofs.size(), 3);
     for (Index i = 0; i < dofs.size(); ++i) {
         pts.row(i) = control_pts_.row(dofs[i]);

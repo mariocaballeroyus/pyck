@@ -78,7 +78,8 @@ static double eval_w_at(const Ptr<Patch<double, 2>>& patch,
     Index flat = su + sv * ni_u;
 
     const auto b = (*patch).tensor_product().eval(pt, 0);
-    auto active = patch->dof_mapper().get_element_dofs(flat);
+    std::vector<Index> active;
+    patch->dof_mapper().get_element_dofs(flat, active);
     Vector<double> w_active(active.size());
     for (std::size_t i = 0; i < active.size(); ++i)
         w_active(i) = u_full(dof_offset + active[i] * ndof + 0);

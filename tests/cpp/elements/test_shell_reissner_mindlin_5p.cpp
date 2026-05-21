@@ -25,34 +25,21 @@ Matrix<T> assemble_global_K(const Patch<T, 2>& patch,
                             const Element<T, 2>& element,
                             int gauss_p)
 {
-    auto intervals = patch.tensor_product().num_intervals();
     const Index ndof = element.num_node_dofs();
     const Index ncps = patch.num_control_pts();
     Matrix<T> K = Matrix<T>::Zero(ndof * ncps, ndof * ncps);
 
     GaussLegendre<T, 2> quad(gauss_p);
+    PatchValues<T, 2> pv(patch,
+                         static_cast<Index>(element.min_order()), quad);
+    const std::size_t num_live = static_cast<std::size_t>(pv.num_elements());
 
-    const Index Q = static_cast<Index>(quad.num_points());
-    ColMatrix<T, 2> pts(Q, 2);
-    Vector<T>       w(Q);
-    for (Index e = 0; e < intervals[0] * intervals[1]; ++e) {
-        auto spans = patch.decode_span(e);
-        std::array<T, 2> lo, hi;
-        bool zero_vol = false;
-        for (int d = 0; d < 2; ++d) {
-            auto [l, h] = patch.basis(d).knot_vector().span_bounds(spans[d]);
-            lo[d] = l; hi[d] = h;
-            if (std::abs(h - l) < 1e-14) { zero_vol = true; break; }
-        }
-        if (zero_vol) continue;
+    Matrix<T> Ke;
+    for (std::size_t e = 0; e < num_live; ++e) {
+        pv.reinit(e);
+        element.compute_local_stiffness(pv, Ke);
 
-        quad.map_to_domain(lo, hi, pts, w);
-        auto basis = patch.tensor_product().eval(
-            pts, static_cast<Index>(element.min_order()));
-        Matrix<T> Ke;
-        element.compute_local_stiffness(patch, e, basis, w, Ke);
-
-        const auto dofs = patch.dof_mapper().get_element_dofs(spans);
+        const auto& dofs = pv.elem_nodes;
         for (Index i = 0; i < (Index)dofs.size(); ++i) {
             for (Index j = 0; j < (Index)dofs.size(); ++j) {
                 for (Index a = 0; a < ndof; ++a) {

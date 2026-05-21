@@ -155,24 +155,14 @@ TEST_CASE("Reissner-Mindlin Plate Stiffness Matrix Size", "[RMPlate]")
     auto material = std::make_shared<PlaneStress2d<double>>(1.0e6, 0.3, 0.1);
     PlateReissnerMindlin3p<double> element(material);
 
+    // Single-point Gauss on the patch's only non-zero span (live element 0).
+    GaussLegendre<double, 2> gauss(1);
+    PatchValues<double, 2> pv(*surface,
+                              static_cast<Index>(element.min_order()), gauss);
+    pv.reinit(0);
+
     Matrix<double> stiffness;
-    auto gauss = std::make_shared<GaussLegendre<double, 2>>(p + 1);
-    
-    // Evaluate on the single span (0,0)
-    std::array<double, 1> q_pts = {0.5}; 
-    ColMatrix<double, 2> q_points(1, 2);
-    q_points << 0.5, 0.5;
-    Vector<double> q_weights(1);
-    q_weights << 1.0;
-
-    // For p=2, n=3, intervals = n+p = 5. 
-    // Active span (where knots change) is s=2. 
-    // Flat elem_idx = 2 * 5 + 2 = 12.
-    Index elem_idx = 12;
-
-    auto basis = surface->tensor_product().eval(
-        q_points, static_cast<Index>(element.min_order()));
-    element.compute_local_stiffness(*surface, elem_idx, basis, q_weights, stiffness);
+    element.compute_local_stiffness(pv, stiffness);
 
     // 9 nodes * 3 DOFs/node = 27
     REQUIRE(stiffness.rows() == 27);
@@ -215,7 +205,8 @@ TEST_CASE("RM Plate: SS uniform load — thin plate convergence", "[RMPlate]")
     Index flat = span_u + span_v * intervals[0];   // u-fastest
 
     const auto b = (*surf).tensor_product().eval(pt, 0);
-    auto active = surf->dof_mapper().get_element_dofs(flat);
+    std::vector<Index> active;
+    surf->dof_mapper().get_element_dofs(flat, active);
 
     const Index ndof = 3;
     Vector<double> w_active(active.size());
@@ -265,7 +256,8 @@ TEST_CASE("RM Plate: thick plate — RM > KL deflection coefficient", "[RMPlate]
     Index flat = span_u + span_v * intervals[0];   // u-fastest
 
     const auto b = (*surf).tensor_product().eval(pt, 0);
-    auto active = surf->dof_mapper().get_element_dofs(flat);
+    std::vector<Index> active;
+    surf->dof_mapper().get_element_dofs(flat, active);
 
     const Index ndof = 3;
     auto get_w = [&](const Eigen::VectorXd& u) {

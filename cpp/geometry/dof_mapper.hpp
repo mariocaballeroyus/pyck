@@ -69,20 +69,28 @@ public:
     std::vector<Index> get_layer_dofs(Index param_dim, bool at_start, Index layer_idx) const;
 
     /**
-     * @brief Get the active global DOF indices for a specific element.
+     * @brief Write active global DOF indices for an element into a caller-owned buffer.
      *
-     * @param elem_idx Flat (lexicographic) element index.
-     * @return Sorted vector of global DOF indices active on the element.
+     * Decodes elem_idx into per-direction spans and forwards to the
+     * span-overload. Prefer the span-overload when spans are known.
+     *
+     * @param elem_idx Flat element index.
+     * @param out      Resized in place; pre-size in a workspace to avoid allocation.
      */
-    std::vector<Index> get_element_dofs(Index elem_idx) const;
+    void get_element_dofs(Index elem_idx, std::vector<Index>& out) const;
 
     /**
-     * @brief Get the active global DOF indices from per-direction span indices.
+     * @brief Write active global DOF indices for an element into a caller-owned buffer.
      *
-     * @param span_indices Per-direction knot-span indices (e.g. {s_u, s_v} for 2D).
-     * @return Sorted vector of global DOF indices active on the element.
+     * Ordering matches TensorProduct::eval_on_span's tensor-product column
+     * layout (dim-0 outer, dim-(d-1) inner) so basis column k pairs with
+     * control-point entry k.
+     *
+     * @param span_indices Per-direction knot-span indices.
+     * @param out          Resized in place; pre-size in a workspace to avoid allocation.
      */
-    std::vector<Index> get_element_dofs(const std::array<Index, d>& span_indices) const;
+    void get_element_dofs(const std::array<Index, d>& span_indices,
+                          std::vector<Index>& out) const;
 
     /**
      * @brief Increment a d-dimensional logical index to the next value in lexicographical order.

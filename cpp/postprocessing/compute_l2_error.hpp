@@ -113,8 +113,9 @@ Vector<T> compute_l2_error(
             phys_pts.row(q) = x_q;
         }
 
-        const auto elem_nodes = patch.dof_mapper().get_element_dofs(
-            static_cast<Index>(elem_idx));
+        std::vector<Index> elem_nodes;
+        patch.dof_mapper().get_element_dofs(
+            static_cast<Index>(elem_idx), elem_nodes);
         Vector<T> u_local(static_cast<Index>(elem_nodes.size() * ndof));
         for (std::size_t k = 0; k < elem_nodes.size(); ++k) {
             for (std::size_t v = 0; v < ndof; ++v) {

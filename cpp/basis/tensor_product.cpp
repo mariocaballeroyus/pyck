@@ -43,6 +43,30 @@ std::array<Index, d> TensorProduct<T, d>::num_intervals() const
 }
 
 template <std::floating_point T, std::size_t d>
+Index TensorProduct<T, d>::num_elements() const
+{
+    Index n = 1;
+    for (std::size_t i = 0; i < d; ++i) {
+        n *= static_cast<Index>(bases_[i]->knot_vector().non_zero_spans().size());
+    }
+    return n;
+}
+
+template <std::floating_point T, std::size_t d>
+std::array<Index, d> TensorProduct<T, d>::decode_element(Index live_idx) const
+{
+    std::array<Index, d> spans;
+    Index t = live_idx;
+    for (std::size_t i = 0; i < d; ++i) {
+        const auto& nz = bases_[i]->knot_vector().non_zero_spans();
+        const Index n_i = static_cast<Index>(nz.size());
+        spans[i] = static_cast<Index>(nz[t % n_i]);
+        t /= n_i;
+    }
+    return spans;
+}
+
+template <std::floating_point T, std::size_t d>
 const Basis<T>& TensorProduct<T, d>::basis(Index dir) const
 {
     if (dir >= d) {
@@ -59,6 +83,7 @@ TensorProduct<T, d>::eval_on_span(const std::type_identity_t<ColMatrix<T, d>>& c
                                   const std::array<Index, d>& spans,
                                   Index order,
                                   Evaluator<T>& ev,
+                                  std::array<std::vector<Matrix<T>>, d>& uni,
                                   std::vector<Matrix<T>>& out) const
 {
     if (order < 0 || order > 3) {
@@ -68,11 +93,12 @@ TensorProduct<T, d>::eval_on_span(const std::type_identity_t<ColMatrix<T, d>>& c
 
     const Index Q = static_cast<Index>(coords.rows());
 
-    // Univariate factors. The Evaluator scratch is shared with the 1D basis
-    // evaluations; passing it in lets the caller reuse one allocation across
-    // many calls to this function.
-    std::array<std::vector<Matrix<T>>, d> uni;
-    std::array<Index, d>                  n_b{};
+    // Univariate factors. Both `ev` (recurrence scratch) and `uni` (per-direction
+    // value buffers) are caller-owned, so pre-sized reuse across an assembly
+    // loop avoids per-call heap allocation. `Basis::eval_on_span` infers the
+    // derivative order from `uni[dim].size()`, so the caller must size each
+    // direction's vector to `order + 1` matrices.
+    std::array<Index, d> n_b{};
 
     Index K = 1;
     for (std::size_t dim = 0; dim < d; ++dim) {
@@ -241,10 +267,11 @@ TensorProduct<T, d>::eval(const std::type_identity_t<ColMatrix<T, d>>& coords, I
     std::vector<Matrix<T>> out;
     resize_basis_buffer<T, d>(out, K, Q, order);
 
-    Evaluator<T>            eval;
-    std::vector<Matrix<T>>  results;
-    ColMatrix<T, d>         single_pt(1, d);
-    std::array<Index, d>    spans;
+    Evaluator<T>                          eval;
+    std::array<std::vector<Matrix<T>>, d> uni;
+    std::vector<Matrix<T>>                results;
+    ColMatrix<T, d>                       single_pt(1, d);
+    std::array<Index, d>                  spans;
 
     for (Index q = 0; q < Q; ++q) {
         // Find spans for this point
@@ -253,7 +280,7 @@ TensorProduct<T, d>::eval(const std::type_identity_t<ColMatrix<T, d>>& coords, I
         }
         // Evaluate basis values for this point
         single_pt.row(0) = coords.row(q);
-        eval_on_span(single_pt, spans, order, eval, results);
+        eval_on_span(single_pt, spans, order, eval, uni, results);
         // Copy into output
         for (Index k = 0; k <= order; ++k) {
             out[k].col(q) = results[k].col(0);

@@ -75,10 +75,8 @@ std::vector<Index> DofMapper<d>::get_layer_dofs(Index param_dim,
 }
 
 template <std::size_t d>
-std::vector<Index> DofMapper<d>::get_element_dofs(Index elem_idx) const
+void DofMapper<d>::get_element_dofs(Index elem_idx, std::vector<Index>& out) const
 {
-    // Compute the number of knot-span intervals per direction:
-    //   intervals[i] = num_basis_[i] + degree_[i]
     std::array<Index, d> intervals;
     Index total_elements = 1;
     for (std::size_t i = 0; i < d; ++i) {
@@ -92,8 +90,6 @@ std::vector<Index> DofMapper<d>::get_element_dofs(Index elem_idx) const
         );
     }
 
-    // Decode the flat element index into per-direction span indices
-    // using row-major (last index fastest) convention matching the assembler
     std::array<Index, d> span_indices;
     Index temp = elem_idx;
     for (std::size_t i = 0; i < d; ++i) {
@@ -101,48 +97,79 @@ std::vector<Index> DofMapper<d>::get_element_dofs(Index elem_idx) const
         temp /= intervals[i];
     }
 
-    return get_element_dofs(span_indices);
+    get_element_dofs(span_indices, out);
 }
 
 template <std::size_t d>
-std::vector<Index> DofMapper<d>::get_element_dofs(const std::array<Index, d>& span_indices) const
+void DofMapper<d>::get_element_dofs(const std::array<Index, d>& span_indices,
+                                    std::vector<Index>& out) const
 {
-    // For each direction, collect the (degree+1) active basis function indices.
-    // For span s in direction i the active basis functions are:
-    //   max(0, s - degree_[i]) .. min(s, num_basis_[i] - 1)
-    std::array<std::vector<Index>, d> active_1d;
-    for (std::size_t i = 0; i < d; ++i) {
-        Index s = span_indices[i];
-        Index lo = (s >= degree_[i]) ? (s - degree_[i]) : 0;
-        Index hi = std::min(s, num_basis_[i] - 1);
-        for (Index k = lo; k <= hi; ++k) {
-            active_1d[i].push_back(k);
+    // Active 1D indices in direction i are [lo_i, hi_i] with
+    //   lo_i = max(0, s_i - p_i),  hi_i = min(s_i, n_i - 1).
+    // Output column order: dim-0 outer, dim-(d-1) inner, matching
+    // TensorProduct::eval_on_span's tensor-product column layout.
+    if constexpr (d == 1) {
+        const Index p = degree_[0];
+        const Index n = num_basis_[0];
+        const Index s = span_indices[0];
+        const Index lo = (s >= p) ? s - p : 0;
+        const Index hi = std::min(s, n - 1);
+        const Index N  = hi - lo + 1;
+
+        out.resize(static_cast<std::size_t>(N));
+        for (Index k = 0; k < N; ++k) out[k] = lo + k;
+    }
+    else if constexpr (d == 2) {
+        const Index p_u = degree_[0],    p_v = degree_[1];
+        const Index n_u = num_basis_[0], n_v = num_basis_[1];
+        const Index s_u = span_indices[0], s_v = span_indices[1];
+
+        const Index lo_u = (s_u >= p_u) ? s_u - p_u : 0;
+        const Index hi_u = std::min(s_u, n_u - 1);
+        const Index lo_v = (s_v >= p_v) ? s_v - p_v : 0;
+        const Index hi_v = std::min(s_v, n_v - 1);
+
+        const Index N_u = hi_u - lo_u + 1;
+        const Index N_v = hi_v - lo_v + 1;
+
+        out.resize(static_cast<std::size_t>(N_u * N_v));
+        Index w = 0;
+        for (Index iu = 0; iu < N_u; ++iu) {
+            const Index cp_u = lo_u + iu;
+            for (Index iv = 0; iv < N_v; ++iv) {
+                out[w++] = cp_u + (lo_v + iv) * n_u;
+            }
         }
     }
+    else if constexpr (d == 3) {
+        const Index p_u = degree_[0],    p_v = degree_[1],    p_w = degree_[2];
+        const Index n_u = num_basis_[0], n_v = num_basis_[1], n_w = num_basis_[2];
+        const Index s_u = span_indices[0], s_v = span_indices[1], s_w = span_indices[2];
 
-    // Build the tensor-product of the per-direction 1D index sets and
-    // map each multi-index to a global DOF
-    std::vector<Index> dofs;
-    std::array<Index, d> logical_idx;
-    logical_idx.fill(0);
+        const Index lo_u = (s_u >= p_u) ? s_u - p_u : 0;
+        const Index hi_u = std::min(s_u, n_u - 1);
+        const Index lo_v = (s_v >= p_v) ? s_v - p_v : 0;
+        const Index hi_v = std::min(s_v, n_v - 1);
+        const Index lo_w = (s_w >= p_w) ? s_w - p_w : 0;
+        const Index hi_w = std::min(s_w, n_w - 1);
 
-    // Recursive lambda to iterate over the tensor product of 1D index sets
-    auto iterate = [&](auto& self, std::size_t dim) -> void {
-        if (dim == d) {
-            dofs.push_back(to_global(logical_idx));
-            return;
+        const Index N_u = hi_u - lo_u + 1;
+        const Index N_v = hi_v - lo_v + 1;
+        const Index N_w = hi_w - lo_w + 1;
+
+        out.resize(static_cast<std::size_t>(N_u * N_v * N_w));
+        const Index stride_w = n_u * n_v;
+        Index w_ = 0;
+        for (Index iu = 0; iu < N_u; ++iu) {
+            const Index cp_u = lo_u + iu;
+            for (Index iv = 0; iv < N_v; ++iv) {
+                const Index cp_uv = cp_u + (lo_v + iv) * n_u;
+                for (Index iw = 0; iw < N_w; ++iw) {
+                    out[w_++] = cp_uv + (lo_w + iw) * stride_w;
+                }
+            }
         }
-        for (Index k : active_1d[dim]) {
-            logical_idx[dim] = k;
-            self(self, dim + 1);
-        }
-    };
-
-    iterate(iterate, 0);
-    // NOTE: Do NOT sort — the order must match the tensor-product column
-    // ordering (dim-0 outer, dim-1 inner, …) so that basis function
-    // column k corresponds to control-point / DOF entry k.
-    return dofs;
+    }
 }
 
 template <std::size_t d>

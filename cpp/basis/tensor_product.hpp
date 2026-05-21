@@ -113,6 +113,11 @@ public:
      * @param eval   Recurrence scratch workspace, shared with the 1D basis
      *               evaluators. Reused across calls to avoid per-call
      *               heap allocation of the scratch buffers.
+     * @param uni    Per-direction univariate values + derivatives scratch.
+     *               `uni[dim][k]` is `(p_dim+1) × Q`, populated by the 1D
+     *               `Basis::eval_on_span` and consumed by the tensor-product
+     *               nest. Pre-sizing in the caller (see `PatchValues`) keeps
+     *               this path allocation-free.
      * @param out    Output buffer; resized in place via `resize_basis_buffer`
      *               (no-op if shape unchanged). Reusing one buffer across an
      *               assembly loop makes the steady-state path allocation-free.
@@ -124,31 +129,23 @@ public:
                  const std::array<Index, d>& spans,
                  Index order,
                  Evaluator<T>& eval,
+                 std::array<std::vector<Matrix<T>>, d>& uni,
                  std::vector<Matrix<T>>& out) const;
 
-    /// @brief Convenience overload that constructs the output buffer
-    ///        internally and returns it by move. Hot-path callers should pass
-    ///        a reused output buffer to the primary overload above.
+    /// @brief Convenience overload that constructs the univariate scratch and
+    ///        output buffer internally and returns the latter by move.
+    ///        Hot-path callers should pass reused buffers to the primary
+    ///        overload above.
     std::vector<Matrix<T>>
     eval_on_span(const std::type_identity_t<ColMatrix<T, d>>& coords,
                  const std::array<Index, d>& spans,
                  Index order,
                  Evaluator<T>& eval) const
     {
+        std::array<std::vector<Matrix<T>>, d> uni;
         std::vector<Matrix<T>> out;
-        eval_on_span(coords, spans, order, eval, out);
+        eval_on_span(coords, spans, order, eval, uni, out);
         return out;
-    }
-
-    /// @brief Convenience overload that constructs both the Evaluator and the
-    ///        output buffer internally. One-shot callers only.
-    std::vector<Matrix<T>>
-    eval_on_span(const std::type_identity_t<ColMatrix<T, d>>& coords,
-                 const std::array<Index, d>& spans,
-                 Index order) const
-    {
-        Evaluator<T> eval;
-        return eval_on_span(coords, spans, order, eval);
     }
 
     /**
@@ -189,6 +186,30 @@ public:
 
     /// @brief Get the number of parametric intervals (elements) for each dimension
     std::array<Index, d> num_intervals() const;
+
+    /**
+     * @brief Total number of non-zero-volume elements in this tensor product.
+     *
+     * @details Equal to ∏_i (number of non-zero spans in `basis(i)`). Use this
+     *          as the loop bound for live-element enumeration:
+     *          `for (Index e = 0; e < tp.num_elements(); ++e) ...`. This skips
+     *          the zero-width clamped spans that `num_intervals()` includes.
+     */
+    Index num_elements() const;
+
+    /**
+     * @brief Decode a live-element index into per-direction knot-span indices.
+     *
+     * @details Maps a live index `live_idx ∈ [0, num_elements())` to the
+     *          tuple of underlying knot-span indices (one per parametric
+     *          direction), all of which point at non-zero-width spans by
+     *          construction. The unflattening uses U-inner ordering, matching
+     *          the convention used by `DofMapper` and `decode_span`.
+     *
+     * @param live_idx Live element index. No bounds check; the caller is
+     *                 responsible for staying in `[0, num_elements())`.
+     */
+    std::array<Index, d> decode_element(Index live_idx) const;
 
     /// @brief Get the 1D basis for a given parametric direction (runtime index)
     const Basis<T>& basis(Index dir) const;

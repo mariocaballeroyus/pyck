@@ -95,7 +95,8 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load", "[assembly][eul
     Index span = basis->find_span(0.5);
     const auto b = (*curve).tensor_product().eval(param, 0);
 
-    auto active = curve->dof_mapper().get_element_dofs(span);
+    std::vector<Index> active;
+    curve->dof_mapper().get_element_dofs(span, active);
     Vector<double> u_active(active.size());
     for (std::size_t i = 0; i < active.size(); ++i)
         u_active(i) = u(active[i]);
@@ -181,7 +182,8 @@ TEST_CASE("Euler-Bernoulli Beam: Simply Supported Uniform Load (Cubic Approximat
     Index span2 = basis->find_span(0.5);
     const auto b = (*curve).tensor_product().eval(param, 0);
 
-    auto active = curve->dof_mapper().get_element_dofs(span2);
+    std::vector<Index> active;
+    curve->dof_mapper().get_element_dofs(span2, active);
     Vector<double> u_active(active.size());
     for (std::size_t i = 0; i < active.size(); ++i)
         u_active(i) = u(active[i]);

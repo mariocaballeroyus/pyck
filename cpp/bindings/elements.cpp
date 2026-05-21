@@ -90,7 +90,8 @@ Matrix<T> eval_global_shape(
             initialized = true;
         }
 
-        const auto active_cp = patch.dof_mapper().get_element_dofs(flat_span);
+        std::vector<Index> active_cp;
+        patch.dof_mapper().get_element_dofs(flat_span, active_cp);
         const Index n_active = static_cast<Index>(active_cp.size());
 
         const Index row_start = i * n_rows_per_pt;

@@ -91,7 +91,8 @@ LagrangeBoundaryCondition<T, d>::apply(Matrix<T>& stiffness, Vector<T>& load,
         auto boundary_act    = boundary_.active_control_pts(s);
         IntrinsicGeometry<T, d - 1> boundary_local(boundary_basis, boundary_act);
 
-        auto multiplier_basis_ids = boundary_.dof_mapper().get_element_dofs(s);
+        std::vector<Index> multiplier_basis_ids;
+        boundary_.dof_mapper().get_element_dofs(s, multiplier_basis_ids);
 
         const Index flat_parent = boundary_.parent_flat_span(s);
         const ColMatrix<T, 2> parent_pts = boundary_.lift_to_parent(mapped_pts);
@@ -100,12 +101,13 @@ LagrangeBoundaryCondition<T, d>::apply(Matrix<T>& stiffness, Vector<T>& load,
         IntrinsicGeometry<T, d> parent_ig(parent_basis, parent_act);
         parent_ig.compute_christoffels();
 
-        auto elem_dofs = parent.dof_mapper().get_element_dofs(flat_parent);
+        std::vector<Index> elem_dofs;
+        parent.dof_mapper().get_element_dofs(flat_parent, elem_dofs);
         const Index n_elem = static_cast<Index>(elem_dofs.size());
         const Index K_elem = n_elem * ndof;
 
-        std::vector<Index> elem_node_cps(elem_dofs.begin(), elem_dofs.end());
-        auto primal_dofs = layout.scatter_primal(primal_block, elem_node_cps);
+        std::vector<Index> primal_dofs;
+        layout.scatter_primal(primal_block, elem_dofs, primal_dofs);
         const Index n_primal = static_cast<Index>(primal_dofs.size());
         const Index n_lambda = static_cast<Index>(multiplier_basis_ids.size());
 
