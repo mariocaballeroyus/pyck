@@ -71,6 +71,7 @@ from pyck.postprocessing import (
     eval_geometry_at,
     eval_shape_at,
     evaluate_field,
+    inner_product,
     integrate_on_patch,
 )
 
@@ -137,5 +138,6 @@ __all__ = [
     "eval_geometry_at",
     "eval_shape_at",
     "evaluate_field",
+    "inner_product",
     "integrate_on_patch",
 ]

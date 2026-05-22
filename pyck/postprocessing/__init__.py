@@ -12,6 +12,7 @@ from pyck.postprocessing.evaluation import (
     evaluate_field,
 )
 from pyck.postprocessing.function import Function
+from pyck.postprocessing.inner_product import inner_product
 from pyck.postprocessing.integrate import integrate_on_patch
 
 __all__ = [
@@ -20,5 +21,6 @@ __all__ = [
     "eval_shape_at",
     "eval_geometry_at",
     "evaluate_field",
+    "inner_product",
     "integrate_on_patch",
 ]

@@ -4,6 +4,7 @@
 #include <pybind11/functional.h>
 
 #include "function.hpp"
+#include "inner_product.hpp"
 
 namespace py = pybind11;
 
@@ -40,6 +41,23 @@ void bind_postprocessing(py::module_& m)
              py::arg("patch"),
              py::arg("field"))
         .def("__call__", &Function<double, 2>::operator(), py::arg("params"));
+
+    // === Quadrature data + inner product ==========================================
+    m.def("eval_quadrature_data",
+          &eval_quadrature_data<double, 1>,
+          py::arg("patch"), py::arg("quadrature"));
+    m.def("eval_quadrature_data",
+          &eval_quadrature_data<double, 2>,
+          py::arg("patch"), py::arg("quadrature"));
+
+    m.def("inner_product",
+          &inner_product<double, 1>,
+          py::arg("patch"), py::arg("quadrature"),
+          py::arg("f_vals"), py::arg("g_vals"));
+    m.def("inner_product",
+          &inner_product<double, 2>,
+          py::arg("patch"), py::arg("quadrature"),
+          py::arg("f_vals"), py::arg("g_vals"));
 }
 
 }
