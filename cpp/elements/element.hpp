@@ -14,6 +14,21 @@ namespace pyck
 {
 
 /**
+ * @brief Field types supported by `Element::eval_field` and `integrate_on_patch`.
+ *
+ * Each tag selects which physical quantity is evaluated at the quadrature
+ * points from `(basis, intrinsic geometry, u_local)`. Component count `k`
+ * depends on the formulation; see the concrete element header.
+ */
+enum class FieldType
+{
+    DISPLACEMENT,  ///< Generalised displacement(s) — N_w · u_local.
+    ROTATION,      ///< Generalised rotation(s)     — N_φ · u_local.
+    STRAIN,        ///< Generalised strain          — B · u_local.
+    STRESS,        ///< Generalised stress          — D · B · u_local.
+};
+
+/**
  * @brief Base class for structural elements of parametric dimension d.
  *
  * @tparam T Scalar type.

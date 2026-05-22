@@ -38,14 +38,13 @@ PlateReissnerMindlin3p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
         const T Gam2_12 = ig.Gamma(1, 0, 1)(q);
         const T Gam2_22 = ig.Gamma(1, 1, 1)(q);
 
-        for (Index i = 0; i < N; ++i)
-        {
+        for (Index i = 0; i < N; ++i) {
             const T N_i   = slab0(i);
             const T N_u_i = slab1(i * 2 + 0);
             const T N_v_i = slab1(i * 2 + 1);
 
-            // B_b = [ 0    N_{i|1} − Γ¹_{11} N_i      −Γ²_{11} N_i           ]   κ_{11}
-            //       [ 0    −Γ¹_{22} N_i               N_{i|2} − Γ²_{22} N_i  ]   κ_{22}
+            // B_b = [ 0    N_{i|1} − Γ¹_{11} N_i      −Γ²_{11} N_i            ]   κ_{11}
+            //       [ 0    −Γ¹_{22} N_i               N_{i|2} − Γ²_{22} N_ i  ]   κ_{22}
             //       [ 0    N_{i|2} − 2 Γ¹_{12} N_i    N_{i|1} − 2 Γ²_{12} N_i ]  2κ_{12}
             B(5*q,     3*i + 1) =  N_u_i - Gam1_11 * N_i;
             B(5*q,     3*i + 2) =        - Gam2_11 * N_i;

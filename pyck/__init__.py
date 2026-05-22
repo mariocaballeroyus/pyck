@@ -66,6 +66,8 @@ from pyck.solver import solve
 import pyck.solver as solver
 from pyck import postprocessing
 from pyck.postprocessing import (
+    FieldType,
+    Function,
     eval_geometry_at,
     eval_shape_at,
     evaluate_field,
@@ -130,6 +132,8 @@ __all__ = [
     "solve",
     "solver",
     "postprocessing",
+    "FieldType",
+    "Function",
     "eval_geometry_at",
     "eval_shape_at",
     "evaluate_field",

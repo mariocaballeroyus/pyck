@@ -62,11 +62,10 @@ add_library(pyck_conditions ${PYCK_CONDITIONS_SOURCES})
 target_include_directories(pyck_conditions PUBLIC cpp/conditions)
 target_link_libraries(pyck_conditions PUBLIC pyck_geometry pyck_assembly)
 
-# Postprocessing library
-file(GLOB PYCK_POSTPROCESSING_SOURCES cpp/postprocessing/*.cpp)
-add_library(pyck_postprocessing ${PYCK_POSTPROCESSING_SOURCES})
-target_include_directories(pyck_postprocessing PUBLIC cpp/postprocessing)
-target_link_libraries(pyck_postprocessing PUBLIC pyck_geometry pyck_quadrature)
+# Postprocessing library (header-only)
+add_library(pyck_postprocessing INTERFACE)
+target_include_directories(pyck_postprocessing INTERFACE cpp/postprocessing)
+target_link_libraries(pyck_postprocessing INTERFACE pyck_geometry pyck_quadrature)
 
 # Elements library
 file(GLOB PYCK_ELEMENTS_SOURCES cpp/elements/*.cpp)

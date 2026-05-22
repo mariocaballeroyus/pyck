@@ -9,7 +9,6 @@
 #include "tensor_product.hpp"
 #include "intrinsic_geometry.hpp"
 #include "extrinsic_geometry.hpp"
-#include "physical_points.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
 #include "knot_vector.hpp"
@@ -168,35 +167,6 @@ TEST_CASE("Patch<double, 2>: Rectangle factory area integral", "[geometry][surfa
         }
 
         CHECK(area == Approx(W * H).margin(1e-10));
-    }
-}
-
-
-// ===========================================================================
-// Test 3: eval_physical_points free function.
-// ===========================================================================
-
-TEST_CASE("Patch<double, 2>: eval_physical_points on a flat rectangle",
-          "[geometry][surface]") {
-
-    auto kv = KnotVector<double>(std::vector<double>{0, 0, 1, 1});
-    auto basis_u = std::make_shared<BSpline<double>>(1, kv);
-    auto basis_v = std::make_shared<BSpline<double>>(1, kv);
-
-    const double Lx = 2.0, Ly = 3.0;
-    auto surf = rectangle<double>(basis_u, basis_v, Lx, Ly);
-
-    GaussLegendre<double, 2> quad(2);
-    auto phys_pts = eval_physical_points<double, 2>(surf, quad);
-
-    // 2×2 quadrature × 1 non-zero element = 4 physical points.
-    CHECK(phys_pts.rows() == 4);
-    for (Eigen::Index i = 0; i < phys_pts.rows(); ++i) {
-        CHECK(phys_pts(i, 2) == Approx(0.0).margin(1e-14));
-        CHECK(phys_pts(i, 0) >= -1e-14);
-        CHECK(phys_pts(i, 0) <= Lx + 1e-14);
-        CHECK(phys_pts(i, 1) >= -1e-14);
-        CHECK(phys_pts(i, 1) <= Ly + 1e-14);
     }
 }
 

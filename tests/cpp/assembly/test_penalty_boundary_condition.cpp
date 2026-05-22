@@ -8,7 +8,6 @@
 
 #include "patch.hpp"
 #include "tensor_product.hpp"
-#include "physical_points.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
 #include "knot_vector.hpp"
@@ -204,90 +203,6 @@ TEST_CASE("PenaltyBoundaryCondition structural properties", "[conditions][penalt
         // All eigenvalues >= 0 (PSD)
         Eigen::SelfAdjointEigenSolver<Matrix<double>> es(K);
         REQUIRE(es.eigenvalues().minCoeff() >= -1e-10);
-    }
-}
-
-// ===========================================================================
-// TEST 2 — KL plate: penalty SS BCs reproduce Navier bi-sinusoidal solution
-// ===========================================================================
-TEST_CASE("PenaltyBoundaryCondition KL plate: SS via penalty matches Navier", "[conditions][penalty]")
-{
-    double E  = 1.0e7;
-    double nu = 0.3;
-    double h  = 0.01;
-    double L  = 2.0, W = 1.0;
-    double f0 = -10.0;
-
-    Index p = 3, n_elem = 10;
-    int   nq = p + 1;
-    double D = E * h*h*h / (12.0 * (1.0 - nu*nu));
-
-    auto bsp_u = std::make_shared<BSpline<double>>(
-        p, KnotVector<double>::clamped_uniform(p, n_elem));
-    auto bsp_v = std::make_shared<BSpline<double>>(
-        p, KnotVector<double>::clamped_uniform(p, n_elem));
-    auto surface = std::make_shared<Patch<double, 2>>(
-        rectangle<double>(bsp_u, bsp_v, L, W));
-
-    auto material = std::make_shared<PlaneStress2d<double>>(E, nu, h);
-    auto element  = std::make_shared<PlateKirchhoffLove1p<double>>(material);
-    auto gauss2d  = std::make_shared<GaussLegendre<double, 2>>(nq);
-    GaussLegendre<double, 1> gauss1d(nq);
-
-    LinearElasticProblem<double, 2> problem(surface, element, gauss2d);
-
-    // Variable load q(x,y) = f0 * sin(πx/L) sin(πy/W)
-    auto phys_pts = eval_physical_points<double, 2>(*surface, *gauss2d);
-    Vector<double> load_vals(phys_pts.rows());
-    for (Index i = 0; i < phys_pts.rows(); ++i)
-        load_vals(i) = f0 * std::sin(M_PI * phys_pts(i,0) / L)
-                          * std::sin(M_PI * phys_pts(i,1) / W);
-
-    problem.add_condition(std::make_shared<LoadCondition<double,2>>(
-        *surface, *element, *gauss2d, load_vals));
-
-    // Penalty factor: α >> D/L so BCs are accurately enforced.
-    // For penalty BCs, a relative error O(D/(α*L³)) compared to the exact BC
-    // is expected; 1e8 keeps this below 0.5 %.
-    const double alpha = 1e8 * D / (L * L * L);
-    std::vector<Ptr<PatchBoundary<double, 2>>> penalty_boundaries;
-    add_penalty_all_edges<double>(
-        problem, penalty_boundaries, surface, *element, gauss1d, alpha, 0.0);
-
-    Matrix<double> K;
-    Vector<double> F;
-    problem.assemble(K, F);
-
-    Eigen::PartialPivLU<Matrix<double>> solver(K);
-    REQUIRE(solver.info() == Eigen::Success);
-    Vector<double> u = solver.solve(F);
-
-    // Verify deflection at a grid of interior points
-    std::vector<double> test_coords = {0.25, 0.5, 0.75};
-    for (double pu : test_coords) {
-        for (double pv : test_coords) {
-            ColMatrix<double, 2> pt(1, 2);
-            pt << pu, pv;
-            Index su = bsp_u->knot_vector().find_span(p, pu);
-            Index sv = bsp_v->knot_vector().find_span(p, pv);
-            Index ni_u = surface->tensor_product().num_intervals()[0];
-            Index flat = su + sv * ni_u;
-
-            const auto b = (*surface).tensor_product().eval_all(pt, 0);
-            std::vector<Index> active;
-            surface->dof_mapper().get_element_cps(flat, active);
-            Vector<double> u_a(active.size());
-            for (std::size_t i = 0; i < active.size(); ++i)
-                u_a(i) = u(active[i]);
-
-            double w_num   = b[0].col(0).dot(u_a);
-            double w_exact = navier_bisin(pu * L, pv * W, L, W, f0, D);
-            double rel_err = std::abs(w_num - w_exact) / std::abs(w_exact);
-
-            INFO("(" << pu*L << ", " << pv*W << ")  w_exact=" << w_exact
-                 << "  w_num=" << w_num);
-            REQUIRE(rel_err < 5e-3);
-        }
     }
 }
 

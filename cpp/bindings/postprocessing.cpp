@@ -3,8 +3,7 @@
 #include <pybind11/eigen.h>
 #include <pybind11/functional.h>
 
-#include "physical_points.hpp"
-#include "compute_l2_error.hpp"
+#include "function.hpp"
 
 namespace py = pybind11;
 
@@ -12,59 +11,35 @@ namespace pyck {
 
 void bind_postprocessing(py::module_& m)
 {
+    // === FieldType ================================================================
+    py::enum_<FieldType>(m, "FieldType")
+        .value("DISPLACEMENT", FieldType::DISPLACEMENT)
+        .value("ROTATION",     FieldType::ROTATION)
+        .value("STRAIN",       FieldType::STRAIN)
+        .value("STRESS",       FieldType::STRESS);
 
-      // === Evaluate Physical Points =================================================
-      m.def("eval_physical_points",
-          &eval_physical_points<double, 1>,
-          py::arg("patch"), 
-          py::arg("quadrature"));
+    // === Function =================================================================
+    py::class_<Function<double, 1>, Ptr<Function<double, 1>>>(m, "Function1d")
+        .def(py::init<Vector<double>,
+                      Ptr<Element<double, 1>>,
+                      Ptr<Patch<double, 1>>,
+                      FieldType>(),
+             py::arg("u"),
+             py::arg("element"),
+             py::arg("patch"),
+             py::arg("field"))
+        .def("__call__", &Function<double, 1>::operator(), py::arg("params"));
 
-      m.def("eval_physical_points",
-          &eval_physical_points<double, 2>,
-          py::arg("patch"),
-          py::arg("quadrature"));
-
-      // === Evaluate Parametric Points ===============================================
-      m.def("eval_parametric_points",
-          &eval_parametric_points<double, 1>,
-          py::arg("patch"),
-          py::arg("quadrature"));
-
-      m.def("eval_parametric_points",
-          &eval_parametric_points<double, 2>,
-          py::arg("patch"),
-          py::arg("quadrature"));
-
-      // === Evaluate Integration Measures ============================================
-      m.def("eval_integration_measures",
-          &eval_integration_measures<double, 1>,
-          py::arg("patch"),
-          py::arg("quadrature"));
-
-      m.def("eval_integration_measures",
-          &eval_integration_measures<double, 2>,
-          py::arg("patch"),
-          py::arg("quadrature"));
-
-      // === Compute L2 Error =========================================================
-
-      m.def("compute_l2_error",
-          &compute_l2_error<double, 1>,
-          py::arg("patch"),
-          py::arg("element"),
-          py::arg("quadrature"),
-          py::arg("order"),
-          py::arg("num_u"),
-          py::arg("integrand"));
-          
-      m.def("compute_l2_error",
-          &compute_l2_error<double, 2>,
-          py::arg("patch"),
-          py::arg("element"),
-          py::arg("quadrature"),
-          py::arg("order"),
-          py::arg("num_u"),
-          py::arg("integrand"));
+    py::class_<Function<double, 2>, Ptr<Function<double, 2>>>(m, "Function2d")
+        .def(py::init<Vector<double>,
+                      Ptr<Element<double, 2>>,
+                      Ptr<Patch<double, 2>>,
+                      FieldType>(),
+             py::arg("u"),
+             py::arg("element"),
+             py::arg("patch"),
+             py::arg("field"))
+        .def("__call__", &Function<double, 2>::operator(), py::arg("params"));
 }
 
 }
