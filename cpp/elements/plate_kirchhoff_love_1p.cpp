@@ -58,12 +58,14 @@ PlateKirchhoffLove1p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
 }
 
 template <std::floating_point T>
-Matrix<T>
+ConstitutiveMatrix<T>
 PlateKirchhoffLove1p<T>::constitutive_matrix(const IntrinsicGeometry<T, 2>& ig,
                                              Index q) const
 {
     // D = D_b. No shear block (normality assumption).
-    return material_->bending_voigt(g_inv_voigt(ig, q));
+    ConstitutiveMatrix<T> D = ConstitutiveMatrix<T>::Zero(3, 3);
+    D.template topLeftCorner<3, 3>() = material_->bending_voigt(g_inv_voigt(ig, q));
+    return D;
 }
 
 // === Shape Matrices =================================================================

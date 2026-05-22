@@ -105,11 +105,11 @@ PlateReissnerMindlinDispl2p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
 }
 
 template <std::floating_point T>
-Matrix<T>
+ConstitutiveMatrix<T>
 PlateReissnerMindlinDispl2p<T>::constitutive_matrix(const IntrinsicGeometry<T, 2>& ig,
                                                     Index q) const
 {
-    Matrix<T> D = Matrix<T>::Zero(5, 5);
+    ConstitutiveMatrix<T> D = ConstitutiveMatrix<T>::Zero(5, 5);
     D.template topLeftCorner    <3, 3>() = material_->bending_voigt(g_inv_voigt(ig, q));
     D.template bottomRightCorner<2, 2>() = material_->shear_voigt  (g_inv_voigt(ig, q));
     return D;
@@ -129,8 +129,7 @@ PlateReissnerMindlinDispl2p<T>::displacement_shape_matrix(const Patch<T, 2>& /*p
     const Index N = basis[0].rows();
     Matrix<T> Nw = Matrix<T>::Zero(Q, 2 * N);
 
-    for (Index q = 0; q < Q; ++q)
-    {
+    for (Index q = 0; q < Q; ++q) {
         auto slab0 = basis[0].col(q);
         auto slab1 = basis[1].col(q);
         auto slab2 = basis[2].col(q);
@@ -145,8 +144,7 @@ PlateReissnerMindlinDispl2p<T>::displacement_shape_matrix(const Patch<T, 2>& /*p
         const T Gam2_12 = ig.Gamma(1, 0, 1)(q);
         const T Gam2_22 = ig.Gamma(1, 1, 1)(q);
 
-        for (Index i = 0; i < N; ++i)
-        {
+        for (Index i = 0; i < N; ++i) {
             const T N_i    = slab0(i);
             const T N_u_i  = slab1(i * 2 + 0);
             const T N_v_i  = slab1(i * 2 + 1);

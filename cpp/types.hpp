@@ -46,6 +46,21 @@ using RowMatrix = Eigen::Matrix<T, Rows, Eigen::Dynamic>;
 template <std::floating_point T, std::size_t N>
 using StaticVector = Eigen::Vector<T, N>;
 
+/// @brief Maximum strain dimension across all Element<T,2> overrides.
+///        Used as the storage bound for ConstitutiveMatrix.
+///        Bump when introducing an element whose strain dim exceeds this.
+constexpr int MAX_STRAIN_DIM = 8;
+
+/// @brief Stack-resident constitutive (D) matrix returned by
+///        Element::constitutive_matrix. Dynamic runtime dimension, with
+///        storage sized for MAX_STRAIN_DIM × MAX_STRAIN_DIM (the worst
+///        case across all element formulations) held inline in the matrix
+///        object — so the type is uniform under virtual dispatch yet
+///        allocation-free.
+template <std::floating_point T>
+using ConstitutiveMatrix =
+    Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic, 0, MAX_STRAIN_DIM, MAX_STRAIN_DIM>;
+
 /// @brief Dynamic-sized dense array of type T
 template <std::floating_point T>
 using Array = Eigen::Array<T, Eigen::Dynamic, Eigen::Dynamic>;

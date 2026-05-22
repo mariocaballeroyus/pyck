@@ -65,13 +65,13 @@ PlateReissnerMindlin3p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
 }
 
 template <std::floating_point T>
-Matrix<T>
+ConstitutiveMatrix<T>
 PlateReissnerMindlin3p<T>::constitutive_matrix(const IntrinsicGeometry<T, 2>& ig,
                                                Index q) const
 {
     // D = [ D_b   0  ]
     //     [  0   D_s ]
-    Matrix<T> D = Matrix<T>::Zero(5, 5);
+    ConstitutiveMatrix<T> D = ConstitutiveMatrix<T>::Zero(5, 5);
     D.template topLeftCorner    <3, 3>() = material_->bending_voigt(g_inv_voigt(ig, q));
     D.template bottomRightCorner<2, 2>() = material_->shear_voigt  (g_inv_voigt(ig, q));
     return D;

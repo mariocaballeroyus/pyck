@@ -81,7 +81,7 @@ ShellReissnerMindlin5p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
 }
 
 template <std::floating_point T>
-Matrix<T>
+ConstitutiveMatrix<T>
 ShellReissnerMindlin5p<T>::constitutive_matrix(const IntrinsicGeometry<T, 2>& ig,
                                                Index q) const
 {
@@ -89,13 +89,13 @@ ShellReissnerMindlin5p<T>::constitutive_matrix(const IntrinsicGeometry<T, 2>& ig
     //     [ 0    D_b  0   ]
     //     [ 0    0    D_s ]
     const Eigen::Matrix<T, 3, 1> g_inv_q = g_inv_voigt(ig, q);
-    const Eigen::Matrix<T, 3, 3> C  = material_->surface_C_voigt(g_inv_q);
+    const Eigen::Matrix<T, 3, 3> C  = material_->elasticity_voigt(g_inv_q);
     const T t = material_->thickness();
     const Eigen::Matrix<T, 3, 3> Dm = t * C;
     const Eigen::Matrix<T, 3, 3> Db = (t * t * t / T(12)) * C;
     const Eigen::Matrix<T, 2, 2> Ds = material_->shear_voigt(g_inv_q);
 
-    Matrix<T> D = Matrix<T>::Zero(8, 8);
+    ConstitutiveMatrix<T> D = ConstitutiveMatrix<T>::Zero(8, 8);
     D.template block<3, 3>(0, 0) = Dm;
     D.template block<3, 3>(3, 3) = Db;
     D.template block<2, 2>(6, 6) = Ds;

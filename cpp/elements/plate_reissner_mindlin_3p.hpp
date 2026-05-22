@@ -53,7 +53,8 @@ public:
      * @param q Quadrature point.
      * @return Constitutive matrix.
      */
-    Matrix<T> constitutive_matrix(const IntrinsicGeometry<T, 2>& ig, Index q) const override;
+    ConstitutiveMatrix<T> constitutive_matrix(const IntrinsicGeometry<T, 2>& ig,
+                                              Index q) const override;
 
     // === Shape Matrices =============================================================
 

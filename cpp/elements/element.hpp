@@ -94,10 +94,11 @@ public:
      *
      * @param ig The intrinsic geometry.
      * @param q  Quadrature point index.
-     * @return The constitutive operator.
+     * @return The constitutive operator (stack-resident ConstitutiveMatrix,
+     *         sized at runtime to the formulation's strain dimension).
      */
-    virtual Matrix<T> constitutive_matrix(const IntrinsicGeometry<T, d>& ig,
-                                          Index q) const = 0;
+    virtual ConstitutiveMatrix<T>
+    constitutive_matrix(const IntrinsicGeometry<T, d>& ig, Index q) const = 0;
 
     // === Shape Matrices (Pure Virtual) ==============================================
 
@@ -140,7 +141,7 @@ Element<T, d>::stress_matrix(const Patch<T, d>& patch,
 
     Matrix<T> Nsigma(n_strain * Q, K);
     for (Index q = 0; q < Q; ++q) {
-        const Matrix<T> D = constitutive_matrix(ig, q);
+        const auto D = constitutive_matrix(ig, q);
         Nsigma.middleRows(n_strain * q, n_strain).noalias() =
             D * B.middleRows(n_strain * q, n_strain);
     }
@@ -165,7 +166,7 @@ Element<T, d>::compute_local_stiffness(const ElementValues<T, d>& pv,
     stiffness.setZero(K, K);
     for (Index q = 0; q < Q; ++q) {
         const T dV = q_weights(q) * ig.jac(q);
-        const Matrix<T> D = constitutive_matrix(ig, q);
+        const auto D = constitutive_matrix(ig, q);
         const auto B_q = B.middleRows(n_strain * q, n_strain);
         stiffness.noalias() += dV * (B_q.transpose() * D * B_q);
     }
