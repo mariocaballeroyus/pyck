@@ -35,7 +35,9 @@ void bind_geometry(py::module_& m)
 
         .def("elevate_degree",
             static_cast<Patch1d (Patch1d::*)(std::size_t) const>(&Patch1d::elevate_degree),
-            py::arg("dir"));
+            py::arg("dir"))
+
+        .def("eval_geometry", &Patch1d::eval_geometry, py::arg("params"));
 
     using Patch2d = Patch<double, 2>;
 
@@ -57,7 +59,9 @@ void bind_geometry(py::module_& m)
 
         .def("elevate_degree",
             static_cast<Patch2d (Patch2d::*)(std::size_t) const>(&Patch2d::elevate_degree),
-            py::arg("dir"));
+            py::arg("dir"))
+
+        .def("eval_geometry", &Patch2d::eval_geometry, py::arg("params"));
 
     // === Patch Boundary =============================================================
 

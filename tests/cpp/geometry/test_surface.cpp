@@ -499,3 +499,98 @@ TEST_CASE("Patch<double, 2>: Intrinsic/Extrinsic containers compose correctly",
 }
 
 
+// ===========================================================================
+// eval_geometry — scattered parametric points → physical coordinates.
+// ===========================================================================
+
+TEST_CASE("Patch<double, 2>::eval_geometry on flat rectangle",
+          "[geometry][surface]") {
+
+    auto kv = KnotVector<double>::clamped_uniform(2, 5);
+    auto basis_u = std::make_shared<BSpline<double>>(2, kv);
+    auto basis_v = std::make_shared<BSpline<double>>(2, kv);
+
+    const double W = 2.0, H = 3.0;
+    auto surf = rectangle<double>(basis_u, basis_v, W, H);
+
+    // Mix of points: some sharing a span (0.1, 0.15), some on a different
+    // span, and span/parametric boundaries (0, 1).
+    ColMatrix<double, 2> params(6, 2);
+    params << 0.0, 0.0,
+              0.1, 0.15,
+              0.15, 0.1,
+              0.5, 0.5,
+              0.75, 0.25,
+              1.0, 1.0;
+
+    auto xyz = surf.eval_geometry(params);
+
+    REQUIRE(xyz.rows() == 6);
+    REQUIRE(xyz.cols() == 3);
+    for (Eigen::Index q = 0; q < params.rows(); ++q) {
+        CHECK(xyz(q, 0) == Approx(params(q, 0) * W).margin(1e-12));
+        CHECK(xyz(q, 1) == Approx(params(q, 1) * H).margin(1e-12));
+        CHECK(xyz(q, 2) == Approx(0.0).margin(1e-14));
+    }
+}
+
+TEST_CASE("Patch<double, 2>::eval_geometry on twisted z=u·v patch",
+          "[geometry][surface]") {
+
+    // Bilinear patch with z = u·v: control points (0,0,0), (1,0,0), (0,1,0),
+    // (1,1,1) give the mapping x=u, y=v, z=u·v exactly.
+    auto kv = KnotVector<double>(std::vector<double>{0, 0, 1, 1});
+    auto basis_u = std::make_shared<BSpline<double>>(1, kv);
+    auto basis_v = std::make_shared<BSpline<double>>(1, kv);
+
+    Eigen::MatrixXd cp(4, 3);
+    cp.row(0) << 0.0, 0.0, 0.0;
+    cp.row(1) << 1.0, 0.0, 0.0;
+    cp.row(2) << 0.0, 1.0, 0.0;
+    cp.row(3) << 1.0, 1.0, 1.0;
+    Patch<double, 2> surf(basis_u, basis_v, cp);
+
+    ColMatrix<double, 2> params(4, 2);
+    params << 0.0, 0.0,
+              0.3, 0.4,
+              0.5, 0.5,
+              0.8, 0.2;
+
+    auto xyz = surf.eval_geometry(params);
+
+    REQUIRE(xyz.rows() == 4);
+    for (Eigen::Index q = 0; q < params.rows(); ++q) {
+        const double u = params(q, 0);
+        const double v = params(q, 1);
+        CHECK(xyz(q, 0) == Approx(u    ).margin(1e-14));
+        CHECK(xyz(q, 1) == Approx(v    ).margin(1e-14));
+        CHECK(xyz(q, 2) == Approx(u * v).margin(1e-14));
+    }
+}
+
+TEST_CASE("Patch<double, 1>::eval_geometry on a straight line",
+          "[geometry][curve]") {
+
+    // Linear B-spline curve from (0,0,0) to (3,2,1).
+    auto kv = KnotVector<double>(std::vector<double>{0, 0, 1, 1});
+    auto basis_u = std::make_shared<BSpline<double>>(1, kv);
+
+    Eigen::MatrixXd cp(2, 3);
+    cp.row(0) << 0.0, 0.0, 0.0;
+    cp.row(1) << 3.0, 2.0, 1.0;
+    Patch<double, 1> curve(basis_u, cp);
+
+    ColMatrix<double, 1> params(4, 1);
+    params << 0.0, 0.25, 0.5, 1.0;
+
+    auto xyz = curve.eval_geometry(params);
+
+    REQUIRE(xyz.rows() == 4);
+    for (Eigen::Index q = 0; q < params.rows(); ++q) {
+        const double t = params(q, 0);
+        CHECK(xyz(q, 0) == Approx(3.0 * t).margin(1e-14));
+        CHECK(xyz(q, 1) == Approx(2.0 * t).margin(1e-14));
+        CHECK(xyz(q, 2) == Approx(1.0 * t).margin(1e-14));
+    }
+}
+

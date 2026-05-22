@@ -82,6 +82,43 @@ Patch<T, d>::active_control_pts(const std::array<Index, d>& spans) const
 
 template <std::floating_point T, std::size_t d>
 ColMatrix<T, 3>
+Patch<T, d>::eval_geometry(const ColMatrix<T, d>& params) const
+{
+    const Index Q = static_cast<Index>(params.rows());
+    ColMatrix<T, 3> result(Q, 3);
+
+    const auto intervals = tensor_product_.num_intervals();
+
+    for (Index q = 0; q < Q; ++q) {
+        ColMatrix<T, d> pt = params.row(q);
+
+        std::array<Index, d> span_idx;
+        for (std::size_t dir = 0; dir < d; ++dir)
+            span_idx[dir] = basis(dir).find_span(
+                static_cast<T>(pt(0, static_cast<Index>(dir))));
+
+        Index flat_span = span_idx[0];
+        if constexpr (d >= 2)
+            flat_span += span_idx[1] * static_cast<Index>(intervals[0]);
+        if constexpr (d >= 3)
+            flat_span += span_idx[2] * static_cast<Index>(intervals[0])
+                                     * static_cast<Index>(intervals[1]);
+
+        const auto bd      = tensor_product_.eval_all(pt, 0);
+        const auto act_pts = active_control_pts(flat_span);
+
+        Eigen::Matrix<T, 1, 3> x_q = Eigen::Matrix<T, 1, 3>::Zero();
+        const Index K = static_cast<Index>(bd[0].rows());
+        for (Index i = 0; i < K; ++i)
+            x_q.noalias() += bd[0](i, 0) * act_pts.row(i);
+        result.row(q) = x_q;
+    }
+
+    return result;
+}
+
+template <std::floating_point T, std::size_t d>
+ColMatrix<T, 3>
 Patch<T, d>::get_control_points(const std::vector<Index>& indices) const
 {
     ColMatrix<T, 3> pts(indices.size(), 3);

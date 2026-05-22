@@ -86,6 +86,14 @@ public:
     ColMatrix<T, 3> active_control_pts(Index span_idx) const
     { return this->active_control_pts(this->decode_span(span_idx)); }
 
+    /**
+     * @brief Physical coordinates at scattered parametric points.
+     *
+     * @param params (Q, d) parametric coordinates.
+     * @return (Q, 3) physical coordinates, one row per query.
+     */
+    ColMatrix<T, 3> eval_geometry(const ColMatrix<T, d>& params) const;
+
     /// @brief Get the DOF indices used for assembly scatter. Defaults to the
     ///        local indices (0, 1, …, N−1); overridden by PatchBoundary.
     virtual std::vector<Index> assembly_dofs() const;

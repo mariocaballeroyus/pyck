@@ -63,3 +63,24 @@ class Patch(ABC):
     def num_control_pts(self) -> int:
         """Total number of control points."""
         return self.control_points.shape[0]
+
+    def eval_geometry(self, params: npt.ArrayLike) -> npt.NDArray[np.float64]:
+        """Physical coordinates at scattered parametric points.
+
+        Parameters
+        ----------
+        params : array_like, shape (Q, tdim)
+            Parametric coordinates. A 1D array of length Q is promoted to
+            ``(Q, 1)`` for curve patches.
+
+        Returns
+        -------
+        np.ndarray, shape (Q, 3)
+            Physical coordinates, one row per query.
+        """
+        arr = np.asarray(params, dtype=np.float64)
+        if self.tdim == 1 and arr.ndim == 1:
+            arr = arr[:, None]
+        elif arr.ndim == 1:
+            arr = arr[None, :]
+        return np.asarray(self._cpp_object.eval_geometry(arr))
