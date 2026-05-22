@@ -11,16 +11,11 @@
 #include "intrinsic_geometry.hpp"
 #include "patch.hpp"
 #include "eval_global_shape.hpp"
-#include "beam_euler_bernoulli_1p.hpp"
-#include "beam_timoshenko_1p.hpp"
-#include "beam_timoshenko_2p.hpp"
 #include "plate_kirchhoff_love_1p.hpp"
 #include "plate_reissner_mindlin_3p.hpp"
 #include "plate_reissner_mindlin_1p.hpp"
 #include "plate_reissner_mindlin_displ_2p.hpp"
-#include "plate_reissner_mindlin_displ_3p.hpp"
 #include "shell_reissner_mindlin_5p.hpp"
-#include "uniaxial_stress_1d.hpp"
 #include "plane_stress_2d.hpp"
 
 namespace py = pybind11;
@@ -74,23 +69,6 @@ void bind_elements(py::module_& m)
                },
                py::arg("patch"),
                py::arg("params"));
-
-     // === Beam elements ===========================================================
-
-     py::class_<BeamEulerBernoulli1p<double>, Element1d,
-                Ptr<BeamEulerBernoulli1p<double>>>(m, "BeamEulerBernoulli1p")
-          .def(py::init<Ptr<UniaxialStress1d<double>>>(),
-               py::arg("material"));
-
-     py::class_<BeamTimoshenko1p<double>, Element1d,
-                Ptr<BeamTimoshenko1p<double>>>(m, "BeamTimoshenko1p")
-          .def(py::init<Ptr<UniaxialStress1d<double>>>(),
-               py::arg("material"));
-
-     py::class_<BeamTimoshenko2p<double>, Element1d,
-                Ptr<BeamTimoshenko2p<double>>>(m, "BeamTimoshenko2p")
-          .def(py::init<Ptr<UniaxialStress1d<double>>>(),
-               py::arg("material"));
 
     // === Element2d ==================================================================
 
@@ -146,11 +124,6 @@ void bind_elements(py::module_& m)
 
      py::class_<PlateReissnerMindlin3p<double>, Element2d,
                 Ptr<PlateReissnerMindlin3p<double>>>(m, "PlateReissnerMindlin3p")
-          .def(py::init<Ptr<PlaneStress2d<double>>>(),
-               py::arg("material"));
-
-     py::class_<PlateReissnerMindlinDispl3p<double>, Element2d,
-                Ptr<PlateReissnerMindlinDispl3p<double>>>(m, "PlateReissnerMindlinDispl3p")
           .def(py::init<Ptr<PlaneStress2d<double>>>(),
                py::arg("material"));
 

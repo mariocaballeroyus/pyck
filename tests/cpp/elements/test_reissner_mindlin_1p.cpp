@@ -138,7 +138,7 @@ static Eigen::VectorXd solve_ss_rm1p_plate(
     //    w_b = 0 on all edges via DirectConstraint is sufficient: the moment
     //    condition w_{b,nn} = 0 is naturally satisfied by the bending
     //    solution (since sin functions vanish on the boundary).
-    //    Linear constraints (as in the Timoshenko 1P beam) are applied in
+    //    Linear constraints for the moment-free condition are applied in
     //    the Python interface for the general case.
 
     // Simply-supported BCs: w_b = 0 on all four edges

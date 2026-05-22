@@ -32,7 +32,7 @@ enum class FieldType
  * @brief Base class for structural elements of parametric dimension d.
  *
  * @tparam T Scalar type.
- * @tparam d Parametric dimension (1 = beam, 2 = plate/shell).
+ * @tparam d Parametric dimension (1 = curve, 2 = plate/shell).
  */
 template <std::floating_point T, std::size_t d>
 class Element

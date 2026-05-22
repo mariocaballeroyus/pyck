@@ -97,39 +97,6 @@ class PlateReissnerMindlin3p(Element):
         return f"PlateReissnerMindlin3p(material={self._material}, k_s={self._k_s})"
 
 
-class PlateReissnerMindlinDispl3p(Element):
-    """Split-displacement Reissner-Mindlin plate element.
-
-    Uses one bending displacement field ``w_b`` and two shear displacement
-    fields ``w_s1`` and ``w_s2``. The recovered physical fields are
-
-        w = w_b + w_s1 + w_s2
-        phi_x = -w_b,x - w_s2,x
-        phi_y = -w_b,y - w_s1,y
-        gamma = [w_s1,x, w_s2,y]
-        kappa = L phi
-
-    Parameters
-    ----------
-    material : PlaneStress2d
-        Plate material model.
-    """
-    num_node_dofs: int = 3
-
-    def __init__(self, material: PlaneStress2d) -> None:
-        self._material = material
-        self._cpp_object = _pyck.PlateReissnerMindlinDispl3p(
-            self._material._cpp_object
-        )
-
-    @property
-    def material(self) -> PlaneStress2d:
-        return self._material
-
-    def __repr__(self) -> str:
-        return f"PlateReissnerMindlinDispl3p(material={self._material})"
-
-
 class PlateReissnerMindlinDispl2p(Element):
     """Two-parameter rotation-free Reissner-Mindlin plate element.
 

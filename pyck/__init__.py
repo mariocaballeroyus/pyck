@@ -11,15 +11,11 @@ from pyck.geometry import (
     SurfacePatch,
 )
 from pyck.elements import (
-    BeamEulerBernoulli1p,
     PlateKirchhoffLove1p,
     PlateReissnerMindlin3p,
-    PlateReissnerMindlinDispl3p,
     PlateReissnerMindlinDispl2p,
     PlateReissnerMindlin1p,
     ShellReissnerMindlin5p,
-    BeamTimoshenko1p,
-    BeamTimoshenko2p,
 )
 from pyck.materials import (
     SlenderBeam1d,
@@ -90,15 +86,11 @@ __all__ = [
     "NURBS",
     "CurvePatch",
     "SurfacePatch",
-    "BeamEulerBernoulli1p",
     "PlateKirchhoffLove1p",
     "PlateReissnerMindlin3p",
-    "PlateReissnerMindlinDispl3p",
     "PlateReissnerMindlinDispl2p",
     "PlateReissnerMindlin1p",
     "ShellReissnerMindlin5p",
-    "BeamTimoshenko1p",
-    "BeamTimoshenko2p",
     "SlenderBeam1d",
     "PlaneStress2d",
     "PlaneStressShell",

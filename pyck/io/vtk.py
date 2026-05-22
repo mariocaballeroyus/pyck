@@ -4,9 +4,9 @@ Each Bezier element (knot span) is sampled on a tensor-product parametric
 grid and emitted as a block of linear ``VTK_QUAD`` cells. The export is
 formulation-agnostic: it relies on each element's
 ``displacement_shape_matrix`` / ``rotation_shape_matrix``, so the same
-function works for KL-1p, RM-3p, RM-displ-3p, RM-1p, etc.  The
-RM-displ-2p formulation additionally exposes its primary ``w_b`` and
-``psi`` fields and their recovered contributions.
+function works for KL-1p, RM-3p, RM-1p, etc.  The RM-displ-2p
+formulation additionally exposes its primary ``w_b`` and ``psi`` fields
+and their recovered contributions.
 """
 
 from __future__ import annotations
@@ -43,8 +43,7 @@ def export_field_vtk(
     surf : SurfacePatch
         The geometry patch the solution lives on.
     element : plate element (e.g. PlateKirchhoffLove1p,
-        PlateReissnerMindlin3p, PlateReissnerMindlinDispl3p,
-        PlateReissnerMindlin1p)
+        PlateReissnerMindlin3p, PlateReissnerMindlin1p)
         Used only via its ``_cpp_object.displacement_shape_matrix`` and
         ``rotation_shape_matrix`` methods.
     solution : ndarray, shape (n_dof,)
@@ -256,7 +255,6 @@ def _needs_higher_order_for_phi(element) -> bool:
     return cls in (
         "PlateKirchhoffLove1p",
         "PlateReissnerMindlin1p",
-        "PlateReissnerMindlinDispl3p",
     )
 
 

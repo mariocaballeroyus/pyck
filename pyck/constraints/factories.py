@@ -13,7 +13,6 @@ import numpy as np
 
 from pyck.constraints.direct_constraint import DirectConstraint
 from pyck.constraints.constraint import LinearConstraint
-from pyck.elements.beams import BeamEulerBernoulli1p, BeamTimoshenko1p, BeamTimoshenko2p
 
 if TYPE_CHECKING:
     from pyck.elements.element import Element
