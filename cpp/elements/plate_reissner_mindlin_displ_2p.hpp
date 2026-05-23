@@ -44,9 +44,7 @@ public:
      * @param chr Christoffel symbols.
      * @return Strain-displacement matrix.
      */
-    void strain_matrix(const Patch<T, 2>& patch,
-                       const std::vector<Matrix<T>>& basis,
-                       const IntrinsicGeometry<T, 2>& ig) const override;
+    void strain_matrix(const ElementValues<T, 2>& ev) const override;
 
     /**
      * @brief Constitutive D-matrix (5×5 block-diag [Db; Ds]).
@@ -55,8 +53,7 @@ public:
      * @param q Quadrature point.
      * @return Constitutive matrix.
      */
-    ConstitutiveMatrix<T> constitutive_matrix(const IntrinsicGeometry<T, 2>& ig,
-                                              Index q) const override;
+    ConstitutiveMatrix<T> constitutive_matrix(const ElementValues<T, 2>& ev, Index q) const override;
 
     // === Shape Matrices =============================================================
 
@@ -69,9 +66,7 @@ public:
      * @param chr Christoffel symbols.
      * @return Displacement shape matrix.
      */
-    void displacement_shape_matrix(const Patch<T, 2>& patch,
-                                   const std::vector<Matrix<T>>& basis,
-                                   const IntrinsicGeometry<T, 2>& ig) const override;
+    void displacement_shape_matrix(const ElementValues<T, 2>& ev) const override;
 
     /**
      * @brief Rotation shape matrix.
@@ -82,19 +77,16 @@ public:
      * @param chr Christoffel symbols.
      * @return Rotation shape matrix.
      */
-    void rotation_shape_matrix(const Patch<T, 2>& patch,
-                               const std::vector<Matrix<T>>& basis,
-                               const IntrinsicGeometry<T, 2>& ig) const override;
+    void rotation_shape_matrix(const ElementValues<T, 2>& ev) const override;
 
     // === Getters ================================================================
 
     /// @brief Number of node degrees of freedom (w_b + ψ).
     std::size_t num_node_dofs() const override
     { return 2; }
+    Index basis_order() const override { return 3; }
 
-    /// @brief Minimum order of basis functions.
-    std::size_t min_order() const override
-    { return 3; }
+    unsigned flags() const override { return Flags::Metric | Flags::Christoffels; }
 
 private:
 

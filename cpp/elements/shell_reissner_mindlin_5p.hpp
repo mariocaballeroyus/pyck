@@ -41,9 +41,7 @@ public:
      * @param chr Christoffel symbols.
      * @return Strain-displacement matrix.
      */
-    void strain_matrix(const Patch<T, 2>& patch,
-                       const std::vector<Matrix<T>>& basis,
-                       const IntrinsicGeometry<T, 2>& ig) const override;
+    void strain_matrix(const ElementValues<T, 2>& ev) const override;
 
     /**
      * @brief Constitutive D-matrix.
@@ -52,8 +50,7 @@ public:
      * @param q Quadrature point.
      * @return Constitutive matrix.
      */
-    ConstitutiveMatrix<T> constitutive_matrix(const IntrinsicGeometry<T, 2>& ig,
-                                              Index q) const override;
+    ConstitutiveMatrix<T> constitutive_matrix(const ElementValues<T, 2>& ev, Index q) const override;
 
     // Shape Matrices =================================================================
 
@@ -66,9 +63,7 @@ public:
      * @param chr Christoffel symbols.
      * @return Zero matrix of correct shape.
      */
-    void displacement_shape_matrix(const Patch<T, 2>& patch,
-                                   const std::vector<Matrix<T>>& basis,
-                                   const IntrinsicGeometry<T, 2>& ig) const override;
+    void displacement_shape_matrix(const ElementValues<T, 2>& ev) const override;
 
     /**
      * @brief Rotation shape matrix stub (returns zero).
@@ -79,9 +74,7 @@ public:
      * @param chr Christoffel symbols.
      * @return Zero matrix of correct shape.
      */
-    void rotation_shape_matrix(const Patch<T, 2>& patch,
-                               const std::vector<Matrix<T>>& basis,
-                               const IntrinsicGeometry<T, 2>& ig) const override;
+    void rotation_shape_matrix(const ElementValues<T, 2>& ev) const override;
 
     // === Getters ================================================================
 
@@ -92,8 +85,9 @@ public:
     /// @brief Minimum order of basis functions. Christoffels in the bending
     /// block require second derivatives of the surface position, i.e. an
     /// order-2 basis evaluation.
-    std::size_t min_order() const override
-    { return 2; }
+    Index basis_order() const override { return 2; }
+
+    unsigned flags() const override { return Flags::Metric | Flags::Christoffels | Flags::Normal; }
 
 private:
 

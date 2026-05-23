@@ -2,24 +2,46 @@
 #define PYCK_ELEMENT_VALUES_HPP
 
 #include <array>
-#include <cmath>
 #include <concepts>
 #include <cstddef>
 #include <vector>
 
-#include "../basis/bspline_algorithms.hpp"
 #include "../basis/tensor_product.hpp"
 #include "../quadrature/quadrature.hpp"
-#include "../geometry/extrinsic_geometry.hpp"
 #include "../geometry/intrinsic_geometry.hpp"
+#include "../geometry/surface_geometry.hpp"
 #include "../geometry/patch.hpp"
+#include "../multi_index.hpp"
 #include "../types.hpp"
 
 namespace pyck
 {
 
+// === Flag constants (plain unsigned bitmask) =======================================
+
 /**
- * @brief Per-element evaluation workspace for a Patch.
+ * @brief Per-quantity flag constants for `ElementValues`. Independent bits
+ *        select which derived geometric quantities the workspace computes
+ *        during `reinit`. Values are plain `unsigned`, combined with native
+ *        bitwise ops: `Flags::Metric | Flags::Christoffels`.
+ */
+namespace Flags
+{
+    constexpr unsigned None           = 0;
+    constexpr unsigned Metric         = 1u << 0;  ///< g, g_inv, jac
+    constexpr unsigned Christoffels   = 1u << 1;  ///< Γ^k_{ij}
+    constexpr unsigned ChristoffelsD1 = 1u << 2;  ///< ∂_γ Γ^k_{ij}
+    constexpr unsigned Normal         = 1u << 3;  ///< a_3 (d=2)
+    constexpr unsigned NormalD1       = 1u << 4;  ///< ∂_β a_3 (d=2)
+    constexpr unsigned Curvature      = 1u << 5;  ///< b_{αβ}, b^α_β (d=2)
+} // namespace Flags
+
+// === ElementValues ==================================================================
+
+/**
+ * @brief Per-element evaluation workspace for a Patch. Owns basis evaluation
+ *        scratch + position derivatives + selected intrinsic / extrinsic
+ *        geometric quantities, all at the current element's quadrature points.
  *
  * @tparam T Scalar floating-point type.
  * @tparam d Parametric dimension of the patch.
@@ -29,35 +51,20 @@ class ElementValues
 {
 public:
 
-    /**
-     * @brief Construct the workspace for a (patch, quadrature) pair, evaluating
-     *        basis derivatives up to @p order.
-     */
-    ElementValues(const Patch<T, d>& patch, Index order,
+    /// @brief Bulk constructor: bound to a quadrature rule. Use with
+    ///        `reinit(elem_idx)` to iterate the patch's own elements.
+    ElementValues(const Patch<T, d>& patch, Index basis_order, unsigned flags,
                   const QuadratureRule<T, d>& quadrature)
-        : patch_(patch), quadrature_(quadrature), order_(order)
-    {
-        const Index Q = static_cast<Index>(quadrature.num_points());
-        mapped_pts_.resize(Q, static_cast<Index>(d));
-        mapped_weights_.resize(Q);
+        : ElementValues(patch, basis_order, flags, quadrature.num_points(), &quadrature)
+    {}
 
-        Index N = 1;
-        for (std::size_t i = 0; i < d; ++i) {
-            const Index Ni = static_cast<Index>(patch.basis(i).degree()) + 1;
-            N *= Ni;
-            intervals_[i] = static_cast<Index>(patch.basis(i).knot_vector().num_spans());
-
-            uni_results_[i].resize(order_ + 1);
-            for (Index k = 0; k <= order_; ++k) {
-                uni_results_[i][k].resize(Ni, Q);
-            }
-        }
-
-        resize_basis_buffer<T, d>(results_, N, Q, order_);
-
-        elem_cps_.reserve(static_cast<std::size_t>(N));
-        act_pts_.resize(N, 3);
-    }
+    /// @brief External-points constructor: sized for @p Q quadrature points
+    ///        without a bound QuadratureRule. `reinit(elem_idx)` is not usable;
+    ///        callers drive refresh via `reinit_on_pts(spans, pts)`.
+    ElementValues(const Patch<T, d>& patch, Index basis_order, unsigned flags,
+                  std::size_t Q)
+        : ElementValues(patch, basis_order, flags, Q, nullptr)
+    {}
 
     /// @brief Number of live (non-zero-volume) elements in the patch.
     Index num_elements() const { return patch_.tensor_product().num_elements(); }
@@ -65,76 +72,85 @@ public:
     /// @brief Patch this workspace is bound to.
     const Patch<T, d>& patch() const { return patch_; }
 
-    /**
-     * @brief Refresh per-element data for the given live element index.
-     *
-     * @param elem_idx Live element index. No zero-volume check is needed.
-     */
+    /// @brief Basis derivative order this workspace was sized for.
+    Index basis_order() const { return basis_order_; }
+
+    /// @brief Quantity flag bitmask this workspace was constructed with.
+    unsigned flags() const { return flags_; }
+
+    /// @brief Standard reinit: decode @p elem_idx into per-direction spans,
+    ///        map the bound quadrature into the span, then delegate to
+    ///        `reinit_on_pts`.
     void reinit(std::size_t elem_idx)
     {
-        span_indices_ = patch_.tensor_product().decode_element(static_cast<Index>(elem_idx));
-
-        elem_idx_ = 0;
-        std::size_t stride = 1;
-        for (std::size_t i = 0; i < d; ++i) {
-            elem_idx_ += static_cast<std::size_t>(span_indices_[i]) * stride;
-            stride   *= static_cast<std::size_t>(intervals_[i]);
-        }
-
-        // Compute span bounds in every direction
+        const auto spans = patch_.tensor_product().decode_element(
+            static_cast<Index>(elem_idx));
         std::array<T, d> u_a, u_b;
         for (std::size_t i = 0; i < d; ++i) {
-            auto [lo, hi] = patch_.basis(i).knot_vector().span_bounds(span_indices_[i]);
+            auto [lo, hi] = patch_.basis(i).knot_vector().span_bounds(spans[i]);
             u_a[i] = lo;
             u_b[i] = hi;
         }
-        // Map quadrature points from gauss to parametric space using span bounds
-        quadrature_.map_to_domain(u_a, u_b, mapped_pts_, mapped_weights_);
-        // Evaluate tensor product basis in the mapped quadrature points
-        patch_.tensor_product().eval_on_span(mapped_pts_, span_indices_, order_,
+        quadrature_->map_to_domain(u_a, u_b, mapped_pts_, mapped_weights_);
+        reinit_on_pts(spans, mapped_pts_);
+    }
+
+    /// @brief Refresh basis + geometry at caller-provided parametric points
+    ///        in a known span. Does not touch `mapped_pts_` / `mapped_weights_`.
+    void reinit_on_pts(const std::array<Index, d>& spans,
+                       const ColMatrix<T, d>& pts)
+    {
+        span_indices_ = spans;
+
+        // Basis evaluation
+        patch_.tensor_product().eval_on_span(pts, spans, basis_order_,
                                              uni_results_, results_);
-        // Get the indices of the element control points
-        patch_.dof_mapper().get_element_cps(span_indices_, elem_cps_);
-        // Gather active control-point coordinates into the workspace buffer
+
+        // Active control points
+        patch_.dof_mapper().get_element_cps(spans, elem_cps_);
         const auto& all_cps = patch_.control_pts();
         for (Index i = 0; i < static_cast<Index>(elem_cps_.size()); ++i) {
             act_pts_.row(i) = all_cps.row(elem_cps_[i]);
         }
-        // Refresh geometric workspaces from the gathered basis + control points
-        intrinsic_geometry_.reinit(results_, act_pts_, order_);
-        extrinsic_geometry_.reinit(intrinsic_geometry_);
+
+        // Geometric quantities (gated by flags)
+        geometry::intrinsic::compute_position_derivatives<T, d>(results_, act_pts_, position_data);
+        if (flags_ & Flags::Metric)
+            geometry::intrinsic::compute_metric<T, d>(position_data, g_data, g_inv_data, jac);
+        if (flags_ & Flags::Christoffels)
+            geometry::intrinsic::compute_christoffels<T, d>(position_data, g_inv_data, Gamma_data);
+        if (flags_ & Flags::ChristoffelsD1)
+            geometry::intrinsic::compute_christoffels_d1<T, d>(position_data, g_inv_data, Gamma_d1_data);
+        if constexpr (d == 2) {
+            if (flags_ & Flags::Normal)
+                geometry::surface::compute_normal<T>(position_data, jac, n);
+            if (flags_ & Flags::NormalD1)
+                geometry::surface::compute_normal_derivatives<T>(position_data, jac, n, n_d1_data);
+            if (flags_ & Flags::Curvature)
+                geometry::surface::compute_curvature<T>(position_data, g_inv_data, n, b_data, b_mixed_data);
+        }
     }
 
     // === Indices ====================================================================
 
-    /// @brief Flat element index (over the full span enumeration, including
-    ///        zero-width spans) of the most recent reinit(). Stays in sync
-    ///        with the DofMapper's element-indexing convention.
-    std::size_t elem_idx_ = static_cast<std::size_t>(-1);
+    /// @brief Per-direction knot-span indices of the most recent reinit.
+    std::array<Index, d> span_indices_;
 
     /// @brief Active control-point indices for the current element, in
     ///        tensor-product column order (matches `results_` row ordering).
     std::vector<Index> elem_cps_;
 
-    /// @brief Gathered active control-point coordinates for the current
-    ///        element, shape `(p+1)^d × 3`. Row `i` is the 3D coordinate of
-    ///        the control point at index `elem_cps_[i]`. Materialised here so
-    ///        the inner geometry loop reads contiguous rows instead of paying
-    ///        an indirection per access.
+    /// @brief Gathered active control-point coordinates, shape `(p+1)^d × 3`.
     ColMatrix<T, 3> act_pts_;
 
-    /// @brief Global DOF indices for the current element (control points
-    ///        expanded by the stride of the assembly's primal block). Filled
-    ///        externally by `DofLayout::scatter_primal`; lazy-sized on the
-    ///        first call, allocation-free thereafter.
+    /// @brief Global DOF indices for the current element. Filled externally by
+    ///        `DofLayout::scatter_primal`.
     std::vector<Index> elem_dofs_;
 
     // === Basis ======================================================================
 
     /// @brief Per-direction univariate basis values + derivatives at the
-    ///        current element's quadrature points. `uni_results_[dim][k]` is
-    ///        the (p_dim+1) × Q matrix of k-th derivatives along direction
-    ///        `dim`; tensor-producted by `eval_on_span` into `results_`.
+    ///        current element's quadrature points.
     std::array<std::vector<Matrix<T>>, d> uni_results_;
 
     /// @brief Basis values and derivatives at the current element's quadrature
@@ -144,84 +160,180 @@ public:
     // === Quadrature =================================================================
 
     /// @brief Quadrature points in parametric coordinates for the current
-    ///        element, shape (Q, d). Filled by QuadratureRule::map_to_domain.
+    ///        element, shape (Q, d). Filled by `reinit(elem_idx)`; stale on
+    ///        the `reinit_on_pts` path.
     ColMatrix<T, d> mapped_pts_;
 
-    /// @brief Quadrature weights for the current element (length Q), scaled by
-    ///        the reference-to-parametric Jacobian.
+    /// @brief Quadrature weights for the current element (length Q). Filled
+    ///        by `reinit(elem_idx)`; stale on `reinit_on_pts`.
     Vector<T> mapped_weights_;
 
-    // === Geometry ===================================================================
+    // === Intrinsic geometry storage =================================================
+    //
+    // Layout: see intrinsic_geometry.hpp for packing conventions.
 
-    /// @brief Metric, Jacobians, Christoffel symbols at the current element's
-    ///        quadrature points.
-    IntrinsicGeometry<T, d> intrinsic_geometry_;
+    /// @brief Per-order packed position-derivative storage (always populated
+    ///        up to `flags_.basis_order`).
+    std::vector<ColMatrix<T, 3>> position_data;
 
-    /// @brief Unit normal, normal derivatives and surface curvature at the
-    ///        current element's quadrature points. Meaningful only for d == 2
-    ///        (empty no-op for other dimensions).
-    ExtrinsicGeometry<T, d> extrinsic_geometry_;
+    /// @brief Packed covariant metric g_{αβ}.
+    Matrix<T> g_data;
+
+    /// @brief Packed contravariant metric g^{αβ}.
+    Matrix<T> g_inv_data;
+
+    /// @brief Jacobian √det g, length Q.
+    Vector<T> jac;
+
+    /// @brief Packed Christoffel symbols Γ^k_{ij}.
+    Matrix<T> Gamma_data;
+
+    /// @brief Packed Christoffel derivatives ∂_γ Γ^k_{ij}.
+    Matrix<T> Gamma_d1_data;
+
+    // === Extrinsic geometry storage (meaningful for d == 2 only) =====================
+
+    /// @brief Unit surface normal a_3, shape Q × 3.
+    ColMatrix<T, 3> n;
+
+    /// @brief Packed normal derivatives ∂_β a_3.
+    ColMatrix<T, 3> n_d1_data;
+
+    /// @brief Second fundamental form b_{αβ}.
+    Matrix<T> b_data;
+
+    /// @brief Shape operator b^α_β.
+    Matrix<T> b_mixed_data;
+
+    // === Position-derivative accessors ==============================================
+
+    /// @brief Position x(ξ).
+    auto x() const                              { return view_pos(0, 0); }
+
+    /// @brief Covariant basis a_α = ∂_α x.
+    auto a(Index i) const                       { return view_pos(1, i); }
+
+    /// @brief Symmetric second derivative a_{αβ} = ∂_{αβ} x.
+    auto a_d1(Index i, Index j) const           { return view_pos(2, pack2<d>(i, j)); }
+
+    /// @brief Symmetric third derivative a_{αβγ} = ∂_{αβγ} x.
+    auto a_d2(Index i, Index j, Index k) const  { return view_pos(3, pack3<d>(i, j, k)); }
+
+    // === Metric accessors ===========================================================
+
+    /// @brief Covariant metric g_{αβ}(q). Symmetric in (α, β).
+    auto g(Index i, Index j) const     { return g_data.col(pack2<d>(i, j)); }
+
+    /// @brief Contravariant metric g^{αβ}(q). Symmetric in (α, β).
+    auto g_inv(Index i, Index j) const { return g_inv_data.col(pack2<d>(i, j)); }
+
+    // === Christoffel accessors ======================================================
+
+    /// @brief Γ^k_{ij}(q) — Q-length view; symmetric in (i, j).
+    auto Gamma(Index k, Index i, Index j) const
+    {
+        constexpr Index n_d2 = d * (d + 1) / 2;
+        return Gamma_data.col(k * n_d2 + pack2<d>(i, j));
+    }
+
+    /// @brief ∂_γ Γ^k_{ij}(q) — Q-length view; symmetric in (i, j).
+    auto Gamma_d1(Index k, Index i, Index j, Index gam) const
+    {
+        constexpr Index n_d2 = d * (d + 1) / 2;
+        return Gamma_d1_data.col(k * (n_d2 * d) + pack2<d>(i, j) * d + gam);
+    }
+
+    // === Extrinsic accessors (d == 2 only meaningful) ===============================
+
+    /// @brief ∂_β a_3 — Q × 3 view.
+    auto n_d1(Index beta) const
+    {
+        const Index Q_ = static_cast<Index>(n.rows());
+        return n_d1_data.middleRows(beta * Q_, Q_);
+    }
+
+    /// @brief b_{αβ}(q). Symmetric in (α, β).
+    auto b(Index alpha, Index beta) const
+    { return b_data.col(pack2<2>(alpha, beta)); }
+
+    /// @brief b^α_β(q). Not symmetric.
+    auto b_mixed(Index alpha, Index beta) const
+    { return b_mixed_data.col(alpha * 2 + beta); }
 
 private:
 
+    /// @brief Shared init helper used by both public constructors.
+    ElementValues(const Patch<T, d>& patch, Index basis_order, unsigned flags,
+                  std::size_t Q, const QuadratureRule<T, d>* quadrature)
+        : patch_(patch), quadrature_(quadrature),
+          basis_order_(basis_order), flags_(flags)
+    {
+        const Index Qi = static_cast<Index>(Q);
+        mapped_pts_.resize(Qi, static_cast<Index>(d));
+        mapped_weights_.resize(Qi);
+
+        Index N = 1;
+        for (std::size_t i = 0; i < d; ++i) {
+            const Index Ni = static_cast<Index>(patch.basis(i).degree()) + 1;
+            N *= Ni;
+
+            uni_results_[i].resize(basis_order + 1);
+            for (Index k = 0; k <= basis_order; ++k) {
+                uni_results_[i][k].resize(Ni, Qi);
+            }
+        }
+        resize_basis_buffer<T, d>(results_, N, Qi, basis_order);
+
+        elem_cps_.reserve(static_cast<std::size_t>(N));
+        act_pts_.resize(N, 3);
+    }
+
+    /// @brief Build a Q × 3 view onto packed-position @p packed within
+    ///        order-@p ord storage.
+    auto view_pos(Index ord, Index packed) const
+    {
+        const Index Q_ = static_cast<Index>(position_data[0].rows());
+        return position_data[ord].middleRows(packed * Q_, Q_);
+    }
+
     const Patch<T, d>&          patch_;
-    const QuadratureRule<T, d>& quadrature_;
-    Index                       order_;
-    std::array<Index, d>        span_indices_;
-    std::array<Index, d>        intervals_;
-    
+    const QuadratureRule<T, d>* quadrature_;
+    Index                       basis_order_;
+    unsigned                    flags_;
 };
+
+// === Voigt-packed metric helpers ====================================================
 
 /**
- * @brief Per-span evaluation workspace for a PatchBoundary.
- *
- * @details Boundary integration is intrinsically a two-basis problem: the
- *          integrand involves both the boundary's own (d-1)-dim basis (for
- *          multipliers, the boundary measure, normal-traction terms) and
- *          the parent's d-dim basis evaluated at the lifted boundary
- *          quadrature points (because primary unknowns live on the parent).
- *          This workspace holds the boundary side here; the parent-side
- *          basis scratch, output buffer, and lifted points will be added
- *          when reinit() is wired. ExtrinsicGeometry omitted for now (see
- *          file header TODO).
- *
- * @tparam T Scalar floating-point type.
- * @tparam d Parametric dimension of the parent patch.
+ * @brief Pack the upper-triangular metric components into a column vector at
+ *        q-point @p q. For d=2 this is (g11, g12, g22)ᵀ; for d=3
+ *        (g11, g12, g13, g22, g23, g33)ᵀ.
  */
 template <std::floating_point T, std::size_t d>
-requires (d > 1)
-class BoundaryElementValues
+Eigen::Matrix<T, d * (d + 1) / 2, 1>
+g_voigt(const ElementValues<T, d>& ev, Index q)
 {
-public:
+    Eigen::Matrix<T, d * (d + 1) / 2, 1> v;
+    std::size_t flat = 0;
+    for (std::size_t i = 0; i < d; ++i)
+        for (std::size_t j = i; j < d; ++j)
+            v(flat++) = ev.g(i, j)(q);
+    return v;
+}
 
-    // === Boundary side ((d-1)-dimensional) ==========================================
-
-    /// @brief Boundary basis values and derivatives at the current span's
-    ///        quadrature points, per-order packed.
-    std::vector<Matrix<T>> results;
-
-    /// @brief Quadrature points in boundary parametric coordinates for the
-    ///        current span, shape (Q, d-1). Filled by QuadratureRule::map_to_domain.
-    ColMatrix<T, d - 1> mapped_pts;
-
-    /// @brief Boundary quadrature weights (length Q), scaled by the
-    ///        reference-to-parametric Jacobian on the boundary span.
-    Vector<T> mapped_weights;
-
-    /// @brief Metric and Jacobians on the (d-1)-dimensional boundary.
-    IntrinsicGeometry<T, d - 1> intrinsic_geometry;
-
-    // === Parent side (d-dimensional, at lifted boundary quadrature points) ==========
-    //
-    // Parent-side basis scratch / output / lifted points to be added when
-    // reinit() is wired. Parent intrinsic + extrinsic geometry live here now
-    // since they're cheap to declare and natural to mirror.
-
-    /// @brief Metric, Jacobians, Christoffel symbols on the parent patch at
-    ///        the lifted boundary quadrature points.
-    IntrinsicGeometry<T, d> parent_intrinsic_geometry;
-};
+/// @brief Same packing as @ref g_voigt, applied to the inverse metric.
+template <std::floating_point T, std::size_t d>
+Eigen::Matrix<T, d * (d + 1) / 2, 1>
+g_inv_voigt(const ElementValues<T, d>& ev, Index q)
+{
+    Eigen::Matrix<T, d * (d + 1) / 2, 1> v;
+    std::size_t flat = 0;
+    for (std::size_t i = 0; i < d; ++i)
+        for (std::size_t j = i; j < d; ++j)
+            v(flat++) = ev.g_inv(i, j)(q);
+    return v;
+}
 
 } // namespace pyck
 
-#endif // PYCK_VALUES_HPP
+#endif // PYCK_ELEMENT_VALUES_HPP

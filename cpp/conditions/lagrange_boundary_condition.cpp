@@ -1,11 +1,7 @@
 #include "lagrange_boundary_condition.hpp"
 
-#include "patch_boundary.hpp"
-#include "patch.hpp"
-#include "tensor_product.hpp"
-#include "intrinsic_geometry.hpp"
+#include "boundary_element_values.hpp"
 
-#include <cmath>
 #include <stdexcept>
 #include <vector>
 
@@ -69,74 +65,57 @@ LagrangeBoundaryCondition<T, d>::apply(Matrix<T>& stiffness, Vector<T>& load,
 {
     if (terms_.empty()) return;
 
-    const Patch<T, 2>& parent = *boundary_.parent();
     const DofLayout::BlockId primal_block = primal_blocks.at(this->patch_idx_);
-
     const Index ndof = static_cast<Index>(element_.num_node_dofs());
-    const std::size_t req_order = element_.min_order();
-    const Index num_spans_bdy = boundary_.basis(0).knot_vector().num_spans();
     const Index Q = static_cast<Index>(quadrature_.num_points());
-    ColMatrix<T, 1> mapped_pts(Q, 1);
-    Vector<T>       mapped_weights(Q);
 
-    for (Index s = 0; s < num_spans_bdy; ++s)
+    Index    parent_basis_order = element_.basis_order();
+    unsigned parent_flags       = element_.flags();
+    for (const auto& term : terms_) {
+        parent_basis_order = std::max(parent_basis_order, term.field->basis_order());
+        parent_flags |= term.field->flags();
+    }
+    BoundaryElementValues<T, d> bvals(boundary_, parent_basis_order,
+                                      parent_flags, quadrature_);
+    const Index num_spans = bvals.num_elements();
+
+    for (Index s = 0; s < num_spans; ++s)
     {
-        auto [lo, hi] = boundary_.basis(0).knot_vector().span_bounds(s);
-        if (std::abs(hi - lo) < T(1e-14)) continue;
+        bvals.reinit(s);
 
-        // Per-span scaffolding: shared across all fields.
-        quadrature_.map_to_domain({lo}, {hi}, mapped_pts, mapped_weights);
+        const Index n_elem  = static_cast<Index>(bvals.parent_vals_.elem_cps_.size());
+        const Index K_elem  = n_elem * ndof;
 
-        auto boundary_basis  = boundary_.tensor_product().eval_all(mapped_pts, 2);
-        auto boundary_act    = boundary_.active_control_pts(s);
-        IntrinsicGeometry<T, d - 1> boundary_local(boundary_basis, boundary_act, Index(boundary_basis.size()) - 1);
-
-        std::vector<Index> multiplier_basis_ids;
-        boundary_.dof_mapper().get_element_cps(s, multiplier_basis_ids);
-
-        const Index flat_parent = boundary_.parent_flat_span(s);
-        const ColMatrix<T, 2> parent_pts = boundary_.lift_to_parent(mapped_pts);
-        auto parent_basis  = parent.tensor_product().eval_all(parent_pts, req_order);
-        auto parent_act    = parent.active_control_pts(flat_parent);
-        IntrinsicGeometry<T, d> parent_ig(parent_basis, parent_act, Index(parent_basis.size()) - 1);
-
-
-        std::vector<Index> elem_dofs;
-        parent.dof_mapper().get_element_cps(flat_parent, elem_dofs);
-        const Index n_elem = static_cast<Index>(elem_dofs.size());
-        const Index K_elem = n_elem * ndof;
-
-        std::vector<Index> primal_dofs;
-        layout.scatter_primal(primal_block, elem_dofs, primal_dofs);
-        const Index n_primal = static_cast<Index>(primal_dofs.size());
-        const Index n_lambda = static_cast<Index>(multiplier_basis_ids.size());
+        layout.scatter_primal(primal_block, bvals.parent_vals_.elem_cps_,
+                              bvals.parent_vals_.elem_dofs_);
+        const Index n_primal = static_cast<Index>(bvals.parent_vals_.elem_dofs_.size());
+        const Index n_lambda = static_cast<Index>(bvals.boundary_vals_.elem_cps_.size());
 
         // Each field assembles its own coupling block but reuses all the
-        // shape data computed above.
+        // shape data carried by bvals.
         for (const auto& term : terms_)
         {
-            Matrix<T> C = term.field->evaluate(
-                element_, boundary_, s, boundary_basis, boundary_local,
-                flat_parent, parent_basis, parent_ig);
+            Matrix<T> C = term.field->evaluate(element_, bvals);
 
             Matrix<T> C_local = Matrix<T>::Zero(n_lambda, K_elem);
             Vector<T> G_local = Vector<T>::Zero(n_lambda);
 
             for (Index q = 0; q < Q; ++q)
             {
-                const T dGamma = boundary_local.jac(q) * mapped_weights(q);
-                auto slab0 = boundary_basis[0].col(q);
+                const T dGamma =
+                    bvals.boundary_vals_.jac(q) * bvals.boundary_vals_.mapped_weights_(q);
+                auto slab0 = bvals.boundary_vals_.results_[0].col(q);
                 C_local.noalias() += dGamma * slab0 * C.row(q);
                 G_local.noalias() += dGamma * term.value * slab0;
             }
 
             const Index multiplier_base = layout.block_base(term.block_id);
             for (Index i = 0; i < n_lambda; ++i) {
-                const Index lambda_i = multiplier_base + multiplier_basis_ids[i];
+                const Index lambda_i = multiplier_base + bvals.boundary_vals_.elem_cps_[i];
                 load(lambda_i) += G_local(i);
 
                 for (Index j = 0; j < n_primal; ++j) {
-                    const Index primal_j = primal_dofs[j];
+                    const Index primal_j = bvals.parent_vals_.elem_dofs_[j];
                     const T cij = C_local(i, j);
                     stiffness(lambda_i, primal_j) += cij;
                     stiffness(primal_j, lambda_i) += cij;

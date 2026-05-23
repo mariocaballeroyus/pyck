@@ -7,7 +7,8 @@
 
 #include "patch.hpp"
 #include "tensor_product.hpp"
-#include "intrinsic_geometry.hpp"
+#include "element_values.hpp"
+#include "element_values_at.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
 #include "knot_vector.hpp"
@@ -22,6 +23,7 @@
 #include <Eigen/Dense>
 
 using namespace pyck;
+using pyck::test::element_values_at;
 
 // ---------------------------------------------------------------------------
 // Navier series for a simply-supported Reissner-Mindlin square plate
@@ -173,7 +175,7 @@ TEST_CASE("RM 1P Plate: element properties", "[RM1P]")
     PlateReissnerMindlin1p<double> element(material);
 
     REQUIRE(element.num_node_dofs() == 1);
-    REQUIRE(element.min_order() == 3);
+    REQUIRE(element.basis_order() == 3);
 }
 
 
@@ -195,7 +197,7 @@ TEST_CASE("RM 1P Plate: stiffness matrix size and symmetry", "[RM1P]")
     // Bind a (p+2)-point Gauss rule to a central live element via ElementValues.
     GaussLegendre<double, 2> gauss(p + 2);
     ElementValues<double, 2> pv(*surface,
-                              static_cast<Index>(element.min_order()), gauss);
+                              element.basis_order(), element.flags(), gauss);
     const std::size_t num_live = static_cast<std::size_t>(pv.num_elements());
     pv.reinit(num_live / 2);
 
@@ -246,11 +248,9 @@ TEST_CASE("RM 1P Plate: thin plate matches KL", "[RM1P]")
     auto intervals = surf->tensor_product().num_intervals();
     Index flat = span_u + span_v * intervals[0];   // u-fastest
 
-    const auto basis_d = (*surf).tensor_product().eval_all(pt, element.min_order());
-    const auto act_pts = surf->active_control_pts(flat);
-    IntrinsicGeometry<double, 2> ig(basis_d, act_pts, Index(basis_d.size()) - 1);
-   element.displacement_shape_matrix(*surf, basis_d, ig);
-   const Matrix<double>& N_eff = element.N_w_workspace_;
+    auto ev = element_values_at(*surf, pt, element.basis_order(), element.flags());
+    element.displacement_shape_matrix(ev);
+    const Matrix<double>& N_eff = element.N_w_workspace_;
     std::vector<Index> active;
     surf->dof_mapper().get_element_cps(flat, active);
 
@@ -306,11 +306,9 @@ TEST_CASE("RM 1P Plate: thick plate — captures shear deformation", "[RM1P]")
         auto intervals = surf->tensor_product().num_intervals();
         Index flat = span_u + span_v * intervals[0];   // u-fastest
 
-        const auto basis_d = (*surf).tensor_product().eval_all(pt, element.min_order());
-        const auto act_pts = surf->active_control_pts(flat);
-        IntrinsicGeometry<double, 2> ig(basis_d, act_pts, Index(basis_d.size()) - 1);
-       element.displacement_shape_matrix(*surf, basis_d, ig);
-   const Matrix<double>& N_eff = element.N_w_workspace_;
+        auto ev = element_values_at(*surf, pt, element.basis_order(), element.flags());
+        element.displacement_shape_matrix(ev);
+        const Matrix<double>& N_eff = element.N_w_workspace_;
         std::vector<Index> active;
     surf->dof_mapper().get_element_cps(flat, active);
 

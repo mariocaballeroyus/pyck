@@ -76,53 +76,19 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
 
     // Track quadrature point offset into broadcasted_values
     std::size_t qp_offset = 0;
-    ColMatrix<T, d> mapped_pts(static_cast<Index>(Q), static_cast<Index>(d));
-    Vector<T>       mapped_weights(static_cast<Index>(Q));
+    ElementValues<T, d> ev(patch, element.basis_order(), element.flags(),
+                           quadrature);
+    const std::size_t num_live = static_cast<std::size_t>(ev.num_elements());
 
-    // Single linear loop over all possible multidimensional element indices
-    for (std::size_t elem_idx = 0; elem_idx < total_elements; ++elem_idx)
+    for (std::size_t e = 0; e < num_live; ++e)
     {
-        // Decode linear index into multidimensional span_indices
-        std::array<std::size_t, d> span_indices;
-        std::size_t temp_idx = elem_idx;
-        for (std::size_t i = 0; i < d; ++i)
-        {
-            span_indices[i] = temp_idx % intervals[i];
-            temp_idx /= intervals[i];
-        }
-
-        // 1. Check if the element has non-zero volume in the parametric domain
-        std::array<T, d> u_a, u_b;
-        bool zero_volume = false;
-
-        for (std::size_t i = 0; i < d; ++i) {
-            auto [lo, hi] = patch.basis(i).knot_vector().span_bounds(span_indices[i]);
-            u_a[i] = lo;
-            u_b[i] = hi;
-
-            if (std::abs(hi - lo) < 1e-14) {
-                zero_volume = true;
-                break;
-            }
-        }
-
-        if (zero_volume) continue;
-
-        // Map quadrature points into the per-element scratch buffer.
-        quadrature.map_to_domain(u_a, u_b, mapped_pts, mapped_weights);
-        
-        // Composable geometric primitives.
-        std::size_t req_order = element.min_order();
-        auto basis   = patch.tensor_product().eval_all(mapped_pts, req_order);
-        auto act_pts = patch.active_control_pts(elem_idx);
-        IntrinsicGeometry<T, d> ig(basis, act_pts, Index(basis.size()) - 1);
-
-        element.displacement_shape_matrix(patch, basis, ig);
+        ev.reinit(e);
+        element.displacement_shape_matrix(ev);
         const Matrix<T>& N_w = element.N_w_workspace_;
 
         Vector<T> W_J_T(Q);
         for (std::size_t k = 0; k < Q; ++k) {
-            T scale = mapped_weights(k) * ig.jac(k);
+            T scale = ev.mapped_weights_(k) * ev.jac(k);
             W_J_T(k) = broadcasted_values((qp_offset + k) * ndof) * scale;
         }
         qp_offset += Q;
@@ -131,8 +97,7 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
         Vector<T> local_load = N_w.transpose() * W_J_T;
 
         // Scatter into the element's global DOFs (node-major layout).
-        std::vector<Index> elem_cps;
-        patch.dof_mapper().get_element_cps(elem_idx, elem_cps);
+        const auto& elem_cps = ev.elem_cps_;
         for (std::size_t k = 0; k < elem_cps.size(); ++k) {
             for (Index v = 0; v < ndof; ++v) {
                 element_load_(elem_cps[k] * ndof + v) += local_load(k * ndof + v);

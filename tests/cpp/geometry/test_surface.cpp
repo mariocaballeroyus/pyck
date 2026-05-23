@@ -7,8 +7,9 @@
 #include "patch.hpp"
 #include "patch_boundary.hpp"
 #include "tensor_product.hpp"
-#include "intrinsic_geometry.hpp"
-#include "extrinsic_geometry.hpp"
+#include "element_values.hpp"
+#include "surface_geometry.hpp"
+#include "element_values_at.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
 #include "knot_vector.hpp"
@@ -16,6 +17,7 @@
 #include "gauss_legendre.hpp"
 
 using namespace pyck;
+using pyck::test::element_values_at;
 
 // ===========================================================================
 // Test 1: Flat rectangular plate — geometry, Jacobian, partition of unity.
@@ -65,8 +67,7 @@ TEST_CASE("Patch<double, 2>: Flat Rectangular Plate", "[geometry][surface]") {
     SECTION("Metric & Jacobian = Lx · Ly") {
         ColMatrix<double, 2> pts(1, 2);
         pts << 0.3, 0.7;
-        const auto b     = surf.tensor_product().eval_all(pts, 3);
-        IntrinsicGeometry<double, 2> local(b, act, Index(b.size()) - 1);
+        auto local = element_values_at(surf, pts, Index(3), Flags::Metric | Flags::Christoffels | Flags::ChristoffelsD1);
 
         CHECK(local.g(0, 0)(0) == Approx(Lx * Lx).margin(1e-12));
         CHECK(local.g(0, 1)(0) == Approx(0.0     ).margin(1e-12));
@@ -77,8 +78,7 @@ TEST_CASE("Patch<double, 2>: Flat Rectangular Plate", "[geometry][surface]") {
     SECTION("Christoffels vanish on flat plate") {
         ColMatrix<double, 2> pts(1, 2);
         pts << 0.4, 0.6;
-        const auto b     = surf.tensor_product().eval_all(pts, 3);
-        IntrinsicGeometry<double, 2> local(b, act, Index(b.size()) - 1);
+        auto local = element_values_at(surf, pts, Index(3), Flags::Metric | Flags::Christoffels | Flags::ChristoffelsD1);
 
         const auto& chr = local;
         CHECK(chr.Gamma(0, 0, 0)(0) == Approx(0.0).margin(1e-14));
@@ -158,9 +158,7 @@ TEST_CASE("Patch<double, 2>: Rectangle factory area integral", "[geometry][surfa
             if (zero_vol) continue;
 
             quad.map_to_domain(lo, hi, mp, mw);
-            const auto b     = surf.tensor_product().eval_all(mp, 1);
-            const auto act   = surf.active_control_pts(e);
-            IntrinsicGeometry<double, 2> local(b, act, Index(b.size()) - 1);
+            auto local = element_values_at(surf, mp, Index(1), Flags::Metric);
 
             for (Eigen::Index q = 0; q < mw.size(); ++q)
                 area += local.jac(q) * mw(q);
@@ -209,8 +207,8 @@ TEST_CASE("Patch<double, 2>: Quadratic Basis — Partition of Unity",
             ColMatrix<double, 2> pts(1, 2);
             pts << u, v;
 
-            const auto b     = surf.tensor_product().eval_all(pts, 3);
-            IntrinsicGeometry<double, 2> local(b, act, Index(b.size()) - 1);
+            auto local = element_values_at(surf, pts, Index(3), Flags::Metric | Flags::Christoffels | Flags::ChristoffelsD1);
+            const auto& b = local.results_;
 
             auto sum_at_0 = [&](Index k_order, Index packed, Index n_k) {
                 auto slab = b[k_order].col(0);
@@ -257,15 +255,11 @@ TEST_CASE("PatchBoundary<double, 2>::eval_outward_normal: flat rectangle",
     Eigen::VectorXd bdy_pts(3);
     bdy_pts << 0.1, 0.5, 0.9;
 
-    const auto bdy_basis = (*bdy).tensor_product().eval_all(bdy_pts, 1);
-    const auto bdy_act   = bdy->active_control_pts(boundary_span);
-    IntrinsicGeometry<double, 1> bdy_local(bdy_basis, bdy_act, Index(bdy_basis.size()) - 1);
+    auto bdy_local = element_values_at(*bdy, bdy_pts, Index(1), Flags::Metric);
 
     const Index parent_flat = bdy->parent_flat_span(boundary_span);
     const auto parent_pts   = bdy->lift_to_parent(bdy_pts);
-    const auto parent_basis = (*surf).tensor_product().eval_all(parent_pts, 1);
-    const auto parent_act   = surf->active_control_pts(parent_flat);
-    IntrinsicGeometry<double, 2> parent_local(parent_basis, parent_act, Index(parent_basis.size()) - 1);
+    auto parent_local = element_values_at(*surf, parent_pts, Index(1), Flags::Metric);
 
     const auto n = bdy->eval_outward_normal(bdy_local, parent_local);
     REQUIRE(n.rows() == bdy_pts.size());
@@ -304,15 +298,14 @@ TEST_CASE("Patch<double, 2>: composable primitives on twisted z=u·v patch",
            0.5, 0.5,
            0.8, 0.2;
 
-    const auto b      = surf.tensor_product().eval_all(pts, 3);
-    const auto actpts = surf.active_control_pts(elem_idx);
-    IntrinsicGeometry<double, 2> local(b, actpts, Index(b.size()) - 1);
+    auto local = element_values_at(surf, pts, Index(3),
+        Flags::Metric | Flags::Christoffels | Flags::ChristoffelsD1
+            | Flags::Normal | Flags::NormalD1 | Flags::Curvature);
 
     const auto& chr = local;
-    const ExtrinsicGeometry<double, 2> eg_local(local);
-    const auto& a3     = eg_local.n;
-    const auto& nd_a31 = eg_local.n_d1(0);
-    const auto& nd_a32 = eg_local.n_d1(1);
+    const auto& a3     = local.n;
+    const auto& nd_a31 = local.n_d1(0);
+    const auto& nd_a32 = local.n_d1(1);
 
     REQUIRE(local.a(0).rows() == 3);
     REQUIRE(local.a(1).rows() == 3);
@@ -414,9 +407,7 @@ TEST_CASE("Patch<double, 2>: ∂Γ on twisted z=u·v patch",
            0.5, 0.5,
            0.8, 0.2;
 
-    const auto b      = surf.tensor_product().eval_all(pts, 3);
-    const auto actpts = surf.active_control_pts(elem_idx);
-    IntrinsicGeometry<double, 2> local(b, actpts, Index(b.size()) - 1);
+    auto local = element_values_at(surf, pts, Index(3), Flags::Metric | Flags::Christoffels | Flags::ChristoffelsD1);
 
     const auto& chr = local;
 
@@ -475,12 +466,10 @@ TEST_CASE("Patch<double, 2>: Intrinsic/Extrinsic containers compose correctly",
            0.5, 0.5,
            0.8, 0.2;
 
-    const auto basis  = surf.tensor_product().eval_all(pts, 3);
-    const auto actpts = surf.active_control_pts(elem_idx);
-
-    IntrinsicGeometry<double, 2> ig(basis, actpts, Index(basis.size()) - 1);
-
-    ExtrinsicGeometry<double, 2> eg(ig);
+    auto ig = element_values_at(surf, pts, Index(3),
+        Flags::Metric | Flags::Christoffels | Flags::ChristoffelsD1
+            | Flags::Normal | Flags::NormalD1 | Flags::Curvature);
+    const auto& eg = ig;
 
 
     for (Eigen::Index q = 0; q < pts.rows(); ++q) {

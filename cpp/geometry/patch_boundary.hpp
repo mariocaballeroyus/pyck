@@ -10,10 +10,12 @@
 #include "../types.hpp"
 #include "patch.hpp"
 #include "tensor_product.hpp"
-#include "intrinsic_geometry.hpp"
 
 namespace pyck
 {
+
+// Forward declaration to avoid circular include with element_values.hpp.
+template <std::floating_point T, std::size_t d> class ElementValues;
 
 /**
  * @brief Represents a boundary face of a d-dimensional patch.
@@ -95,9 +97,9 @@ public:
      * outward normal is the boundary's own a_3 = a_1^bd × a_2^bd / ‖…‖,
      * signed by `sign_n_`. The parent local frame is unused.
      */
-    ColMatrix<T, 3> eval_outward_normal(const IntrinsicGeometry<T, d - 1>& boundary_local,
-                                        const IntrinsicGeometry<T, d>& parent_local) const requires(d == 2);
-    ColMatrix<T, 3> eval_outward_normal(const IntrinsicGeometry<T, d - 1>& boundary_local) const requires(d == 3);
+    ColMatrix<T, 3> eval_outward_normal(const ElementValues<T, d - 1>& boundary_vals,
+                                        const ElementValues<T, d>& parent_vals) const requires(d == 2);
+    ColMatrix<T, 3> eval_outward_normal(const ElementValues<T, d - 1>& boundary_vals) const requires(d == 3);
 
 private:
 

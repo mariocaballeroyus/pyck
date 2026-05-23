@@ -2,7 +2,7 @@
 #include "patch.hpp"
 #include "tensor_product.hpp"
 #include "intrinsic_geometry.hpp"
-#include "extrinsic_geometry.hpp"
+#include "surface_geometry.hpp"
 
 namespace pyck
 {
@@ -20,33 +20,30 @@ ShellReissnerMindlin5p<T>::ShellReissnerMindlin5p(Ptr<PlaneStress2d<T>> material
 
 template <std::floating_point T>
 void
-ShellReissnerMindlin5p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
-                                         const std::vector<Matrix<T>>& basis,
-                                         const IntrinsicGeometry<T, 2>& ig) const
+ShellReissnerMindlin5p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
 {
-    const ExtrinsicGeometry<T, 2> eg(ig);
-    const ColMatrix<T, 3>& a_3 = eg.n;
+    const ColMatrix<T, 3>& a_3 = ev.n;
 
     Matrix<T>& B = this->B_workspace_;
-    const Index Q = basis[0].cols();
-    const Index N = basis[0].rows();
+    const Index Q = ev.results_[0].cols();
+    const Index N = ev.results_[0].rows();
     B.setZero(8 * Q, 5 * N);
 
     for (Index q = 0; q < Q; ++q)
     {
-        auto slab0 = basis[0].col(q);
-        auto slab1 = basis[1].col(q);
+        auto slab0 = ev.results_[0].col(q);
+        auto slab1 = ev.results_[1].col(q);
 
-        const auto a1_q = ig.a(0).row(q);
-        const auto a2_q = ig.a(1).row(q);
+        const auto a1_q = ev.a(0).row(q);
+        const auto a2_q = ev.a(1).row(q);
         const auto a3_q = a_3.row(q);
 
-        const T Gam1_11 = ig.Gamma(0, 0, 0)(q);
-        const T Gam1_12 = ig.Gamma(0, 0, 1)(q);
-        const T Gam1_22 = ig.Gamma(0, 1, 1)(q);
-        const T Gam2_11 = ig.Gamma(1, 0, 0)(q);
-        const T Gam2_12 = ig.Gamma(1, 0, 1)(q);
-        const T Gam2_22 = ig.Gamma(1, 1, 1)(q);
+        const T Gam1_11 = ev.Gamma(0, 0, 0)(q);
+        const T Gam1_12 = ev.Gamma(0, 0, 1)(q);
+        const T Gam1_22 = ev.Gamma(0, 1, 1)(q);
+        const T Gam2_11 = ev.Gamma(1, 0, 0)(q);
+        const T Gam2_12 = ev.Gamma(1, 0, 1)(q);
+        const T Gam2_22 = ev.Gamma(1, 1, 1)(q);
 
         for (Index i = 0; i < N; ++i)
         {
@@ -82,13 +79,12 @@ ShellReissnerMindlin5p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
 
 template <std::floating_point T>
 ConstitutiveMatrix<T>
-ShellReissnerMindlin5p<T>::constitutive_matrix(const IntrinsicGeometry<T, 2>& ig,
-                                               Index q) const
+ShellReissnerMindlin5p<T>::constitutive_matrix(const ElementValues<T, 2>& ev, Index q) const
 {
     // D = [ D_m  0    0   ]
     //     [ 0    D_b  0   ]
     //     [ 0    0    D_s ]
-    const Eigen::Matrix<T, 3, 1> g_inv_q = g_inv_voigt(ig, q);
+    const Eigen::Matrix<T, 3, 1> g_inv_q = g_inv_voigt(ev, q);
     const Eigen::Matrix<T, 3, 3> C  = material_->elasticity_voigt(g_inv_q);
     const T t = material_->thickness();
     const Eigen::Matrix<T, 3, 3> Dm = t * C;
@@ -106,24 +102,20 @@ ShellReissnerMindlin5p<T>::constitutive_matrix(const IntrinsicGeometry<T, 2>& ig
 
 template <std::floating_point T>
 void
-ShellReissnerMindlin5p<T>::displacement_shape_matrix(const Patch<T, 2>& /*patch*/,
-                                                     const std::vector<Matrix<T>>& basis,
-                                                     const IntrinsicGeometry<T, 2>& /*ig*/) const
+ShellReissnerMindlin5p<T>::displacement_shape_matrix(const ElementValues<T, 2>& ev) const
 {
-    const Index Q = basis[0].cols();
-    const Index N = basis[0].rows();
+    const Index Q = ev.results_[0].cols();
+    const Index N = ev.results_[0].rows();
     this->N_w_workspace_.setZero(Q, 5 * N);
     // TODO: implement this
 }
 
 template <std::floating_point T>
 void
-ShellReissnerMindlin5p<T>::rotation_shape_matrix(const Patch<T, 2>& /*patch*/,
-                                                 const std::vector<Matrix<T>>& basis,
-                                                 const IntrinsicGeometry<T, 2>& /*ig*/) const
+ShellReissnerMindlin5p<T>::rotation_shape_matrix(const ElementValues<T, 2>& ev) const
 {
-    const Index Q = basis[0].cols();
-    const Index N = basis[0].rows();
+    const Index Q = ev.results_[0].cols();
+    const Index N = ev.results_[0].rows();
     this->N_phi_workspace_.setZero(2 * Q, 5 * N);
     // TODO: implement this
 }

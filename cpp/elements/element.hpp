@@ -6,7 +6,6 @@
 
 #include "patch.hpp"
 #include "tensor_product.hpp"
-#include "intrinsic_geometry.hpp"
 #include "element_values.hpp"
 #include "../types.hpp"
 
@@ -45,8 +44,15 @@ public:
     /// @brief Number of DOFs per node.
     virtual std::size_t num_node_dofs() const = 0;
 
-    /// @brief Minimum required derivative order for shape-function evaluation.
-    virtual std::size_t min_order() const { return 0; }
+    /// @brief Basis derivative order needed by this element's strain / stress
+    ///        / shape matrix bodies.
+    virtual Index basis_order() const = 0;
+
+    /// @brief Quantity flag bitmask declaring which geometric quantities this
+    ///        element's bodies read (Metric, Christoffels, Normal, …). The
+    ///        bulk assembler and boundary conditions use this to size the
+    ///        `ElementValues` workspace.
+    virtual unsigned flags() const = 0;
 
     // === Matrix Operators (Element Formulation-Agnostic) ============================
 
@@ -56,66 +62,43 @@ public:
      *        `element.N_sigma_workspace_` after the call. Internally
      *        reuses @ref B_workspace_ as scratch for B.
      */
-    virtual void stress_matrix(const Patch<T, d>& patch,
-                               const std::vector<Matrix<T>>& basis,
-                               const IntrinsicGeometry<T, d>& ig) const;
+    virtual void stress_matrix(const ElementValues<T, d>& ev) const;
 
     /**
-     * @brief Local stiffness matrix \
-     *        K = \int_{\Omega}{ B^T D B dV }.
+     * @brief Local stiffness matrix K = ∫_Ω B^T D B dV.
      *
-     * @param pv Per-element workspace bound via `ElementValues::reinit`. Carries
-     *           the patch reference, basis values + derivatives, mapped
-     *           quadrature weights, and flat element index.
+     * @param ev Per-element workspace bound via `ElementValues::reinit`.
      * @param stiffness The local stiffness matrix.
      */
-    virtual void compute_local_stiffness(const ElementValues<T, d>& pv,
+    virtual void compute_local_stiffness(const ElementValues<T, d>& ev,
                                          Matrix<T>& stiffness) const;
 
     // === Matrix Operators (Element Formulation-Specific) ============================
 
     /**
      * @brief Strain-displacement operator B, row-stacked per qp. Writes
-     *        into this element's own @ref B_workspace_; read the result
-     *        via `element.B_workspace_` after the call. Implementations
-     *        size the workspace via `setZero(rows, cols)` — Eigen's resize
-     *        is a no-op when dimensions already match, so repeated calls
-     *        on the same element reuse the existing storage.
+     *        into this element's own @ref B_workspace_.
      */
-    virtual void strain_matrix(const Patch<T, d>& patch,
-                               const std::vector<Matrix<T>>& basis,
-                               const IntrinsicGeometry<T, d>& ig) const = 0;
+    virtual void strain_matrix(const ElementValues<T, d>& ev) const = 0;
 
     /**
      * @brief Constitutive operator D at quadrature point q.
-     *
-     * @param ig The intrinsic geometry.
-     * @param q  Quadrature point index.
-     * @return The constitutive operator (stack-resident ConstitutiveMatrix,
-     *         sized at runtime to the formulation's strain dimension).
      */
     virtual ConstitutiveMatrix<T>
-    constitutive_matrix(const IntrinsicGeometry<T, d>& ig, Index q) const = 0;
+    constitutive_matrix(const ElementValues<T, d>& ev, Index q) const = 0;
 
     // === Shape Matrices (Pure Virtual) ==============================================
 
     /**
      * @brief Transverse-displacement shape matrix N_w (Q × K). Writes into
-     *        this element's own @ref N_w_workspace_; read the result via
-     *        `element.N_w_workspace_` after the call.
+     *        @ref N_w_workspace_.
      */
-    virtual void displacement_shape_matrix(const Patch<T, d>& patch,
-                                           const std::vector<Matrix<T>>& basis,
-                                           const IntrinsicGeometry<T, d>& ig) const = 0;
+    virtual void displacement_shape_matrix(const ElementValues<T, d>& ev) const = 0;
 
     /**
-     * @brief Rotation shape matrix N_φ. Writes into this element's own
-     *        @ref N_phi_workspace_; read the result via
-     *        `element.N_phi_workspace_` after the call.
+     * @brief Rotation shape matrix N_φ. Writes into @ref N_phi_workspace_.
      */
-    virtual void rotation_shape_matrix(const Patch<T, d>& patch,
-                                       const std::vector<Matrix<T>>& basis,
-                                       const IntrinsicGeometry<T, d>& ig) const = 0;
+    virtual void rotation_shape_matrix(const ElementValues<T, d>& ev) const = 0;
 
     // === Preallocated scratch =======================================================
     //
@@ -134,18 +117,16 @@ public:
 
 template <std::floating_point T, std::size_t d>
 void
-Element<T, d>::stress_matrix(const Patch<T, d>& patch,
-                             const std::vector<Matrix<T>>& basis,
-                             const IntrinsicGeometry<T, d>& ig) const
+Element<T, d>::stress_matrix(const ElementValues<T, d>& ev) const
 {
-    strain_matrix(patch, basis, ig);
-    const Index Q        = basis[0].cols();
+    strain_matrix(ev);
+    const Index Q        = ev.results_[0].cols();
     const Index n_strain = B_workspace_.rows() / Q;
     const Index K        = B_workspace_.cols();
 
     N_sigma_workspace_.setZero(n_strain * Q, K);
     for (Index q = 0; q < Q; ++q) {
-        const auto D = constitutive_matrix(ig, q);
+        const auto D = constitutive_matrix(ev, q);
         N_sigma_workspace_.middleRows(n_strain * q, n_strain).noalias() =
             D * B_workspace_.middleRows(n_strain * q, n_strain);
     }
@@ -153,24 +134,19 @@ Element<T, d>::stress_matrix(const Patch<T, d>& patch,
 
 template <std::floating_point T, std::size_t d>
 void
-Element<T, d>::compute_local_stiffness(const ElementValues<T, d>& pv,
+Element<T, d>::compute_local_stiffness(const ElementValues<T, d>& ev,
                                        Matrix<T>& stiffness) const
 {
-    const Patch<T, d>& patch          = pv.patch();
-    const auto& basis                 = pv.results_;
-    const auto& q_weights             = pv.mapped_weights_;
-    const IntrinsicGeometry<T, d>& ig = pv.intrinsic_geometry_;
-
-    strain_matrix(patch, basis, ig);
+    strain_matrix(ev);
     const Matrix<T>& B   = B_workspace_;
-    const Index Q        = q_weights.size();
+    const Index Q        = ev.mapped_weights_.size();
     const Index n_strain = B.rows() / Q;
     const Index K        = B.cols();
 
     stiffness.setZero(K, K);
     for (Index q = 0; q < Q; ++q) {
-        const T dV = q_weights(q) * ig.jac(q);
-        const auto D = constitutive_matrix(ig, q);
+        const T dV = ev.mapped_weights_(q) * ev.jac(q);
+        const auto D = constitutive_matrix(ev, q);
         const auto B_q = B.middleRows(n_strain * q, n_strain);
         stiffness.noalias() += dV * (B_q.transpose() * D * B_q);
     }

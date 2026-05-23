@@ -5,11 +5,13 @@
 
 #include "patch.hpp"
 #include "tensor_product.hpp"
-#include "intrinsic_geometry.hpp"
+#include "element_values.hpp"
+#include "element_values_at.hpp"
 #include "bspline.hpp"
 #include "knot_vector.hpp"
 
 using namespace pyck;
+using pyck::test::element_values_at;
 
 namespace {
 
@@ -26,7 +28,7 @@ struct CurveDerivs
 };
 
 CurveDerivs metric_derivs(const std::vector<Matrix<double>>& basis,
-                          IntrinsicGeometry<double, 1>& local,
+                          const ElementValues<double, 1>& local,
                           Index q)
 {
     const double g11      = local.g(0, 0)(q);
@@ -117,9 +119,9 @@ TEST_CASE("Patch<double, 1>: Analytical Push-Forward Verification", "[geometry][
                                   - 2.0 * Gamma * Gamma;
 
             // New-API evaluation.
-            auto b     = curve.tensor_product().eval_all(params, 3);
-            auto act   = curve.active_control_pts(span);
-            IntrinsicGeometry<double, 1> local(b, act, Index(b.size()) - 1);            auto md    = metric_derivs(b, local, 0);
+            auto local = element_values_at(curve, params, Index(3),
+                Flags::Metric | Flags::Christoffels | Flags::ChristoffelsD1);
+            auto md    = metric_derivs(local.results_, local, 0);
 
             CHECK(local.jac(0) == Approx(sqrt_g11).margin(1e-12));
 
@@ -159,8 +161,9 @@ TEST_CASE("Patch<double, 1>: External AD Numerical Validation", "[geometry][curv
 
     auto eval_at = [&](double u) {
         ColMatrix<double, 1> params(1, 1); params << u;
-        auto b     = curve.tensor_product().eval_all(params, 3);
-        IntrinsicGeometry<double, 1> local(b, act, Index(b.size()) - 1);        return metric_derivs(b, local, 0);
+        auto local = element_values_at(curve, params, Index(3),
+            Flags::Metric | Flags::Christoffels | Flags::ChristoffelsD1);
+        return metric_derivs(local.results_, local, 0);
     };
 
     SECTION("Evaluation at u = 0.15") {

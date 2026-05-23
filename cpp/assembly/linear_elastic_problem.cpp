@@ -57,7 +57,8 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
         const DofLayout::BlockId primal_block = primal_blocks[p];
 
         ElementValues<T, d> patch_values(patch,
-                                       static_cast<Index>(element.min_order()),
+                                       element.basis_order(),
+                                       element.flags(),
                                        quadrature);
         const std::size_t num_live = static_cast<std::size_t>(patch_values.num_elements());
 

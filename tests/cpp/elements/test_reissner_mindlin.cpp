@@ -125,7 +125,7 @@ TEST_CASE("Reissner-Mindlin Plate element properties", "[RMPlate]")
 
     SECTION("Basic properties") {
         REQUIRE(element.num_node_dofs() == 3);
-        REQUIRE(element.min_order() == 2);
+        REQUIRE(element.basis_order() == 2);
     }
 
     SECTION("Constitutive matrices") {
@@ -158,7 +158,7 @@ TEST_CASE("Reissner-Mindlin Plate Stiffness Matrix Size", "[RMPlate]")
     // Single-point Gauss on the patch's only non-zero span (live element 0).
     GaussLegendre<double, 2> gauss(1);
     ElementValues<double, 2> pv(*surface,
-                              static_cast<Index>(element.min_order()), gauss);
+                              element.basis_order(), element.flags(), gauss);
     pv.reinit(0);
 
     Matrix<double> stiffness;

@@ -4,9 +4,10 @@
 #include <concepts>
 
 #include "../elements/element.hpp"
-#include "../geometry/patch_boundary.hpp"
+#include "../elements/boundary_element_values.hpp"
+#include "../geometry/surface_geometry.hpp"
 #include "../geometry/intrinsic_geometry.hpp"
-#include "../geometry/extrinsic_geometry.hpp"
+#include "../geometry/patch_boundary.hpp"
 #include "../types.hpp"
 
 namespace pyck
@@ -26,26 +27,21 @@ public:
     virtual ~BoundaryField() = default;
 
     /**
-     * @brief Evaluate the boundary field.
-     * 
-     * @param element The element to evaluate the boundary field on.
-     * @param boundary The boundary of the patch.
-     * @param boundary_span The span of the boundary.
-     * @param boundary_basis The basis derivatives of the boundary.
-     * @param boundary_local The local frame of the boundary.
-     * @param parent_flat_span The flat span of the parent.
-     * @param parent_basis The basis derivatives of the parent.
-     * @param parent_ig The intrinsic geometry of the parent.
-     * @return The boundary field evaluated at the quadrature points.
+     * @brief Evaluate the boundary field at the workspace's quadrature points.
+     *
+     * @param element The element supplying the trace operator's physics.
+     * @param bvals   Per-span boundary workspace (boundary + parent basis,
+     *                metric, normal, …) refreshed by the caller.
+     * @return The (Q × K) field-trace matrix at the quadrature points.
      */
     virtual Matrix<T> evaluate(const Element<T, 2>& element,
-                               const PatchBoundary<T, 2>& boundary,
-                               Index boundary_span,
-                               const std::vector<Matrix<T>>& boundary_basis,
-                               const IntrinsicGeometry<T, 1>& boundary_local,
-                               Index parent_flat_span,
-                               const std::vector<Matrix<T>>& parent_basis,
-                               const IntrinsicGeometry<T, 2>& parent_ig) const = 0;
+                               const BoundaryElementValues<T, 2>& bvals) const = 0;
+
+    /// @brief Basis derivative order this field reads on the parent side.
+    virtual Index basis_order() const = 0;
+
+    /// @brief Quantity flag bitmask this field reads on the parent side.
+    virtual unsigned flags() const = 0;
 };
 
 namespace detail
@@ -56,7 +52,7 @@ namespace detail
 template <std::floating_point T>
 inline std::pair<Vector<T>, Vector<T>>
 covariant_components(const ColMatrix<T, 3>& v,
-                     const IntrinsicGeometry<T, 2>& local)
+                     const ElementValues<T, 2>& local)
 {
     const Index Q = v.rows();
     Vector<T> v_cov_1(Q), v_cov_2(Q);
@@ -73,7 +69,7 @@ covariant_components(const ColMatrix<T, 3>& v,
 template <std::floating_point T>
 inline std::pair<Vector<T>, Vector<T>>
 contravariant_components(const ColMatrix<T, 3>& v,
-                         const IntrinsicGeometry<T, 2>& local)
+                         const ElementValues<T, 2>& local)
 {
     auto [v_cov_1, v_cov_2] = covariant_components(v, local);
     const Index Q = v.rows();
@@ -123,30 +119,27 @@ class BasisValue : public BoundaryField<T>
 public:
     explicit BasisValue(std::size_t dof_index = 0) : dof_index_(dof_index) {}
 
-    Matrix<T> evaluate(
-        const Element<T, 2>& element,
-        const PatchBoundary<T, 2>& /*boundary*/,
-        Index /*boundary_span*/,
-        const std::vector<Matrix<T>>& /*boundary_basis*/,
-        const IntrinsicGeometry<T, 1>& /*boundary_local*/,
-        Index /*parent_flat_span*/,
-        const std::vector<Matrix<T>>& parent_basis,
-        const IntrinsicGeometry<T, 2>& /*parent_ig*/) const override
+    Matrix<T> evaluate(const Element<T, 2>& element,
+                       const BoundaryElementValues<T, 2>& bvals) const override
     {
         const Index ndof = static_cast<Index>(element.num_node_dofs());
-        const Index Q = parent_basis[0].cols();
-        const Index N = parent_basis[0].rows();
+        const Matrix<T>& slab0 = bvals.parent_vals_.results_[0];
+        const Index Q = slab0.cols();
+        const Index N = slab0.rows();
         const Index slot = static_cast<Index>(dof_index_);
 
         Matrix<T> C = Matrix<T>::Zero(Q, N * ndof);
         for (Index q = 0; q < Q; ++q) {
-            auto slab0 = parent_basis[0].col(q);
+            auto col = slab0.col(q);
             for (Index i = 0; i < N; ++i) {
-                C(q, i * ndof + slot) = slab0(i);
+                C(q, i * ndof + slot) = col(i);
             }
         }
         return C;
     }
+
+    Index basis_order() const override { return Index(0); }
+    unsigned flags() const override { return Flags::None; }
 
 private:
     std::size_t dof_index_;
@@ -170,39 +163,38 @@ class BasisNormalSlope : public BoundaryField<T>
 public:
     explicit BasisNormalSlope(std::size_t dof_index = 0) : dof_index_(dof_index) {}
 
-    Matrix<T> evaluate(
-        const Element<T, 2>& element,
-        const PatchBoundary<T, 2>& boundary,
-        Index /*boundary_span*/,
-        const std::vector<Matrix<T>>& /*boundary_basis*/,
-        const IntrinsicGeometry<T, 1>& boundary_local,
-        Index /*parent_flat_span*/,
-        const std::vector<Matrix<T>>& parent_basis,
-        const IntrinsicGeometry<T, 2>& parent_ig) const override
+    Matrix<T> evaluate(const Element<T, 2>& element,
+                       const BoundaryElementValues<T, 2>& bvals) const override
     {
         const Index ndof = static_cast<Index>(element.num_node_dofs());
-        const Index Q = parent_basis[0].cols();
-        const Index N = parent_basis[0].rows();
+        const Matrix<T>& slab0 = bvals.parent_vals_.results_[0];
+        const Matrix<T>& slab1 = bvals.parent_vals_.results_[1];
+        const Index Q = slab0.cols();
+        const Index N = slab0.rows();
         const Index slot = static_cast<Index>(dof_index_);
 
         const ColMatrix<T, 3> normal =
-            boundary.eval_outward_normal(boundary_local, parent_ig);
+            bvals.boundary().eval_outward_normal(bvals.boundary_vals_,
+                                                 bvals.parent_vals_);
         const auto [n_up_1, n_up_2] =
-            detail::contravariant_components(normal, parent_ig);
+            detail::contravariant_components(normal, bvals.parent_vals_);
 
         Matrix<T> C = Matrix<T>::Zero(Q, N * ndof);
         for (Index q = 0; q < Q; ++q) {
-            auto slab1 = parent_basis[1].col(q);
+            auto col1 = slab1.col(q);
             const T n1 = n_up_1(q);
             const T n2 = n_up_2(q);
             for (Index i = 0; i < N; ++i) {
-                const T N_u_i = slab1(i * 2 + 0);
-                const T N_v_i = slab1(i * 2 + 1);
+                const T N_u_i = col1(i * 2 + 0);
+                const T N_v_i = col1(i * 2 + 1);
                 C(q, i * ndof + slot) = n1 * N_u_i + n2 * N_v_i;
             }
         }
         return C;
     }
+
+    Index basis_order() const override { return Index(1); }
+    unsigned flags() const override { return Flags::Metric; }
 
 private:
     std::size_t dof_index_;
@@ -226,47 +218,44 @@ class BasisNormalCurvature : public BoundaryField<T>
 public:
     explicit BasisNormalCurvature(std::size_t dof_index = 0) : dof_index_(dof_index) {}
 
-    Matrix<T> evaluate(
-        const Element<T, 2>& element,
-        const PatchBoundary<T, 2>& boundary,
-        Index /*boundary_span*/,
-        const std::vector<Matrix<T>>& /*boundary_basis*/,
-        const IntrinsicGeometry<T, 1>& boundary_local,
-        Index /*parent_flat_span*/,
-        const std::vector<Matrix<T>>& parent_basis,
-        const IntrinsicGeometry<T, 2>& parent_ig) const override
+    Matrix<T> evaluate(const Element<T, 2>& element,
+                       const BoundaryElementValues<T, 2>& bvals) const override
     {
         const Index ndof = static_cast<Index>(element.num_node_dofs());
-        const Index Q = parent_basis[0].cols();
-        const Index N = parent_basis[0].rows();
+        const Matrix<T>& slab0 = bvals.parent_vals_.results_[0];
+        const Matrix<T>& slab1 = bvals.parent_vals_.results_[1];
+        const Matrix<T>& slab2 = bvals.parent_vals_.results_[2];
+        const Index Q = slab0.cols();
+        const Index N = slab0.rows();
         const Index slot = static_cast<Index>(dof_index_);
 
+        const ElementValues<T, 2>& parent = bvals.parent_vals_;
         const ColMatrix<T, 3> normal =
-            boundary.eval_outward_normal(boundary_local, parent_ig);
+            bvals.boundary().eval_outward_normal(bvals.boundary_vals_, parent);
         const auto [n_up_1, n_up_2] =
-            detail::contravariant_components(normal, parent_ig);
+            detail::contravariant_components(normal, parent);
 
         Matrix<T> C = Matrix<T>::Zero(Q, N * ndof);
         for (Index q = 0; q < Q; ++q) {
-            auto slab1 = parent_basis[1].col(q);
-            auto slab2 = parent_basis[2].col(q);
-            const T G1_11 = parent_ig.Gamma(0, 0, 0)(q);
-            const T G1_12 = parent_ig.Gamma(0, 0, 1)(q);
-            const T G1_22 = parent_ig.Gamma(0, 1, 1)(q);
-            const T G2_11 = parent_ig.Gamma(1, 0, 0)(q);
-            const T G2_12 = parent_ig.Gamma(1, 0, 1)(q);
-            const T G2_22 = parent_ig.Gamma(1, 1, 1)(q);
+            auto col1 = slab1.col(q);
+            auto col2 = slab2.col(q);
+            const T G1_11 = parent.Gamma(0, 0, 0)(q);
+            const T G1_12 = parent.Gamma(0, 0, 1)(q);
+            const T G1_22 = parent.Gamma(0, 1, 1)(q);
+            const T G2_11 = parent.Gamma(1, 0, 0)(q);
+            const T G2_12 = parent.Gamma(1, 0, 1)(q);
+            const T G2_22 = parent.Gamma(1, 1, 1)(q);
             const T n1 = n_up_1(q);
             const T n2 = n_up_2(q);
             const T n1n1 = n1 * n1;
             const T n2n2 = n2 * n2;
             const T two_n1n2 = T(2) * n1 * n2;
             for (Index i = 0; i < N; ++i) {
-                const T N_u_i  = slab1(i * 2 + 0);
-                const T N_v_i  = slab1(i * 2 + 1);
-                const T N_uu_i = slab2(i * 3 + 0);
-                const T N_vv_i = slab2(i * 3 + 1);
-                const T N_uv_i = slab2(i * 3 + 2);
+                const T N_u_i  = col1(i * 2 + 0);
+                const T N_v_i  = col1(i * 2 + 1);
+                const T N_uu_i = col2(i * 3 + 0);
+                const T N_vv_i = col2(i * 3 + 1);
+                const T N_uv_i = col2(i * 3 + 2);
                 // Covariant Hessian: N_{|αβ} = N_{,αβ} − Γ^γ_{αβ} N_{,γ}.
                 const T H11 = N_uu_i - G1_11 * N_u_i - G2_11 * N_v_i;
                 const T H12 = N_uv_i - G1_12 * N_u_i - G2_12 * N_v_i;
@@ -276,6 +265,9 @@ public:
         }
         return C;
     }
+
+    Index basis_order() const override { return Index(2); }
+    unsigned flags() const override { return Flags::Metric | Flags::Christoffels; }
 
 private:
     std::size_t dof_index_;
@@ -290,18 +282,14 @@ class TransverseDisplacement : public BoundaryField<T>
 public:
 
     Matrix<T> evaluate(const Element<T, 2>& element,
-                       const PatchBoundary<T, 2>& boundary,
-                       Index /*boundary_span*/,
-                       const std::vector<Matrix<T>>& /*boundary_basis*/,
-                       const IntrinsicGeometry<T, 1>& /*boundary_local*/,
-                       Index /*parent_flat_span*/,
-                       const std::vector<Matrix<T>>& parent_basis,
-                       const IntrinsicGeometry<T, 2>& parent_ig) const override
+                       const BoundaryElementValues<T, 2>& bvals) const override
     {
-        element.displacement_shape_matrix(*boundary.parent(),
-                                          parent_basis, parent_ig);
+        element.displacement_shape_matrix(bvals.parent_vals_);
         return element.N_w_workspace_;
     }
+
+    Index basis_order() const override { return Index(0); }
+    unsigned flags() const override { return Flags::Metric; }
 };
 
 /**
@@ -316,22 +304,16 @@ template <std::floating_point T>
 class NormalRotation : public BoundaryField<T>
 {
 public:
-    Matrix<T> evaluate(
-        const Element<T, 2>& element,
-        const PatchBoundary<T, 2>& boundary,
-        Index /*boundary_span*/,
-        const std::vector<Matrix<T>>& /*boundary_basis*/,
-        const IntrinsicGeometry<T, 1>& boundary_local,
-        Index /*parent_flat_span*/,
-        const std::vector<Matrix<T>>& parent_basis,
-        const IntrinsicGeometry<T, 2>& parent_ig) const override
+    Matrix<T> evaluate(const Element<T, 2>& element,
+                       const BoundaryElementValues<T, 2>& bvals) const override
     {
-        element.rotation_shape_matrix(*boundary.parent(), parent_basis, parent_ig);
+        element.rotation_shape_matrix(bvals.parent_vals_);
         const Matrix<T>& Nrot = element.N_phi_workspace_;
         const ColMatrix<T, 3> n =
-            boundary.eval_outward_normal(boundary_local, parent_ig);
+            bvals.boundary().eval_outward_normal(bvals.boundary_vals_,
+                                                 bvals.parent_vals_);
         const auto [n_up_1, n_up_2] =
-            detail::contravariant_components(n, parent_ig);
+            detail::contravariant_components(n, bvals.parent_vals_);
         const Index Q = static_cast<Index>(n.rows());
         Matrix<T> C(Q, Nrot.cols());
         for (Index q = 0; q < Q; ++q) {
@@ -340,6 +322,9 @@ public:
         }
         return C;
     }
+
+    Index basis_order() const override { return Index(1); }
+    unsigned flags() const override { return Flags::Metric; }
 };
 
 /**
@@ -354,25 +339,18 @@ template <std::floating_point T>
 class TangentialRotation : public BoundaryField<T>
 {
 public:
-    Matrix<T> evaluate(
-        const Element<T, 2>& element,
-        const PatchBoundary<T, 2>& boundary,
-        Index /*boundary_span*/,
-        const std::vector<Matrix<T>>& /*boundary_basis*/,
-        const IntrinsicGeometry<T, 1>& boundary_local,
-        Index /*parent_flat_span*/,
-        const std::vector<Matrix<T>>& parent_basis,
-        const IntrinsicGeometry<T, 2>& parent_ig) const override
+    Matrix<T> evaluate(const Element<T, 2>& element,
+                       const BoundaryElementValues<T, 2>& bvals) const override
     {
-        element.rotation_shape_matrix(*boundary.parent(), parent_basis, parent_ig);
+        element.rotation_shape_matrix(bvals.parent_vals_);
         const Matrix<T>& Nrot = element.N_phi_workspace_;
         const ColMatrix<T, 3> n =
-            boundary.eval_outward_normal(boundary_local, parent_ig);
-        const ExtrinsicGeometry<T, 2> eg(parent_ig);
-        const ColMatrix<T, 3>& a_3 = eg.n;
+            bvals.boundary().eval_outward_normal(bvals.boundary_vals_,
+                                                 bvals.parent_vals_);
+        const ColMatrix<T, 3>& a_3 = bvals.parent_vals_.n;
         const ColMatrix<T, 3> s = detail::surface_tangent(n, a_3);
         const auto [s_up_1, s_up_2] =
-            detail::contravariant_components(s, parent_ig);
+            detail::contravariant_components(s, bvals.parent_vals_);
         const Index Q = static_cast<Index>(n.rows());
         Matrix<T> C(Q, Nrot.cols());
         for (Index q = 0; q < Q; ++q) {
@@ -381,6 +359,9 @@ public:
         }
         return C;
     }
+
+    Index basis_order() const override { return Index(1); }
+    unsigned flags() const override { return Flags::Metric | Flags::Normal; }
 };
 
 /**
@@ -398,22 +379,16 @@ template <std::floating_point T>
 class NormalTransverseShear : public BoundaryField<T>
 {
 public:
-    Matrix<T> evaluate(
-        const Element<T, 2>& element,
-        const PatchBoundary<T, 2>& boundary,
-        Index /*boundary_span*/,
-        const std::vector<Matrix<T>>& /*boundary_basis*/,
-        const IntrinsicGeometry<T, 1>& boundary_local,
-        Index /*parent_flat_span*/,
-        const std::vector<Matrix<T>>& parent_basis,
-        const IntrinsicGeometry<T, 2>& parent_ig) const override
+    Matrix<T> evaluate(const Element<T, 2>& element,
+                       const BoundaryElementValues<T, 2>& bvals) const override
     {
-        element.stress_matrix(*boundary.parent(), parent_basis, parent_ig);
+        element.stress_matrix(bvals.parent_vals_);
         const Matrix<T>& Nsigma = element.N_sigma_workspace_;
         const ColMatrix<T, 3> n =
-            boundary.eval_outward_normal(boundary_local, parent_ig);
+            bvals.boundary().eval_outward_normal(bvals.boundary_vals_,
+                                                 bvals.parent_vals_);
         const auto [n_cov_1, n_cov_2] =
-            detail::covariant_components(n, parent_ig);
+            detail::covariant_components(n, bvals.parent_vals_);
         const Index Q = static_cast<Index>(n.rows());
         Matrix<T> C(Q, Nsigma.cols());
         for (Index q = 0; q < Q; ++q) {
@@ -422,6 +397,9 @@ public:
         }
         return C;
     }
+
+    Index basis_order() const override { return Index(0); }
+    unsigned flags() const override { return Flags::Metric; }
 };
 
 /**
@@ -436,22 +414,16 @@ template <std::floating_point T>
 class NormalBendingMoment : public BoundaryField<T>
 {
 public:
-    Matrix<T> evaluate(
-        const Element<T, 2>& element,
-        const PatchBoundary<T, 2>& boundary,
-        Index /*boundary_span*/,
-        const std::vector<Matrix<T>>& /*boundary_basis*/,
-        const IntrinsicGeometry<T, 1>& boundary_local,
-        Index /*parent_flat_span*/,
-        const std::vector<Matrix<T>>& parent_basis,
-        const IntrinsicGeometry<T, 2>& parent_ig) const override
+    Matrix<T> evaluate(const Element<T, 2>& element,
+                       const BoundaryElementValues<T, 2>& bvals) const override
     {
-        element.stress_matrix(*boundary.parent(), parent_basis, parent_ig);
+        element.stress_matrix(bvals.parent_vals_);
         const Matrix<T>& Nsigma = element.N_sigma_workspace_;
         const ColMatrix<T, 3> n =
-            boundary.eval_outward_normal(boundary_local, parent_ig);
+            bvals.boundary().eval_outward_normal(bvals.boundary_vals_,
+                                                 bvals.parent_vals_);
         const auto [n_cov_1, n_cov_2] =
-            detail::covariant_components(n, parent_ig);
+            detail::covariant_components(n, bvals.parent_vals_);
         const Index Q = static_cast<Index>(n.rows());
         const Index n_strain = Nsigma.rows() / Q;
         Matrix<T> C(Q, Nsigma.cols());
@@ -464,6 +436,9 @@ public:
         }
         return C;
     }
+
+    Index basis_order() const override { return Index(0); }
+    unsigned flags() const override { return Flags::Metric; }
 };
 
 /**
@@ -479,27 +454,20 @@ template <std::floating_point T>
 class TwistingMoment : public BoundaryField<T>
 {
 public:
-    Matrix<T> evaluate(
-        const Element<T, 2>& element,
-        const PatchBoundary<T, 2>& boundary,
-        Index /*boundary_span*/,
-        const std::vector<Matrix<T>>& /*boundary_basis*/,
-        const IntrinsicGeometry<T, 1>& boundary_local,
-        Index /*parent_flat_span*/,
-        const std::vector<Matrix<T>>& parent_basis,
-        const IntrinsicGeometry<T, 2>& parent_ig) const override
+    Matrix<T> evaluate(const Element<T, 2>& element,
+                       const BoundaryElementValues<T, 2>& bvals) const override
     {
-        element.stress_matrix(*boundary.parent(), parent_basis, parent_ig);
+        element.stress_matrix(bvals.parent_vals_);
         const Matrix<T>& Nsigma = element.N_sigma_workspace_;
         const ColMatrix<T, 3> n =
-            boundary.eval_outward_normal(boundary_local, parent_ig);
-        const ExtrinsicGeometry<T, 2> eg(parent_ig);
-        const ColMatrix<T, 3>& a_3 = eg.n;
+            bvals.boundary().eval_outward_normal(bvals.boundary_vals_,
+                                                 bvals.parent_vals_);
+        const ColMatrix<T, 3>& a_3 = bvals.parent_vals_.n;
         const ColMatrix<T, 3> s = detail::surface_tangent(n, a_3);
         const auto [n_cov_1, n_cov_2] =
-            detail::covariant_components(n, parent_ig);
+            detail::covariant_components(n, bvals.parent_vals_);
         const auto [s_cov_1, s_cov_2] =
-            detail::covariant_components(s, parent_ig);
+            detail::covariant_components(s, bvals.parent_vals_);
         const Index Q = static_cast<Index>(n.rows());
         const Index n_strain = Nsigma.rows() / Q;
         Matrix<T> C(Q, Nsigma.cols());
@@ -512,6 +480,9 @@ public:
         }
         return C;
     }
+
+    Index basis_order() const override { return Index(0); }
+    unsigned flags() const override { return Flags::Metric | Flags::Normal; }
 };
 
 } // namespace pyck

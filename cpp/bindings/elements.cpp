@@ -35,10 +35,8 @@ void bind_elements(py::module_& m)
                   const Patch<double, 1>& patch,
                   const ColMatrix<double, 1>& params) -> Matrix<double> {
                    return eval_global_shape<double, 1>(patch, elem,
-                       [](const Element1d& e, const Patch<double, 1>& p,
-                          const std::vector<Matrix<double>>& b,
-                          const IntrinsicGeometry<double, 1>& ig) -> const Matrix<double>& {
-                           e.displacement_shape_matrix(p, b, ig);
+                       [](const Element1d& e, const ElementValues<double, 1>& ev) -> const Matrix<double>& {
+                           e.displacement_shape_matrix(ev);
                            return e.N_w_workspace_;
                        }, params);
                },
@@ -50,10 +48,8 @@ void bind_elements(py::module_& m)
                   const Patch<double, 1>& patch,
                   const ColMatrix<double, 1>& params) -> Matrix<double> {
                    return eval_global_shape<double, 1>(patch, elem,
-                       [](const Element1d& e, const Patch<double, 1>& p,
-                          const std::vector<Matrix<double>>& b,
-                          const IntrinsicGeometry<double, 1>& ig) -> const Matrix<double>& {
-                           e.rotation_shape_matrix(p, b, ig);
+                       [](const Element1d& e, const ElementValues<double, 1>& ev) -> const Matrix<double>& {
+                           e.rotation_shape_matrix(ev);
                            return e.N_phi_workspace_;
                        }, params);
                },
@@ -65,10 +61,8 @@ void bind_elements(py::module_& m)
                   const Patch<double, 1>& patch,
                   const ColMatrix<double, 1>& params) -> Matrix<double> {
                    return eval_global_shape<double, 1>(patch, elem,
-                       [](const Element1d& e, const Patch<double, 1>& p,
-                          const std::vector<Matrix<double>>& b,
-                          const IntrinsicGeometry<double, 1>& ig) -> const Matrix<double>& {
-                           e.strain_matrix(p, b, ig);
+                       [](const Element1d& e, const ElementValues<double, 1>& ev) -> const Matrix<double>& {
+                           e.strain_matrix(ev);
                            return e.B_workspace_;
                        }, params);
                },
@@ -80,10 +74,8 @@ void bind_elements(py::module_& m)
                   const Patch<double, 1>& patch,
                   const ColMatrix<double, 1>& params) -> Matrix<double> {
                    return eval_global_shape<double, 1>(patch, elem,
-                       [](const Element1d& e, const Patch<double, 1>& p,
-                          const std::vector<Matrix<double>>& b,
-                          const IntrinsicGeometry<double, 1>& ig) -> const Matrix<double>& {
-                           e.stress_matrix(p, b, ig);
+                       [](const Element1d& e, const ElementValues<double, 1>& ev) -> const Matrix<double>& {
+                           e.stress_matrix(ev);
                            return e.N_sigma_workspace_;
                        }, params);
                },
@@ -100,10 +92,8 @@ void bind_elements(py::module_& m)
                   const Patch<double, 2>& patch,
                   const ColMatrix<double, 2>& params) -> Matrix<double> {
                    return eval_global_shape<double, 2>(patch, elem,
-                       [](const Element2d& e, const Patch<double, 2>& p,
-                          const std::vector<Matrix<double>>& b,
-                          const IntrinsicGeometry<double, 2>& ig) -> const Matrix<double>& {
-                           e.displacement_shape_matrix(p, b, ig);
+                       [](const Element2d& e, const ElementValues<double, 2>& ev) -> const Matrix<double>& {
+                           e.displacement_shape_matrix(ev);
                            return e.N_w_workspace_;
                        }, params);
                },
@@ -115,10 +105,8 @@ void bind_elements(py::module_& m)
                   const Patch<double, 2>& patch,
                   const ColMatrix<double, 2>& params) -> Matrix<double> {
                    return eval_global_shape<double, 2>(patch, elem,
-                       [](const Element2d& e, const Patch<double, 2>& p,
-                          const std::vector<Matrix<double>>& b,
-                          const IntrinsicGeometry<double, 2>& ig) -> const Matrix<double>& {
-                           e.rotation_shape_matrix(p, b, ig);
+                       [](const Element2d& e, const ElementValues<double, 2>& ev) -> const Matrix<double>& {
+                           e.rotation_shape_matrix(ev);
                            return e.N_phi_workspace_;
                        }, params);
                },
@@ -130,10 +118,8 @@ void bind_elements(py::module_& m)
                   const Patch<double, 2>& patch,
                   const ColMatrix<double, 2>& params) -> Matrix<double> {
                    return eval_global_shape<double, 2>(patch, elem,
-                       [](const Element2d& e, const Patch<double, 2>& p,
-                          const std::vector<Matrix<double>>& b,
-                          const IntrinsicGeometry<double, 2>& ig) -> const Matrix<double>& {
-                           e.strain_matrix(p, b, ig);
+                       [](const Element2d& e, const ElementValues<double, 2>& ev) -> const Matrix<double>& {
+                           e.strain_matrix(ev);
                            return e.B_workspace_;
                        }, params);
                },
@@ -145,10 +131,8 @@ void bind_elements(py::module_& m)
                   const Patch<double, 2>& patch,
                   const ColMatrix<double, 2>& params) -> Matrix<double> {
                    return eval_global_shape<double, 2>(patch, elem,
-                       [](const Element2d& e, const Patch<double, 2>& p,
-                          const std::vector<Matrix<double>>& b,
-                          const IntrinsicGeometry<double, 2>& ig) -> const Matrix<double>& {
-                           e.stress_matrix(p, b, ig);
+                       [](const Element2d& e, const ElementValues<double, 2>& ev) -> const Matrix<double>& {
+                           e.stress_matrix(ev);
                            return e.N_sigma_workspace_;
                        }, params);
                },

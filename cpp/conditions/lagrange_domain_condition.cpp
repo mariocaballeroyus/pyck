@@ -58,59 +58,24 @@ void LagrangeDomainCondition<T, d>::apply(
 
     const DofLayout::BlockId primal_block = primal_blocks.at(this->patch_idx_);
     const Index ndof = static_cast<Index>(element_.num_node_dofs());
-    const std::size_t req_order = element_.min_order();
+    const Index Q    = static_cast<Index>(quadrature_.num_points());
 
-    // Span counts in each parametric direction.
-    std::array<std::size_t, d> intervals;
-    std::size_t total_elements = 1;
-    for (std::size_t i = 0; i < d; ++i) {
-        intervals[i] = patch_.basis(i).knot_vector().num_spans();
-        total_elements *= intervals[i];
-    }
+    ElementValues<T, d> ev(patch_, Index(1), Flags::Metric, quadrature_);
+    const std::size_t num_live = static_cast<std::size_t>(ev.num_elements());
 
-    const Index Q = static_cast<Index>(quadrature_.num_points());
-    ColMatrix<T, d> mapped_pts(Q, static_cast<Index>(d));
-    Vector<T>       mapped_weights(Q);
-
-    for (std::size_t elem_idx = 0; elem_idx < total_elements; ++elem_idx)
+    for (std::size_t e = 0; e < num_live; ++e)
     {
-        // Decode flat span index into per-dimension span indices (U-inner).
-        std::array<std::size_t, d> span_indices;
-        std::size_t temp_idx = elem_idx;
-        for (std::size_t i = 0; i < d; ++i) {
-            span_indices[i] = temp_idx % intervals[i];
-            temp_idx /= intervals[i];
-        }
+        ev.reinit(e);
 
-        // Span bounds in parametric domain; skip zero-volume spans.
-        std::array<T, d> u_a, u_b;
-        bool zero_volume = false;
-        for (std::size_t i = 0; i < d; ++i) {
-            auto [lo, hi] = patch_.basis(i).knot_vector().span_bounds(span_indices[i]);
-            u_a[i] = lo;
-            u_b[i] = hi;
-            if (std::abs(hi - lo) < T(1e-14)) { zero_volume = true; break; }
-        }
-        if (zero_volume) continue;
+        const Index n_basis = ev.results_[0].rows();
 
-        quadrature_.map_to_domain(u_a, u_b, mapped_pts, mapped_weights);
-
-        auto basis   = patch_.tensor_product().eval_all(mapped_pts, req_order);
-        auto act_pts = patch_.active_control_pts(elem_idx);
-        IntrinsicGeometry<T, d> local(basis, act_pts, Index(basis.size()) - 1);
-        const Index n_basis = basis[0].rows();
-
-        std::vector<Index> elem_cps;
-        patch_.dof_mapper().get_element_cps(elem_idx, elem_cps);
         std::vector<Index> primal_dofs;
-        layout.scatter_primal(primal_block, elem_cps, primal_dofs);
+        layout.scatter_primal(primal_block, ev.elem_cps_, primal_dofs);
         // primal_dofs is CP-major, ndof-inner: primal_dofs[i*ndof + v].
 
-        // Element-wise integrated measure dω = w_q · |J|_q, used for the load
-        // contribution of every term.
         T elem_measure = T(0);
         for (Index q = 0; q < Q; ++q) {
-            elem_measure += mapped_weights(q) * local.jac(q);
+            elem_measure += ev.mapped_weights_(q) * ev.jac(q);
         }
 
         for (const auto& term : terms_)
@@ -118,12 +83,10 @@ void LagrangeDomainCondition<T, d>::apply(
             const Index slot       = static_cast<Index>(term.dof_index);
             const Index lambda_row = layout.block_base(term.block_id);
 
-            // C_i = ∫ N_i dω over this element. Scattered into the global
-            // saddle-point coupling (symmetric).
             Vector<T> C = Vector<T>::Zero(n_basis);
             for (Index q = 0; q < Q; ++q) {
-                auto slab0 = basis[0].col(q);
-                const T dV = mapped_weights(q) * local.jac(q);
+                auto slab0 = ev.results_[0].col(q);
+                const T dV = ev.mapped_weights_(q) * ev.jac(q);
                 for (Index i = 0; i < n_basis; ++i) {
                     C(i) += dV * slab0(i);
                 }
@@ -136,8 +99,6 @@ void LagrangeDomainCondition<T, d>::apply(
                 stiffness(col, lambda_row) += C_i;
             }
 
-            // RHS: g = value · ∫ dω accumulated over elements yields
-            // value · |Ω| at the end of assembly.
             if (term.value != T(0)) {
                 load(lambda_row) += term.value * elem_measure;
             }

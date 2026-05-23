@@ -31,7 +31,7 @@ Matrix<T> assemble_global_K(const Patch<T, 2>& patch,
 
     GaussLegendre<T, 2> quad(gauss_p);
     ElementValues<T, 2> pv(patch,
-                         static_cast<Index>(element.min_order()), quad);
+                         element.basis_order(), element.flags(), quad);
     const std::size_t num_live = static_cast<std::size_t>(pv.num_elements());
 
     Matrix<T> Ke;

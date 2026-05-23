@@ -60,15 +60,13 @@ public:
     Matrix<T> operator()(const ColMatrix<T, d>& params) const
     {
         auto eval = [field = field_](const Element<T, d>& e,
-                                     const Patch<T, d>& p,
-                                     const std::vector<Matrix<T>>& b,
-                                     const IntrinsicGeometry<T, d>& ig)
+                                     const ElementValues<T, d>& ev)
                                      -> const Matrix<T>& {
             switch (field) {
-                case FieldType::DISPLACEMENT: e.displacement_shape_matrix(p, b, ig); return e.N_w_workspace_;
-                case FieldType::ROTATION:     e.rotation_shape_matrix(p, b, ig);     return e.N_phi_workspace_;
-                case FieldType::STRAIN:       e.strain_matrix(p, b, ig);             return e.B_workspace_;
-                case FieldType::STRESS:       e.stress_matrix(p, b, ig);             return e.N_sigma_workspace_;
+                case FieldType::DISPLACEMENT: e.displacement_shape_matrix(ev); return e.N_w_workspace_;
+                case FieldType::ROTATION:     e.rotation_shape_matrix(ev);     return e.N_phi_workspace_;
+                case FieldType::STRAIN:       e.strain_matrix(ev);             return e.B_workspace_;
+                case FieldType::STRESS:       e.stress_matrix(ev);             return e.N_sigma_workspace_;
             }
             throw std::runtime_error("Function: unknown FieldType.");
         };

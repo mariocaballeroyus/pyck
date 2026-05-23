@@ -7,7 +7,7 @@
 #include <vector>
 
 #include "../elements/element.hpp"
-#include "../geometry/intrinsic_geometry.hpp"
+#include "../elements/element_values.hpp"
 #include "../geometry/patch.hpp"
 #include "../basis/tensor_product.hpp"
 #include "../types.hpp"
@@ -43,17 +43,14 @@ Matrix<T> eval_global_shape(const Patch<T, d>& patch,
     const Index n_pts    = static_cast<Index>(params.rows());
     const Index ndof     = static_cast<Index>(element.num_node_dofs());
     const Index n_global = static_cast<Index>(patch.num_control_pts()) * ndof;
-    const std::size_t order = element.min_order();
 
-    std::array<Index, d> n_spans;
-    for (std::size_t dir = 0; dir < d; ++dir)
-        n_spans[dir] = static_cast<Index>(
-            patch.basis(dir).knot_vector().num_spans());
+    Matrix<T>  N_global;
+    Index      n_rows_per_pt = 0;
+    bool       initialized   = false;
 
-    Matrix<T>           N_global;
-    std::vector<Index>  active_cp;         // Reused across spans (lazy-sized).
-    Index               n_rows_per_pt = 0;
-    bool                initialized = false;
+    // One-point workspace; reinit_on_pts is called per parametric query point.
+    ElementValues<T, d> ev(patch, element.basis_order(), element.flags(),
+                           std::size_t(1));
 
     for (Index i = 0; i < n_pts; ++i)
     {
@@ -64,15 +61,9 @@ Matrix<T> eval_global_shape(const Patch<T, d>& patch,
             span_idx[dir] = patch.basis(dir).find_span(
                 static_cast<T>(pt(0, static_cast<Index>(dir))));
 
-        Index flat_span = span_idx[0];
-        if constexpr (d >= 2)
-            flat_span += span_idx[1] * n_spans[0];
+        ev.reinit_on_pts(span_idx, pt);
 
-        auto bd      = patch.tensor_product().eval_all(pt, order);
-        auto act_pts = patch.active_control_pts(flat_span);
-        IntrinsicGeometry<T, d> lf(bd, act_pts, Index(bd.size()) - 1);
-
-        const Matrix<T>& N_span = eval_at_span(element, patch, bd, lf);
+        const Matrix<T>& N_span = eval_at_span(element, ev);
 
         if (!initialized)
         {
@@ -81,7 +72,7 @@ Matrix<T> eval_global_shape(const Patch<T, d>& patch,
             initialized = true;
         }
 
-        patch.dof_mapper().get_element_cps(flat_span, active_cp);
+        const auto& active_cp = ev.elem_cps_;
         const Index n_active = static_cast<Index>(active_cp.size());
 
         const Index row_start = i * n_rows_per_pt;

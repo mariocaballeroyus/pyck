@@ -1,6 +1,6 @@
 #include "laplace_beltrami.hpp"
 
-#include "intrinsic_geometry.hpp"
+#include "../elements/element_values.hpp"
 
 #include <algorithm>
 #include <array>
@@ -34,9 +34,9 @@ sym3(std::size_t i, std::size_t j, std::size_t k)
 
 template <std::floating_point T, std::size_t d>
 LaplaceGradAux<T, d>
-compute_laplace_grad_aux(const IntrinsicGeometry<T, d>& ig)
+compute_laplace_grad_aux(const ElementValues<T, d>& ev)
 {
-    const Index Q = ig.a(0).rows();
+    const Index Q = ev.a(0).rows();
 
 
     LaplaceGradAux<T, d> aux;
@@ -54,23 +54,23 @@ compute_laplace_grad_aux(const IntrinsicGeometry<T, d>& ig)
     {
         // Symmetric accessors hiding the upper-tri storage convention.
         auto a1  = [&](std::size_t i) {
-            return ig.a(i).row(q);
+            return ev.a(i).row(q);
         };
         auto a2  = [&](std::size_t i, std::size_t j) {
             auto [lo, hi] = sym2(i, j);
-            return ig.a_d1(lo, hi).row(q);
+            return ev.a_d1(lo, hi).row(q);
         };
         auto a3  = [&](std::size_t i, std::size_t j, std::size_t k) {
             auto v = sym3(i, j, k);
-            return ig.a_d2(v[0], v[1], v[2]).row(q);
+            return ev.a_d2(v[0], v[1], v[2]).row(q);
         };
         auto G   = [&](std::size_t i, std::size_t j) {
             auto [lo, hi] = sym2(i, j);
-            return ig.g_inv(lo, hi)(q);
+            return ev.g_inv(lo, hi)(q);
         };
         auto Gam = [&](std::size_t e, std::size_t i, std::size_t j) {
             auto [lo, hi] = sym2(i, j);
-            return ig.Gamma(e, lo, hi)(q);
+            return ev.Gamma(e, lo, hi)(q);
         };
 
         // ---- Precompute unique dot products once per q ---------------------
@@ -167,11 +167,11 @@ compute_laplace_grad_aux(const IntrinsicGeometry<T, d>& ig)
 // === Template Instantiations ========================================================
 
 template LaplaceGradAux<double, 2> compute_laplace_grad_aux<double, 2>(
-    const IntrinsicGeometry<double, 2>&);
+    const ElementValues<double, 2>&);
 
 #ifdef PYCK_BUILD_SINGLE_PRECISION
 template LaplaceGradAux<float, 2> compute_laplace_grad_aux<float, 2>(
-    const IntrinsicGeometry<float, 2>&);
+    const ElementValues<float, 2>&);
 #endif
 
 } // namespace pyck

@@ -10,7 +10,7 @@
 #include <utility>
 
 #include "../basis/tensor_product.hpp"
-#include "../geometry/intrinsic_geometry.hpp"
+#include "../elements/element_values.hpp"
 #include "../geometry/patch.hpp"
 #include "../quadrature/quadrature.hpp"
 #include "../types.hpp"
@@ -39,50 +39,20 @@ eval_quadrature_data(const Patch<T, d>& patch,
 {
     const Index Q = static_cast<Index>(quadrature.num_points());
 
-    std::array<std::size_t, d> intervals;
-    std::size_t total_elements = 1;
-    for (std::size_t i = 0; i < d; ++i) {
-        intervals[i] = patch.basis(i).knot_vector().num_spans();
-        total_elements *= intervals[i];
-    }
+    ElementValues<T, d> ev(patch, Index(1), Flags::Metric, quadrature);
+    const std::size_t num_live = static_cast<std::size_t>(ev.num_elements());
 
-    ColMatrix<T, d> params_out(total_elements * Q, static_cast<Index>(d));
-    Vector<T>       dV_out(total_elements * Q);
+    ColMatrix<T, d> params_out(num_live * Q, static_cast<Index>(d));
+    Vector<T>       dV_out(num_live * Q);
     Index out = 0;
 
-    ColMatrix<T, d> mapped_pts(Q, static_cast<Index>(d));
-    Vector<T>       mapped_weights(Q);
-
-    for (std::size_t elem_idx = 0; elem_idx < total_elements; ++elem_idx)
+    for (std::size_t e = 0; e < num_live; ++e)
     {
-        std::array<std::size_t, d> spans;
-        std::size_t tmp = elem_idx;
-        for (std::size_t i = 0; i < d; ++i) {
-            spans[i] = tmp % intervals[i];
-            tmp /= intervals[i];
-        }
+        ev.reinit(e);
 
-        std::array<T, d> lo, hi;
-        bool zero_volume = false;
-        for (std::size_t i = 0; i < d; ++i) {
-            auto [l, h] = patch.basis(i).knot_vector().span_bounds(spans[i]);
-            lo[i] = l;
-            hi[i] = h;
-            if (std::abs(h - l) < T(1e-14)) {
-                zero_volume = true;
-                break;
-            }
-        }
-        if (zero_volume) continue;
-
-        quadrature.map_to_domain(lo, hi, mapped_pts, mapped_weights);
-        auto basis   = patch.tensor_product().eval_all(mapped_pts, 1);
-        auto act_pts = patch.active_control_pts(static_cast<Index>(elem_idx));
-        IntrinsicGeometry<T, d> ig(basis, act_pts, Index(basis.size()) - 1);
-
-        params_out.block(out, 0, Q, static_cast<Index>(d)) = mapped_pts;
+        params_out.block(out, 0, Q, static_cast<Index>(d)) = ev.mapped_pts_;
         for (Index q = 0; q < Q; ++q)
-            dV_out(out + q) = mapped_weights(q) * ig.jac(q);
+            dV_out(out + q) = ev.mapped_weights_(q) * ev.jac(q);
 
         out += Q;
     }

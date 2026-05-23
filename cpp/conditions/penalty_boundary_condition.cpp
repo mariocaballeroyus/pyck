@@ -1,11 +1,7 @@
 #include "penalty_boundary_condition.hpp"
 
-#include "patch_boundary.hpp"
-#include "patch.hpp"
-#include "tensor_product.hpp"
-#include "intrinsic_geometry.hpp"
+#include "boundary_element_values.hpp"
 
-#include <cmath>
 #include <stdexcept>
 
 namespace pyck
@@ -42,42 +38,26 @@ void PenaltyBoundaryCondition<T, d>::apply(Matrix<T>& stiffness,
                                    const std::vector<DofLayout::BlockId>& primal_blocks) const
 {
     if (terms_.empty()) return;
+
     const DofLayout::BlockId primal_block = primal_blocks.at(this->patch_idx_);
+    const Index ndof = static_cast<Index>(element_.num_node_dofs());
+    const Index Q = static_cast<Index>(quadrature_.num_points());
 
-    const PatchBoundary<T, 2>& boundary = boundary_;
-    const auto& element = element_;
-    const auto& quadrature = quadrature_;
-    const Patch<T, 2>& parent = *boundary.parent();
-    const Index ndof = static_cast<Index>(element.num_node_dofs());
-    const std::size_t req_order = element.min_order();
+    Index    parent_basis_order = element_.basis_order();
+    unsigned parent_flags       = element_.flags();
+    for (const auto& term : terms_) {
+        parent_basis_order = std::max(parent_basis_order, term.field->basis_order());
+        parent_flags |= term.field->flags();
+    }
+    BoundaryElementValues<T, d> bvals(boundary_, parent_basis_order,
+                                      parent_flags, quadrature_);
+    const Index num_spans = bvals.num_elements();
 
-    const Index num_spans = boundary.basis(0).knot_vector().num_spans();
-    const Index Q = static_cast<Index>(quadrature.num_points());
-    ColMatrix<T, 1> mapped_pts(Q, 1);
-    Vector<T>       mapped_weights(Q);
     for (Index span = 0; span < num_spans; ++span)
     {
-        // Skip zero-length spans.
-        auto [lo, hi] = boundary.basis(0).knot_vector().span_bounds(span);
-        if (std::abs(hi - lo) < T(1e-14)) continue;
+        bvals.reinit(span);
 
-        // Per-span scaffolding: shared across all fields.
-        quadrature.map_to_domain({lo}, {hi}, mapped_pts, mapped_weights);
-
-        auto boundary_basis  = boundary.tensor_product().eval_all(mapped_pts, 2);
-        auto boundary_act    = boundary.active_control_pts(span);
-        IntrinsicGeometry<T, d - 1> boundary_local(boundary_basis, boundary_act, Index(boundary_basis.size()) - 1);
-
-        const Index flat_parent = boundary.parent_flat_span(span);
-        const ColMatrix<T, 2> parent_pts = boundary.lift_to_parent(mapped_pts);
-        auto parent_basis  = parent.tensor_product().eval_all(parent_pts, req_order);
-        auto parent_act    = parent.active_control_pts(flat_parent);
-        IntrinsicGeometry<T, d> parent_ig(parent_basis, parent_act, Index(parent_basis.size()) - 1);
-
-
-        std::vector<Index> elem_dofs;
-        parent.dof_mapper().get_element_cps(flat_parent, elem_dofs);
-        const Index n_elem = static_cast<Index>(elem_dofs.size());
+        const Index n_elem = static_cast<Index>(bvals.parent_vals_.elem_cps_.size());
         const Index K_elem = n_elem * ndof;
 
         Matrix<T> K_local = Matrix<T>::Zero(K_elem, K_elem);
@@ -86,13 +66,12 @@ void PenaltyBoundaryCondition<T, d>::apply(Matrix<T>& stiffness,
         // Accumulate every field's contribution into the same local matrices.
         for (const auto& term : terms_)
         {
-            Matrix<T> C = term.field->evaluate(
-                element, boundary, span, boundary_basis, boundary_local,
-                flat_parent, parent_basis, parent_ig);
+            Matrix<T> C = term.field->evaluate(element_, bvals);
 
             for (Index q = 0; q < Q; ++q)
             {
-                const T dGamma = boundary_local.jac(q) * mapped_weights(q);
+                const T dGamma =
+                    bvals.boundary_vals_.jac(q) * bvals.boundary_vals_.mapped_weights_(q);
                 K_local.noalias() += dGamma * term.penalty
                                    * C.row(q).transpose() * C.row(q);
                 F_local.noalias() += dGamma * term.penalty * term.value
@@ -101,15 +80,15 @@ void PenaltyBoundaryCondition<T, d>::apply(Matrix<T>& stiffness,
         }
 
         // Scatter once per span.
-        std::vector<Index> dofs;
-        layout.scatter_primal(primal_block, elem_dofs, dofs);
-        const Index n = static_cast<Index>(dofs.size());
+        layout.scatter_primal(primal_block, bvals.parent_vals_.elem_cps_,
+                              bvals.parent_vals_.elem_dofs_);
+        const Index n = static_cast<Index>(bvals.parent_vals_.elem_dofs_.size());
         for (Index i = 0; i < n; ++i)
         {
-            const Index gi = dofs[i];
+            const Index gi = bvals.parent_vals_.elem_dofs_[i];
             load(gi) += F_local(i);
             for (Index j = 0; j < n; ++j) {
-                stiffness(gi, dofs[j]) += K_local(i, j);
+                stiffness(gi, bvals.parent_vals_.elem_dofs_[j]) += K_local(i, j);
             }
         }
     }

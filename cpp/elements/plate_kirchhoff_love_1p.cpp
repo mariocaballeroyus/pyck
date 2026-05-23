@@ -18,26 +18,24 @@ PlateKirchhoffLove1p<T>::PlateKirchhoffLove1p(Ptr<PlaneStress2d<T>> material)
 
 template <std::floating_point T>
 void
-PlateKirchhoffLove1p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
-                                       const std::vector<Matrix<T>>& basis,
-                                       const IntrinsicGeometry<T, 2>& ig) const
+PlateKirchhoffLove1p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
 {
     Matrix<T>& B = this->B_workspace_;
-    const Index Q = basis[0].cols();
-    const Index N = basis[0].rows();
+    const Index Q = ev.results_[0].cols();
+    const Index N = ev.results_[0].rows();
     B.setZero(3 * Q, N);
 
     for (Index q = 0; q < Q; ++q)
     {
-        auto slab1 = basis[1].col(q);  // (N · 2)
-        auto slab2 = basis[2].col(q);  // (N · 3)
+        auto slab1 = ev.results_[1].col(q);  // (N · 2)
+        auto slab2 = ev.results_[2].col(q);  // (N · 3)
 
-        const T Gam1_11 = ig.Gamma(0, 0, 0)(q);
-        const T Gam1_12 = ig.Gamma(0, 0, 1)(q);
-        const T Gam1_22 = ig.Gamma(0, 1, 1)(q);
-        const T Gam2_11 = ig.Gamma(1, 0, 0)(q);
-        const T Gam2_12 = ig.Gamma(1, 0, 1)(q);
-        const T Gam2_22 = ig.Gamma(1, 1, 1)(q);
+        const T Gam1_11 = ev.Gamma(0, 0, 0)(q);
+        const T Gam1_12 = ev.Gamma(0, 0, 1)(q);
+        const T Gam1_22 = ev.Gamma(0, 1, 1)(q);
+        const T Gam2_11 = ev.Gamma(1, 0, 0)(q);
+        const T Gam2_12 = ev.Gamma(1, 0, 1)(q);
+        const T Gam2_22 = ev.Gamma(1, 1, 1)(q);
 
         for (Index i = 0; i < N; ++i)
         {
@@ -59,12 +57,11 @@ PlateKirchhoffLove1p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
 
 template <std::floating_point T>
 ConstitutiveMatrix<T>
-PlateKirchhoffLove1p<T>::constitutive_matrix(const IntrinsicGeometry<T, 2>& ig,
-                                             Index q) const
+PlateKirchhoffLove1p<T>::constitutive_matrix(const ElementValues<T, 2>& ev, Index q) const
 {
     // D = D_b. No shear block (normality assumption).
     ConstitutiveMatrix<T> D = ConstitutiveMatrix<T>::Zero(3, 3);
-    D.template topLeftCorner<3, 3>() = material_->bending_voigt(g_inv_voigt(ig, q));
+    D.template topLeftCorner<3, 3>() = material_->bending_voigt(g_inv_voigt(ev, q));
     return D;
 }
 
@@ -72,17 +69,15 @@ PlateKirchhoffLove1p<T>::constitutive_matrix(const IntrinsicGeometry<T, 2>& ig,
 
 template <std::floating_point T>
 void
-PlateKirchhoffLove1p<T>::displacement_shape_matrix(const Patch<T, 2>& /*patch*/,
-                                                   const std::vector<Matrix<T>>& basis,
-                                                   const IntrinsicGeometry<T, 2>& /*ig*/) const
+PlateKirchhoffLove1p<T>::displacement_shape_matrix(const ElementValues<T, 2>& ev) const
 {
     // N_w = [ N_i ]
     Matrix<T>& N_w = this->N_w_workspace_;
-    const Index Q = basis[0].cols();
-    const Index N = basis[0].rows();
+    const Index Q = ev.results_[0].cols();
+    const Index N = ev.results_[0].rows();
     N_w.resize(Q, N);
     for (Index q = 0; q < Q; ++q) {
-        auto slab0 = basis[0].col(q);
+        auto slab0 = ev.results_[0].col(q);
         for (Index i = 0; i < N; ++i) {
             N_w(q, i) = slab0(i);
         }
@@ -91,18 +86,16 @@ PlateKirchhoffLove1p<T>::displacement_shape_matrix(const Patch<T, 2>& /*patch*/,
 
 template <std::floating_point T>
 void
-PlateKirchhoffLove1p<T>::rotation_shape_matrix(const Patch<T, 2>& /*patch*/,
-                                               const std::vector<Matrix<T>>& basis,
-                                               const IntrinsicGeometry<T, 2>& /*ig*/) const
+PlateKirchhoffLove1p<T>::rotation_shape_matrix(const ElementValues<T, 2>& ev) const
 {
     // N_rot = [ -N_{i|1} ]
     //         [ -N_{i|2} ]
     Matrix<T>& N_varphi = this->N_phi_workspace_;
-    const Index Q = basis[0].cols();
-    const Index N = basis[0].rows();
+    const Index Q = ev.results_[0].cols();
+    const Index N = ev.results_[0].rows();
     N_varphi.resize(2 * Q, N);
     for (Index q = 0; q < Q; ++q) {
-        auto slab1 = basis[1].col(q);
+        auto slab1 = ev.results_[1].col(q);
         for (Index i = 0; i < N; ++i) {
             N_varphi(2*q,     i) = -slab1(i * 2 + 0);
             N_varphi(2*q + 1, i) = -slab1(i * 2 + 1);

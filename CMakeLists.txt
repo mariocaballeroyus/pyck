@@ -31,7 +31,7 @@ target_link_libraries(pyck_basis PUBLIC eigen)
 # Geometry library
 file(GLOB PYCK_GEOMETRY_SOURCES cpp/geometry/*.cpp)
 add_library(pyck_geometry ${PYCK_GEOMETRY_SOURCES})
-target_include_directories(pyck_geometry PUBLIC cpp/geometry)
+target_include_directories(pyck_geometry PUBLIC cpp/geometry cpp/elements)
 target_link_libraries(pyck_geometry PUBLIC pyck_basis pyck_quadrature)
 
 # Constraints library

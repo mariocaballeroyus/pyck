@@ -80,32 +80,29 @@ const Basis<T>& TensorProduct<T, d>::basis(Index dir) const
 template <std::floating_point T, std::size_t d>
 void
 TensorProduct<T, d>::eval_on_span(const ColMatrix<T, d>& coords,
-                                  const std::array<Index, d>& spans,
-                                  Index order,
+                                  const std::array<Index, d>& spans, Index order,
                                   std::array<std::vector<Matrix<T>>, d>& uni_results,
                                   std::vector<Matrix<T>>& results) const
 {
-    if (order < 0 || order > MAX_DERIV_ORDER) {
-        throw std::invalid_argument("TensorProduct::eval_on_span: "
-                                    "order out of supported range.");
-    }
-
     const Index Q = static_cast<Index>(coords.rows());
-
     std::array<Index, d> n_b{};
 
+    // Evaluate univariate results
     Index K = 1;
     for (std::size_t dim = 0; dim < d; ++dim) {
+        // Resize buffer
         uni_results[dim].resize(order + 1);
+        // Evaluate basis (in-place modified buffer)
         bases_[dim]->eval_on_span(coords.col(dim), spans[dim], order, uni_results[dim]);
+        // Update number of basis
         n_b[dim] = static_cast<Index>(uni_results[dim][0].rows());
         K *= n_b[dim];
     }
 
     resize_basis_buffer<T, d>(results, K, Q, order);
-
     const auto& comps_all = compositions_by_order<d>();
 
+    // Evaluate tensor product
     for (Index k = 0; k <= order; ++k) {
         const auto& compositions = comps_all[k];
         const Index n_slots = static_cast<Index>(compositions.size());

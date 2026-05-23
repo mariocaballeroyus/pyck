@@ -5,13 +5,15 @@
 
 #include "patch.hpp"
 #include "tensor_product.hpp"
-#include "intrinsic_geometry.hpp"
+#include "element_values.hpp"
+#include "element_values_at.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
 #include "knot_vector.hpp"
 #include "gauss_legendre.hpp"
 
 using namespace pyck;
+using pyck::test::element_values_at;
 
 // ===========================================================================
 // Test 1: Flat axis-aligned box — geometry, Jacobian, partition of unity,
@@ -54,8 +56,8 @@ TEST_CASE("Patch<double, 3>: Flat Box", "[geometry][volume]")
     SECTION("Metric and Jacobian on a stretched box") {
         ColMatrix<double, 3> pts(1, 3);
         pts << 0.3, 0.5, 0.7;
-        const auto b     = vol.tensor_product().eval_all(pts, 3);
-        IntrinsicGeometry<double, 3> local(b, act, Index(b.size()) - 1);
+        auto local = element_values_at(vol, pts, Index(3),
+            Flags::Metric | Flags::Christoffels | Flags::ChristoffelsD1);
 
         // Metric layout: (g_11, g_12, g_13, g_22, g_23, g_33).
         CHECK(local.g(0, 0)(0) == Approx(Lx * Lx).margin(1e-12));
@@ -78,8 +80,8 @@ TEST_CASE("Patch<double, 3>: Flat Box", "[geometry][volume]")
     SECTION("Christoffels vanish on flat box") {
         ColMatrix<double, 3> pts(1, 3);
         pts << 0.4, 0.6, 0.2;
-        const auto b     = vol.tensor_product().eval_all(pts, 3);
-        IntrinsicGeometry<double, 3> local(b, act, Index(b.size()) - 1);
+        auto local = element_values_at(vol, pts, Index(3),
+            Flags::Metric | Flags::Christoffels | Flags::ChristoffelsD1);
 
         const auto& chr = local;
         CHECK(chr.Gamma(0, 0, 0)(0) == Approx(0.0).margin(1e-14));
@@ -159,32 +161,15 @@ TEST_CASE("Patch<double, 3>: Box factory volume integral", "[geometry][volume]")
 
     SECTION("Integral of Jacobian equals volume") {
         GaussLegendre<double, 3> quad(3);
-        const auto intervals = vol.tensor_product().num_intervals();
-        const Index total = intervals[0] * intervals[1] * intervals[2];
 
         double vol_int = 0.0;
-        const Eigen::Index Q = static_cast<Eigen::Index>(quad.num_points());
-        ColMatrix<double, 3> mp(Q, 3);
-        Vector<double>       mw(Q);
-        for (Index e = 0; e < total; ++e)
+        ElementValues<double, 3> ev(vol, Index(1), Flags::Metric, quad);
+        const std::size_t num_live = static_cast<std::size_t>(ev.num_elements());
+        for (std::size_t e = 0; e < num_live; ++e)
         {
-            const auto spans = vol.decode_span(e);
-            std::array<double, 3> lo{}, hi{};
-            bool zero_vol = false;
-            for (std::size_t d = 0; d < 3; ++d) {
-                auto [l, h] = vol.basis(d).knot_vector().span_bounds(spans[d]);
-                lo[d] = l; hi[d] = h;
-                if (std::abs(h - l) < 1e-14) { zero_vol = true; break; }
-            }
-            if (zero_vol) continue;
-
-            quad.map_to_domain(lo, hi, mp, mw);
-            const auto b     = vol.tensor_product().eval_all(mp, 1);
-            const auto act   = vol.active_control_pts(e);
-            IntrinsicGeometry<double, 3> local(b, act, Index(b.size()) - 1);
-
-            for (Eigen::Index q = 0; q < mw.size(); ++q)
-                vol_int += local.jac(q) * mw(q);
+            ev.reinit(e);
+            for (Eigen::Index q = 0; q < ev.mapped_weights_.size(); ++q)
+                vol_int += ev.jac(q) * ev.mapped_weights_(q);
         }
 
         CHECK(vol_int == Approx(Lx * Ly * Lz).margin(1e-10));

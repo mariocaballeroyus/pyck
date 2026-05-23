@@ -6,10 +6,12 @@
 #include <cstddef>
 
 #include "../types.hpp"
-#include "intrinsic_geometry.hpp"
 
 namespace pyck
 {
+
+// Forward declaration to avoid a circular include via element_values.hpp.
+template <std::floating_point T, std::size_t d> class ElementValues;
 
 /**
  * @brief Per-quadrature-point auxiliary data for ∂_α(Δ_g f).
@@ -40,7 +42,7 @@ struct LaplaceGradAux
  */
 template <std::floating_point T, std::size_t d>
 LaplaceGradAux<T, d>
-compute_laplace_grad_aux(const IntrinsicGeometry<T, d>& ig);
+compute_laplace_grad_aux(const ElementValues<T, d>& ev);
 
 } // namespace pyck
 
