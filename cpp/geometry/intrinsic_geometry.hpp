@@ -232,6 +232,50 @@ inline void compute_christoffels_d1(const std::vector<ColMatrix<T, 3>>& position
     }
 }
 
+// === Projections ====================================================================
+
+/**
+ * @brief Project an ambient-space vector field v (Q × 3) onto the covariant
+ *        basis: v_α(q) = v(q) · a_α(q). Output is (Q × d).
+ */
+template <std::floating_point T, std::size_t d>
+inline void project_to_covariant(const ColMatrix<T, 3>& v,
+                                 const std::vector<ColMatrix<T, 3>>& position_data,
+                                 Matrix<T>& v_cov)
+{
+    const Index Q = v.rows();
+    v_cov.resize(Q, d);
+
+    auto a_view = [&](Index i) {
+        return position_data[1].middleRows(i * Q, Q);
+    };
+
+    for (Index q = 0; q < Q; ++q)
+        for (std::size_t alpha = 0; alpha < d; ++alpha)
+            v_cov(q, alpha) = v.row(q).dot(a_view(alpha).row(q));
+}
+
+/**
+ * @brief Raise covariant components to contravariant via the inverse metric:
+ *        v^α(q) = g^{αβ}(q) v_β(q). Output is (Q × d).
+ */
+template <std::floating_point T, std::size_t d>
+inline void project_to_contravariant(const Matrix<T>& v_cov,
+                                     const Matrix<T>& g_inv_data,
+                                     Matrix<T>& v_up)
+{
+    const Index Q = v_cov.rows();
+    v_up.resize(Q, d);
+
+    for (Index q = 0; q < Q; ++q)
+        for (std::size_t alpha = 0; alpha < d; ++alpha) {
+            T sum = T(0);
+            for (std::size_t beta = 0; beta < d; ++beta)
+                sum += g_inv_data(q, pack2<d>(alpha, beta)) * v_cov(q, beta);
+            v_up(q, alpha) = sum;
+        }
+}
+
 } // namespace geometry::intrinsic
 
 } // namespace pyck

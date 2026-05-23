@@ -31,8 +31,8 @@ namespace Flags
     constexpr unsigned Metric         = 1u << 0;  ///< g, g_inv, jac
     constexpr unsigned Christoffels   = 1u << 1;  ///< Γ^k_{ij}
     constexpr unsigned ChristoffelsD1 = 1u << 2;  ///< ∂_γ Γ^k_{ij}
-    constexpr unsigned Normal         = 1u << 3;  ///< a_3 (d=2)
-    constexpr unsigned NormalD1       = 1u << 4;  ///< ∂_β a_3 (d=2)
+    constexpr unsigned Normal         = 1u << 3;  ///< a_3           (d=2)
+    constexpr unsigned NormalD1       = 1u << 4;  ///< ∂_β a_3       (d=2)
     constexpr unsigned Curvature      = 1u << 5;  ///< b_{αβ}, b^α_β (d=2)
 } // namespace Flags
 

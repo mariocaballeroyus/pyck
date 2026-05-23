@@ -49,7 +49,7 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
     // Single allocation of element stiffness
     Matrix<T> Ke;
 
-    // === Patch Loop =================================================================
+    // --- Patch Loop -----------------------------------------------------------------
     for (std::size_t p = 0; p < patches_.size(); ++p) {
         const auto& patch = *patches_[p];
         const auto& element = *elements_[p];
@@ -62,7 +62,7 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
                                        quadrature);
         const std::size_t num_live = static_cast<std::size_t>(patch_values.num_elements());
 
-        // === Element Loop ===========================================================
+        // --- Element Loop -----------------------------------------------------------
         for (std::size_t e = 0; e < num_live; ++e) {
             patch_values.reinit(e);
 
