@@ -60,12 +60,16 @@ private:
         DofLayout::BlockId block_id = 0; // assigned in allocate_dofs
     };
 
+    std::vector<Term> terms_;
+
+    Index multiplier_dof_count_ = 0;
+
     const PatchBoundary<T, d>& boundary_;
+
     const Element<T, d>& element_;
+
     const QuadratureRule<T, d - 1>& quadrature_;
 
-    std::vector<Term> terms_;
-    Index multiplier_dof_count_ = 0;
 };
 
 } // namespace pyck

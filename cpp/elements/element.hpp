@@ -49,10 +49,22 @@ public:
     virtual Index basis_order() const = 0;
 
     /// @brief Quantity flag bitmask declaring which geometric quantities this
-    ///        element's bodies read (Metric, Christoffels, Normal, …). The
-    ///        bulk assembler and boundary conditions use this to size the
-    ///        `ElementValues` workspace.
+    ///        element's `strain_matrix` / `constitutive_matrix` /
+    ///        `compute_local_stiffness` read. The bulk assembler uses this to
+    ///        size the interior `ElementValues` workspace.
     virtual unsigned flags() const = 0;
+
+    /// @brief Flags this element's *essential*-boundary shape matrices read
+    ///        (`displacement_shape_matrix`, `rotation_shape_matrix`). Used by
+    ///        kinematic boundary fields — those that constrain primary
+    ///        unknowns (displacements, rotations).
+    virtual unsigned essential_flags() const = 0;
+
+    /// @brief Flags this element's `stress_matrix` reads (= what its
+    ///        `strain_matrix` + `constitutive_matrix` consume). Used by
+    ///        *natural*-boundary fields — those applying work-conjugate
+    ///        tractions (shear, bending moment, twisting moment).
+    virtual unsigned natural_flags() const = 0;
 
     // === Matrix Operators (Element Formulation-Agnostic) ============================
 

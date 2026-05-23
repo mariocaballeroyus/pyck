@@ -42,6 +42,14 @@ public:
 
     /// @brief Quantity flag bitmask this field reads on the parent side.
     virtual unsigned flags() const = 0;
+
+    /// @brief Parent-side flags the field's *element method call* triggers.
+    ///        `Flags::None` for fields that don't invoke any element method;
+    ///        `e.essential_flags()` for kinematic fields (calling
+    ///        `displacement_shape_matrix` / `rotation_shape_matrix`);
+    ///        `e.natural_flags()` for stress-based fields (calling
+    ///        `stress_matrix`).
+    virtual unsigned element_flags(const Element<T, 2>& e) const = 0;
 };
 
 namespace detail
@@ -140,6 +148,7 @@ public:
 
     Index basis_order() const override { return Index(0); }
     unsigned flags() const override { return Flags::None; }
+    unsigned element_flags(const Element<T, 2>&) const override { return Flags::None; }
 
 private:
     std::size_t dof_index_;
@@ -195,6 +204,7 @@ public:
 
     Index basis_order() const override { return Index(1); }
     unsigned flags() const override { return Flags::Metric; }
+    unsigned element_flags(const Element<T, 2>&) const override { return Flags::None; }
 
 private:
     std::size_t dof_index_;
@@ -268,6 +278,7 @@ public:
 
     Index basis_order() const override { return Index(2); }
     unsigned flags() const override { return Flags::Metric | Flags::Christoffels; }
+    unsigned element_flags(const Element<T, 2>&) const override { return Flags::None; }
 
 private:
     std::size_t dof_index_;
@@ -290,6 +301,7 @@ public:
 
     Index basis_order() const override { return Index(0); }
     unsigned flags() const override { return Flags::Metric; }
+    unsigned element_flags(const Element<T, 2>& e) const override { return e.essential_flags(); }
 };
 
 /**
@@ -325,6 +337,7 @@ public:
 
     Index basis_order() const override { return Index(1); }
     unsigned flags() const override { return Flags::Metric; }
+    unsigned element_flags(const Element<T, 2>& e) const override { return e.essential_flags(); }
 };
 
 /**
@@ -362,6 +375,7 @@ public:
 
     Index basis_order() const override { return Index(1); }
     unsigned flags() const override { return Flags::Metric | Flags::Normal; }
+    unsigned element_flags(const Element<T, 2>& e) const override { return e.essential_flags(); }
 };
 
 /**
@@ -400,6 +414,7 @@ public:
 
     Index basis_order() const override { return Index(0); }
     unsigned flags() const override { return Flags::Metric; }
+    unsigned element_flags(const Element<T, 2>& e) const override { return e.natural_flags(); }
 };
 
 /**
@@ -439,6 +454,7 @@ public:
 
     Index basis_order() const override { return Index(0); }
     unsigned flags() const override { return Flags::Metric; }
+    unsigned element_flags(const Element<T, 2>& e) const override { return e.natural_flags(); }
 };
 
 /**
@@ -483,6 +499,7 @@ public:
 
     Index basis_order() const override { return Index(0); }
     unsigned flags() const override { return Flags::Metric | Flags::Normal; }
+    unsigned element_flags(const Element<T, 2>& e) const override { return e.natural_flags(); }
 };
 
 } // namespace pyck

@@ -84,6 +84,9 @@ public:
 
     unsigned flags() const override { return Flags::Metric | Flags::Christoffels; }
 
+    unsigned essential_flags() const override { return Flags::None; }
+    unsigned natural_flags()   const override { return Flags::Metric | Flags::Christoffels; }
+
 private:
 
     /// @brief Material properties.

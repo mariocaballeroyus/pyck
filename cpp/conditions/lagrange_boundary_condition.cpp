@@ -70,10 +70,11 @@ LagrangeBoundaryCondition<T, d>::apply(Matrix<T>& stiffness, Vector<T>& load,
     const Index Q = static_cast<Index>(quadrature_.num_points());
 
     Index    parent_basis_order = element_.basis_order();
-    unsigned parent_flags       = element_.flags();
+    unsigned parent_flags       = Flags::None;
     for (const auto& term : terms_) {
         parent_basis_order = std::max(parent_basis_order, term.field->basis_order());
         parent_flags |= term.field->flags();
+        parent_flags |= term.field->element_flags(element_);
     }
     BoundaryElementValues<T, d> bvals(boundary_, parent_basis_order,
                                       parent_flags, quadrature_);
