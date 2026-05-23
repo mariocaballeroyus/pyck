@@ -35,7 +35,12 @@ void bind_elements(py::module_& m)
                   const Patch<double, 1>& patch,
                   const ColMatrix<double, 1>& params) -> Matrix<double> {
                    return eval_global_shape<double, 1>(patch, elem,
-                       &Element1d::displacement_shape_matrix, params);
+                       [](const Element1d& e, const Patch<double, 1>& p,
+                          const std::vector<Matrix<double>>& b,
+                          const IntrinsicGeometry<double, 1>& ig) -> const Matrix<double>& {
+                           e.displacement_shape_matrix(p, b, ig);
+                           return e.N_w_workspace_;
+                       }, params);
                },
                py::arg("patch"),
                py::arg("params"))
@@ -45,7 +50,12 @@ void bind_elements(py::module_& m)
                   const Patch<double, 1>& patch,
                   const ColMatrix<double, 1>& params) -> Matrix<double> {
                    return eval_global_shape<double, 1>(patch, elem,
-                       &Element1d::rotation_shape_matrix, params);
+                       [](const Element1d& e, const Patch<double, 1>& p,
+                          const std::vector<Matrix<double>>& b,
+                          const IntrinsicGeometry<double, 1>& ig) -> const Matrix<double>& {
+                           e.rotation_shape_matrix(p, b, ig);
+                           return e.N_phi_workspace_;
+                       }, params);
                },
                py::arg("patch"),
                py::arg("params"))
@@ -55,7 +65,12 @@ void bind_elements(py::module_& m)
                   const Patch<double, 1>& patch,
                   const ColMatrix<double, 1>& params) -> Matrix<double> {
                    return eval_global_shape<double, 1>(patch, elem,
-                       &Element1d::strain_matrix, params);
+                       [](const Element1d& e, const Patch<double, 1>& p,
+                          const std::vector<Matrix<double>>& b,
+                          const IntrinsicGeometry<double, 1>& ig) -> const Matrix<double>& {
+                           e.strain_matrix(p, b, ig);
+                           return e.B_workspace_;
+                       }, params);
                },
                py::arg("patch"),
                py::arg("params"))
@@ -65,7 +80,12 @@ void bind_elements(py::module_& m)
                   const Patch<double, 1>& patch,
                   const ColMatrix<double, 1>& params) -> Matrix<double> {
                    return eval_global_shape<double, 1>(patch, elem,
-                       &Element1d::stress_matrix, params);
+                       [](const Element1d& e, const Patch<double, 1>& p,
+                          const std::vector<Matrix<double>>& b,
+                          const IntrinsicGeometry<double, 1>& ig) -> const Matrix<double>& {
+                           e.stress_matrix(p, b, ig);
+                           return e.N_sigma_workspace_;
+                       }, params);
                },
                py::arg("patch"),
                py::arg("params"));
@@ -80,7 +100,12 @@ void bind_elements(py::module_& m)
                   const Patch<double, 2>& patch,
                   const ColMatrix<double, 2>& params) -> Matrix<double> {
                    return eval_global_shape<double, 2>(patch, elem,
-                       &Element2d::displacement_shape_matrix, params);
+                       [](const Element2d& e, const Patch<double, 2>& p,
+                          const std::vector<Matrix<double>>& b,
+                          const IntrinsicGeometry<double, 2>& ig) -> const Matrix<double>& {
+                           e.displacement_shape_matrix(p, b, ig);
+                           return e.N_w_workspace_;
+                       }, params);
                },
                py::arg("patch"),
                py::arg("params"))
@@ -90,7 +115,12 @@ void bind_elements(py::module_& m)
                   const Patch<double, 2>& patch,
                   const ColMatrix<double, 2>& params) -> Matrix<double> {
                    return eval_global_shape<double, 2>(patch, elem,
-                       &Element2d::rotation_shape_matrix, params);
+                       [](const Element2d& e, const Patch<double, 2>& p,
+                          const std::vector<Matrix<double>>& b,
+                          const IntrinsicGeometry<double, 2>& ig) -> const Matrix<double>& {
+                           e.rotation_shape_matrix(p, b, ig);
+                           return e.N_phi_workspace_;
+                       }, params);
                },
                py::arg("patch"),
                py::arg("params"))
@@ -100,7 +130,12 @@ void bind_elements(py::module_& m)
                   const Patch<double, 2>& patch,
                   const ColMatrix<double, 2>& params) -> Matrix<double> {
                    return eval_global_shape<double, 2>(patch, elem,
-                       &Element2d::strain_matrix, params);
+                       [](const Element2d& e, const Patch<double, 2>& p,
+                          const std::vector<Matrix<double>>& b,
+                          const IntrinsicGeometry<double, 2>& ig) -> const Matrix<double>& {
+                           e.strain_matrix(p, b, ig);
+                           return e.B_workspace_;
+                       }, params);
                },
                py::arg("patch"),
                py::arg("params"))
@@ -110,7 +145,12 @@ void bind_elements(py::module_& m)
                   const Patch<double, 2>& patch,
                   const ColMatrix<double, 2>& params) -> Matrix<double> {
                    return eval_global_shape<double, 2>(patch, elem,
-                       &Element2d::stress_matrix, params);
+                       [](const Element2d& e, const Patch<double, 2>& p,
+                          const std::vector<Matrix<double>>& b,
+                          const IntrinsicGeometry<double, 2>& ig) -> const Matrix<double>& {
+                           e.stress_matrix(p, b, ig);
+                           return e.N_sigma_workspace_;
+                       }, params);
                },
                py::arg("patch"),
                py::arg("params"));

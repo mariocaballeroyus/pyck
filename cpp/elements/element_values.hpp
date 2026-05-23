@@ -101,7 +101,7 @@ public:
             act_pts_.row(i) = all_cps.row(elem_cps_[i]);
         }
         // Refresh geometric workspaces from the gathered basis + control points
-        intrinsic_geometry_.reinit(results_, act_pts_);
+        intrinsic_geometry_.reinit(results_, act_pts_, order_);
         extrinsic_geometry_.reinit(intrinsic_geometry_);
     }
 

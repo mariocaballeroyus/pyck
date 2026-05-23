@@ -248,8 +248,9 @@ TEST_CASE("RM 1P Plate: thin plate matches KL", "[RM1P]")
 
     const auto basis_d = (*surf).tensor_product().eval_all(pt, element.min_order());
     const auto act_pts = surf->active_control_pts(flat);
-    IntrinsicGeometry<double, 2> ig(basis_d, act_pts);
-   auto N_eff = element.displacement_shape_matrix(*surf, basis_d, ig);
+    IntrinsicGeometry<double, 2> ig(basis_d, act_pts, Index(basis_d.size()) - 1);
+   element.displacement_shape_matrix(*surf, basis_d, ig);
+   const Matrix<double>& N_eff = element.N_w_workspace_;
     std::vector<Index> active;
     surf->dof_mapper().get_element_cps(flat, active);
 
@@ -307,8 +308,9 @@ TEST_CASE("RM 1P Plate: thick plate — captures shear deformation", "[RM1P]")
 
         const auto basis_d = (*surf).tensor_product().eval_all(pt, element.min_order());
         const auto act_pts = surf->active_control_pts(flat);
-        IntrinsicGeometry<double, 2> ig(basis_d, act_pts);
-       auto N_eff = element.displacement_shape_matrix(*surf, basis_d, ig);
+        IntrinsicGeometry<double, 2> ig(basis_d, act_pts, Index(basis_d.size()) - 1);
+       element.displacement_shape_matrix(*surf, basis_d, ig);
+   const Matrix<double>& N_eff = element.N_w_workspace_;
         std::vector<Index> active;
     surf->dof_mapper().get_element_cps(flat, active);
 

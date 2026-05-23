@@ -15,7 +15,7 @@ NormalBendingMoment = _pyck.NormalBendingMoment
 TwistingMoment = _pyck.TwistingMoment
 
 # Generic basis-DOF fields, parameterised by `dof_index` (which slot of the
-# per-node DOF block to read). C^k building blocks for inter-patch coupling.
+# per-node DOF block to read).
 BasisValue = _pyck.BasisValue
 BasisNormalSlope = _pyck.BasisNormalSlope
 BasisNormalCurvature = _pyck.BasisNormalCurvature

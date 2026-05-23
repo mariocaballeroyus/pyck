@@ -66,7 +66,7 @@ TEST_CASE("Patch<double, 2>: Flat Rectangular Plate", "[geometry][surface]") {
         ColMatrix<double, 2> pts(1, 2);
         pts << 0.3, 0.7;
         const auto b     = surf.tensor_product().eval_all(pts, 3);
-        IntrinsicGeometry<double, 2> local(b, act);
+        IntrinsicGeometry<double, 2> local(b, act, Index(b.size()) - 1);
 
         CHECK(local.g(0, 0)(0) == Approx(Lx * Lx).margin(1e-12));
         CHECK(local.g(0, 1)(0) == Approx(0.0     ).margin(1e-12));
@@ -78,7 +78,7 @@ TEST_CASE("Patch<double, 2>: Flat Rectangular Plate", "[geometry][surface]") {
         ColMatrix<double, 2> pts(1, 2);
         pts << 0.4, 0.6;
         const auto b     = surf.tensor_product().eval_all(pts, 3);
-        IntrinsicGeometry<double, 2> local(b, act);
+        IntrinsicGeometry<double, 2> local(b, act, Index(b.size()) - 1);
 
         const auto& chr = local;
         CHECK(chr.Gamma(0, 0, 0)(0) == Approx(0.0).margin(1e-14));
@@ -160,7 +160,7 @@ TEST_CASE("Patch<double, 2>: Rectangle factory area integral", "[geometry][surfa
             quad.map_to_domain(lo, hi, mp, mw);
             const auto b     = surf.tensor_product().eval_all(mp, 1);
             const auto act   = surf.active_control_pts(e);
-            IntrinsicGeometry<double, 2> local(b, act);
+            IntrinsicGeometry<double, 2> local(b, act, Index(b.size()) - 1);
 
             for (Eigen::Index q = 0; q < mw.size(); ++q)
                 area += local.jac(q) * mw(q);
@@ -210,7 +210,7 @@ TEST_CASE("Patch<double, 2>: Quadratic Basis — Partition of Unity",
             pts << u, v;
 
             const auto b     = surf.tensor_product().eval_all(pts, 3);
-            IntrinsicGeometry<double, 2> local(b, act);
+            IntrinsicGeometry<double, 2> local(b, act, Index(b.size()) - 1);
 
             auto sum_at_0 = [&](Index k_order, Index packed, Index n_k) {
                 auto slab = b[k_order].col(0);
@@ -259,13 +259,13 @@ TEST_CASE("PatchBoundary<double, 2>::eval_outward_normal: flat rectangle",
 
     const auto bdy_basis = (*bdy).tensor_product().eval_all(bdy_pts, 1);
     const auto bdy_act   = bdy->active_control_pts(boundary_span);
-    IntrinsicGeometry<double, 1> bdy_local(bdy_basis, bdy_act);
+    IntrinsicGeometry<double, 1> bdy_local(bdy_basis, bdy_act, Index(bdy_basis.size()) - 1);
 
     const Index parent_flat = bdy->parent_flat_span(boundary_span);
     const auto parent_pts   = bdy->lift_to_parent(bdy_pts);
     const auto parent_basis = (*surf).tensor_product().eval_all(parent_pts, 1);
     const auto parent_act   = surf->active_control_pts(parent_flat);
-    IntrinsicGeometry<double, 2> parent_local(parent_basis, parent_act);
+    IntrinsicGeometry<double, 2> parent_local(parent_basis, parent_act, Index(parent_basis.size()) - 1);
 
     const auto n = bdy->eval_outward_normal(bdy_local, parent_local);
     REQUIRE(n.rows() == bdy_pts.size());
@@ -306,7 +306,7 @@ TEST_CASE("Patch<double, 2>: composable primitives on twisted z=u·v patch",
 
     const auto b      = surf.tensor_product().eval_all(pts, 3);
     const auto actpts = surf.active_control_pts(elem_idx);
-    IntrinsicGeometry<double, 2> local(b, actpts);
+    IntrinsicGeometry<double, 2> local(b, actpts, Index(b.size()) - 1);
 
     const auto& chr = local;
     const ExtrinsicGeometry<double, 2> eg_local(local);
@@ -416,7 +416,7 @@ TEST_CASE("Patch<double, 2>: ∂Γ on twisted z=u·v patch",
 
     const auto b      = surf.tensor_product().eval_all(pts, 3);
     const auto actpts = surf.active_control_pts(elem_idx);
-    IntrinsicGeometry<double, 2> local(b, actpts);
+    IntrinsicGeometry<double, 2> local(b, actpts, Index(b.size()) - 1);
 
     const auto& chr = local;
 
@@ -478,7 +478,7 @@ TEST_CASE("Patch<double, 2>: Intrinsic/Extrinsic containers compose correctly",
     const auto basis  = surf.tensor_product().eval_all(pts, 3);
     const auto actpts = surf.active_control_pts(elem_idx);
 
-    IntrinsicGeometry<double, 2> ig(basis, actpts);
+    IntrinsicGeometry<double, 2> ig(basis, actpts, Index(basis.size()) - 1);
 
     ExtrinsicGeometry<double, 2> eg(ig);
 

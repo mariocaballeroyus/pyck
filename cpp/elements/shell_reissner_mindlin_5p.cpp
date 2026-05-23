@@ -19,7 +19,7 @@ ShellReissnerMindlin5p<T>::ShellReissnerMindlin5p(Ptr<PlaneStress2d<T>> material
 // === Matrix Operators ===============================================================
 
 template <std::floating_point T>
-Matrix<T>
+void
 ShellReissnerMindlin5p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
                                          const std::vector<Matrix<T>>& basis,
                                          const IntrinsicGeometry<T, 2>& ig) const
@@ -27,9 +27,10 @@ ShellReissnerMindlin5p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
     const ExtrinsicGeometry<T, 2> eg(ig);
     const ColMatrix<T, 3>& a_3 = eg.n;
 
+    Matrix<T>& B = this->B_workspace_;
     const Index Q = basis[0].cols();
     const Index N = basis[0].rows();
-    Matrix<T> B = Matrix<T>::Zero(8 * Q, 5 * N);
+    B.setZero(8 * Q, 5 * N);
 
     for (Index q = 0; q < Q; ++q)
     {
@@ -77,7 +78,6 @@ ShellReissnerMindlin5p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
             B(8*q + 7, 5*i + 4) = N_i;
         }
     }
-    return B;
 }
 
 template <std::floating_point T>
@@ -105,29 +105,27 @@ ShellReissnerMindlin5p<T>::constitutive_matrix(const IntrinsicGeometry<T, 2>& ig
 // === Shape Matrices =================================================================
 
 template <std::floating_point T>
-Matrix<T>
+void
 ShellReissnerMindlin5p<T>::displacement_shape_matrix(const Patch<T, 2>& /*patch*/,
                                                      const std::vector<Matrix<T>>& basis,
                                                      const IntrinsicGeometry<T, 2>& /*ig*/) const
 {
     const Index Q = basis[0].cols();
     const Index N = basis[0].rows();
-    Matrix<T> N_w = Matrix<T>::Zero(Q, 5 * N);
+    this->N_w_workspace_.setZero(Q, 5 * N);
     // TODO: implement this
-    return N_w;
 }
 
 template <std::floating_point T>
-Matrix<T>
+void
 ShellReissnerMindlin5p<T>::rotation_shape_matrix(const Patch<T, 2>& /*patch*/,
                                                  const std::vector<Matrix<T>>& basis,
                                                  const IntrinsicGeometry<T, 2>& /*ig*/) const
 {
     const Index Q = basis[0].cols();
     const Index N = basis[0].rows();
-    Matrix<T> N_psi = Matrix<T>::Zero(2 * Q, 5 * N);
+    this->N_phi_workspace_.setZero(2 * Q, 5 * N);
     // TODO: implement this
-    return N_psi;
 }
 
 // === Template Instantiations ========================================================

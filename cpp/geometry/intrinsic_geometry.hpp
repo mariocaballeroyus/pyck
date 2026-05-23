@@ -15,29 +15,6 @@ namespace pyck
 {
 
 /**
- * @brief Per-quantity update flags for @ref IntrinsicGeometry. Each flag gates
- *        both the storage allocation and the per-element computation of the
- *        associated quantity, mirroring deal.II's `UpdateFlags` pattern.
- *
- * Flags are interpreted on a best-effort basis: `reinit` silently clamps each
- * flag against the basis's available derivative orders (`metric` needs order
- * ≥ 1, `christoffels` ≥ 2, `christoffels_d1` ≥ 3). Default-constructed flags
- * therefore yield the maximum the basis supports — preserving the previous
- * "always compute Christoffels" semantics.
- */
-struct IntrinsicGeometryFlags
-{
-    /// Compute covariant metric, contravariant metric and Jacobian.
-    bool metric          = true;
-
-    /// Compute Christoffel symbols Γ^k_{ij}.
-    bool christoffels    = true;
-
-    /// Compute first derivatives of Christoffel symbols ∂_γ Γ^k_{ij}.
-    bool christoffels_d1 = true;
-};
-
-/**
  * @brief Bonnet-intrinsic geometric data of a d-dimensional parametric chart,
  *        stored in Gismo-style packed buffers (one per derivative order for
  *        position derivatives; column-packed for metric / Christoffels).
@@ -47,8 +24,11 @@ struct IntrinsicGeometryFlags
  *   `0 ≤ k ≤ (basis.size() - 1)`. Within each order, the multi-index slice
  *   for packed-index `m` lives at rows `m·Q .. (m+1)·Q - 1`.
  *
- * Population of metric, Christoffels and Γ_d1 is controlled by
- * `IntrinsicGeometryFlags` passed to `reinit`.
+ * Which quantities are populated is determined entirely by the basis
+ * derivative order supplied to `reinit`:
+ *   - order ≥ 1 → covariant + contravariant metric and Jacobian
+ *   - order ≥ 2 → Christoffel symbols Γ^k_{ij}
+ *   - order ≥ 3 → Christoffel symbol derivatives ∂_γ Γ^k_{ij}
  *
  * Christoffels storage:
  *   - @ref Gamma_data: shape Q × (d · n_d2), col-major. Column index packed as
@@ -86,35 +66,34 @@ struct IntrinsicGeometry
     IntrinsicGeometry() = default;
 
     /**
-     * @brief Populate position derivatives and the quantities selected by
-     *        @p flags. Delegates to @ref reinit.
+     * @brief Populate position derivatives and every derived quantity up to
+     *        @p order. Delegates to @ref reinit.
      */
     IntrinsicGeometry(const std::vector<Matrix<T>>& basis,
                       const ColMatrix<T, 3>& act_pts,
-                      IntrinsicGeometryFlags flags = {})
+                      const Index order)
     {
-        reinit(basis, act_pts, flags);
+        reinit(basis, act_pts, order);
     }
 
     // === Methods ====================================================================
 
     /**
-     * @brief Refresh position derivatives (up to the basis buffer's maximum
-     *        order) and the quantities selected by @p flags on existing
-     *        storage.
+     * @brief Refresh position derivatives and every derived quantity up to
+     *        @p order (see class doc for the order ↔ quantity ladder). The
+     *        basis must carry at least @p order derivatives (debug-asserted).
      *
      * Internal `resize` calls are no-ops once the buffers have been sized by
-     * a prior `reinit` call with matching Q, order and flags, making
-     * subsequent refreshes allocation-free.
+     * a prior `reinit` call with matching Q and order, making subsequent
+     * refreshes allocation-free.
      *
      * @param basis    Per-order packed basis values + derivatives.
      * @param act_pts  Active control points (one row per active basis fn).
-     * @param flags    Which derived quantities to compute. The basis must
-     *                 carry enough orders to satisfy them (debug-asserted).
+     * @param order    Maximum derivative order to evaluate (≤ basis.size()-1).
      */
     void reinit(const std::vector<Matrix<T>>& basis,
                 const ColMatrix<T, 3>& act_pts,
-                IntrinsicGeometryFlags flags = {});
+                const Index order);
 
     // === Properties =================================================================
 
@@ -167,6 +146,28 @@ struct IntrinsicGeometry
     }
 
 private:
+
+    /// Pass 1 — fill @ref position_data from basis values and active control
+    /// points (covariant tangents and higher-order position derivatives) up
+    /// to derivative order @p order. The basis may carry more entries than
+    /// @p order + 1; only the first @p order + 1 are read.
+    void compute_position_derivatives_(const std::vector<Matrix<T>>& basis,
+                                       const ColMatrix<T, 3>& act_pts,
+                                       const Index order);
+
+    /// Pass 2 — fill @ref g_data, @ref g_inv_data and @ref jac. Requires
+    /// @ref compute_position_derivatives_ to have been called with order ≥ 1.
+    void compute_metric_();
+
+    /// Pass 3 — fill @ref Gamma_data. Requires Pass 2 to have been called
+    /// and basis order ≥ 2.
+    void compute_christoffels_();
+
+    /// Pass 4 — fill @ref Gamma_d1_data. Requires Pass 2 to have been called
+    /// and basis order ≥ 3. Recomputes the per-q intermediates `g_inv_full`
+    /// and `aup` that Pass 3 also uses; the redundant arithmetic is small
+    /// (~d² mults/adds per qpt) and worth the cleaner separation.
+    void compute_christoffels_d1_();
 
     /// Build a Q × 3 view onto packed-position @p packed within order-@p ord storage.
     auto view_pos(Index ord, Index packed) const

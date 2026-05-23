@@ -59,9 +59,21 @@ public:
      */
     Matrix<T> operator()(const ColMatrix<T, d>& params) const
     {
-        const Matrix<T> N = eval_global_shape<T, d>(*patch_, *element_, 
-                                                    shape_method(field_), 
-                                                    params);
+        auto eval = [field = field_](const Element<T, d>& e,
+                                     const Patch<T, d>& p,
+                                     const std::vector<Matrix<T>>& b,
+                                     const IntrinsicGeometry<T, d>& ig)
+                                     -> const Matrix<T>& {
+            switch (field) {
+                case FieldType::DISPLACEMENT: e.displacement_shape_matrix(p, b, ig); return e.N_w_workspace_;
+                case FieldType::ROTATION:     e.rotation_shape_matrix(p, b, ig);     return e.N_phi_workspace_;
+                case FieldType::STRAIN:       e.strain_matrix(p, b, ig);             return e.B_workspace_;
+                case FieldType::STRESS:       e.stress_matrix(p, b, ig);             return e.N_sigma_workspace_;
+            }
+            throw std::runtime_error("Function: unknown FieldType.");
+        };
+
+        const Matrix<T> N = eval_global_shape<T, d>(*patch_, *element_, eval, params);
 
         if (N.rows() == 0) {
             return Matrix<T>(0, 0);
@@ -84,18 +96,6 @@ public:
     const Element<T, d>& element() const { return *element_; }
     const Patch<T, d>&   patch()   const { return *patch_; }
     FieldType            field()   const { return field_; }
-
-private:
-    static ShapeMatrixFn<T, d> shape_method(FieldType f)
-    {
-        switch (f) {
-            case FieldType::DISPLACEMENT: return &Element<T, d>::displacement_shape_matrix;
-            case FieldType::ROTATION:     return &Element<T, d>::rotation_shape_matrix;
-            case FieldType::STRAIN:       return &Element<T, d>::strain_matrix;
-            case FieldType::STRESS:       return &Element<T, d>::stress_matrix;
-        }
-        throw std::runtime_error("Function: unknown FieldType.");
-    }
 
     Vector<T>          u_;
     Ptr<Element<T, d>> element_;

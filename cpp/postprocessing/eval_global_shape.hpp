@@ -15,30 +15,29 @@
 namespace pyck
 {
 
-/// @brief Pointer-to-member-function type for an element shape-matrix method.
-template <std::floating_point T, std::size_t d>
-using ShapeMatrixFn = Matrix<T> (Element<T, d>::*)(const Patch<T, d>&,
-                                                   const std::vector<Matrix<T>>&,
-                                                   const IntrinsicGeometry<T, d>&) const;
-
 /**
  * @brief Evaluate a global shape matrix at a set of global parametric points.
  *
  * Loops over the unique knot spans implied by `params`, builds the per-point
- * basis derivatives and intrinsic geometry, calls the chosen element shape
- * matrix, and scatters into a global `(n_pts * n_rows_per_pt, n_cp * ndof)`
- * matrix.
+ * basis derivatives and intrinsic geometry, calls the supplied per-span
+ * functor (which returns a reference to the element's shape-matrix
+ * workspace), and scatters into a global `(n_pts * n_rows_per_pt, n_cp *
+ * ndof)` matrix.
  *
  * @param patch   Patch carrying basis and control points.
  * @param element Element formulation (provides ndof, min_order, shape mats).
- * @param mem_fn  Pointer-to-member of the element shape-matrix method.
+ * @param eval_at_span  Callable
+ *                      `(elem, patch, basis, ig) -> const Matrix<T>&`
+ *                      that triggers the per-span shape matrix computation
+ *                      on the element and returns a reference to the
+ *                      element-owned workspace holding the result.
  * @param params  `(Q, d)` parametric coordinates (column-major).
  * @return Global shape matrix of shape `(Q * k, n_cp * ndof)`.
  */
-template <std::floating_point T, std::size_t d>
+template <std::floating_point T, std::size_t d, typename Callable>
 Matrix<T> eval_global_shape(const Patch<T, d>& patch,
                             const Element<T, d>& element,
-                            ShapeMatrixFn<T, d> mem_fn,
+                            Callable&& eval_at_span,
                             const ColMatrix<T, d>& params)
 {
     const Index n_pts    = static_cast<Index>(params.rows());
@@ -51,9 +50,10 @@ Matrix<T> eval_global_shape(const Patch<T, d>& patch,
         n_spans[dir] = static_cast<Index>(
             patch.basis(dir).knot_vector().num_spans());
 
-    Matrix<T> N_global;
-    Index n_rows_per_pt = 0;
-    bool initialized = false;
+    Matrix<T>           N_global;
+    std::vector<Index>  active_cp;         // Reused across spans (lazy-sized).
+    Index               n_rows_per_pt = 0;
+    bool                initialized = false;
 
     for (Index i = 0; i < n_pts; ++i)
     {
@@ -70,9 +70,9 @@ Matrix<T> eval_global_shape(const Patch<T, d>& patch,
 
         auto bd      = patch.tensor_product().eval_all(pt, order);
         auto act_pts = patch.active_control_pts(flat_span);
-        IntrinsicGeometry<T, d> lf(bd, act_pts);
+        IntrinsicGeometry<T, d> lf(bd, act_pts, Index(bd.size()) - 1);
 
-        const Matrix<T> N_span = (element.*mem_fn)(patch, bd, lf);
+        const Matrix<T>& N_span = eval_at_span(element, patch, bd, lf);
 
         if (!initialized)
         {
@@ -81,7 +81,6 @@ Matrix<T> eval_global_shape(const Patch<T, d>& patch,
             initialized = true;
         }
 
-        std::vector<Index> active_cp;
         patch.dof_mapper().get_element_cps(flat_span, active_cp);
         const Index n_active = static_cast<Index>(active_cp.size());
 

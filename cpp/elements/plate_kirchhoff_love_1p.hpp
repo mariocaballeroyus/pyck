@@ -40,9 +40,9 @@ public:
      * @param chr Christoffel symbols.
      * @return B-matrix.
      */
-    Matrix<T> strain_matrix(const Patch<T, 2>& patch,
-                            const std::vector<Matrix<T>>& basis,
-                            const IntrinsicGeometry<T, 2>& ig) const override;
+    void strain_matrix(const Patch<T, 2>& patch,
+                       const std::vector<Matrix<T>>& basis,
+                       const IntrinsicGeometry<T, 2>& ig) const override;
 
     /**
      * @brief Constitutive D-matrix.
@@ -65,9 +65,9 @@ public:
      * @param chr Christoffel symbols.
      * @return Displacement shape matrix.
      */
-    Matrix<T> displacement_shape_matrix(const Patch<T, 2>& patch,
-                                        const std::vector<Matrix<T>>& basis,
-                                        const IntrinsicGeometry<T, 2>& ig) const override;
+    void displacement_shape_matrix(const Patch<T, 2>& patch,
+                                   const std::vector<Matrix<T>>& basis,
+                                   const IntrinsicGeometry<T, 2>& ig) const override;
 
     /**
      * @brief Rotation shape matrix.
@@ -78,9 +78,9 @@ public:
      * @param chr Christoffel symbols.
      * @return Rotation shape matrix.
      */
-    Matrix<T> rotation_shape_matrix(const Patch<T, 2>& patch,
-                                    const std::vector<Matrix<T>>& basis,
-                                    const IntrinsicGeometry<T, 2>& ig) const override;
+    void rotation_shape_matrix(const Patch<T, 2>& patch,
+                               const std::vector<Matrix<T>>& basis,
+                               const IntrinsicGeometry<T, 2>& ig) const override;
 
     // === Getters ================================================================
 

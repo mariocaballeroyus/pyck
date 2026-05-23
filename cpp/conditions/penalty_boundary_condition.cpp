@@ -66,13 +66,13 @@ void PenaltyBoundaryCondition<T, d>::apply(Matrix<T>& stiffness,
 
         auto boundary_basis  = boundary.tensor_product().eval_all(mapped_pts, 2);
         auto boundary_act    = boundary.active_control_pts(span);
-        IntrinsicGeometry<T, d - 1> boundary_local(boundary_basis, boundary_act);
+        IntrinsicGeometry<T, d - 1> boundary_local(boundary_basis, boundary_act, Index(boundary_basis.size()) - 1);
 
         const Index flat_parent = boundary.parent_flat_span(span);
         const ColMatrix<T, 2> parent_pts = boundary.lift_to_parent(mapped_pts);
         auto parent_basis  = parent.tensor_product().eval_all(parent_pts, req_order);
         auto parent_act    = parent.active_control_pts(flat_parent);
-        IntrinsicGeometry<T, d> parent_ig(parent_basis, parent_act);
+        IntrinsicGeometry<T, d> parent_ig(parent_basis, parent_act, Index(parent_basis.size()) - 1);
 
 
         std::vector<Index> elem_dofs;

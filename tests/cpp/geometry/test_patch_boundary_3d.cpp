@@ -194,7 +194,7 @@ TEST_CASE("PatchBoundary<double, 3>: outward normal on cube faces",
 
             const auto bbasis = (*bdy).tensor_product().eval_all(mapped, 1);
             const auto bact   = bdy->active_control_pts(span);
-            IntrinsicGeometry<double, 2> blocal(bbasis, bact);
+            IntrinsicGeometry<double, 2> blocal(bbasis, bact, Index(bbasis.size()) - 1);
 
             const auto normals = bdy->eval_outward_normal(blocal);
             REQUIRE(normals.rows() == 2);

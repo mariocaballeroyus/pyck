@@ -119,7 +119,7 @@ TEST_CASE("Patch<double, 1>: Analytical Push-Forward Verification", "[geometry][
             // New-API evaluation.
             auto b     = curve.tensor_product().eval_all(params, 3);
             auto act   = curve.active_control_pts(span);
-            IntrinsicGeometry<double, 1> local(b, act);            auto md    = metric_derivs(b, local, 0);
+            IntrinsicGeometry<double, 1> local(b, act, Index(b.size()) - 1);            auto md    = metric_derivs(b, local, 0);
 
             CHECK(local.jac(0) == Approx(sqrt_g11).margin(1e-12));
 
@@ -160,7 +160,7 @@ TEST_CASE("Patch<double, 1>: External AD Numerical Validation", "[geometry][curv
     auto eval_at = [&](double u) {
         ColMatrix<double, 1> params(1, 1); params << u;
         auto b     = curve.tensor_product().eval_all(params, 3);
-        IntrinsicGeometry<double, 1> local(b, act);        return metric_derivs(b, local, 0);
+        IntrinsicGeometry<double, 1> local(b, act, Index(b.size()) - 1);        return metric_derivs(b, local, 0);
     };
 
     SECTION("Evaluation at u = 0.15") {

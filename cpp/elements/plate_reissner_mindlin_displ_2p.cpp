@@ -18,7 +18,7 @@ PlateReissnerMindlinDispl2p<T>::PlateReissnerMindlinDispl2p(Ptr<PlaneStress2d<T>
 // === Matrix Operators ===============================================================
 
 template <std::floating_point T>
-Matrix<T>
+void
 PlateReissnerMindlinDispl2p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
                                               const std::vector<Matrix<T>>& basis,
                                               const IntrinsicGeometry<T, 2>& ig) const
@@ -26,9 +26,10 @@ PlateReissnerMindlinDispl2p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
     auto aux = compute_laplace_grad_aux(ig);
     const T ratio = material_->bending_stiffness() / material_->shear_stiffness();
 
+    Matrix<T>& B = this->B_workspace_;
     const Index Q = basis[0].cols();
     const Index N = basis[0].rows();
-    Matrix<T> B = Matrix<T>::Zero(5 * Q, 2 * N);
+    B.setZero(5 * Q, 2 * N);
 
     for (Index q = 0; q < Q; ++q)
     {
@@ -101,7 +102,6 @@ PlateReissnerMindlinDispl2p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
             B(5*q + 4, 2*i + 1) = -N_u_i;
         }
     }
-    return B;
 }
 
 template <std::floating_point T>
@@ -118,16 +118,17 @@ PlateReissnerMindlinDispl2p<T>::constitutive_matrix(const IntrinsicGeometry<T, 2
 // === Shape Matrices =================================================================
 
 template <std::floating_point T>
-Matrix<T>
+void
 PlateReissnerMindlinDispl2p<T>::displacement_shape_matrix(const Patch<T, 2>& /*patch*/,
                                                           const std::vector<Matrix<T>>& basis,
                                                           const IntrinsicGeometry<T, 2>& ig) const
 {
     const T ratio = material_->bending_stiffness() / material_->shear_stiffness();
 
+    Matrix<T>& Nw = this->N_w_workspace_;
     const Index Q = basis[0].cols();
     const Index N = basis[0].rows();
-    Matrix<T> Nw = Matrix<T>::Zero(Q, 2 * N);
+    Nw.setZero(Q, 2 * N);
 
     for (Index q = 0; q < Q; ++q) {
         auto slab0 = basis[0].col(q);
@@ -160,20 +161,20 @@ PlateReissnerMindlinDispl2p<T>::displacement_shape_matrix(const Patch<T, 2>& /*p
             Nw(q, 2*i) = N_i - ratio * (gi11 * N11 + T(2) * gi12 * N12 + gi22 * N22);
         }
     }
-    return Nw;
 }
 
 template <std::floating_point T>
-Matrix<T>
+void
 PlateReissnerMindlinDispl2p<T>::rotation_shape_matrix(const Patch<T, 2>& /*patch*/,
                                                       const std::vector<Matrix<T>>& basis,
                                                       const IntrinsicGeometry<T, 2>& /*ig*/) const
 {
     // N_rot = [ -N_{i|1}   N_{i|2} ]
     //         [ -N_{i|2}  -N_{i|1} ]
+    Matrix<T>& Nphi = this->N_phi_workspace_;
     const Index Q = basis[0].cols();
     const Index N = basis[0].rows();
-    Matrix<T> Nphi = Matrix<T>::Zero(2 * Q, 2 * N);
+    Nphi.setZero(2 * Q, 2 * N);
     for (Index q = 0; q < Q; ++q) {
         auto slab1 = basis[1].col(q);
         for (Index i = 0; i < N; ++i) {
@@ -185,7 +186,6 @@ PlateReissnerMindlinDispl2p<T>::rotation_shape_matrix(const Patch<T, 2>& /*patch
             Nphi(2*q + 1, 2*i + 1) = -N_u_i;
         }
     }
-    return Nphi;
 }
 
 // === Template Instantiations ========================================================

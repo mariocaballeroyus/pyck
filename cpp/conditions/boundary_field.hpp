@@ -112,10 +112,10 @@ surface_tangent(const ColMatrix<T, 3>& n,
  * @brief Basis-DOF value field: extracts the spline value of a single DOF
  *        slot within each node block, ignoring all others.
  *
- * Used as the `C^0` building block for inter-patch coupling: pinning a
- * primary DOF directly (e.g. `w_b` at index 0 or `psi` at index 1 on
- * `PlateReissnerMindlinDispl2p`) sidesteps the linear-combination
- * identities baked into the element's `displacement_shape_matrix`.
+ * Useful when you need to pin a primary DOF directly (e.g. `w_b` at index
+ * 0 or `psi` at index 1 on `PlateReissnerMindlinDispl2p`), sidestepping
+ * the linear-combination identities baked into the element's
+ * `displacement_shape_matrix`.
  */
 template <std::floating_point T>
 class BasisValue : public BoundaryField<T>
@@ -298,8 +298,9 @@ public:
                        const std::vector<Matrix<T>>& parent_basis,
                        const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
-        return element.displacement_shape_matrix(*boundary.parent(),
-                                                 parent_basis, parent_ig);
+        element.displacement_shape_matrix(*boundary.parent(),
+                                          parent_basis, parent_ig);
+        return element.N_w_workspace_;
     }
 };
 
@@ -325,8 +326,8 @@ public:
         const std::vector<Matrix<T>>& parent_basis,
         const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
-        const Matrix<T> Nrot = element.rotation_shape_matrix(
-            *boundary.parent(), parent_basis, parent_ig);
+        element.rotation_shape_matrix(*boundary.parent(), parent_basis, parent_ig);
+        const Matrix<T>& Nrot = element.N_phi_workspace_;
         const ColMatrix<T, 3> n =
             boundary.eval_outward_normal(boundary_local, parent_ig);
         const auto [n_up_1, n_up_2] =
@@ -363,8 +364,8 @@ public:
         const std::vector<Matrix<T>>& parent_basis,
         const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
-        const Matrix<T> Nrot = element.rotation_shape_matrix(
-            *boundary.parent(), parent_basis, parent_ig);
+        element.rotation_shape_matrix(*boundary.parent(), parent_basis, parent_ig);
+        const Matrix<T>& Nrot = element.N_phi_workspace_;
         const ColMatrix<T, 3> n =
             boundary.eval_outward_normal(boundary_local, parent_ig);
         const ExtrinsicGeometry<T, 2> eg(parent_ig);
@@ -407,8 +408,8 @@ public:
         const std::vector<Matrix<T>>& parent_basis,
         const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
-        const Matrix<T> Nsigma = element.stress_matrix(
-            *boundary.parent(), parent_basis, parent_ig);
+        element.stress_matrix(*boundary.parent(), parent_basis, parent_ig);
+        const Matrix<T>& Nsigma = element.N_sigma_workspace_;
         const ColMatrix<T, 3> n =
             boundary.eval_outward_normal(boundary_local, parent_ig);
         const auto [n_cov_1, n_cov_2] =
@@ -445,8 +446,8 @@ public:
         const std::vector<Matrix<T>>& parent_basis,
         const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
-        const Matrix<T> Nsigma = element.stress_matrix(
-            *boundary.parent(), parent_basis, parent_ig);
+        element.stress_matrix(*boundary.parent(), parent_basis, parent_ig);
+        const Matrix<T>& Nsigma = element.N_sigma_workspace_;
         const ColMatrix<T, 3> n =
             boundary.eval_outward_normal(boundary_local, parent_ig);
         const auto [n_cov_1, n_cov_2] =
@@ -469,8 +470,7 @@ public:
  * @brief Twisting (cross) moment: M_{ns} = n_α s_β M^{αβ}, with s = a_3 × n.
  *
  * Work-conjugate to the tangential rotation θ_s on a Reissner–Mindlin
- * boundary; used as the traction in Nitsche enforcement of θ_s = θ̄_s.
- * Reads the bending rows from `stress_matrix` in symmetric-Voigt
+ * boundary. Reads the bending rows from `stress_matrix` in symmetric-Voigt
  * contravariant order (M^11, M^22, M^12) at rows 5q, 5q+1, 5q+2 (or 3q for
  * pure-bending KL plates) and uses the symmetric form
  *   M_{ns} = n_1 s_1 M^11 + n_2 s_2 M^22 + (n_1 s_2 + n_2 s_1) M^12.
@@ -489,8 +489,8 @@ public:
         const std::vector<Matrix<T>>& parent_basis,
         const IntrinsicGeometry<T, 2>& parent_ig) const override
     {
-        const Matrix<T> Nsigma = element.stress_matrix(
-            *boundary.parent(), parent_basis, parent_ig);
+        element.stress_matrix(*boundary.parent(), parent_basis, parent_ig);
+        const Matrix<T>& Nsigma = element.N_sigma_workspace_;
         const ColMatrix<T, 3> n =
             boundary.eval_outward_normal(boundary_local, parent_ig);
         const ExtrinsicGeometry<T, 2> eg(parent_ig);

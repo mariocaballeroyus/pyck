@@ -55,7 +55,7 @@ TEST_CASE("Patch<double, 3>: Flat Box", "[geometry][volume]")
         ColMatrix<double, 3> pts(1, 3);
         pts << 0.3, 0.5, 0.7;
         const auto b     = vol.tensor_product().eval_all(pts, 3);
-        IntrinsicGeometry<double, 3> local(b, act);
+        IntrinsicGeometry<double, 3> local(b, act, Index(b.size()) - 1);
 
         // Metric layout: (g_11, g_12, g_13, g_22, g_23, g_33).
         CHECK(local.g(0, 0)(0) == Approx(Lx * Lx).margin(1e-12));
@@ -79,7 +79,7 @@ TEST_CASE("Patch<double, 3>: Flat Box", "[geometry][volume]")
         ColMatrix<double, 3> pts(1, 3);
         pts << 0.4, 0.6, 0.2;
         const auto b     = vol.tensor_product().eval_all(pts, 3);
-        IntrinsicGeometry<double, 3> local(b, act);
+        IntrinsicGeometry<double, 3> local(b, act, Index(b.size()) - 1);
 
         const auto& chr = local;
         CHECK(chr.Gamma(0, 0, 0)(0) == Approx(0.0).margin(1e-14));
@@ -181,7 +181,7 @@ TEST_CASE("Patch<double, 3>: Box factory volume integral", "[geometry][volume]")
             quad.map_to_domain(lo, hi, mp, mw);
             const auto b     = vol.tensor_product().eval_all(mp, 1);
             const auto act   = vol.active_control_pts(e);
-            IntrinsicGeometry<double, 3> local(b, act);
+            IntrinsicGeometry<double, 3> local(b, act, Index(b.size()) - 1);
 
             for (Eigen::Index q = 0; q < mw.size(); ++q)
                 vol_int += local.jac(q) * mw(q);

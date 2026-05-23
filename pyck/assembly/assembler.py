@@ -166,18 +166,6 @@ class LinearElasticProblem:
             self._conditions[name].append(condition)
             self._cpp_object.add_condition(cast(Any, cpp_obj), self._patch_idx[name])
 
-    def add_coupling(self, coupling_condition: Any) -> None:
-        """Attach an inter-patch coupling condition.
-
-        The condition stores its own patch indices (``patch_a_idx``,
-        ``patch_b_idx``); the ``patch_idx`` we hand to the C++ layer is
-        therefore irrelevant — we just need it to be valid, so we use
-        ``patch_a_idx``.
-        """
-        cpp_obj = getattr(coupling_condition, "_cpp_object", coupling_condition)
-        idx = getattr(coupling_condition, "patch_a_idx", 0)
-        self._cpp_object.add_condition(cast(Any, cpp_obj), int(idx))
-
     def add_constraint(
         self,
         constraint: Any,

@@ -97,7 +97,7 @@ void LagrangeDomainCondition<T, d>::apply(
 
         auto basis   = patch_.tensor_product().eval_all(mapped_pts, req_order);
         auto act_pts = patch_.active_control_pts(elem_idx);
-        IntrinsicGeometry<T, d> local(basis, act_pts);
+        IntrinsicGeometry<T, d> local(basis, act_pts, Index(basis.size()) - 1);
         const Index n_basis = basis[0].rows();
 
         std::vector<Index> elem_cps;

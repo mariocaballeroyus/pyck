@@ -115,9 +115,10 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
         std::size_t req_order = element.min_order();
         auto basis   = patch.tensor_product().eval_all(mapped_pts, req_order);
         auto act_pts = patch.active_control_pts(elem_idx);
-        IntrinsicGeometry<T, d> ig(basis, act_pts);
+        IntrinsicGeometry<T, d> ig(basis, act_pts, Index(basis.size()) - 1);
 
-        Matrix<T> N_w = element.displacement_shape_matrix(patch, basis, ig);
+        element.displacement_shape_matrix(patch, basis, ig);
+        const Matrix<T>& N_w = element.N_w_workspace_;
 
         Vector<T> W_J_T(Q);
         for (std::size_t k = 0; k < Q; ++k) {

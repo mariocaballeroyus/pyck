@@ -78,7 +78,7 @@ eval_quadrature_data(const Patch<T, d>& patch,
         quadrature.map_to_domain(lo, hi, mapped_pts, mapped_weights);
         auto basis   = patch.tensor_product().eval_all(mapped_pts, 1);
         auto act_pts = patch.active_control_pts(static_cast<Index>(elem_idx));
-        IntrinsicGeometry<T, d> ig(basis, act_pts);
+        IntrinsicGeometry<T, d> ig(basis, act_pts, Index(basis.size()) - 1);
 
         params_out.block(out, 0, Q, static_cast<Index>(d)) = mapped_pts;
         for (Index q = 0; q < Q; ++q)

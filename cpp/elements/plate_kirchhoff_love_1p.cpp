@@ -17,14 +17,15 @@ PlateKirchhoffLove1p<T>::PlateKirchhoffLove1p(Ptr<PlaneStress2d<T>> material)
 // === Matrix Operators ===============================================================
 
 template <std::floating_point T>
-Matrix<T>
+void
 PlateKirchhoffLove1p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
                                        const std::vector<Matrix<T>>& basis,
                                        const IntrinsicGeometry<T, 2>& ig) const
 {
+    Matrix<T>& B = this->B_workspace_;
     const Index Q = basis[0].cols();
     const Index N = basis[0].rows();
-    Matrix<T> B(3 * Q, N);
+    B.setZero(3 * Q, N);
 
     for (Index q = 0; q < Q; ++q)
     {
@@ -54,7 +55,6 @@ PlateKirchhoffLove1p<T>::strain_matrix(const Patch<T, 2>& /*patch*/,
             B(3*q + 2, i) = -T(2) * (N_uv_i - Gam1_12 * N_u_i - Gam2_12 * N_v_i);
         }
     }
-    return B;
 }
 
 template <std::floating_point T>
@@ -71,35 +71,36 @@ PlateKirchhoffLove1p<T>::constitutive_matrix(const IntrinsicGeometry<T, 2>& ig,
 // === Shape Matrices =================================================================
 
 template <std::floating_point T>
-Matrix<T>
+void
 PlateKirchhoffLove1p<T>::displacement_shape_matrix(const Patch<T, 2>& /*patch*/,
                                                    const std::vector<Matrix<T>>& basis,
                                                    const IntrinsicGeometry<T, 2>& /*ig*/) const
 {
     // N_w = [ N_i ]
+    Matrix<T>& N_w = this->N_w_workspace_;
     const Index Q = basis[0].cols();
     const Index N = basis[0].rows();
-    Matrix<T> N_w(Q, N);
+    N_w.resize(Q, N);
     for (Index q = 0; q < Q; ++q) {
         auto slab0 = basis[0].col(q);
         for (Index i = 0; i < N; ++i) {
             N_w(q, i) = slab0(i);
         }
     }
-    return N_w;
 }
 
 template <std::floating_point T>
-Matrix<T>
+void
 PlateKirchhoffLove1p<T>::rotation_shape_matrix(const Patch<T, 2>& /*patch*/,
                                                const std::vector<Matrix<T>>& basis,
                                                const IntrinsicGeometry<T, 2>& /*ig*/) const
 {
     // N_rot = [ -N_{i|1} ]
     //         [ -N_{i|2} ]
+    Matrix<T>& N_varphi = this->N_phi_workspace_;
     const Index Q = basis[0].cols();
     const Index N = basis[0].rows();
-    Matrix<T> N_varphi(2 * Q, N);
+    N_varphi.resize(2 * Q, N);
     for (Index q = 0; q < Q; ++q) {
         auto slab1 = basis[1].col(q);
         for (Index i = 0; i < N; ++i) {
@@ -107,7 +108,6 @@ PlateKirchhoffLove1p<T>::rotation_shape_matrix(const Patch<T, 2>& /*patch*/,
             N_varphi(2*q + 1, i) = -slab1(i * 2 + 1);
         }
     }
-    return N_varphi;
 }
 
 // === Template Instantiations ========================================================
