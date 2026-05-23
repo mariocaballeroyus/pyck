@@ -21,6 +21,7 @@ namespace pyck
  */
 enum class FieldType
 {
+    PRIMAL,        ///< Primary DOFs                — N_p · u_local.
     DISPLACEMENT,  ///< Generalised displacement(s) — N_w · u_local.
     ROTATION,      ///< Generalised rotation(s)     — N_φ · u_local.
     STRAIN,        ///< Generalised strain          — B · u_local.
@@ -77,6 +78,11 @@ public:
     virtual void stress_matrix(const ElementValues<T, d>& ev) const;
 
     /**
+     * @brief Primal-DOF shape matrix N_p.
+     */
+    virtual void primal_shape_matrix(const ElementValues<T, d>& ev) const;
+
+    /**
      * @brief Local stiffness matrix K = ∫_Ω B^T D B dV.
      *
      * @param ev Per-element workspace bound via `ElementValues::reinit`.
@@ -124,6 +130,7 @@ public:
     mutable Matrix<T> N_w_workspace_;      ///< displacement_shape_matrix output
     mutable Matrix<T> N_phi_workspace_;    ///< rotation_shape_matrix output
     mutable Matrix<T> N_sigma_workspace_;  ///< stress_matrix output
+    mutable Matrix<T> N_primal_workspace_; ///< primal_shape_matrix output
 };
 
 
@@ -141,6 +148,23 @@ Element<T, d>::stress_matrix(const ElementValues<T, d>& ev) const
         const auto D = constitutive_matrix(ev, q);
         N_sigma_workspace_.middleRows(n_strain * q, n_strain).noalias() =
             D * B_workspace_.middleRows(n_strain * q, n_strain);
+    }
+}
+
+template <std::floating_point T, std::size_t d>
+void
+Element<T, d>::primal_shape_matrix(const ElementValues<T, d>& ev) const
+{
+    const Index Q    = ev.results_[0].cols();
+    const Index N    = ev.results_[0].rows();
+    const Index ndof = static_cast<Index>(num_node_dofs());
+    Matrix<T>& Np    = N_primal_workspace_;
+    Np.setZero(ndof * Q, ndof * N);
+    for (Index q = 0; q < Q; ++q) {
+        auto slab0 = ev.results_[0].col(q);
+        for (Index i = 0; i < N; ++i)
+            for (Index v = 0; v < ndof; ++v)
+                Np(ndof * q + v, i * ndof + v) = slab0(i);
     }
 }
 

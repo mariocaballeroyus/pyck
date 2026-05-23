@@ -12,11 +12,8 @@ namespace pyck
 
 /**
  * @brief Base interface for all assembly conditions.
- *
- *        Conditions store the information they need (patch index, boundary,
- *        etc.) and expose a single `apply` entry point. The assembler hands
- *        them the global K, F, layout, and the full per-patch primal block
- *        vector; each condition picks out the blocks it touches.
+ * 
+ * @tparam T Scalar floating-point type.
  */
 template <std::floating_point T>
 class Condition

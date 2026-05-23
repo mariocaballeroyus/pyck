@@ -30,6 +30,19 @@ void bind_elements(py::module_& m)
     using Element1d = Element<double, 1>;
 
     py::class_<Element1d, Ptr<Element1d>>(m, "Element1d")
+          .def("primal_shape_matrix",
+               [](const Element1d& elem,
+                  const Patch<double, 1>& patch,
+                  const ColMatrix<double, 1>& params) -> Matrix<double> {
+                   return eval_global_shape<double, 1>(patch, elem,
+                       [](const Element1d& e, const ElementValues<double, 1>& ev) -> const Matrix<double>& {
+                           e.primal_shape_matrix(ev);
+                           return e.N_primal_workspace_;
+                       }, params);
+               },
+               py::arg("patch"),
+               py::arg("params"))
+
           .def("displacement_shape_matrix",
                [](const Element1d& elem,
                   const Patch<double, 1>& patch,
@@ -87,6 +100,19 @@ void bind_elements(py::module_& m)
     using Element2d = Element<double, 2>;
 
     py::class_<Element2d, Ptr<Element2d>>(m, "Element2d")
+          .def("primal_shape_matrix",
+               [](const Element2d& elem,
+                  const Patch<double, 2>& patch,
+                  const ColMatrix<double, 2>& params) -> Matrix<double> {
+                   return eval_global_shape<double, 2>(patch, elem,
+                       [](const Element2d& e, const ElementValues<double, 2>& ev) -> const Matrix<double>& {
+                           e.primal_shape_matrix(ev);
+                           return e.N_primal_workspace_;
+                       }, params);
+               },
+               py::arg("patch"),
+               py::arg("params"))
+
           .def("displacement_shape_matrix",
                [](const Element2d& elem,
                   const Patch<double, 2>& patch,

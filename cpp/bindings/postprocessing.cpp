@@ -14,6 +14,7 @@ void bind_postprocessing(py::module_& m)
 {
     // === FieldType ================================================================
     py::enum_<FieldType>(m, "FieldType")
+        .value("PRIMAL",       FieldType::PRIMAL)
         .value("DISPLACEMENT", FieldType::DISPLACEMENT)
         .value("ROTATION",     FieldType::ROTATION)
         .value("STRAIN",       FieldType::STRAIN)
