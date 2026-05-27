@@ -2,7 +2,7 @@ from . import basis
 from . import curve
 from . import surface
 from . import vtk
-from .vtk import export_field_vtk
+from .vtk import export_field_vtk, export_bezier_vtu, bezier_anchor_params
 
 __all__ = [
     "basis",
@@ -10,4 +10,6 @@ __all__ = [
     "surface",
     "vtk",
     "export_field_vtk",
+    "export_bezier_vtu",
+    "bezier_anchor_params",
 ]

@@ -54,6 +54,8 @@ from pyck.io import (
     basis as io_basis,
     curve as io_curve,
     export_field_vtk,
+    export_bezier_vtu,
+    bezier_anchor_params,
 )
 from pyck.solver import solve
 import pyck.solver as solver
@@ -116,6 +118,8 @@ __all__ = [
     "io_basis",
     "io_curve",
     "export_field_vtk",
+    "export_bezier_vtu",
+    "bezier_anchor_params",
     "solve",
     "solver",
     "postprocessing",
