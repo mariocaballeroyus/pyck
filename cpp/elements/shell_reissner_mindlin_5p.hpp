@@ -87,10 +87,10 @@ public:
     /// order-2 basis evaluation.
     Index basis_order() const override { return 2; }
 
-    unsigned flags() const override { return Flags::Metric | Flags::Christoffels | Flags::Normal; }
+    unsigned flags() const override { return Flags::Metric | Flags::Christoffels | Flags::Normal | Flags::NormalD1; }
 
     unsigned essential_flags() const override { return Flags::None; }
-    unsigned natural_flags()   const override { return Flags::Metric | Flags::Christoffels | Flags::Normal; }
+    unsigned natural_flags()   const override { return Flags::Metric | Flags::Christoffels | Flags::Normal | Flags::NormalD1; }
 
 private:
 

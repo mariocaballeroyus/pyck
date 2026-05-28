@@ -38,6 +38,11 @@ ShellReissnerMindlin5p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
         const auto a2_q = ev.a(1).row(q);
         const auto a3_q = a_3.row(q);
 
+        // Reference-normal derivatives A_{3,β}, for the displacement-curvature
+        // coupling in the bending block.
+        const auto A3_d1_q = ev.n_d1(0).row(q);
+        const auto A3_d2_q = ev.n_d1(1).row(q);
+
         const T Gam1_11 = ev.Gamma(0, 0, 0)(q);
         const T Gam1_12 = ev.Gamma(0, 0, 1)(q);
         const T Gam1_22 = ev.Gamma(0, 1, 1)(q);
@@ -59,12 +64,20 @@ ShellReissnerMindlin5p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
             }
 
             // Bending and twisting: B_b
+            // Rotation-derivative contribution: A_α · w_,β  =  φ_α|β.
             B(8*q + 3, 5*i + 3) =  N_u_i - Gam1_11 * N_i;
             B(8*q + 3, 5*i + 4) =        - Gam2_11 * N_i;
             B(8*q + 4, 5*i + 3) =        - Gam1_22 * N_i;
             B(8*q + 4, 5*i + 4) =  N_v_i - Gam2_22 * N_i;
             B(8*q + 5, 5*i + 3) =  N_v_i - T(2) * Gam1_12 * N_i;
             B(8*q + 5, 5*i + 4) =  N_u_i - T(2) * Gam2_12 * N_i;
+            // Displacement-curvature coupling: u_,α · A_{3,β}. Vanishes for a
+            // flat reference (A_{3,β} = 0); essential for curved shells.
+            for (Index k = 0; k < 3; ++k) {
+                B(8*q + 3, 5*i + k) = N_u_i * A3_d1_q(k);
+                B(8*q + 4, 5*i + k) = N_v_i * A3_d2_q(k);
+                B(8*q + 5, 5*i + k) = N_u_i * A3_d2_q(k) + N_v_i * A3_d1_q(k);
+            }
 
             // Transverse shear: B_s
             for (Index k = 0; k < 3; ++k) {
