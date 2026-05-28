@@ -47,8 +47,9 @@ void LinearElasticProblem<T, d>::assemble(SparseMatrix<T>& K, Vector<T>& F) cons
     const Index total_dofs = static_cast<Index>(layout_.num_dofs());
     SystemAssembler<T> assembler(total_dofs);
 
-    // Single allocation of element stiffness
-    Matrix<T> Ke;
+    // Single allocation of element stiffness and local load
+    Matrix<T> K_local;
+    Vector<T> f_local;
 
     // --- Patch Loop -----------------------------------------------------------------
     for (std::size_t p = 0; p < patches_.size(); ++p) {
@@ -57,17 +58,16 @@ void LinearElasticProblem<T, d>::assemble(SparseMatrix<T>& K, Vector<T>& F) cons
         const auto& quadrature = *quadratures_[p];
         const DofLayout::BlockId primal_block = primal_blocks[p];
 
-        ElementValues<T, d> patch_values(patch,
-                                       element.basis_order(),
-                                       element.flags(),
-                                       quadrature);
+        ElementValues<T, d> patch_values(patch, element.basis_order(),
+                                         element.flags(),
+                                         quadrature);
         const std::size_t num_live = static_cast<std::size_t>(patch_values.num_elements());
 
         // --- Element Loop -----------------------------------------------------------
         for (std::size_t e = 0; e < num_live; ++e) {
             patch_values.reinit(e);
 
-            element.compute_local_stiffness(patch_values, Ke);
+            element.compute_local_stiffness(patch_values, K_local);
 
             layout_.scatter_primal(primal_block, patch_values.elem_cps_,
                                    patch_values.elem_dofs_);
@@ -77,7 +77,15 @@ void LinearElasticProblem<T, d>::assemble(SparseMatrix<T>& K, Vector<T>& F) cons
             // Accumulate element stiffness triplets
             for (std::size_t i = 0; i < Ne; ++i) {
                 for (std::size_t j = 0; j < Ne; ++j) {
-                    assembler.add_stiffness(elem_dofs[i], elem_dofs[j], Ke(i, j));
+                    assembler.add_stiffness(elem_dofs[i], elem_dofs[j], K_local(i, j));
+                }
+            }
+
+            // Accumulate element distributed-load contributions
+            for (const auto& load_fn : domain_loads_per_patch_[p]) {
+                element.compute_local_load(patch_values, load_fn, f_local);
+                for (std::size_t i = 0; i < Ne; ++i) {
+                    assembler.add_load(elem_dofs[i], f_local(i));
                 }
             }
         }

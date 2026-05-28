@@ -51,8 +51,10 @@ public:
 
     /// @brief Quantity flag bitmask declaring which geometric quantities this
     ///        element's `strain_matrix` / `constitutive_matrix` /
-    ///        `compute_local_stiffness` read. The bulk assembler uses this to
-    ///        size the interior `ElementValues` workspace.
+    ///        `compute_local_stiffness` / `compute_local_load` read. The bulk
+    ///        assembler sizes the interior `ElementValues` workspace from it, so
+    ///        it must also cover what `displacement_shape_matrix` reads (the
+    ///        distributed-load path shares the interior workspace).
     virtual unsigned flags() const = 0;
 
     /// @brief Flags this element's *essential*-boundary shape matrices read
@@ -91,6 +93,22 @@ public:
     virtual void compute_local_stiffness(const ElementValues<T, d>& ev,
                                          Matrix<T>& stiffness) const;
 
+    /**
+     * @brief Local distributed-load vector.
+     *
+     *        Integrates a body load over the element against the transverse
+     *        displacement shape, so the form is formulation-agnostic. The load
+     *        is evaluated once per element on the physical quadrature-point
+     *        coordinates.
+     *
+     * @param ev      Per-element workspace bound via `ElementValues::reinit`.
+     * @param load_fn Functor mapping physical coordinates to load values.
+     * @param f_local The local load vector.
+     */
+    void compute_local_load(const ElementValues<T, d>& ev,
+                            const LoadFunction<T>& load_fn,
+                            Vector<T>& f_local) const;
+
     // === Matrix Operators (Element Formulation-Specific) ============================
 
     /**
@@ -121,10 +139,10 @@ public:
     // === Preallocated scratch =======================================================
     //
     // Per-formulation workspaces for the per-element shape matrices. Public
-    // because in-process callers (boundary fields, LoadCondition, the
-    // assembler's hot loop) write into them through a `const Element&` to
-    // get heap-free per-call behaviour. `mutable` since they're scratch —
-    // the formulation's logical state is unchanged.
+    // because in-process callers (boundary fields, the assembler's hot loop)
+    // write into them through a `const Element&` to get heap-free per-call
+    // behaviour. `mutable` since they're scratch — the formulation's logical
+    // state is unchanged.
 
     mutable Matrix<T> B_workspace_;        ///< strain_matrix output / stress_matrix scratch
     mutable Matrix<T> N_w_workspace_;      ///< displacement_shape_matrix output
@@ -185,6 +203,27 @@ Element<T, d>::compute_local_stiffness(const ElementValues<T, d>& ev,
         const auto D = constitutive_matrix(ev, q);
         const auto B_q = B.middleRows(n_strain * q, n_strain);
         stiffness.noalias() += dV * (B_q.transpose() * D * B_q);
+    }
+}
+
+template <std::floating_point T, std::size_t d>
+void
+Element<T, d>::compute_local_load(const ElementValues<T, d>& ev,
+                                  const LoadFunction<T>& load_fn,
+                                  Vector<T>& f_local) const
+{
+    // f_local = \int{ q N_w^T d\Omega }
+    displacement_shape_matrix(ev);
+    const Matrix<T>& N_w = N_w_workspace_;
+
+    // Load values at the element's physical quadrature-point coordinates.
+    const Vector<T> q_vals = load_fn(ev.position_data[0]);
+
+    const Index Q = ev.mapped_weights_.size();
+    f_local.setZero(N_w.cols());
+    for (Index q = 0; q < Q; ++q) {
+        const T dV = ev.mapped_weights_(q) * ev.jac(q);
+        f_local.noalias() += (q_vals(q) * dV) * N_w.row(q).transpose();
     }
 }
 

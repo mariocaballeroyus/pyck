@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <concepts>
+#include <functional>
 #include <memory>
 #include <Eigen/Dense>
 #include <Eigen/Sparse>
@@ -33,6 +34,11 @@ using Ptr = std::shared_ptr<T>;
 /// @brief Dynamic-sized column vector of type T
 template <std::floating_point T>
 using Vector = Eigen::Vector<T, Eigen::Dynamic>;
+
+/// @brief Distributed-load functor: maps quadrature-point physical coordinates
+///        (n × 3) to load values (n). Evaluated once per element at assembly.
+template <std::floating_point T>
+using LoadFunction = std::function<Vector<T>(const Matrix<T>&)>;
 
 /// @brief Dynamic-sized row vector of type T
 template <std::floating_point T>

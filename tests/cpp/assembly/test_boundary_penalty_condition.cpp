@@ -17,7 +17,6 @@
 #include "quadrature.hpp"
 #include "linear_elastic_problem.hpp"
 #include "system_assembler.hpp"
-#include "load_condition.hpp"
 #include "direct_constraint.hpp"
 #include "boundary_penalty_condition.hpp"
 #include "dof_layout.hpp"
@@ -239,23 +238,7 @@ TEST_CASE("PenaltyBoundaryCondition RM-1p plate: SS via penalty matches Navier",
 
     LinearElasticProblem<double, 2> problem(surface, element, gauss2d);
 
-    // Uniform load (full DOF vector)
-    Index n_spans = bsp->knot_vector().num_spans();
-    Index active_elems = 0;
-    for (Index e = 0; e < n_spans * n_spans; ++e) {
-        Index su = e % n_spans;
-        Index sv = e / n_spans;
-        auto [lou, hiu] = bsp->knot_vector().span_bounds(su);
-        auto [lov, hiv] = bsp->knot_vector().span_bounds(sv);
-        if (std::abs(hiu-lou) > 1e-14 && std::abs(hiv-lov) > 1e-14)
-            ++active_elems;
-    }
-    const Index Q = gauss2d->num_points();
-    Vector<double> load_vals = Vector<double>::Constant(active_elems * Q, q0);
-
-    auto load = std::make_shared<LoadCondition<double, 2>>(*surface, *element, *gauss2d);
-    load->add(load_vals);
-    problem.add_condition(load);
+    problem.add_domain_load(*surface, q0);
 
     const double alpha = 1e6 * D / (a * a * a);
     std::vector<Ptr<PatchBoundary<double, 2>>> penalty_boundaries;
@@ -308,24 +291,9 @@ TEST_CASE("PenaltyBoundaryCondition RM-3p plate: SS (w-only) matches Navier", "[
 
     LinearElasticProblem<double, 2> problem(surface, element, gauss2d);
 
-    // Uniform load (only w-DOF = 0 carries the load)
-    Index n_spans = bsp->knot_vector().num_spans();
-    Index active_elems = 0;
-    for (Index e = 0; e < n_spans * n_spans; ++e) {
-        Index su = e % n_spans;
-        Index sv = e / n_spans;
-        auto [lou, hiu] = bsp->knot_vector().span_bounds(su);
-        auto [lov, hiv] = bsp->knot_vector().span_bounds(sv);
-        if (std::abs(hiu-lou) > 1e-14 && std::abs(hiv-lov) > 1e-14)
-            ++active_elems;
-    }
-    const Index Q    = gauss2d->num_points();
     const Index ndof = 3;
-    Vector<double> load_vals = Vector<double>::Constant(active_elems * Q, q0);
 
-    auto load = std::make_shared<LoadCondition<double, 2>>(*surface, *element, *gauss2d);
-    load->add(load_vals);
-    problem.add_condition(load);
+    problem.add_domain_load(*surface, q0);
 
     // Only penalise w; rotations are free (SS condition)
     const double penalty_w = 1e6 * D / (a * a * a);
@@ -384,18 +352,6 @@ TEST_CASE("PenaltyBoundaryCondition RM-3p plate: clamped BCs agree with DirectCo
 
     // Build load values once
     auto surface_ref = make_surface();
-    Index n_spans = bsp->knot_vector().num_spans();
-    Index active_elems = 0;
-    for (Index e = 0; e < n_spans * n_spans; ++e) {
-        Index su = e % n_spans;
-        Index sv = e / n_spans;
-        auto [lou, hiu] = bsp->knot_vector().span_bounds(su);
-        auto [lov, hiv] = bsp->knot_vector().span_bounds(sv);
-        if (std::abs(hiu-lou) > 1e-14 && std::abs(hiv-lov) > 1e-14)
-            ++active_elems;
-    }
-    const Index Q = gauss2d->num_points();
-    Vector<double> load_vals = Vector<double>::Constant(active_elems * Q, q0);
 
     // ------------------------------------------------------------------
     // Reference solution: DirectConstraint clamped BCs
@@ -405,9 +361,7 @@ TEST_CASE("PenaltyBoundaryCondition RM-3p plate: clamped BCs agree with DirectCo
     {
         auto surface = make_surface();
         LinearElasticProblem<double, 2> problem(surface, element, gauss2d);
-        auto load = std::make_shared<LoadCondition<double, 2>>(*surface, *element, *gauss2d);
-        load->add(load_vals);
-        problem.add_condition(load);
+        problem.add_domain_load(*surface, q0);
 
         SparseMatrix<double> K;
         Vector<double> F;
@@ -440,9 +394,7 @@ TEST_CASE("PenaltyBoundaryCondition RM-3p plate: clamped BCs agree with DirectCo
     {
         auto surface = make_surface();
         LinearElasticProblem<double, 2> problem(surface, element, gauss2d);
-        auto load = std::make_shared<LoadCondition<double, 2>>(*surface, *element, *gauss2d);
-        load->add(load_vals);
-        problem.add_condition(load);
+        problem.add_domain_load(*surface, q0);
 
         const double alpha = 1e4 * D / (a * a * a);
         std::vector<Ptr<PatchBoundary<double, 2>>> penalty_boundaries;

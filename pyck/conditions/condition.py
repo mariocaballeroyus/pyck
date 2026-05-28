@@ -12,9 +12,8 @@ if TYPE_CHECKING:
 class Condition(Protocol):
     """Protocol for conditions contributing to the global system.
 
-    A condition may either expose a ready-to-use C++ object immediately
-    (for example ``PenaltyBoundaryCondition``), or build it lazily during assembly
-    (for example ``LoadCondition``).
+    A condition may either expose a ready-to-use C++ object immediately, or
+    build it lazily during assembly (for example ``LagrangeBoundaryCondition``).
     """
 
     @property

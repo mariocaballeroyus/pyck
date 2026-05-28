@@ -1,6 +1,7 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 #include <pybind11/eigen.h>
+#include <pybind11/functional.h>
 
 #include "linear_elastic_problem.hpp"
 #include "element.hpp"
@@ -50,6 +51,15 @@ void bind_assembly(py::module_& m)
           .def("add_condition", &LinearElasticProblem1d::add_condition,
                py::arg("condition"))
 
+          .def("add_domain_load",
+               py::overload_cast<const Patch1d&, double>(
+                   &LinearElasticProblem1d::add_domain_load),
+               py::arg("patch"), py::arg("value"))
+          .def("add_domain_load",
+               py::overload_cast<const Patch1d&, LoadFunction<double>>(
+                   &LinearElasticProblem1d::add_domain_load),
+               py::arg("patch"), py::arg("load_fn"))
+
           .def("add_constraint", &LinearElasticProblem1d::add_direct_constraint,
                py::arg("constraint"))
           .def("add_constraint", &LinearElasticProblem1d::add_constraint,
@@ -83,6 +93,15 @@ void bind_assembly(py::module_& m)
 
         .def("add_condition", &LinearElasticProblem2d::add_condition,
              py::arg("condition"))
+
+        .def("add_domain_load",
+             py::overload_cast<const Patch2d&, double>(
+                 &LinearElasticProblem2d::add_domain_load),
+             py::arg("patch"), py::arg("value"))
+        .def("add_domain_load",
+             py::overload_cast<const Patch2d&, LoadFunction<double>>(
+                 &LinearElasticProblem2d::add_domain_load),
+             py::arg("patch"), py::arg("load_fn"))
 
         .def("add_constraint", &LinearElasticProblem2d::add_direct_constraint,
              py::arg("constraint"))

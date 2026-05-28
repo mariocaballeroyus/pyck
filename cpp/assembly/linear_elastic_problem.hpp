@@ -94,6 +94,7 @@ public:
         elements_.push_back(element);
         quadratures_.push_back(quadrature);
         conditions_per_patch_.emplace_back();
+        domain_loads_per_patch_.emplace_back();
         return patches_.size() - 1;
     }
 
@@ -122,6 +123,41 @@ public:
         throw std::invalid_argument(
             "LinearElasticProblem::add_condition: the condition's patch is "
             "not registered with this problem.");
+    }
+
+    /**
+     * @brief Add a distributed load over a patch's interior.
+     *
+     *        The load is integrated during assembly inside the element loop,
+     *        reusing its workspace. The patch must be one of those already
+     *        registered with this problem.
+     *
+     * @param patch   The patch the load is applied over.
+     * @param load_fn Functor mapping physical coordinates to load values.
+     */
+    void add_domain_load(const Patch<T, d>& patch, LoadFunction<T> load_fn)
+    {
+        for (std::size_t p = 0; p < patches_.size(); ++p) {
+            if (patches_[p].get() == &patch) {
+                domain_loads_per_patch_[p].push_back(std::move(load_fn));
+                return;
+            }
+        }
+        throw std::invalid_argument("LinearElasticProblem::add_domain_load: "
+                                    "the load's patch is not registered with this problem.");
+    }
+
+    /**
+     * @brief Add a uniform constant distributed load over a patch's interior.
+     *
+     * @param patch The patch the load is applied over.
+     * @param value Constant load value applied at every quadrature point.
+     */
+    void add_domain_load(const Patch<T, d>& patch, T value)
+    {
+        add_domain_load(patch, [value](const Matrix<T>& points) -> Vector<T> {
+            return Vector<T>::Constant(points.rows(), value);
+        });
     }
 
     /**
@@ -167,6 +203,8 @@ private:
     std::vector<Ptr<QuadratureRule<T, d>>> quadratures_;
 
     std::vector<std::vector<Ptr<Condition<T, d>>>> conditions_per_patch_;
+
+    std::vector<std::vector<LoadFunction<T>>> domain_loads_per_patch_;
 
     std::vector<Ptr<Constraint<T>>> constraints_;
 

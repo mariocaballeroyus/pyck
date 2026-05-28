@@ -15,7 +15,6 @@
 #include "gauss_legendre.hpp"
 #include "boundary_lagrange_condition.hpp"
 #include "linear_elastic_problem.hpp"
-#include "load_condition.hpp"
 #include "patch.hpp"
 #include "plane_stress_2d.hpp"
 #include "plate_reissner_mindlin_1p.hpp"

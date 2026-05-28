@@ -15,7 +15,6 @@
 #include "gauss_legendre.hpp"
 #include "quadrature.hpp"
 #include "linear_elastic_problem.hpp"
-#include "load_condition.hpp"
 #include "boundary_penalty_condition.hpp"
 #include "dof_layout.hpp"
 #include "plane_stress_2d.hpp"
@@ -37,20 +36,6 @@ static Ptr<Patch<double, 2>> make_square_plate(
         p, KnotVector<double>::clamped_uniform(p, n_elem));
     return std::make_shared<Patch<double, 2>>(
         rectangle<double>(bsp, bsp, L, L));
-}
-
-// ---------------------------------------------------------------------------
-// Build a LoadCondition with per-quadrature-point values.
-// ---------------------------------------------------------------------------
-static Ptr<LoadCondition<double, 2>> make_load(
-    const Patch<double, 2>& patch,
-    const Element<double, 2>& element,
-    const QuadratureRule<double, 2>& quadrature,
-    const Vector<double>& values)
-{
-    auto load = std::make_shared<LoadCondition<double, 2>>(patch, element, quadrature);
-    load->add(values);
-    return load;
 }
 
 // ---------------------------------------------------------------------------
@@ -102,19 +87,7 @@ TEST_CASE("LinearElasticProblem single-patch vector ctor matches legacy ctor",
     // -------- Legacy single-patch ----------------------------------------
     LinearElasticProblem<double, 2> legacy(surface, element, gauss2d);
 
-    Index n_spans = surface->basis(0).knot_vector().num_spans();
-    Index active_elems = 0;
-    for (Index e = 0; e < n_spans * n_spans; ++e) {
-        Index su = e % n_spans, sv = e / n_spans;
-        auto [lou, hiu] = surface->basis(0).knot_vector().span_bounds(su);
-        auto [lov, hiv] = surface->basis(1).knot_vector().span_bounds(sv);
-        if (std::abs(hiu-lou) > 1e-14 && std::abs(hiv-lov) > 1e-14)
-            ++active_elems;
-    }
-    const Index Q = gauss2d->num_points();
-    Vector<double> load_vals = Vector<double>::Constant(active_elems * Q, q0);
-
-    legacy.add_condition(make_load(*surface, *element, *gauss2d, load_vals));
+    legacy.add_domain_load(*surface, q0);
 
     std::vector<Ptr<PatchBoundary<double, 2>>> bds_legacy;
     clamp_w_all_edges(legacy, bds_legacy, surface, *element, gauss1d, alpha);
@@ -132,7 +105,7 @@ TEST_CASE("LinearElasticProblem single-patch vector ctor matches legacy ctor",
 
     REQUIRE(vec_problem.num_patches() == 1);
 
-    vec_problem.add_condition(make_load(*surface, *element, *gauss2d, load_vals));
+    vec_problem.add_domain_load(*surface, q0);
 
     std::vector<Ptr<PatchBoundary<double, 2>>> bds_vec;
     clamp_w_all_edges(vec_problem, bds_vec, surface, *element, gauss1d, alpha);
@@ -178,29 +151,12 @@ TEST_CASE("LinearElasticProblem two disconnected patches → block-diagonal",
 
     const double D = E * h*h*h / (12.0 * (1.0 - nu*nu));
 
-    auto build_load = [&](const Ptr<Patch<double, 2>>& surf, double q) {
-        Index ns = surf->basis(0).knot_vector().num_spans();
-        Index active = 0;
-        for (Index e = 0; e < ns * ns; ++e) {
-            Index su = e % ns, sv = e / ns;
-            auto [lou, hiu] = surf->basis(0).knot_vector().span_bounds(su);
-            auto [lov, hiv] = surf->basis(1).knot_vector().span_bounds(sv);
-            if (std::abs(hiu-lou) > 1e-14 && std::abs(hiv-lov) > 1e-14)
-                ++active;
-        }
-        const Index Q = gauss2d->num_points();
-        return Vector<double>::Constant(active * Q, q).eval();
-    };
-
-    Vector<double> load_A = build_load(surf_A, q_A);
-    Vector<double> load_B = build_load(surf_B, q_B);
-
     const double alpha_A = 1e6 * D / (L_A * L_A * L_A);
     const double alpha_B = 1e6 * D / (L_B * L_B * L_B);
 
     // -------- Standalone reference solves --------------------------------
     LinearElasticProblem<double, 2> ref_A(surf_A, element, gauss2d);
-    ref_A.add_condition(make_load(*surf_A, *element, *gauss2d, load_A));
+    ref_A.add_domain_load(*surf_A, q_A);
     std::vector<Ptr<PatchBoundary<double, 2>>> bd_A_ref;
     clamp_w_all_edges(ref_A, bd_A_ref, surf_A, *element, gauss1d, alpha_A);
     SparseMatrix<double> K_A_ref_sparse;
@@ -209,7 +165,7 @@ TEST_CASE("LinearElasticProblem two disconnected patches → block-diagonal",
     Matrix<double> K_A_ref = Matrix<double>(K_A_ref_sparse);
 
     LinearElasticProblem<double, 2> ref_B(surf_B, element, gauss2d);
-    ref_B.add_condition(make_load(*surf_B, *element, *gauss2d, load_B));
+    ref_B.add_domain_load(*surf_B, q_B);
     std::vector<Ptr<PatchBoundary<double, 2>>> bd_B_ref;
     clamp_w_all_edges(ref_B, bd_B_ref, surf_B, *element, gauss1d, alpha_B);
     SparseMatrix<double> K_B_ref_sparse;
@@ -225,8 +181,8 @@ TEST_CASE("LinearElasticProblem two disconnected patches → block-diagonal",
     REQUIRE(idx_B == 1);
     REQUIRE(combined.num_patches() == 2);
 
-    combined.add_condition(make_load(*surf_A, *element, *gauss2d, load_A));
-    combined.add_condition(make_load(*surf_B, *element, *gauss2d, load_B));
+    combined.add_domain_load(*surf_A, q_A);
+    combined.add_domain_load(*surf_B, q_B);
 
     std::vector<Ptr<PatchBoundary<double, 2>>> bd_combined;
     clamp_w_all_edges(combined, bd_combined, surf_A, *element, gauss1d, alpha_A);
@@ -311,18 +267,6 @@ TEST_CASE("LinearElasticProblem builder API: empty ctor and add_patch",
     // A condition whose patch is not registered with the problem must throw.
     // Build it on a separate, unregistered patch.
     auto surf_other = make_square_plate(L, p, n_elem);
-    Index n_spans = surf_other->basis(0).knot_vector().num_spans();
-    Index active_elems = 0;
-    for (Index e = 0; e < n_spans * n_spans; ++e) {
-        Index su = e % n_spans, sv = e / n_spans;
-        auto [lou, hiu] = surf_other->basis(0).knot_vector().span_bounds(su);
-        auto [lov, hiv] = surf_other->basis(1).knot_vector().span_bounds(sv);
-        if (std::abs(hiu-lou) > 1e-14 && std::abs(hiv-lov) > 1e-14)
-            ++active_elems;
-    }
-    auto dummy_load = make_load(
-        *surf_other, *element, *gauss2d,
-        Vector<double>::Constant(active_elems * gauss2d->num_points(), 0.0));
-    REQUIRE_THROWS_AS(problem.add_condition(dummy_load),
+    REQUIRE_THROWS_AS(problem.add_domain_load(*surf_other, 0.0),
                       std::invalid_argument);
 }

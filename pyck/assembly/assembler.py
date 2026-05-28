@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from typing import TYPE_CHECKING, Sequence, Union, cast, Any
 
 import numpy as np
@@ -169,6 +170,31 @@ class LinearElasticProblem:
         # The C++ condition carries its own patch; registration infers the
         # target DOF block by identity, so register exactly once.
         self._cpp_object.add_condition(cast(Any, cpp_obj))
+
+    def add_domain_load(
+        self,
+        value: float | Callable[[npt.NDArray[np.floating]], npt.NDArray[np.floating]],
+        *,
+        patch: str | None = None,
+    ) -> None:
+        """Register a distributed body load over a patch's interior.
+
+        The load is integrated during assembly inside the element loop. A native
+        C++ functor evaluates at full speed; a Python callable re-enters the
+        interpreter once per element.
+
+        Parameters
+        ----------
+        value : float or callable
+            A uniform constant load, or a callable mapping quadrature-point
+            physical coordinates ``(n, 3)`` to load values ``(n,)``.
+        patch : str, optional
+            Target patch name. If None, the load is applied to all patches.
+        """
+        for name in self._resolve_patch_names(patch):
+            self._cpp_object.add_domain_load(
+                cast(Any, self._patches[name]._cpp_object), value
+            )
 
     def add_constraint(
         self,

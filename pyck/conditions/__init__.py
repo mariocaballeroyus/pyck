@@ -13,9 +13,6 @@ from pyck.conditions.boundary_field import (
     BasisNormalSlope,
     BasisNormalCurvature,
 )
-from pyck.conditions.load_condition import (
-    LoadCondition,
-)
 from pyck.conditions.load_boundary_condition import (
     LoadBoundaryCondition,
 )
@@ -40,7 +37,6 @@ __all__ = [
     "BasisValue",
     "BasisNormalSlope",
     "BasisNormalCurvature",
-    "LoadCondition",
     "LoadBoundaryCondition",
     "LagrangeBoundaryCondition",
     "PenaltyBoundaryCondition",

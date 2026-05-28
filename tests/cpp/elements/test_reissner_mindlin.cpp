@@ -14,7 +14,6 @@
 #include "quadrature.hpp"
 #include "gauss_legendre.hpp"
 #include "linear_elastic_problem.hpp"
-#include "load_condition.hpp"
 #include "direct_constraint.hpp"
 #include "plane_stress_2d.hpp"
 #include <Eigen/Dense>
@@ -58,35 +57,14 @@ static Eigen::VectorXd solve_ss_rm_plate(
 
     LinearElasticProblem<double, 2> problem(surface, element, gauss);
 
-    // Count active (non-zero-volume) elements to size the load vector
-    Index num_spans = bsp->knot_vector().num_spans();
-    Index total_elements = num_spans * num_spans;
-    Index active_elements = 0;
-    for (Index e = 0; e < total_elements; ++e) {
-        Index su = e / num_spans;
-        Index sv = e % num_spans;
-        auto [lo_u, hi_u] = bsp->knot_vector().span_bounds(su);
-        auto [lo_v, hi_v] = bsp->knot_vector().span_bounds(sv);
-        if (std::abs(hi_u - lo_u) > 1e-14 && std::abs(hi_v - lo_v) > 1e-14)
-            ++active_elements;
-    }
-
-    const Index Q    = gauss->num_points();
-    const Index ndof = element->num_node_dofs();  // = 3
-
-    // load_vals: [q0, 0, 0,  q0, 0, 0, ...] — only the w-DOF gets the load
-    Vector<double> load_vals = Vector<double>::Constant(active_elements * Q, q0);
-
-    auto load_cond = std::make_shared<LoadCondition<double, 2>>(
-        *surface, *element, *gauss);
-    load_cond->add(load_vals);
-    problem.add_condition(load_cond);
+    problem.add_domain_load(*surface, q0);
 
     SparseMatrix<double> K;
     Vector<double> F;
     problem.assemble(K, F);
 
     // SS BCs: w = 0 (only DOF 0 of 3 per node) at all four edges
+    const Index ndof = element->num_node_dofs();
     std::vector<Index> ss_dofs;
     for (int dim = 0; dim < 2; ++dim) {
         for (bool start : {true, false}) {
