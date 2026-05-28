@@ -1,9 +1,7 @@
 #ifndef PYCK_LOAD_CONDITION_HPP
 #define PYCK_LOAD_CONDITION_HPP
 
-
 #include <vector>
-#include <functional>
 #include <Eigen/Dense>
 
 #include "condition.hpp"
@@ -16,7 +14,7 @@ namespace pyck
 {
 
 /**
- * @brief Generic domain load condition.
+ * @brief Generic distributed domain load
  *
  * @tparam T Scalar type
  * @tparam d Parametric dimension
@@ -28,30 +26,19 @@ public:
 
     // === Constructors ===============================================================
 
-    /**
-     * @brief Construct a generic load condition by numerically integrating the
-     *        load values.
-     *
-     * @param patch The geometric patch over which to integrate.
-     * @param element The element formulation.
-     * @param quadrature The 1D quadrature rule.
-     * @param load_values Pre-evaluated load values at the quadrature points.
-     */
     LoadCondition(const Patch<T, d>& patch,
                   const Element<T, d>& element,
-                  const QuadratureRule<T, d>& quadrature,
-                  const Vector<T>& load_values);
+                  const QuadratureRule<T, d>& quadrature);
 
     // === Utility ====================================================================
 
-    /**
-     * @brief Assemble the condition's contribution into the global system.
-     *
-     * @param stiffness     Global stiffness matrix (mutable).
-     * @param load          Global load vector (mutable).
-     * @param layout        DOF layout (read-only).
-     * @param primal_block  This condition's patch primal block.
-     */
+    /// @brief Constant uniform load applied over the whole domain.
+    LoadCondition& add(T value);
+
+    /// @brief Pre-evaluated per-quadrature-point load values. Size must equal
+    ///        num_active_qpts() (one value per active Gauss point).
+    LoadCondition& add(const Vector<T>& values_at_qpts);
+
     void apply(Matrix<T>& stiffness,
                Vector<T>& load,
                const DofLayout& layout,
@@ -59,23 +46,31 @@ public:
 
     // === Properties =================================================================
 
-    /// @brief The patch where the domain load condition is applied. 
+    /// @brief The patch where the domain load is applied.
     const Patch<T, d>& patch() const override { return patch_; }
+
+    /// @brief Number of active quadrature points (live elements × points/element).
+    Index num_active_qpts() const;
 
 private:
 
-    /// @brief Patch this load is integrated over (for DOF-block routing).
+    struct Term {
+        bool varying = false;       ///< True if the load varies per qp.
+        T constant_value = T(0);    ///< Constant load (when not varying).
+        Vector<T> values_at_qpts;   ///< Per-qp load; size num_active_qpts().
+    };
+
+    /// @brief Patch the load is integrated over.
     const Patch<T, d>& patch_;
 
-    /// @brief Patch control-point indices contributing to the load.
-    std::vector<Index> cp_indices_;
+    /// @brief Element formulation (supplies the displacement shape).
+    const Element<T, d>& element_;
 
-    /// @brief Element DOFs per control point.
-    Index node_dofs_ = 0;
+    /// @brief Domain quadrature rule.
+    const QuadratureRule<T, d>& quadrature_;
 
-    /// @brief Load vector evaluated at the element level.
-    Vector<T> element_load_;
-
+    /// @brief Registered load terms.
+    std::vector<Term> terms_;
 };
 
 } // namespace pyck

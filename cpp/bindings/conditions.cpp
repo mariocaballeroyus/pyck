@@ -69,13 +69,33 @@ void bind_conditions(py::module_& m)
 
     using LoadCondition1d = LoadCondition<double, 1>;
     py::class_<LoadCondition1d, Condition<double, 1>, Ptr<LoadCondition1d>>(m, "LoadCondition1d")
-        .def(py::init<const Patch1d&, const Element1d&, const QuadratureRule1d&, const Vector<double>&>(),
-             py::arg("patch"), py::arg("element"), py::arg("quadrature"), py::arg("load_values"));
+        .def(py::init<const Patch1d&, const Element1d&, const QuadratureRule1d&>(),
+             py::arg("patch"), py::arg("element"), py::arg("quadrature"))
+        .def("add",
+             [](LoadCondition1d& self, double value) -> LoadCondition1d& {
+                 return self.add(value);
+             },
+             py::arg("value"), py::return_value_policy::reference)
+        .def("add",
+             [](LoadCondition1d& self, const Vector<double>& values) -> LoadCondition1d& {
+                 return self.add(values);
+             },
+             py::arg("values"), py::return_value_policy::reference);
 
     using LoadCondition2d = LoadCondition<double, 2>;
     py::class_<LoadCondition2d, Condition<double, 2>, Ptr<LoadCondition2d>>(m, "LoadCondition2d")
-        .def(py::init<const Patch2d&, const Element2d&, const QuadratureRule2d&, const Vector<double>&>(),
-             py::arg("patch"), py::arg("element"), py::arg("quadrature"), py::arg("load_values"));
+        .def(py::init<const Patch2d&, const Element2d&, const QuadratureRule2d&>(),
+             py::arg("patch"), py::arg("element"), py::arg("quadrature"))
+        .def("add",
+             [](LoadCondition2d& self, double value) -> LoadCondition2d& {
+                 return self.add(value);
+             },
+             py::arg("value"), py::return_value_policy::reference)
+        .def("add",
+             [](LoadCondition2d& self, const Vector<double>& values) -> LoadCondition2d& {
+                 return self.add(values);
+             },
+             py::arg("values"), py::return_value_policy::reference);
 
     using LoadBoundaryCondition2d = LoadBoundaryCondition<double, 2>;
     py::class_<LoadBoundaryCondition2d, Condition<double, 2>, Ptr<LoadBoundaryCondition2d>>(m, "LoadBoundaryCondition2d")
