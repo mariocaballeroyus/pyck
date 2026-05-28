@@ -124,11 +124,12 @@ static Eigen::VectorXd solve_ss_rm1p_plate(
     Vector<double> load_vals = Vector<double>::Constant(active_elements * Q, q0);
 
     auto load_cond = std::make_shared<LoadCondition<double, 2>>(
-        *surface, *element, *gauss, load_vals);
+        *surface, *element, *gauss);
+    load_cond->add(load_vals);
     problem.add_condition(load_cond);
 
     // Assemble
-    Matrix<double> K;
+    SparseMatrix<double> K;
     Vector<double> F;
     problem.assemble(K, F);
 
@@ -159,8 +160,7 @@ static Eigen::VectorXd solve_ss_rm1p_plate(
         Vector<double>::Zero(ss_dofs.size())).apply(K, F);
 
     Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
-    Eigen::SparseMatrix<double> Ks = K.sparseView();
-    solver.compute(Ks);
+    solver.compute(K);
     REQUIRE(solver.info() == Eigen::Success);
     return solver.solve(F);
 }
@@ -382,10 +382,11 @@ TEST_CASE("RM 1P Plate: strain energy convergence (thin plate)", "[RM1P]")
     Index Q = gauss->num_points();
     Vector<double> load_vals = Vector<double>::Constant(active_elements * Q, q0);
     auto load_cond = std::make_shared<LoadCondition<double, 2>>(
-        *surf, *element, *gauss, load_vals);
+        *surf, *element, *gauss);
+    load_cond->add(load_vals);
     problem.add_condition(load_cond);
 
-    Matrix<double> K;
+    SparseMatrix<double> K;
     Vector<double> F;
     problem.assemble(K, F);
 
@@ -449,10 +450,11 @@ TEST_CASE("RM 1P Plate: shear-locking-free across slenderness ratios", "[RM1P]")
         Index Q = gauss->num_points();
         Vector<double> load_vals = Vector<double>::Constant(active * Q, q0);
         auto load_cond = std::make_shared<LoadCondition<double, 2>>(
-            *surf, *element, *gauss, load_vals);
+            *surf, *element, *gauss);
+        load_cond->add(load_vals);
         problem.add_condition(load_cond);
 
-        Matrix<double> K;
+        SparseMatrix<double> K;
         Vector<double> F;
         problem.assemble(K, F);
 

@@ -36,8 +36,7 @@ PenaltyBoundaryCondition<T, d>& PenaltyBoundaryCondition<T, d>::add(Ptr<const Bo
 
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-void PenaltyBoundaryCondition<T, d>::apply(Matrix<T>& stiffness,
-                                           Vector<T>& load,
+void PenaltyBoundaryCondition<T, d>::apply(SystemAssembler<T>& assembler,
                                            const DofLayout& layout,
                                            DofLayout::BlockId primal_block) const
 {
@@ -106,12 +105,12 @@ void PenaltyBoundaryCondition<T, d>::apply(Matrix<T>& stiffness,
 
         // Loop over primal DOFs
         for (Index i = 0; i < n_primal; ++i) {
-            // Scatter f_pen into global laod vector
+            // Scatter f_pen into global load vector
             const Index gi = bd_values.parent_vals_.elem_dofs_[i];
-            load(gi) += f_pen(i);
+            assembler.add_load(gi, f_pen(i));
             // Scatter K_pen into global stiffness matrix
             for (Index j = 0; j < n_primal; ++j) {
-                stiffness(gi, bd_values.parent_vals_.elem_dofs_[j]) += K_pen(i, j);
+                assembler.add_stiffness(gi, bd_values.parent_vals_.elem_dofs_[j], K_pen(i, j));
             }
         }
     }

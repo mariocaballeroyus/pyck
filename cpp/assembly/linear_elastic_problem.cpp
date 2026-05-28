@@ -3,15 +3,17 @@
 #include "direct_constraint.hpp"
 #include "patch.hpp"
 #include "element_values.hpp"
+#include "system_assembler.hpp"
 
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 namespace pyck
 {
 
 template <std::floating_point T, std::size_t d>
-void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
+void LinearElasticProblem<T, d>::assemble(SparseMatrix<T>& K, Vector<T>& F) const
 {
     if (patches_.empty()) {
         throw std::runtime_error("LinearElasticProblem::assemble: no patches registered.");
@@ -41,10 +43,9 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
         }
     }
 
-    // Reset stiffness and load
-    const std::size_t total_dofs = layout_.num_dofs();
-    K.setZero(total_dofs, total_dofs);
-    F.setZero(total_dofs);
+    // Sparse-assembly sink for the global stiffness and load
+    const Index total_dofs = static_cast<Index>(layout_.num_dofs());
+    SystemAssembler<T> assembler(total_dofs);
 
     // Single allocation of element stiffness
     Matrix<T> Ke;
@@ -73,10 +74,10 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
             const auto& elem_dofs = patch_values.elem_dofs_;
             const std::size_t Ne = elem_dofs.size();
 
-            // Write into global matrix
+            // Accumulate element stiffness triplets
             for (std::size_t i = 0; i < Ne; ++i) {
                 for (std::size_t j = 0; j < Ne; ++j) {
-                    K(elem_dofs[i], elem_dofs[j]) += Ke(i, j);
+                    assembler.add_stiffness(elem_dofs[i], elem_dofs[j], Ke(i, j));
                 }
             }
         }
@@ -85,9 +86,13 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
     // --- Conditions -----------------------------------------------------------------
     for (std::size_t p = 0; p < patches_.size(); ++p) {
         for (const auto& cond : conditions_per_patch_[p]) {
-            cond->apply(K, F, layout_, primal_blocks[p]);
+            cond->apply(assembler, layout_, primal_blocks[p]);
         }
     }
+
+    // Build the sparse system from the accumulated triplets + load
+    K = assembler.finalize_matrix();
+    F = std::move(assembler.load());
 
     // --- Constraints ----------------------------------------------------------------
     for (const auto& constraint : constraints_) {
@@ -96,6 +101,8 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
     for (const auto& constraint : direct_constraints_) {
         constraint->apply(K, F);
     }
+
+    K.makeCompressed();
 }
 
 // === Template Instantiations ========================================================

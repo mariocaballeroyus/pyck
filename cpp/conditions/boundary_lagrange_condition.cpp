@@ -53,7 +53,7 @@ void LagrangeBoundaryCondition<T, d>::allocate_dofs(DofLayout& layout)
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
 void
-LagrangeBoundaryCondition<T, d>::apply(Matrix<T>& stiffness, Vector<T>& load,
+LagrangeBoundaryCondition<T, d>::apply(SystemAssembler<T>& assembler,
                                        const DofLayout& layout,
                                        DofLayout::BlockId primal_block) const
 {
@@ -130,13 +130,13 @@ LagrangeBoundaryCondition<T, d>::apply(Matrix<T>& stiffness, Vector<T>& load,
             for (Index i = 0; i < n_lambda; ++i) {
                 // Scatter g into the global load vector
                 const Index lambda_i = multiplier_base + bd_values.boundary_vals_.elem_cps_[i];
-                load(lambda_i) += g_local(i);
+                assembler.add_load(lambda_i, g_local(i));
                 // Scatter G into the global stiffness matrix
                 for (Index j = 0; j < n_primal; ++j) {
                     const Index primal_j = bd_values.parent_vals_.elem_dofs_[j];
                     const T gij = G_local(i, j);
-                    stiffness(lambda_i, primal_j) += gij;  // G block
-                    stiffness(primal_j, lambda_i) += gij;  // G^T block
+                    assembler.add_stiffness(lambda_i, primal_j, gij);  // G block
+                    assembler.add_stiffness(primal_j, lambda_i, gij);  // G^T block
                 }
             }
         }

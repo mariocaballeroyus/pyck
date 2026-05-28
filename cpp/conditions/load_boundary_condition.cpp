@@ -68,11 +68,9 @@ LoadBoundaryCondition<T, d>& LoadBoundaryCondition<T, d>::add(Ptr<const Boundary
 
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-void LoadBoundaryCondition<T, d>::apply(
-    Matrix<T>& /*stiffness*/,
-    Vector<T>& load,
-    const DofLayout& layout,
-    DofLayout::BlockId primal_block) const
+void LoadBoundaryCondition<T, d>::apply(SystemAssembler<T>& assembler,
+                                        const DofLayout& layout,
+                                        DofLayout::BlockId primal_block) const
 {
     if (terms_.empty()) return;
 
@@ -140,7 +138,7 @@ void LoadBoundaryCondition<T, d>::apply(
 
         // Scatter f_load into the global load vector
         for (Index i = 0; i < n_primal; ++i) {
-            load(bd_values.parent_vals_.elem_dofs_[i]) += f_local(i);
+            assembler.add_load(bd_values.parent_vals_.elem_dofs_[i], f_local(i));
         }
     }
 }

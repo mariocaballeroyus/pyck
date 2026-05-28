@@ -6,6 +6,7 @@
 
 #include "patch.hpp"
 #include "../assembly/dof_layout.hpp"
+#include "../assembly/system_assembler.hpp"
 #include "../types.hpp"
 
 namespace pyck
@@ -38,13 +39,11 @@ public:
     /**
      * @brief Assemble the condition's contribution into the global system.
      *
-     * @param stiffness     Global stiffness matrix (mutable).
-     * @param load          Global load vector (mutable).
+     * @param assembler     Sparse-assembly sink for stiffness and load (mutable).
      * @param layout        DOF layout (read-only).
      * @param primal_block  This condition's patch primal block.
      */
-    virtual void apply(Matrix<T>& stiffness,
-                       Vector<T>& load,
+    virtual void apply(SystemAssembler<T>& assembler,
                        const DofLayout& layout,
                        DofLayout::BlockId primal_block) const = 0;
 

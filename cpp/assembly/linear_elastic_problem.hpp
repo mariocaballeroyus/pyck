@@ -156,7 +156,7 @@ public:
      *        3. Loops over (patch, element) and scatters local stiffness.
      *        4. Applies per-patch conditions, then global constraints.
      */
-    void assemble(Matrix<T>& K, Vector<T>& F) const;
+    void assemble(SparseMatrix<T>& K, Vector<T>& F) const;
 
 private:
 

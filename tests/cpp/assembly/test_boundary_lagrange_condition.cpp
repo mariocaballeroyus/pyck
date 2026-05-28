@@ -94,7 +94,7 @@ TEST_CASE("LagrangeBoundaryCondition augments the system symmetrically", "[condi
     LinearElasticProblem<double, 2> problem(surface, element, gauss2d);
     problem.add_condition(cond);
 
-    Matrix<double> K;
+    SparseMatrix<double> K;
     Vector<double> F;
     problem.assemble(K, F);
 
@@ -104,7 +104,7 @@ TEST_CASE("LagrangeBoundaryCondition augments the system symmetrically", "[condi
     REQUIRE(K.rows() == n_primal + n_lambda);
     REQUIRE(K.cols() == n_primal + n_lambda);
     REQUIRE(F.size() == n_primal + n_lambda);
-    REQUIRE((K - K.transpose()).norm() < 1e-12 * K.norm());
+    REQUIRE((K - SparseMatrix<double>(K.transpose())).norm() < 1e-12 * K.norm());
     REQUIRE(F.norm() == Approx(0.0).margin(1e-14));
 }
 

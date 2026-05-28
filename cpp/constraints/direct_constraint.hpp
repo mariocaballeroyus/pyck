@@ -38,7 +38,7 @@ public:
     /**
      * @brief Apply the Dirichlet constraint to a stiffness matrix and load vector.
      */
-    void apply(Matrix<T>& stiffness,
+    void apply(SparseMatrix<T>& stiffness,
                Vector<T>& load) const override;
 
     /// @brief Get the constrained DOF indices

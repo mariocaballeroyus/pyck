@@ -55,13 +55,11 @@ public:
     /**
      * @brief Assemble the condition's contribution into the global system.
      *
-     * @param stiffness     Global stiffness matrix (mutable).
-     * @param load          Global load vector (mutable).
+     * @param assembler     Sparse-assembly sink for stiffness and load (mutable).
      * @param layout        DOF layout (read-only).
      * @param primal_block  This condition's patch primal block.
      */
-    void apply(Matrix<T>& stiffness,
-               Vector<T>& load,
+    void apply(SystemAssembler<T>& assembler,
                const DofLayout& layout,
                DofLayout::BlockId primal_block) const override;
 

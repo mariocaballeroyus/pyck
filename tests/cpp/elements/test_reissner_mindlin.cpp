@@ -75,15 +75,14 @@ static Eigen::VectorXd solve_ss_rm_plate(
     const Index ndof = element->num_node_dofs();  // = 3
 
     // load_vals: [q0, 0, 0,  q0, 0, 0, ...] — only the w-DOF gets the load
-    Vector<double> load_vals = Vector<double>::Zero(active_elements * Q * ndof);
-    for (Index i = 0; i < active_elements * Q; ++i)
-        load_vals(i * ndof + 0) = q0;
+    Vector<double> load_vals = Vector<double>::Constant(active_elements * Q, q0);
 
     auto load_cond = std::make_shared<LoadCondition<double, 2>>(
-        *surface, *element, *gauss, load_vals);
+        *surface, *element, *gauss);
+    load_cond->add(load_vals);
     problem.add_condition(load_cond);
 
-    Matrix<double> K;
+    SparseMatrix<double> K;
     Vector<double> F;
     problem.assemble(K, F);
 
@@ -104,8 +103,7 @@ static Eigen::VectorXd solve_ss_rm_plate(
         Vector<double>::Zero(ss_dofs.size())).apply(K, F);
 
     Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
-    Eigen::SparseMatrix<double> Ks = K.sparseView();
-    solver.compute(Ks);
+    solver.compute(K);
     REQUIRE(solver.info() == Eigen::Success);
     return solver.solve(F);
 }

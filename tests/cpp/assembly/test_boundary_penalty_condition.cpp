@@ -16,6 +16,7 @@
 #include "gauss_legendre.hpp"
 #include "quadrature.hpp"
 #include "linear_elastic_problem.hpp"
+#include "system_assembler.hpp"
 #include "load_condition.hpp"
 #include "direct_constraint.hpp"
 #include "boundary_penalty_condition.hpp"
@@ -150,9 +151,10 @@ TEST_CASE("PenaltyBoundaryCondition structural properties", "[conditions][penalt
         PenaltyBoundaryCondition<double, 2> pen(*bdy, *elem_rm3, g1);
         pen.add(std::make_shared<TransverseDisplacement<double>>(), 1e6, 0.0);
         auto [layout, primal] = setup_layout_rm3();
-        Matrix<double> K = Matrix<double>::Zero(N_dof_rm3, N_dof_rm3);
-        Vector<double> F = Vector<double>::Zero(N_dof_rm3);
-        pen.apply(K, F, layout, primal);
+        SystemAssembler<double> assembler(N_dof_rm3);
+        pen.apply(assembler, layout, primal);
+        Matrix<double> K = Matrix<double>(assembler.finalize_matrix());
+        Vector<double> F = assembler.load();
         REQUIRE((K - K.transpose()).norm() < 1e-12 * K.norm());
     }
 
@@ -163,9 +165,10 @@ TEST_CASE("PenaltyBoundaryCondition structural properties", "[conditions][penalt
         pen.add(std::make_shared<NormalRotation<double>>(), 1e6, 0.0);
         pen.add(std::make_shared<TangentialRotation<double>>(), 1e6, 0.0);
         auto [layout, primal] = setup_layout_rm3();
-        Matrix<double> K = Matrix<double>::Zero(N_dof_rm3, N_dof_rm3);
-        Vector<double> F = Vector<double>::Zero(N_dof_rm3);
-        pen.apply(K, F, layout, primal);
+        SystemAssembler<double> assembler(N_dof_rm3);
+        pen.apply(assembler, layout, primal);
+        Matrix<double> K = Matrix<double>(assembler.finalize_matrix());
+        Vector<double> F = assembler.load();
         REQUIRE((K - K.transpose()).norm() < 1e-12 * K.norm());
     }
 
@@ -177,9 +180,10 @@ TEST_CASE("PenaltyBoundaryCondition structural properties", "[conditions][penalt
         pen.add(std::make_shared<TangentialRotation<double>>(), 0.0, 1.0);
         auto [layout, primal] = setup_layout_rm3();
         Index N_dof = surface->num_control_pts() * 3;
-        Matrix<double> K = Matrix<double>::Zero(N_dof, N_dof);
-        Vector<double> F = Vector<double>::Zero(N_dof);
-        pen.apply(K, F, layout, primal);
+        SystemAssembler<double> assembler(N_dof);
+        pen.apply(assembler, layout, primal);
+        Matrix<double> K = Matrix<double>(assembler.finalize_matrix());
+        Vector<double> F = assembler.load();
         REQUIRE(K.norm() == Approx(0.0).margin(1e-15));
         REQUIRE(F.norm() == Approx(0.0).margin(1e-15));
     }
@@ -195,9 +199,10 @@ TEST_CASE("PenaltyBoundaryCondition structural properties", "[conditions][penalt
         auto primal = layout.allocate(pyck::DofType::Primal, surface->num_control_pts() * 1, 1);
 
         Index N_dof = surface->num_control_pts();
-        Matrix<double> K = Matrix<double>::Zero(N_dof, N_dof);
-        Vector<double> F = Vector<double>::Zero(N_dof);
-        pen.apply(K, F, layout, primal);
+        SystemAssembler<double> assembler(N_dof);
+        pen.apply(assembler, layout, primal);
+        Matrix<double> K = Matrix<double>(assembler.finalize_matrix());
+        Vector<double> F = assembler.load();
 
         REQUIRE((K - K.transpose()).norm() < 1e-12 * K.norm());
         // All eigenvalues >= 0 (PSD)
@@ -248,20 +253,21 @@ TEST_CASE("PenaltyBoundaryCondition RM-1p plate: SS via penalty matches Navier",
     const Index Q = gauss2d->num_points();
     Vector<double> load_vals = Vector<double>::Constant(active_elems * Q, q0);
 
-    problem.add_condition(std::make_shared<LoadCondition<double,2>>(
-        *surface, *element, *gauss2d, load_vals));
+    auto load = std::make_shared<LoadCondition<double, 2>>(*surface, *element, *gauss2d);
+    load->add(load_vals);
+    problem.add_condition(load);
 
     const double alpha = 1e6 * D / (a * a * a);
     std::vector<Ptr<PatchBoundary<double, 2>>> penalty_boundaries;
     add_penalty_all_edges<double>(
         problem, penalty_boundaries, surface, *element, gauss1d, alpha, 0.0);
 
-    Matrix<double> K;
+    SparseMatrix<double> K;
     Vector<double> F;
     problem.assemble(K, F);
 
     Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
-    solver.compute(K.sparseView());
+    solver.compute(K);
     REQUIRE(solver.info() == Eigen::Success);
     Vector<double> u = solver.solve(F);
 
@@ -315,12 +321,11 @@ TEST_CASE("PenaltyBoundaryCondition RM-3p plate: SS (w-only) matches Navier", "[
     }
     const Index Q    = gauss2d->num_points();
     const Index ndof = 3;
-    Vector<double> load_vals = Vector<double>::Zero(active_elems * Q * ndof);
-    for (Index i = 0; i < active_elems * Q; ++i)
-        load_vals(i * ndof + 0) = q0;
+    Vector<double> load_vals = Vector<double>::Constant(active_elems * Q, q0);
 
-    problem.add_condition(std::make_shared<LoadCondition<double,2>>(
-        *surface, *element, *gauss2d, load_vals));
+    auto load = std::make_shared<LoadCondition<double, 2>>(*surface, *element, *gauss2d);
+    load->add(load_vals);
+    problem.add_condition(load);
 
     // Only penalise w; rotations are free (SS condition)
     const double penalty_w = 1e6 * D / (a * a * a);
@@ -328,12 +333,12 @@ TEST_CASE("PenaltyBoundaryCondition RM-3p plate: SS (w-only) matches Navier", "[
     add_penalty_all_edges<double>(problem, penalty_boundaries, surface, *element, gauss1d,
                                   penalty_w, 0.0);
 
-    Matrix<double> K;
+    SparseMatrix<double> K;
     Vector<double> F;
     problem.assemble(K, F);
 
     Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
-    solver.compute(K.sparseView());
+    solver.compute(K);
     REQUIRE(solver.info() == Eigen::Success);
     Vector<double> u = solver.solve(F);
 
@@ -390,9 +395,7 @@ TEST_CASE("PenaltyBoundaryCondition RM-3p plate: clamped BCs agree with DirectCo
             ++active_elems;
     }
     const Index Q = gauss2d->num_points();
-    Vector<double> load_vals = Vector<double>::Zero(active_elems * Q * ndof);
-    for (Index i = 0; i < active_elems * Q; ++i)
-        load_vals(i * ndof + 0) = q0;
+    Vector<double> load_vals = Vector<double>::Constant(active_elems * Q, q0);
 
     // ------------------------------------------------------------------
     // Reference solution: DirectConstraint clamped BCs
@@ -402,10 +405,11 @@ TEST_CASE("PenaltyBoundaryCondition RM-3p plate: clamped BCs agree with DirectCo
     {
         auto surface = make_surface();
         LinearElasticProblem<double, 2> problem(surface, element, gauss2d);
-        problem.add_condition(std::make_shared<LoadCondition<double,2>>(
-            *surface, *element, *gauss2d, load_vals));
+        auto load = std::make_shared<LoadCondition<double, 2>>(*surface, *element, *gauss2d);
+        load->add(load_vals);
+        problem.add_condition(load);
 
-        Matrix<double> K;
+        SparseMatrix<double> K;
         Vector<double> F;
         problem.assemble(K, F);
 
@@ -424,7 +428,7 @@ TEST_CASE("PenaltyBoundaryCondition RM-3p plate: clamped BCs agree with DirectCo
             Vector<double>::Zero(fixed_dofs.size())).apply(K, F);
 
         Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
-        solver.compute(K.sparseView());
+        solver.compute(K);
         REQUIRE(solver.info() == Eigen::Success);
         u_ref = solver.solve(F);
     }
@@ -436,8 +440,9 @@ TEST_CASE("PenaltyBoundaryCondition RM-3p plate: clamped BCs agree with DirectCo
     {
         auto surface = make_surface();
         LinearElasticProblem<double, 2> problem(surface, element, gauss2d);
-        problem.add_condition(std::make_shared<LoadCondition<double,2>>(
-            *surface, *element, *gauss2d, load_vals));
+        auto load = std::make_shared<LoadCondition<double, 2>>(*surface, *element, *gauss2d);
+        load->add(load_vals);
+        problem.add_condition(load);
 
         const double alpha = 1e4 * D / (a * a * a);
         std::vector<Ptr<PatchBoundary<double, 2>>> penalty_boundaries;
@@ -446,12 +451,12 @@ TEST_CASE("PenaltyBoundaryCondition RM-3p plate: clamped BCs agree with DirectCo
                                       alpha, 0.0,   // rot_n
                                       alpha, 0.0);  // rot_s
 
-        Matrix<double> K;
+        SparseMatrix<double> K;
         Vector<double> F;
         problem.assemble(K, F);
 
         Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
-        solver.compute(K.sparseView());
+        solver.compute(K);
         REQUIRE(solver.info() == Eigen::Success);
         u_pen = solver.solve(F);
     }
@@ -513,12 +518,12 @@ TEST_CASE("PenaltyBoundaryCondition RM-3p: prescribed non-zero displacement",
     add_penalty_all_edges<double>(problem, penalty_boundaries, surface, *element, gauss1d,
                                   penalty, value_w);
 
-    Matrix<double> K;
+    SparseMatrix<double> K;
     Vector<double> F;
     problem.assemble(K, F);
 
     Eigen::SimplicialLDLT<Eigen::SparseMatrix<double>> solver;
-    solver.compute(K.sparseView());
+    solver.compute(K);
     REQUIRE(solver.info() == Eigen::Success);
     Vector<double> u = solver.solve(F);
 
@@ -569,9 +574,10 @@ TEST_CASE("PenaltyBoundaryCondition normal direction: axis-aligned rectangle",
     pen_r.add(std::make_shared<TangentialRotation<double>>(), penalty, 0.0);
     DofLayout layout_r;
     auto primal_r = layout_r.allocate(pyck::DofType::Primal, surface->num_control_pts() * ndof, ndof);
-    Matrix<double> K_r = Matrix<double>::Zero(N, N);
-    Vector<double> F_r = Vector<double>::Zero(N);
-    pen_r.apply(K_r, F_r, layout_r, primal_r);
+    SystemAssembler<double> assembler_r(N);
+    pen_r.apply(assembler_r, layout_r, primal_r);
+    Matrix<double> K_r = Matrix<double>(assembler_r.finalize_matrix());
+    Vector<double> F_r = assembler_r.load();
 
     // For each boundary node: K[θx, θy] = 0 (cross-term)
     // and K[θx, θx] ≈ K[θy, θy] (same mass integral, same penalty)
@@ -593,9 +599,10 @@ TEST_CASE("PenaltyBoundaryCondition normal direction: axis-aligned rectangle",
     pen_b.add(std::make_shared<TangentialRotation<double>>(), penalty, 0.0);
     DofLayout layout_b;
     auto primal_b = layout_b.allocate(pyck::DofType::Primal, surface->num_control_pts() * ndof, ndof);
-    Matrix<double> K_b = Matrix<double>::Zero(N, N);
-    Vector<double> F_b = Vector<double>::Zero(N);
-    pen_b.apply(K_b, F_b, layout_b, primal_b);
+    SystemAssembler<double> assembler_b(N);
+    pen_b.apply(assembler_b, layout_b, primal_b);
+    Matrix<double> K_b = Matrix<double>(assembler_b.finalize_matrix());
+    Vector<double> F_b = assembler_b.load();
 
     auto bot_nodes = surface->dof_mapper().get_layer_dofs(1, true, 0);
     for (auto node : bot_nodes) {

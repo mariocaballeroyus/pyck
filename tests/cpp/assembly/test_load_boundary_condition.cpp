@@ -14,6 +14,7 @@
 #include "gauss_legendre.hpp"
 #include "quadrature.hpp"
 #include "linear_elastic_problem.hpp"
+#include "system_assembler.hpp"
 #include "load_boundary_condition.hpp"
 #include "boundary_lagrange_condition.hpp"
 #include "dof_layout.hpp"
@@ -53,9 +54,10 @@ TEST_CASE("LoadBoundaryCondition: K is unchanged and F sums to Q*L_edge",
         DofType::Primal, surface->num_control_pts() * 3, 3);
 
     const Index N = surface->num_control_pts() * 3;
-    Matrix<double> K = Matrix<double>::Zero(N, N);
-    Vector<double> F = Vector<double>::Zero(N);
-    cond.apply(K, F, layout, primal);
+    SystemAssembler<double> assembler(N);
+    cond.apply(assembler, layout, primal);
+    Matrix<double> K = Matrix<double>(assembler.finalize_matrix());
+    Vector<double> F = assembler.load();
 
     REQUIRE(K.norm() == Approx(0.0).margin(1e-15));
 
@@ -126,9 +128,10 @@ TEST_CASE("LoadBoundaryCondition: cantilever tip deflection matches closed form"
     neumann->add(std::make_shared<TransverseDisplacement<double>>(), Q);
     problem.add_condition(neumann);
 
-    Matrix<double> K;
+    SparseMatrix<double> K_sparse;
     Vector<double> F;
-    problem.assemble(K, F);
+    problem.assemble(K_sparse, F);
+    Matrix<double> K = Matrix<double>(K_sparse);
 
     Eigen::PartialPivLU<Matrix<double>> solver(K);
     REQUIRE(solver.info() == Eigen::Success);
@@ -191,8 +194,9 @@ TEST_CASE("LoadBoundaryCondition: scalar and per-qpt array overloads agree",
     {
         LoadBoundaryCondition<double, 2> cond(*bdy, *element, g1);
         cond.add(std::make_shared<TransverseDisplacement<double>>(), Q);
-        Matrix<double> K = Matrix<double>::Zero(N, N);
-        cond.apply(K, F_scalar, layout, primal);
+        SystemAssembler<double> assembler(N);
+        cond.apply(assembler, layout, primal);
+        F_scalar = assembler.load();
     }
 
     // Per-qpt array path: same constant value at every active qpt.
@@ -202,8 +206,9 @@ TEST_CASE("LoadBoundaryCondition: scalar and per-qpt array overloads agree",
         const Index nq = cond.num_active_qpts();
         Vector<double> values = Vector<double>::Constant(nq, Q);
         cond.add(std::make_shared<TransverseDisplacement<double>>(), values);
-        Matrix<double> K = Matrix<double>::Zero(N, N);
-        cond.apply(K, F_array, layout, primal);
+        SystemAssembler<double> assembler(N);
+        cond.apply(assembler, layout, primal);
+        F_array = assembler.load();
     }
 
     REQUIRE((F_scalar - F_array).norm() < 1e-14);

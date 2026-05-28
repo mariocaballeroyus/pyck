@@ -5,6 +5,7 @@
 #include <concepts>
 #include <memory>
 #include <Eigen/Dense>
+#include <Eigen/Sparse>
 
 namespace pyck
 {
@@ -15,6 +16,15 @@ using Index = int;
 /// @brief Row-major dynamic-sized dense matrix of type T
 template <std::floating_point T>
 using Matrix = Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>;
+
+/// @brief Column-major dynamic-sized sparse matrix of type T. Used for the
+///        global system matrix; column-major maps directly to scipy CSC.
+template <std::floating_point T>
+using SparseMatrix = Eigen::SparseMatrix<T>;
+
+/// @brief Sparse-assembly triplet (row, col, value) of type T.
+template <std::floating_point T>
+using Triplet = Eigen::Triplet<T>;
 
 /// @brief Shared pointer type
 template <typename T>

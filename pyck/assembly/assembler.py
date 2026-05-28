@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, Sequence, Union, cast, Any
 
 import numpy as np
 import numpy.typing as npt
+from scipy import sparse
 
 import pyck._pyck as _pyck
 from pyck.conditions.condition import BindableCondition
@@ -186,18 +187,18 @@ class LinearElasticProblem:
         cpp = getattr(constraint, "_cpp_object", constraint)
         self._cpp_object.add_constraint(cpp)
 
-    def assemble(self) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+    def assemble(self) -> tuple[sparse.csc_matrix, npt.NDArray[np.float64]]:
         """Assemble the global system.
 
         Returns
         -------
-        K : ndarray, shape (n, n)
+        K : scipy.sparse.csc_matrix, shape (n, n)
             Global stiffness matrix.
         F : ndarray, shape (n,)
             Global load vector.
         """
         K, F = self._cpp_object.assemble()
-        return np.asarray(K), np.asarray(F).ravel()
+        return K, np.asarray(F).ravel()
 
     def __repr__(self) -> str:
         patches = ", ".join(f"'{n}'" for n in self._patches)

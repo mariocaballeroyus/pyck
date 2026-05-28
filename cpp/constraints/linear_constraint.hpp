@@ -42,7 +42,7 @@ public:
     /**
      * @brief Apply the constraints to the stiffness matrix and load vector.
      */
-    void apply(Matrix<T>& stiffness, Vector<T>& load) const override;
+    void apply(SparseMatrix<T>& stiffness, Vector<T>& load) const override;
 
     /// @brief Get the slave DOF indices
     const IndexVector& slaves() const { return slaves_; }

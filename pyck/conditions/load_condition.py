@@ -1,8 +1,8 @@
-"""Distributed load condition for assembly."""
+"""Distributed (transverse) domain load condition for assembly."""
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 import numpy as np
 import numpy.typing as npt
@@ -16,24 +16,17 @@ if TYPE_CHECKING:
 
 
 class LoadCondition:
-    """Distributed load condition applied to a patch.
+    """Distributed body load integrated over a patch into the load vector.
 
-    The load values are evaluated at quadrature points and passed to the
-    C++ :class:`LoadCondition` which handles assembly.
+    Mirrors :class:`LoadBoundaryCondition`: register one or more loads via
+    :meth:`add`, either a uniform constant or per-quadrature-point values.
 
     Parameters
     ----------
     patch : Patch
         Geometry patch on which the load is applied.
-    load_values : ndarray
-        Pre-evaluated load values at quadrature points. Can be either:
-        - Shape (n_points,) for scalar load (broadcast to first DOF)
-        - Shape (n_points * ndof,) for full DOF array
-
-    Notes
-    -----
-    Use factory methods such as :func:`create_load_condition` for easier
-    construction.
+    quadrature : QuadratureRule, optional
+        Quadrature rule. If omitted, the parent problem's rule is used.
     """
 
     _cpp_object: _pyck.LoadCondition1d | _pyck.LoadCondition2d | None
@@ -41,50 +34,50 @@ class LoadCondition:
     def __init__(
         self,
         patch: Patch,
-        load_values: npt.NDArray[np.floating],
         quadrature: QuadratureRule | None = None,
     ) -> None:
         self._patch = patch
-        self._load_values = np.asarray(load_values, dtype=float).ravel()
         self._quadrature = quadrature
+        # Each term is a float (uniform) or an ndarray (per quadrature point).
+        self._terms: list[float | npt.NDArray[np.floating]] = []
         self._cpp_object = None
 
-    def bind(self, quadrature: QuadratureRule, element: Element) -> None:
-        """Build the C++ LoadCondition, binding it to an element.
-
-        If this condition was created with an explicit quadrature rule (via
-        a factory), that rule is used and the ``quadrature`` argument is
-        ignored — the load values were evaluated at *that* rule's points and
-        must be integrated with the same rule.
+    def add(self, value: float | npt.NDArray[np.floating] = 0.0) -> LoadCondition:
+        """Add a load term.
 
         Parameters
         ----------
-        quadrature : QuadratureRule
-            Fallback quadrature rule (used only if none was stored at
-            construction time).
-        element : Element
-            Element formulation (determines DOFs per node).
+        value : float or ndarray
+            Constant uniform load, or an array sized to the patch's active
+            quadrature points (one value per Gauss point).
         """
+        if self._cpp_object is not None:
+            raise RuntimeError(
+                "Cannot add loads after the condition has been bound to a problem."
+            )
+        if isinstance(value, (int, float, np.floating)):
+            self._terms.append(float(value))
+        else:
+            self._terms.append(np.asarray(value, dtype=float).ravel())
+        return self
+
+    def bind(self, quadrature: QuadratureRule, element: Element) -> None:
+        """Build the C++ object, binding it to the parent problem's element."""
         rule = self._quadrature if self._quadrature is not None else quadrature
         if isinstance(self._patch._cpp_object, _pyck.Patch1d):
-            self._cpp_object = _pyck.LoadCondition1d(
-                self._patch._cpp_object,
-                element._cpp_object,
-                rule._cpp_object,
-                self._load_values,
+            cpp = _pyck.LoadCondition1d(
+                self._patch._cpp_object, element._cpp_object, rule._cpp_object
             )
         elif isinstance(self._patch._cpp_object, _pyck.Patch2d):
-            self._cpp_object = _pyck.LoadCondition2d(
-                self._patch._cpp_object,
-                element._cpp_object,
-                rule._cpp_object,
-                self._load_values,
+            cpp = _pyck.LoadCondition2d(
+                self._patch._cpp_object, element._cpp_object, rule._cpp_object
             )
         else:
             raise ValueError(f"Unsupported patch dimension: {self._patch.tdim}")
+        for value in self._terms:
+            cpp.add(value)
+        self._cpp_object = cpp
 
     def __repr__(self) -> str:
         status = "pending" if self._cpp_object is None else "bound"
-        return f"LoadCondition({status})"
-
-
+        return f"LoadCondition({status}, num_terms={len(self._terms)})"

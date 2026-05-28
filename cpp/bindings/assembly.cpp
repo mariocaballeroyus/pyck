@@ -56,7 +56,7 @@ void bind_assembly(py::module_& m)
                py::arg("constraint"))
 
           .def("assemble", [](const LinearElasticProblem1d& p) {
-            Matrix<double> K;
+            SparseMatrix<double> K;
             Vector<double> F;
             p.assemble(K, F);
             return py::make_tuple(K, F);
@@ -90,7 +90,7 @@ void bind_assembly(py::module_& m)
              py::arg("constraint"))
 
         .def("assemble", [](const LinearElasticProblem2d& p) {
-            Matrix<double> K;
+            SparseMatrix<double> K;
             Vector<double> F;
             p.assemble(K, F);
             return py::make_tuple(K, F);

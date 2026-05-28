@@ -58,8 +58,7 @@ Index LoadCondition<T, d>::num_active_qpts() const
 // === Assembly =======================================================================
 
 template <std::floating_point T, std::size_t d>
-void LoadCondition<T, d>::apply(Matrix<T>& /*stiffness*/,
-                                Vector<T>& load,
+void LoadCondition<T, d>::apply(SystemAssembler<T>& assembler,
                                 const DofLayout& layout,
                                 DofLayout::BlockId primal_block) const
 {
@@ -112,7 +111,7 @@ void LoadCondition<T, d>::apply(Matrix<T>& /*stiffness*/,
         // Scatter the element primal DOFs
         layout.scatter_primal(primal_block, ev.elem_cps_, ev.elem_dofs_);
         for (Index i = 0; i < n_primal; ++i) {
-            load(ev.elem_dofs_[i]) += f_local(i);
+            assembler.add_load(ev.elem_dofs_[i], f_local(i));
         }
     }
 }

@@ -40,6 +40,20 @@ static Ptr<Patch<double, 2>> make_square_plate(
 }
 
 // ---------------------------------------------------------------------------
+// Build a LoadCondition with per-quadrature-point values.
+// ---------------------------------------------------------------------------
+static Ptr<LoadCondition<double, 2>> make_load(
+    const Patch<double, 2>& patch,
+    const Element<double, 2>& element,
+    const QuadratureRule<double, 2>& quadrature,
+    const Vector<double>& values)
+{
+    auto load = std::make_shared<LoadCondition<double, 2>>(patch, element, quadrature);
+    load->add(values);
+    return load;
+}
+
+// ---------------------------------------------------------------------------
 // Apply a w-only penalty on all four edges of a patch.
 // ---------------------------------------------------------------------------
 static void clamp_w_all_edges(
@@ -100,15 +114,15 @@ TEST_CASE("LinearElasticProblem single-patch vector ctor matches legacy ctor",
     const Index Q = gauss2d->num_points();
     Vector<double> load_vals = Vector<double>::Constant(active_elems * Q, q0);
 
-    legacy.add_condition(std::make_shared<LoadCondition<double, 2>>(
-        *surface, *element, *gauss2d, load_vals));
+    legacy.add_condition(make_load(*surface, *element, *gauss2d, load_vals));
 
     std::vector<Ptr<PatchBoundary<double, 2>>> bds_legacy;
     clamp_w_all_edges(legacy, bds_legacy, surface, *element, gauss1d, alpha);
 
-    Matrix<double> K_legacy;
+    SparseMatrix<double> K_legacy_sparse;
     Vector<double> F_legacy;
-    legacy.assemble(K_legacy, F_legacy);
+    legacy.assemble(K_legacy_sparse, F_legacy);
+    Matrix<double> K_legacy = Matrix<double>(K_legacy_sparse);
 
     // -------- New vector ctor (single patch) -----------------------------
     LinearElasticProblem<double, 2> vec_problem(
@@ -118,15 +132,15 @@ TEST_CASE("LinearElasticProblem single-patch vector ctor matches legacy ctor",
 
     REQUIRE(vec_problem.num_patches() == 1);
 
-    vec_problem.add_condition(std::make_shared<LoadCondition<double, 2>>(
-        *surface, *element, *gauss2d, load_vals));
+    vec_problem.add_condition(make_load(*surface, *element, *gauss2d, load_vals));
 
     std::vector<Ptr<PatchBoundary<double, 2>>> bds_vec;
     clamp_w_all_edges(vec_problem, bds_vec, surface, *element, gauss1d, alpha);
 
-    Matrix<double> K_vec;
+    SparseMatrix<double> K_vec_sparse;
     Vector<double> F_vec;
-    vec_problem.assemble(K_vec, F_vec);
+    vec_problem.assemble(K_vec_sparse, F_vec);
+    Matrix<double> K_vec = Matrix<double>(K_vec_sparse);
 
     // -------- Assertions --------------------------------------------------
     REQUIRE(K_vec.rows() == K_legacy.rows());
@@ -186,22 +200,22 @@ TEST_CASE("LinearElasticProblem two disconnected patches → block-diagonal",
 
     // -------- Standalone reference solves --------------------------------
     LinearElasticProblem<double, 2> ref_A(surf_A, element, gauss2d);
-    ref_A.add_condition(std::make_shared<LoadCondition<double, 2>>(
-        *surf_A, *element, *gauss2d, load_A));
+    ref_A.add_condition(make_load(*surf_A, *element, *gauss2d, load_A));
     std::vector<Ptr<PatchBoundary<double, 2>>> bd_A_ref;
     clamp_w_all_edges(ref_A, bd_A_ref, surf_A, *element, gauss1d, alpha_A);
-    Matrix<double> K_A_ref;
+    SparseMatrix<double> K_A_ref_sparse;
     Vector<double> F_A_ref;
-    ref_A.assemble(K_A_ref, F_A_ref);
+    ref_A.assemble(K_A_ref_sparse, F_A_ref);
+    Matrix<double> K_A_ref = Matrix<double>(K_A_ref_sparse);
 
     LinearElasticProblem<double, 2> ref_B(surf_B, element, gauss2d);
-    ref_B.add_condition(std::make_shared<LoadCondition<double, 2>>(
-        *surf_B, *element, *gauss2d, load_B));
+    ref_B.add_condition(make_load(*surf_B, *element, *gauss2d, load_B));
     std::vector<Ptr<PatchBoundary<double, 2>>> bd_B_ref;
     clamp_w_all_edges(ref_B, bd_B_ref, surf_B, *element, gauss1d, alpha_B);
-    Matrix<double> K_B_ref;
+    SparseMatrix<double> K_B_ref_sparse;
     Vector<double> F_B_ref;
-    ref_B.assemble(K_B_ref, F_B_ref);
+    ref_B.assemble(K_B_ref_sparse, F_B_ref);
+    Matrix<double> K_B_ref = Matrix<double>(K_B_ref_sparse);
 
     // -------- Combined two-patch problem --------------------------------
     LinearElasticProblem<double, 2> combined;
@@ -211,18 +225,17 @@ TEST_CASE("LinearElasticProblem two disconnected patches → block-diagonal",
     REQUIRE(idx_B == 1);
     REQUIRE(combined.num_patches() == 2);
 
-    combined.add_condition(std::make_shared<LoadCondition<double, 2>>(
-        *surf_A, *element, *gauss2d, load_A));
-    combined.add_condition(std::make_shared<LoadCondition<double, 2>>(
-        *surf_B, *element, *gauss2d, load_B));
+    combined.add_condition(make_load(*surf_A, *element, *gauss2d, load_A));
+    combined.add_condition(make_load(*surf_B, *element, *gauss2d, load_B));
 
     std::vector<Ptr<PatchBoundary<double, 2>>> bd_combined;
     clamp_w_all_edges(combined, bd_combined, surf_A, *element, gauss1d, alpha_A);
     clamp_w_all_edges(combined, bd_combined, surf_B, *element, gauss1d, alpha_B);
 
-    Matrix<double> K_AB;
+    SparseMatrix<double> K_AB_sparse;
     Vector<double> F_AB;
-    combined.assemble(K_AB, F_AB);
+    combined.assemble(K_AB_sparse, F_AB);
+    Matrix<double> K_AB = Matrix<double>(K_AB_sparse);
 
     // -------- Sizes -----------------------------------------------------
     const Index n_dof_A = K_A_ref.rows();
@@ -286,7 +299,7 @@ TEST_CASE("LinearElasticProblem builder API: empty ctor and add_patch",
 
     // assembling with no patches must throw a clear error
     {
-        Matrix<double> K;
+        SparseMatrix<double> K;
         Vector<double> F;
         REQUIRE_THROWS_AS(problem.assemble(K, F), std::runtime_error);
     }
@@ -307,7 +320,7 @@ TEST_CASE("LinearElasticProblem builder API: empty ctor and add_patch",
         if (std::abs(hiu-lou) > 1e-14 && std::abs(hiv-lov) > 1e-14)
             ++active_elems;
     }
-    auto dummy_load = std::make_shared<LoadCondition<double, 2>>(
+    auto dummy_load = make_load(
         *surf_other, *element, *gauss2d,
         Vector<double>::Constant(active_elems * gauss2d->num_points(), 0.0));
     REQUIRE_THROWS_AS(problem.add_condition(dummy_load),

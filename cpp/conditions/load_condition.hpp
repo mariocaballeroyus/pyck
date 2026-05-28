@@ -39,8 +39,7 @@ public:
     ///        num_active_qpts() (one value per active Gauss point).
     LoadCondition& add(const Vector<T>& values_at_qpts);
 
-    void apply(Matrix<T>& stiffness,
-               Vector<T>& load,
+    void apply(SystemAssembler<T>& assembler,
                const DofLayout& layout,
                DofLayout::BlockId primal_block) const override;
 
