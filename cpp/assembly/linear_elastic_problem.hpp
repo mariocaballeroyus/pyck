@@ -98,23 +98,30 @@ public:
     }
 
     /**
-     * @brief Add a boundary/load condition to a specific patch.
+     * @brief Add a boundary/load condition.
      *
-     *        The default patch_idx = 0 keeps the single-patch call site
-     *        signature unchanged.
+     *        The target patch is inferred from the condition's own patch by
+     *        identity, so it must be one of the patches already registered
+     *        with this problem.
      *
      * @param condition Shared pointer to the condition.
-     * @param patch_idx Index of the patch this condition acts on.
      */
-    void add_condition(const Ptr<Condition<T>>& condition,
-                       std::size_t patch_idx = 0)
+    void add_condition(const Ptr<Condition<T, d>>& condition)
     {
-        if (patch_idx >= patches_.size()) {
-            throw std::out_of_range(
-                "LinearElasticProblem::add_condition: patch_idx out of range.");
+        if (!condition) {
+            throw std::invalid_argument(
+                "LinearElasticProblem::add_condition: null condition.");
         }
-        condition->set_patch_idx(patch_idx);
-        conditions_per_patch_[patch_idx].push_back(condition);
+        const Patch<T, d>* target = &condition->patch();
+        for (std::size_t p = 0; p < patches_.size(); ++p) {
+            if (patches_[p].get() == target) {
+                conditions_per_patch_[p].push_back(condition);
+                return;
+            }
+        }
+        throw std::invalid_argument(
+            "LinearElasticProblem::add_condition: the condition's patch is "
+            "not registered with this problem.");
     }
 
     /**
@@ -159,7 +166,7 @@ private:
 
     std::vector<Ptr<QuadratureRule<T, d>>> quadratures_;
 
-    std::vector<std::vector<Ptr<Condition<T>>>> conditions_per_patch_;
+    std::vector<std::vector<Ptr<Condition<T, d>>>> conditions_per_patch_;
 
     std::vector<Ptr<Constraint<T>>> constraints_;
 

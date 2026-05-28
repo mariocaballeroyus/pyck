@@ -16,7 +16,7 @@
 #include "quadrature.hpp"
 #include "linear_elastic_problem.hpp"
 #include "load_condition.hpp"
-#include "penalty_boundary_condition.hpp"
+#include "boundary_penalty_condition.hpp"
 #include "dof_layout.hpp"
 #include "plane_stress_2d.hpp"
 #include "plate_kirchhoff_love_1p.hpp"
@@ -48,8 +48,7 @@ static void clamp_w_all_edges(
     const Ptr<Patch<double, 2>>& surface,
     const Element<double, 2>& element,
     const QuadratureRule<double, 1>& gauss1d,
-    double alpha,
-    std::size_t patch_idx = 0)
+    double alpha)
 {
     for (std::size_t dim = 0; dim < 2; ++dim) {
         for (bool start : {true, false}) {
@@ -59,7 +58,7 @@ static void clamp_w_all_edges(
                 *boundaries.back(), element, gauss1d);
             cond->add(std::make_shared<TransverseDisplacement<double>>(),
                       alpha, 0.0);
-            problem.add_condition(cond, patch_idx);
+            problem.add_condition(cond);
         }
     }
 }
@@ -213,13 +212,13 @@ TEST_CASE("LinearElasticProblem two disconnected patches → block-diagonal",
     REQUIRE(combined.num_patches() == 2);
 
     combined.add_condition(std::make_shared<LoadCondition<double, 2>>(
-        *surf_A, *element, *gauss2d, load_A), idx_A);
+        *surf_A, *element, *gauss2d, load_A));
     combined.add_condition(std::make_shared<LoadCondition<double, 2>>(
-        *surf_B, *element, *gauss2d, load_B), idx_B);
+        *surf_B, *element, *gauss2d, load_B));
 
     std::vector<Ptr<PatchBoundary<double, 2>>> bd_combined;
-    clamp_w_all_edges(combined, bd_combined, surf_A, *element, gauss1d, alpha_A, idx_A);
-    clamp_w_all_edges(combined, bd_combined, surf_B, *element, gauss1d, alpha_B, idx_B);
+    clamp_w_all_edges(combined, bd_combined, surf_A, *element, gauss1d, alpha_A);
+    clamp_w_all_edges(combined, bd_combined, surf_B, *element, gauss1d, alpha_B);
 
     Matrix<double> K_AB;
     Vector<double> F_AB;
@@ -296,20 +295,21 @@ TEST_CASE("LinearElasticProblem builder API: empty ctor and add_patch",
     REQUIRE(idx == 0);
     REQUIRE(problem.num_patches() == 1);
 
-    // out-of-range patch index on add_condition must throw.
-    // Compute the active-quad-point count matching LoadCondition's expectation.
-    Index n_spans = surf->basis(0).knot_vector().num_spans();
+    // A condition whose patch is not registered with the problem must throw.
+    // Build it on a separate, unregistered patch.
+    auto surf_other = make_square_plate(L, p, n_elem);
+    Index n_spans = surf_other->basis(0).knot_vector().num_spans();
     Index active_elems = 0;
     for (Index e = 0; e < n_spans * n_spans; ++e) {
         Index su = e % n_spans, sv = e / n_spans;
-        auto [lou, hiu] = surf->basis(0).knot_vector().span_bounds(su);
-        auto [lov, hiv] = surf->basis(1).knot_vector().span_bounds(sv);
+        auto [lou, hiu] = surf_other->basis(0).knot_vector().span_bounds(su);
+        auto [lov, hiv] = surf_other->basis(1).knot_vector().span_bounds(sv);
         if (std::abs(hiu-lou) > 1e-14 && std::abs(hiv-lov) > 1e-14)
             ++active_elems;
     }
     auto dummy_load = std::make_shared<LoadCondition<double, 2>>(
-        *surf, *element, *gauss2d,
+        *surf_other, *element, *gauss2d,
         Vector<double>::Constant(active_elems * gauss2d->num_points(), 0.0));
-    REQUIRE_THROWS_AS(problem.add_condition(dummy_load, /*patch_idx=*/5),
-                      std::out_of_range);
+    REQUIRE_THROWS_AS(problem.add_condition(dummy_load),
+                      std::invalid_argument);
 }

@@ -13,7 +13,7 @@
 #include "direct_constraint.hpp"
 #include "factories.hpp"
 #include "gauss_legendre.hpp"
-#include "lagrange_boundary_condition.hpp"
+#include "boundary_lagrange_condition.hpp"
 #include "linear_elastic_problem.hpp"
 #include "load_condition.hpp"
 #include "patch.hpp"

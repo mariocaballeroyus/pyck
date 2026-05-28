@@ -6,9 +6,8 @@
 #include "condition.hpp"
 #include "load_condition.hpp"
 #include "load_boundary_condition.hpp"
-#include "lagrange_boundary_condition.hpp"
-#include "lagrange_domain_condition.hpp"
-#include "penalty_boundary_condition.hpp"
+#include "boundary_lagrange_condition.hpp"
+#include "boundary_penalty_condition.hpp"
 #include "patch_boundary.hpp"
 #include "element.hpp"
 #include "quadrature.hpp"
@@ -27,7 +26,8 @@ void bind_conditions(py::module_& m)
     using QuadratureRule1d = QuadratureRule<double, 1>;
     using QuadratureRule2d = QuadratureRule<double, 2>;
 
-    py::class_<Condition<double>, Ptr<Condition<double>>>(m, "Condition");
+    py::class_<Condition<double, 1>, Ptr<Condition<double, 1>>>(m, "Condition1d");
+    py::class_<Condition<double, 2>, Ptr<Condition<double, 2>>>(m, "Condition2d");
 
     py::class_<BoundaryField<double>, Ptr<BoundaryField<double>>>(m, "BoundaryField");
 
@@ -68,17 +68,17 @@ void bind_conditions(py::module_& m)
         .def(py::init<std::size_t>(), py::arg("dof_index") = 0);
 
     using LoadCondition1d = LoadCondition<double, 1>;
-    py::class_<LoadCondition1d, Condition<double>, Ptr<LoadCondition1d>>(m, "LoadCondition1d")
+    py::class_<LoadCondition1d, Condition<double, 1>, Ptr<LoadCondition1d>>(m, "LoadCondition1d")
         .def(py::init<const Patch1d&, const Element1d&, const QuadratureRule1d&, const Vector<double>&>(),
              py::arg("patch"), py::arg("element"), py::arg("quadrature"), py::arg("load_values"));
 
     using LoadCondition2d = LoadCondition<double, 2>;
-    py::class_<LoadCondition2d, Condition<double>, Ptr<LoadCondition2d>>(m, "LoadCondition2d")
+    py::class_<LoadCondition2d, Condition<double, 2>, Ptr<LoadCondition2d>>(m, "LoadCondition2d")
         .def(py::init<const Patch2d&, const Element2d&, const QuadratureRule2d&, const Vector<double>&>(),
              py::arg("patch"), py::arg("element"), py::arg("quadrature"), py::arg("load_values"));
 
     using LoadBoundaryCondition2d = LoadBoundaryCondition<double, 2>;
-    py::class_<LoadBoundaryCondition2d, Condition<double>, Ptr<LoadBoundaryCondition2d>>(m, "LoadBoundaryCondition2d")
+    py::class_<LoadBoundaryCondition2d, Condition<double, 2>, Ptr<LoadBoundaryCondition2d>>(m, "LoadBoundaryCondition2d")
         .def(py::init<const PatchBoundary2d&, const Element2d&, const QuadratureRule1d&>(),
              py::arg("boundary"), py::arg("element"), py::arg("quadrature"))
         .def("add",
@@ -95,7 +95,7 @@ void bind_conditions(py::module_& m)
              py::return_value_policy::reference);
 
     using PenaltyBoundaryCondition2d = PenaltyBoundaryCondition<double, 2>;
-    py::class_<PenaltyBoundaryCondition2d, Condition<double>, Ptr<PenaltyBoundaryCondition2d>>(m, "PenaltyBoundaryCondition2d")
+    py::class_<PenaltyBoundaryCondition2d, Condition<double, 2>, Ptr<PenaltyBoundaryCondition2d>>(m, "PenaltyBoundaryCondition2d")
         .def(py::init<const PatchBoundary2d&, const Element2d&, const QuadratureRule1d&>(),
              py::arg("boundary"), py::arg("element"), py::arg("quadrature"))
         .def("add",
@@ -107,7 +107,7 @@ void bind_conditions(py::module_& m)
              py::return_value_policy::reference);
 
     using LagrangeBoundaryCondition2d = LagrangeBoundaryCondition<double, 2>;
-    py::class_<LagrangeBoundaryCondition2d, Condition<double>, Ptr<LagrangeBoundaryCondition2d>>(m, "LagrangeBoundaryCondition2d")
+    py::class_<LagrangeBoundaryCondition2d, Condition<double, 2>, Ptr<LagrangeBoundaryCondition2d>>(m, "LagrangeBoundaryCondition2d")
         .def(py::init<const PatchBoundary2d&, const Element2d&, const QuadratureRule1d&>(),
              py::arg("boundary"), py::arg("element"), py::arg("quadrature"))
         .def("add",
@@ -115,17 +115,6 @@ void bind_conditions(py::module_& m)
                  return self.add(std::move(field), value);
              },
              py::arg("field"), py::arg("value") = 0.0,
-             py::return_value_policy::reference);
-
-    using LagrangeDomainCondition2d = LagrangeDomainCondition<double, 2>;
-    py::class_<LagrangeDomainCondition2d, Condition<double>, Ptr<LagrangeDomainCondition2d>>(m, "LagrangeDomainCondition2d")
-        .def(py::init<const Patch2d&, const Element2d&, const QuadratureRule2d&>(),
-             py::arg("patch"), py::arg("element"), py::arg("quadrature"))
-        .def("add",
-             [](LagrangeDomainCondition2d& self, std::size_t dof_index, double value) -> LagrangeDomainCondition2d& {
-                 return self.add(dof_index, value);
-             },
-             py::arg("dof_index"), py::arg("value") = 0.0,
              py::return_value_policy::reference);
 
 }

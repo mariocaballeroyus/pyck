@@ -147,24 +147,27 @@ class LinearElasticProblem:
                 self.add_condition(item, patch=patch)
             return
 
-        for name in self._resolve_patch_names(patch):
+        cpp_obj = condition._cpp_object
+        if cpp_obj is None:
+            if not isinstance(condition, BindableCondition):
+                raise TypeError(
+                    f"Condition of type {type(condition).__name__} "
+                    f"does not provide a bound C++ object or a bind() method."
+                )
+            condition.bind(self._quadrature, self._element)
             cpp_obj = condition._cpp_object
             if cpp_obj is None:
-                if not isinstance(condition, BindableCondition):
-                    raise TypeError(
-                        f"Condition of type {type(condition).__name__} "
-                        f"does not provide a bound C++ object or a bind() method."
-                    )
-                condition.bind(self._quadrature, self._element)
-                cpp_obj = condition._cpp_object
-                if cpp_obj is None:
-                    raise TypeError(
-                        f"Condition of type {type(condition).__name__} "
-                        f"did not produce a C++ object after bind()."
-                    )
+                raise TypeError(
+                    f"Condition of type {type(condition).__name__} "
+                    f"did not produce a C++ object after bind()."
+                )
 
+        for name in self._resolve_patch_names(patch):
             self._conditions[name].append(condition)
-            self._cpp_object.add_condition(cast(Any, cpp_obj), self._patch_idx[name])
+
+        # The C++ condition carries its own patch; registration infers the
+        # target DOF block by identity, so register exactly once.
+        self._cpp_object.add_condition(cast(Any, cpp_obj))
 
     def add_constraint(
         self,

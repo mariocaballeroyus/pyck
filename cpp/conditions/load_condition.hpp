@@ -16,17 +16,18 @@ namespace pyck
 {
 
 /**
- * @brief Generic external load condition evaluating the integral: 
- *        f_ext = \int_{\Gamma} N^T t d\Gamma
- *        where N are the shape functions and t is the external force/traction.
+ * @brief Generic domain load condition.
  *
  * @tparam T Scalar type
  * @tparam d Parametric dimension
  */
 template <std::floating_point T, std::size_t d>
-class LoadCondition : public Condition<T>
+class LoadCondition : public Condition<T, d>
 {
 public:
+
+    // === Constructors ===============================================================
+
     /**
      * @brief Construct a generic load condition by numerically integrating the
      *        load values.
@@ -41,20 +42,31 @@ public:
                   const QuadratureRule<T, d>& quadrature,
                   const Vector<T>& load_values);
 
+    // === Utility ====================================================================
+
     /**
-     * @brief Apply the integrated load to the global load vector.
+     * @brief Assemble the condition's contribution into the global system.
      *
-     * @param stiffness    Stiffness matrix
-     * @param load         Load vector
-     * @param layout       Equation-numbering authority.
-     * @param primal_block Primal DOF block handle.
+     * @param stiffness     Global stiffness matrix (mutable).
+     * @param load          Global load vector (mutable).
+     * @param layout        DOF layout (read-only).
+     * @param primal_block  This condition's patch primal block.
      */
     void apply(Matrix<T>& stiffness,
                Vector<T>& load,
                const DofLayout& layout,
-               const std::vector<DofLayout::BlockId>& primal_blocks) const override;
+               DofLayout::BlockId primal_block) const override;
+
+    // === Properties =================================================================
+
+    /// @brief The patch where the domain load condition is applied. 
+    const Patch<T, d>& patch() const override { return patch_; }
 
 private:
+
+    /// @brief Patch this load is integrated over (for DOF-block routing).
+    const Patch<T, d>& patch_;
+
     /// @brief Patch control-point indices contributing to the load.
     std::vector<Index> cp_indices_;
 
@@ -63,6 +75,7 @@ private:
 
     /// @brief Load vector evaluated at the element level.
     Vector<T> element_load_;
+
 };
 
 } // namespace pyck

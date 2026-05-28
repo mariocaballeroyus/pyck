@@ -7,26 +7,30 @@
 namespace pyck
 {
 
+// === Constructors ===================================================================
+
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-LoadBoundaryCondition<T, d>::LoadBoundaryCondition(
-    const PatchBoundary<T, d>& boundary,
-    const Element<T, d>& element,
-    const QuadratureRule<T, d - 1>& quadrature)
+LoadBoundaryCondition<T, d>::LoadBoundaryCondition(const PatchBoundary<T, d>& boundary,
+                                                   const Element<T, d>& element,
+                                                   const QuadratureRule<T, d - 1>& quadrature)
     : boundary_(boundary),
       element_(element),
       quadrature_(quadrature)
 {}
 
+// === Utility ========================================================================
+
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-LoadBoundaryCondition<T, d>& LoadBoundaryCondition<T, d>::add(
-    Ptr<const BoundaryField<T>> field, T value)
+LoadBoundaryCondition<T, d>& LoadBoundaryCondition<T, d>::add(Ptr<const BoundaryField<T>> field, 
+                                                              T value)
 {
     if (!field) {
-        throw std::invalid_argument(
-            "LoadBoundaryCondition::add: field must not be null.");
+        throw std::invalid_argument("LoadBoundaryCondition::add: "
+                                    "field must not be null.");
     }
+
     Term term;
     term.field = std::move(field);
     term.varying = false;
@@ -37,21 +41,23 @@ LoadBoundaryCondition<T, d>& LoadBoundaryCondition<T, d>::add(
 
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-LoadBoundaryCondition<T, d>& LoadBoundaryCondition<T, d>::add(
-    Ptr<const BoundaryField<T>> field, const Vector<T>& values_at_qpts)
+LoadBoundaryCondition<T, d>& LoadBoundaryCondition<T, d>::add(Ptr<const BoundaryField<T>> field, 
+                                                              const Vector<T>& values_at_qpts)
 {
     if (!field) {
-        throw std::invalid_argument(
-            "LoadBoundaryCondition::add: field must not be null.");
+        throw std::invalid_argument("LoadBoundaryCondition::add: "
+                                    "field must not be null.");
     }
+
     const Index nq = num_active_qpts();
+
     if (values_at_qpts.size() != static_cast<Eigen::Index>(nq)) {
-        throw std::runtime_error(
-            "LoadBoundaryCondition::add: values_at_qpts has size " +
-            std::to_string(values_at_qpts.size()) +
-            " but expected " + std::to_string(nq) +
-            " (one value per active boundary quadrature point).");
+        throw std::runtime_error("LoadBoundaryCondition::add: "
+                                 "values_at_qpts has size " + 
+                                 std::to_string(values_at_qpts.size()) +
+                                 " but expected " + std::to_string(nq));
     }
+
     Term term;
     term.field = std::move(field);
     term.varying = true;
@@ -62,71 +68,91 @@ LoadBoundaryCondition<T, d>& LoadBoundaryCondition<T, d>::add(
 
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-Index LoadBoundaryCondition<T, d>::num_active_qpts() const
-{
-    return boundary_.tensor_product().num_elements()
-         * static_cast<Index>(quadrature_.num_points());
-}
-
-template <std::floating_point T, std::size_t d>
-requires (d > 1)
 void LoadBoundaryCondition<T, d>::apply(
     Matrix<T>& /*stiffness*/,
     Vector<T>& load,
     const DofLayout& layout,
-    const std::vector<DofLayout::BlockId>& primal_blocks) const
+    DofLayout::BlockId primal_block) const
 {
     if (terms_.empty()) return;
 
-    const DofLayout::BlockId primal_block = primal_blocks.at(this->patch_idx_);
-    const Index ndof = static_cast<Index>(element_.num_node_dofs());
-    const Index Q = static_cast<Index>(quadrature_.num_points());
-
-    Index    parent_basis_order = element_.basis_order();
-    unsigned parent_flags       = Flags::None;
+    // Infer the required order and flags
+    Index    order = element_.basis_order();
+    unsigned flags = Flags::None;
     for (const auto& term : terms_) {
-        parent_basis_order = std::max(parent_basis_order, term.field->basis_order());
-        parent_flags |= term.field->flags();
-        parent_flags |= term.field->element_flags(element_);
+        order = std::max(order, term.field->basis_order());
+        flags |= term.field->flags();
+        flags |= term.field->element_flags(element_);
     }
-    BoundaryElementValues<T, d> bvals(boundary_, parent_basis_order,
-                                      parent_flags, quadrature_);
-    const Index num_spans = bvals.num_elements();
 
+    // Get the number of elements, primal DOFs and boundary Gauss points
+    BoundaryElementValues<T, d> bd_values(boundary_, order, flags, quadrature_);
+    const Index n_elems  = bd_values.num_elements();
+    const Index n_cps    = static_cast<Index>(bd_values.parent_vals_.act_pts_.rows());
+    const Index n_primal = n_cps * element_.num_node_dofs();
+    const Index n_gp     = static_cast<Index>(quadrature_.num_points());
+
+    // --- Assemble Local Blocks ------------------------------------------------------
+    // f_load = \int{ \bar{t} N_w^T d\Gamma }
+
+    // Preallocate local load vector
+    Vector<T> f_local(n_primal);
+
+    // Loop over elements (spans)
     std::size_t qpt_offset = 0;
-    for (Index span = 0; span < num_spans; ++span)
-    {
-        bvals.reinit(span);
+    for (Index s = 0; s < n_elems; ++s) {
+        // Compute values at the boundary
+        bd_values.reinit(s);
 
-        const Index n_elem = static_cast<Index>(bvals.parent_vals_.elem_cps_.size());
-        const Index K_elem = n_elem * ndof;
+        // Reset the reused local load vector (all terms accumulate per span)
+        f_local.setZero();
 
-        Vector<T> F_local = Vector<T>::Zero(K_elem);
+        // Loop over traction terms to apply
+        for (const auto& term : terms_) {
+            // Evaluate the field (w) at the boundary quadrature points
+            // Boundary values (N_w) size = (n_gp,n_primal)
+            Matrix<T> N_w = term.field->evaluate(element_, bd_values);
 
-        for (const auto& term : terms_)
-        {
-            Matrix<T> C = term.field->evaluate(element_, bvals);
-
-            for (Index q = 0; q < Q; ++q)
-            {
+            // Loop over quadrature points
+            for (Index q = 0; q < n_gp; ++q) {
+                // Prescribed traction: constant or per-qp value
                 const T t_bar = term.varying
                     ? term.values_at_qpts(static_cast<Eigen::Index>(qpt_offset + q))
                     : term.constant_value;
-                const T dGamma =
-                    bvals.boundary_vals_.jac(q) * bvals.boundary_vals_.mapped_weights_(q);
-                F_local.noalias() += (dGamma * t_bar) * C.row(q).transpose();
+                // Get the boundary integration measure
+                // ds = Jac * w_gp
+                const T ds = bd_values.boundary_vals_.jac(q) *
+                             bd_values.boundary_vals_.mapped_weights_(q);
+
+                // Add contribution to the local load vector
+                // f_load += \bar{t} * N_w * ds
+                f_local.noalias() += (ds * t_bar) * N_w.row(q).transpose();
             }
         }
-        qpt_offset += static_cast<std::size_t>(Q);
+        qpt_offset += static_cast<std::size_t>(n_gp);
 
-        // Scatter F_local into the global load vector.
-        layout.scatter_primal(primal_block, bvals.parent_vals_.elem_cps_,
-                              bvals.parent_vals_.elem_dofs_);
-        const Index n = static_cast<Index>(bvals.parent_vals_.elem_dofs_.size());
-        for (Index i = 0; i < n; ++i) {
-            load(bvals.parent_vals_.elem_dofs_[i]) += F_local(i);
+        // --- Scatter into Global System -------------------------------------------------
+        // {f + f_load}
+
+        // Scatter the parent primal DOFs for this span
+        layout.scatter_primal(primal_block, bd_values.parent_vals_.elem_cps_,
+                              bd_values.parent_vals_.elem_dofs_);
+
+        // Scatter f_load into the global load vector
+        for (Index i = 0; i < n_primal; ++i) {
+            load(bd_values.parent_vals_.elem_dofs_[i]) += f_local(i);
         }
     }
+}
+
+// === Properties =====================================================================
+
+template <std::floating_point T, std::size_t d>
+requires (d > 1)
+Index LoadBoundaryCondition<T, d>::num_active_qpts() const
+{
+    return boundary_.tensor_product().num_elements()
+         * static_cast<Index>(quadrature_.num_points());
 }
 
 template class LoadBoundaryCondition<double, 2>;

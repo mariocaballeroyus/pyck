@@ -37,7 +37,7 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
     // Allocate auxiliary DOFs per patch (e.g. Lagrange multipliers).
     for (std::size_t p = 0; p < patches_.size(); ++p) {
         for (const auto& cond : conditions_per_patch_[p]) {
-            cond->allocate_dofs(layout_, primal_blocks);
+            cond->allocate_dofs(layout_);
         }
     }
 
@@ -85,7 +85,7 @@ void LinearElasticProblem<T, d>::assemble(Matrix<T>& K, Vector<T>& F) const
     // --- Conditions -----------------------------------------------------------------
     for (std::size_t p = 0; p < patches_.size(); ++p) {
         for (const auto& cond : conditions_per_patch_[p]) {
-            cond->apply(K, F, layout_, primal_blocks);
+            cond->apply(K, F, layout_, primal_blocks[p]);
         }
     }
 

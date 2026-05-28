@@ -48,8 +48,7 @@ void bind_assembly(py::module_& m)
                py::arg("quadrature"))
 
           .def("add_condition", &LinearElasticProblem1d::add_condition,
-               py::arg("condition"), 
-               py::arg("patch_idx"))
+               py::arg("condition"))
 
           .def("add_constraint", &LinearElasticProblem1d::add_direct_constraint,
                py::arg("constraint"))
@@ -83,8 +82,7 @@ void bind_assembly(py::module_& m)
              py::arg("quadrature"))
 
         .def("add_condition", &LinearElasticProblem2d::add_condition,
-             py::arg("condition"), 
-             py::arg("patch_idx"))
+             py::arg("condition"))
 
         .def("add_constraint", &LinearElasticProblem2d::add_direct_constraint,
              py::arg("constraint"))

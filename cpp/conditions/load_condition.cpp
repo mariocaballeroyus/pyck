@@ -8,52 +8,26 @@
 namespace pyck
 {
 
+// === Constructors ===================================================================
+
 template <std::floating_point T, std::size_t d>
 LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
                                    const Element<T, d>& element,
                                    const QuadratureRule<T, d>& quadrature,
                                    const Vector<T>& load_values)
+    : patch_(patch)
 {
     const Index ndof = element.num_node_dofs();
-    Index num_nodes = patch.dof_mapper().num_basis()[0];
-    for (Index i = 1; i < d; ++i) {
-        num_nodes *= patch.dof_mapper().num_basis()[i];
-    }
-
-    std::array<std::size_t, d> intervals;
-    std::size_t total_elements = 1;
-    for (std::size_t i = 0; i < d; ++i) {
-        intervals[i] = patch.basis(i).knot_vector().num_spans();
-        total_elements *= intervals[i];
-    }
 
     // Initialize the element load vector with zeros
-    element_load_.setZero(num_nodes * ndof);
+    element_load_.setZero(static_cast<Index>(patch.num_control_pts()) * ndof);
 
     const std::size_t Q = quadrature.num_points();
 
-    // Count actual active quadrature points (excluding zero-volume elements)
-    std::size_t num_active_qpts = 0;
-    for (std::size_t elem_idx = 0; elem_idx < total_elements; ++elem_idx) {
-        std::array<std::size_t, d> span_indices;
-        std::size_t temp_idx = elem_idx;
-        for (std::size_t i = 0; i < d; ++i) {
-            span_indices[i] = temp_idx % intervals[i];
-            temp_idx /= intervals[i];
-        }
-
-        bool zero_volume = false;
-        for (std::size_t i = 0; i < d; ++i) {
-            auto [lo, hi] = patch.basis(i).knot_vector().span_bounds(span_indices[i]);
-            if (std::abs(hi - lo) < static_cast<T>(1e-14)) {
-                zero_volume = true;
-                break;
-            }
-        }
-        if (!zero_volume) {
-            num_active_qpts += Q;
-        }
-    }
+    // The tensor product already excludes zero-volume (degenerate) elements, so
+    // the active quadrature points are simply (live elements) × (points/element).
+    const std::size_t num_active_qpts =
+        static_cast<std::size_t>(patch.tensor_product().num_elements()) * Q;
 
     // Handle broadcasting: if load_values has size num_active_qpts, broadcast to first DOF
     Vector<T> broadcasted_values;
@@ -111,14 +85,15 @@ LoadCondition<T, d>::LoadCondition(const Patch<T, d>& patch,
     node_dofs_ = ndof;
 }
 
+// === Utility ========================================================================
+
 template <std::floating_point T, std::size_t d>
 void LoadCondition<T, d>::apply(Matrix<T>& /*stiffness*/,
                                 Vector<T>& load,
                                 const DofLayout& layout,
-                                const std::vector<DofLayout::BlockId>& primal_blocks) const
+                                DofLayout::BlockId primal_block) const
 {
     // The load condition is a RHS-only contribution.
-    const DofLayout::BlockId primal_block = primal_blocks.at(this->patch_idx_);
     const Index ndof = node_dofs_;
     const Index base_offset = layout.block_base(primal_block);
     const Index stride = layout.block_stride(primal_block);

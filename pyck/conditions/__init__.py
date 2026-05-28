@@ -19,13 +19,10 @@ from pyck.conditions.load_condition import (
 from pyck.conditions.load_boundary_condition import (
     LoadBoundaryCondition,
 )
-from pyck.conditions.lagrange_boundary_condition import (
+from pyck.conditions.boundary_lagrange_condition import (
     LagrangeBoundaryCondition,
 )
-from pyck.conditions.lagrange_domain_condition import (
-    LagrangeDomainCondition,
-)
-from pyck.conditions.penalty_boundary_condition import (
+from pyck.conditions.boundary_penalty_condition import (
     PenaltyBoundaryCondition,
 )
 
@@ -46,6 +43,5 @@ __all__ = [
     "LoadCondition",
     "LoadBoundaryCondition",
     "LagrangeBoundaryCondition",
-    "LagrangeDomainCondition",
     "PenaltyBoundaryCondition",
 ]

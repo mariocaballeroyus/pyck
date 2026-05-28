@@ -15,7 +15,7 @@
 #include "quadrature.hpp"
 #include "linear_elastic_problem.hpp"
 #include "load_boundary_condition.hpp"
-#include "lagrange_boundary_condition.hpp"
+#include "boundary_lagrange_condition.hpp"
 #include "dof_layout.hpp"
 #include "plane_stress_2d.hpp"
 #include "plate_reissner_mindlin_3p.hpp"
@@ -55,7 +55,7 @@ TEST_CASE("LoadBoundaryCondition: K is unchanged and F sums to Q*L_edge",
     const Index N = surface->num_control_pts() * 3;
     Matrix<double> K = Matrix<double>::Zero(N, N);
     Vector<double> F = Vector<double>::Zero(N);
-    cond.apply(K, F, layout, std::vector<DofLayout::BlockId>{primal});
+    cond.apply(K, F, layout, primal);
 
     REQUIRE(K.norm() == Approx(0.0).margin(1e-15));
 
@@ -192,7 +192,7 @@ TEST_CASE("LoadBoundaryCondition: scalar and per-qpt array overloads agree",
         LoadBoundaryCondition<double, 2> cond(*bdy, *element, g1);
         cond.add(std::make_shared<TransverseDisplacement<double>>(), Q);
         Matrix<double> K = Matrix<double>::Zero(N, N);
-        cond.apply(K, F_scalar, layout, std::vector<DofLayout::BlockId>{primal});
+        cond.apply(K, F_scalar, layout, primal);
     }
 
     // Per-qpt array path: same constant value at every active qpt.
@@ -203,7 +203,7 @@ TEST_CASE("LoadBoundaryCondition: scalar and per-qpt array overloads agree",
         Vector<double> values = Vector<double>::Constant(nq, Q);
         cond.add(std::make_shared<TransverseDisplacement<double>>(), values);
         Matrix<double> K = Matrix<double>::Zero(N, N);
-        cond.apply(K, F_array, layout, std::vector<DofLayout::BlockId>{primal});
+        cond.apply(K, F_array, layout, primal);
     }
 
     REQUIRE((F_scalar - F_array).norm() < 1e-14);
