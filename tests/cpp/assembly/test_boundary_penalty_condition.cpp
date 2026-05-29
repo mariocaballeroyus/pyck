@@ -238,7 +238,7 @@ TEST_CASE("PenaltyBoundaryCondition RM-1p plate: SS via penalty matches Navier",
 
     LinearElasticProblem<double, 2> problem(surface, element, gauss2d);
 
-    problem.add_domain_load(*surface, q0);
+    problem.add_domain_load(*surface, (Vector<double>(3) << 0.0, 0.0, q0).finished());
 
     const double alpha = 1e6 * D / (a * a * a);
     std::vector<Ptr<PatchBoundary<double, 2>>> penalty_boundaries;
@@ -293,7 +293,7 @@ TEST_CASE("PenaltyBoundaryCondition RM-3p plate: SS (w-only) matches Navier", "[
 
     const Index ndof = 3;
 
-    problem.add_domain_load(*surface, q0);
+    problem.add_domain_load(*surface, (Vector<double>(3) << 0.0, 0.0, q0).finished());
 
     // Only penalise w; rotations are free (SS condition)
     const double penalty_w = 1e6 * D / (a * a * a);
@@ -361,7 +361,7 @@ TEST_CASE("PenaltyBoundaryCondition RM-3p plate: clamped BCs agree with DirectCo
     {
         auto surface = make_surface();
         LinearElasticProblem<double, 2> problem(surface, element, gauss2d);
-        problem.add_domain_load(*surface, q0);
+        problem.add_domain_load(*surface, (Vector<double>(3) << 0.0, 0.0, q0).finished());
 
         SparseMatrix<double> K;
         Vector<double> F;
@@ -394,7 +394,7 @@ TEST_CASE("PenaltyBoundaryCondition RM-3p plate: clamped BCs agree with DirectCo
     {
         auto surface = make_surface();
         LinearElasticProblem<double, 2> problem(surface, element, gauss2d);
-        problem.add_domain_load(*surface, q0);
+        problem.add_domain_load(*surface, (Vector<double>(3) << 0.0, 0.0, q0).finished());
 
         const double alpha = 1e4 * D / (a * a * a);
         std::vector<Ptr<PatchBoundary<double, 2>>> penalty_boundaries;

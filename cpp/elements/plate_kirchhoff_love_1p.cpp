@@ -71,15 +71,15 @@ template <std::floating_point T>
 void
 PlateKirchhoffLove1p<T>::displacement_shape_matrix(const ElementValues<T, 2>& ev) const
 {
-    // N_w = [ N_i ]
+    // Physical displacement u = (0, 0, w): transverse deflection along +z.
     Matrix<T>& N_w = this->N_w_workspace_;
     const Index Q = ev.results_[0].cols();
     const Index N = ev.results_[0].rows();
-    N_w.resize(Q, N);
+    N_w.setZero(3 * Q, N);
     for (Index q = 0; q < Q; ++q) {
         auto slab0 = ev.results_[0].col(q);
         for (Index i = 0; i < N; ++i) {
-            N_w(q, i) = slab0(i);
+            N_w(3 * q + 2, i) = slab0(i);
         }
     }
 }

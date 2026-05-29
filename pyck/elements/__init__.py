@@ -6,6 +6,7 @@ from pyck.elements.plates import (
     PlateReissnerMindlin1p,
     PlateReissnerMindlin3p,
     PlateReissnerMindlinDispl2p,
+    ShellReissnerMindlin4p,
     ShellReissnerMindlin5p,
 )
 
@@ -18,5 +19,6 @@ __all__ = [
     "PlateReissnerMindlin3p",
     "PlateReissnerMindlinDispl2p",
     # Shell elements
+    "ShellReissnerMindlin4p",
     "ShellReissnerMindlin5p",
 ]

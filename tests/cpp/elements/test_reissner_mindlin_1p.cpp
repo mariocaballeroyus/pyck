@@ -106,7 +106,7 @@ static Eigen::VectorXd solve_ss_rm1p_plate(
 
     LinearElasticProblem<double, 2> problem(surface, element, gauss);
 
-    problem.add_domain_load(*surface, q0);
+    problem.add_domain_load(*surface, (Vector<double>(3) << 0.0, 0.0, q0).finished());
 
     // Assemble
     SparseMatrix<double> K;
@@ -238,7 +238,7 @@ TEST_CASE("RM 1P Plate: thin plate matches KL", "[RM1P]")
     for (std::size_t i = 0; i < active.size(); ++i)
         u_active(i) = u(active[i]);
 
-    double w_num = (N_eff * u_active)(0, 0);
+    double w_num = (N_eff * u_active)(2, 0);   // transverse w is the z-component
     double rel_err = std::abs(w_num - w_kl) / std::abs(w_kl);
 
     INFO("w_kl    = " << w_kl);
@@ -295,7 +295,7 @@ TEST_CASE("RM 1P Plate: thick plate — captures shear deformation", "[RM1P]")
         Vector<double> u_active(active.size());
         for (std::size_t i = 0; i < active.size(); ++i)
             u_active(i) = u_vec(active[i]);
-        return (N_eff * u_active)(0, 0);
+        return (N_eff * u_active)(2, 0);   // transverse w is the z-component
     };
 
     double w_thin  = eval_w(u_thin,  h_thin);
@@ -348,7 +348,7 @@ TEST_CASE("RM 1P Plate: strain energy convergence (thin plate)", "[RM1P]")
 
     LinearElasticProblem<double, 2> problem(surf, element, gauss);
 
-    problem.add_domain_load(*surf, q0);
+    problem.add_domain_load(*surf, (Vector<double>(3) << 0.0, 0.0, q0).finished());
 
     SparseMatrix<double> K;
     Vector<double> F;
@@ -402,7 +402,7 @@ TEST_CASE("RM 1P Plate: shear-locking-free across slenderness ratios", "[RM1P]")
 
         LinearElasticProblem<double, 2> problem(surf, element, gauss);
 
-        problem.add_domain_load(*surf, q0);
+        problem.add_domain_load(*surf, (Vector<double>(3) << 0.0, 0.0, q0).finished());
 
         SparseMatrix<double> K;
         Vector<double> F;

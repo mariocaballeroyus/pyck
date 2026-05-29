@@ -35,10 +35,11 @@ using Ptr = std::shared_ptr<T>;
 template <std::floating_point T>
 using Vector = Eigen::Vector<T, Eigen::Dynamic>;
 
-/// @brief Distributed-load functor: maps quadrature-point physical coordinates
-///        (n × 3) to load values (n). Evaluated once per element at assembly.
+/// @brief Body-force functor: maps quadrature-point physical coordinates
+///        (n × 3) to force vectors per unit area (n × 3). Evaluated once per
+///        element at assembly.
 template <std::floating_point T>
-using LoadFunction = std::function<Vector<T>(const Matrix<T>&)>;
+using LoadFunction = std::function<Matrix<T>(const Matrix<T>&)>;
 
 /// @brief Dynamic-sized row vector of type T
 template <std::floating_point T>

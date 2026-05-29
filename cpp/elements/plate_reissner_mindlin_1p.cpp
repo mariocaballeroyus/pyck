@@ -113,7 +113,7 @@ PlateReissnerMindlin1p<T>::displacement_shape_matrix(const ElementValues<T, 2>& 
     Matrix<T>& Nw = this->N_w_workspace_;
     const Index Q = ev.results_[0].cols();
     const Index N = ev.results_[0].rows();
-    Nw.resize(Q, N);
+    Nw.setZero(3 * Q, N);   // u = (0, 0, w): transverse deflection along +z
 
     for (Index q = 0; q < Q; ++q)
     {
@@ -144,8 +144,8 @@ PlateReissnerMindlin1p<T>::displacement_shape_matrix(const ElementValues<T, 2>& 
             const T N12 = N_uv_i - Gam1_12 * N_u_i - Gam2_12 * N_v_i;
             const T N22 = N_vv_i - Gam1_22 * N_u_i - Gam2_22 * N_v_i;
 
-            // N_w = N_i - (K_b/K_s) Δ_g N_i
-            Nw(q, i) = N_i - ratio * (gi11 * N11 + T(2) * gi12 * N12 + gi22 * N22);
+            // w = N_i - (K_b/K_s) Δ_g N_i, placed in the z-component row.
+            Nw(3 * q + 2, i) = N_i - ratio * (gi11 * N11 + T(2) * gi12 * N12 + gi22 * N22);
         }
     }
 }

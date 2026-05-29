@@ -52,7 +52,7 @@ void bind_assembly(py::module_& m)
                py::arg("condition"))
 
           .def("add_domain_load",
-               py::overload_cast<const Patch1d&, double>(
+               py::overload_cast<const Patch1d&, const Vector<double>&>(
                    &LinearElasticProblem1d::add_domain_load),
                py::arg("patch"), py::arg("value"))
           .def("add_domain_load",
@@ -95,7 +95,7 @@ void bind_assembly(py::module_& m)
              py::arg("condition"))
 
         .def("add_domain_load",
-             py::overload_cast<const Patch2d&, double>(
+             py::overload_cast<const Patch2d&, const Vector<double>&>(
                  &LinearElasticProblem2d::add_domain_load),
              py::arg("patch"), py::arg("value"))
         .def("add_domain_load",

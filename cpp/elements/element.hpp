@@ -94,20 +94,15 @@ public:
                                          Matrix<T>& stiffness) const;
 
     /**
-     * @brief Local distributed-load vector.
-     *
-     *        Integrates a body load over the element against the transverse
-     *        displacement shape, so the form is formulation-agnostic. The load
-     *        is evaluated once per element on the physical quadrature-point
-     *        coordinates.
+     * @brief Local body-force load vector
      *
      * @param ev      Per-element workspace bound via `ElementValues::reinit`.
-     * @param load_fn Functor mapping physical coordinates to load values.
+     * @param load_fn Body force per unit area: physical coords → force vectors.
      * @param f_local The local load vector.
      */
-    void compute_local_load(const ElementValues<T, d>& ev,
-                            const LoadFunction<T>& load_fn,
-                            Vector<T>& f_local) const;
+    void compute_local_domain_load(const ElementValues<T, d>& ev,
+                                 const LoadFunction<T>& load_fn,
+                                 Vector<T>& f_local) const;
 
     // === Matrix Operators (Element Formulation-Specific) ============================
 
@@ -208,22 +203,23 @@ Element<T, d>::compute_local_stiffness(const ElementValues<T, d>& ev,
 
 template <std::floating_point T, std::size_t d>
 void
-Element<T, d>::compute_local_load(const ElementValues<T, d>& ev,
-                                  const LoadFunction<T>& load_fn,
-                                  Vector<T>& f_local) const
+Element<T, d>::compute_local_domain_load(const ElementValues<T, d>& ev,
+                                       const LoadFunction<T>& load_fn,
+                                       Vector<T>& f_local) const
 {
-    // f_local = \int{ q N_w^T d\Omega }
+    // f_local = \int{ U^T b d\Omega }, with U the 3D displacement shape (3Q × K).
     displacement_shape_matrix(ev);
-    const Matrix<T>& N_w = N_w_workspace_;
+    const Matrix<T>& U = N_w_workspace_;
 
-    // Load values at the element's physical quadrature-point coordinates.
-    const Vector<T> q_vals = load_fn(ev.position_data[0]);
+    // Body force at the element's physical quadrature-point coordinates (Q × 3).
+    const Matrix<T> b = load_fn(ev.position_data[0]);
 
     const Index Q = ev.mapped_weights_.size();
-    f_local.setZero(N_w.cols());
+    f_local.setZero(U.cols());
     for (Index q = 0; q < Q; ++q) {
         const T dV = ev.mapped_weights_(q) * ev.jac(q);
-        f_local.noalias() += (q_vals(q) * dV) * N_w.row(q).transpose();
+        f_local.noalias() += dV *
+            (U.middleRows(3 * q, 3).transpose() * b.row(q).transpose());
     }
 }
 

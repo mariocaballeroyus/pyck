@@ -126,14 +126,15 @@ public:
     }
 
     /**
-     * @brief Add a distributed load over a patch's interior.
+     * @brief Add a body force over a patch's interior.
      *
-     *        The load is integrated during assembly inside the element loop,
-     *        reusing its workspace. The patch must be one of those already
-     *        registered with this problem.
+     *        Integrated during assembly inside the element loop, reusing its
+     *        workspace. The patch must be one of those already registered with
+     *        this problem.
      *
-     * @param patch   The patch the load is applied over.
-     * @param load_fn Functor mapping physical coordinates to load values.
+     * @param patch   The patch the body force acts over.
+     * @param load_fn Force per unit area: physical coords (n × 3) → force
+     *                vectors (n × 3).
      */
     void add_domain_load(const Patch<T, d>& patch, LoadFunction<T> load_fn)
     {
@@ -148,15 +149,16 @@ public:
     }
 
     /**
-     * @brief Add a uniform constant distributed load over a patch's interior.
+     * @brief Add a uniform constant body force over a patch's interior.
      *
-     * @param patch The patch the load is applied over.
-     * @param value Constant load value applied at every quadrature point.
+     * @param patch       The patch the body force acts over.
+     * @param body_force  Constant force per unit area (three physical components).
      */
-    void add_domain_load(const Patch<T, d>& patch, T value)
+    void add_domain_load(const Patch<T, d>& patch, const Vector<T>& body_force)
     {
-        add_domain_load(patch, [value](const Matrix<T>& points) -> Vector<T> {
-            return Vector<T>::Constant(points.rows(), value);
+        const Vector<T> b = body_force;
+        add_domain_load(patch, [b](const Matrix<T>& points) -> Matrix<T> {
+            return b.transpose().replicate(points.rows(), 1);
         });
     }
 

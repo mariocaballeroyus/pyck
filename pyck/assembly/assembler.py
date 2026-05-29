@@ -173,23 +173,25 @@ class LinearElasticProblem:
 
     def add_domain_load(
         self,
-        value: float | Callable[[npt.NDArray[np.floating]], npt.NDArray[np.floating]],
+        value: npt.NDArray[np.floating]
+        | Callable[[npt.NDArray[np.floating]], npt.NDArray[np.floating]],
         *,
         patch: str | None = None,
     ) -> None:
-        """Register a distributed body load over a patch's interior.
+        """Register a body force over a patch's interior.
 
-        The load is integrated during assembly inside the element loop. A native
-        C++ functor evaluates at full speed; a Python callable re-enters the
-        interpreter once per element.
+        The body force is integrated during assembly inside the element loop. A
+        native C++ functor evaluates at full speed; a Python callable re-enters
+        the interpreter once per element.
 
         Parameters
         ----------
-        value : float or callable
-            A uniform constant load, or a callable mapping quadrature-point
-            physical coordinates ``(n, 3)`` to load values ``(n,)``.
+        value : ndarray or callable
+            A uniform constant force per unit area ``(3,)``, or a callable
+            mapping quadrature-point physical coordinates ``(n, 3)`` to force
+            vectors ``(n, 3)``.
         patch : str, optional
-            Target patch name. If None, the load is applied to all patches.
+            Target patch name. If None, the body force is applied to all patches.
         """
         for name in self._resolve_patch_names(patch):
             self._cpp_object.add_domain_load(

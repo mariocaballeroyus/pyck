@@ -57,7 +57,7 @@ static Eigen::VectorXd solve_ss_rm_plate(
 
     LinearElasticProblem<double, 2> problem(surface, element, gauss);
 
-    problem.add_domain_load(*surface, q0);
+    problem.add_domain_load(*surface, (Vector<double>(3) << 0.0, 0.0, q0).finished());
 
     SparseMatrix<double> K;
     Vector<double> F;

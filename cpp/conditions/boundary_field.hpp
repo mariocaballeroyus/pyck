@@ -295,8 +295,23 @@ public:
     Matrix<T> evaluate(const Element<T, 2>& element,
                        const BoundaryElementValues<T, 2>& bvals) const override
     {
-        element.displacement_shape_matrix(bvals.parent_vals_);
-        return element.N_w_workspace_;
+        const auto& ev = bvals.parent_vals_;
+        element.displacement_shape_matrix(ev);
+        const Matrix<T>& U = element.N_w_workspace_;   // 3D displacement shape (3Q × K)
+
+        // Project onto the unit surface normal to recover the scalar transverse
+        // (normal) displacement w = n · u.
+        const Index Q = static_cast<Index>(ev.results_[0].cols());
+        const Index K = static_cast<Index>(U.cols());
+        Matrix<T> Nw(Q, K);
+        for (Index q = 0; q < Q; ++q) {
+            const Eigen::Matrix<T, 3, 1> a1 = ev.a(0).row(q).transpose();
+            const Eigen::Matrix<T, 3, 1> a2 = ev.a(1).row(q).transpose();
+            Eigen::Matrix<T, 3, 1> n = a1.cross(a2);
+            n.normalize();
+            Nw.row(q) = n.transpose() * U.middleRows(3 * q, 3);
+        }
+        return Nw;
     }
 
     Index basis_order() const override { return Index(0); }

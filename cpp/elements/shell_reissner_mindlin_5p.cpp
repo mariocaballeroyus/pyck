@@ -117,10 +117,20 @@ template <std::floating_point T>
 void
 ShellReissnerMindlin5p<T>::displacement_shape_matrix(const ElementValues<T, 2>& ev) const
 {
+    // Physical displacement u = (u_x, u_y, u_z): the three Cartesian DOFs.
     const Index Q = ev.results_[0].cols();
     const Index N = ev.results_[0].rows();
-    this->N_w_workspace_.setZero(Q, 5 * N);
-    // TODO: implement this
+    Matrix<T>& U = this->N_w_workspace_;
+    U.setZero(3 * Q, 5 * N);
+    for (Index q = 0; q < Q; ++q) {
+        auto slab0 = ev.results_[0].col(q);
+        for (Index i = 0; i < N; ++i) {
+            const T Ni = slab0(i);
+            U(3 * q + 0, 5 * i + 0) = Ni;   // u_x
+            U(3 * q + 1, 5 * i + 1) = Ni;   // u_y
+            U(3 * q + 2, 5 * i + 2) = Ni;   // u_z
+        }
+    }
 }
 
 template <std::floating_point T>

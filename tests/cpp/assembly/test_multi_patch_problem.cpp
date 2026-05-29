@@ -87,7 +87,7 @@ TEST_CASE("LinearElasticProblem single-patch vector ctor matches legacy ctor",
     // -------- Legacy single-patch ----------------------------------------
     LinearElasticProblem<double, 2> legacy(surface, element, gauss2d);
 
-    legacy.add_domain_load(*surface, q0);
+    legacy.add_domain_load(*surface, (Vector<double>(3) << 0.0, 0.0, q0).finished());
 
     std::vector<Ptr<PatchBoundary<double, 2>>> bds_legacy;
     clamp_w_all_edges(legacy, bds_legacy, surface, *element, gauss1d, alpha);
@@ -105,7 +105,7 @@ TEST_CASE("LinearElasticProblem single-patch vector ctor matches legacy ctor",
 
     REQUIRE(vec_problem.num_patches() == 1);
 
-    vec_problem.add_domain_load(*surface, q0);
+    vec_problem.add_domain_load(*surface, (Vector<double>(3) << 0.0, 0.0, q0).finished());
 
     std::vector<Ptr<PatchBoundary<double, 2>>> bds_vec;
     clamp_w_all_edges(vec_problem, bds_vec, surface, *element, gauss1d, alpha);
@@ -156,7 +156,7 @@ TEST_CASE("LinearElasticProblem two disconnected patches → block-diagonal",
 
     // -------- Standalone reference solves --------------------------------
     LinearElasticProblem<double, 2> ref_A(surf_A, element, gauss2d);
-    ref_A.add_domain_load(*surf_A, q_A);
+    ref_A.add_domain_load(*surf_A, (Vector<double>(3) << 0.0, 0.0, q_A).finished());
     std::vector<Ptr<PatchBoundary<double, 2>>> bd_A_ref;
     clamp_w_all_edges(ref_A, bd_A_ref, surf_A, *element, gauss1d, alpha_A);
     SparseMatrix<double> K_A_ref_sparse;
@@ -165,7 +165,7 @@ TEST_CASE("LinearElasticProblem two disconnected patches → block-diagonal",
     Matrix<double> K_A_ref = Matrix<double>(K_A_ref_sparse);
 
     LinearElasticProblem<double, 2> ref_B(surf_B, element, gauss2d);
-    ref_B.add_domain_load(*surf_B, q_B);
+    ref_B.add_domain_load(*surf_B, (Vector<double>(3) << 0.0, 0.0, q_B).finished());
     std::vector<Ptr<PatchBoundary<double, 2>>> bd_B_ref;
     clamp_w_all_edges(ref_B, bd_B_ref, surf_B, *element, gauss1d, alpha_B);
     SparseMatrix<double> K_B_ref_sparse;
@@ -181,8 +181,8 @@ TEST_CASE("LinearElasticProblem two disconnected patches → block-diagonal",
     REQUIRE(idx_B == 1);
     REQUIRE(combined.num_patches() == 2);
 
-    combined.add_domain_load(*surf_A, q_A);
-    combined.add_domain_load(*surf_B, q_B);
+    combined.add_domain_load(*surf_A, (Vector<double>(3) << 0.0, 0.0, q_A).finished());
+    combined.add_domain_load(*surf_B, (Vector<double>(3) << 0.0, 0.0, q_B).finished());
 
     std::vector<Ptr<PatchBoundary<double, 2>>> bd_combined;
     clamp_w_all_edges(combined, bd_combined, surf_A, *element, gauss1d, alpha_A);
@@ -267,6 +267,6 @@ TEST_CASE("LinearElasticProblem builder API: empty ctor and add_patch",
     // A condition whose patch is not registered with the problem must throw.
     // Build it on a separate, unregistered patch.
     auto surf_other = make_square_plate(L, p, n_elem);
-    REQUIRE_THROWS_AS(problem.add_domain_load(*surf_other, 0.0),
+    REQUIRE_THROWS_AS(problem.add_domain_load(*surf_other, (Vector<double>(3) << 0.0, 0.0, 0.0).finished()),
                       std::invalid_argument);
 }

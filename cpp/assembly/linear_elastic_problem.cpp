@@ -81,9 +81,9 @@ void LinearElasticProblem<T, d>::assemble(SparseMatrix<T>& K, Vector<T>& F) cons
                 }
             }
 
-            // Accumulate element distributed-load contributions
+            // Accumulate element body-force contributions
             for (const auto& load_fn : domain_loads_per_patch_[p]) {
-                element.compute_local_load(patch_values, load_fn, f_local);
+                element.compute_local_domain_load(patch_values, load_fn, f_local);
                 for (std::size_t i = 0; i < Ne; ++i) {
                     assembler.add_load(elem_dofs[i], f_local(i));
                 }

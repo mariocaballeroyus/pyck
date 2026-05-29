@@ -16,6 +16,7 @@
 #include "plate_reissner_mindlin_1p.hpp"
 #include "plate_reissner_mindlin_displ_2p.hpp"
 #include "shell_reissner_mindlin_5p.hpp"
+#include "shell_reissner_mindlin_4p.hpp"
 #include "plane_stress_2d.hpp"
 
 namespace py = pybind11;
@@ -191,6 +192,11 @@ void bind_elements(py::module_& m)
 
      py::class_<ShellReissnerMindlin5p<double>, Element2d,
                 Ptr<ShellReissnerMindlin5p<double>>>(m, "ShellReissnerMindlin5p")
+          .def(py::init<Ptr<PlaneStress2d<double>>>(),
+               py::arg("material"));
+
+     py::class_<ShellReissnerMindlin4p<double>, Element2d,
+                Ptr<ShellReissnerMindlin4p<double>>>(m, "ShellReissnerMindlin4p")
           .def(py::init<Ptr<PlaneStress2d<double>>>(),
                py::arg("material"));
 }

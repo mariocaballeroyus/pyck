@@ -80,15 +80,15 @@ template <std::floating_point T>
 void
 PlateReissnerMindlin3p<T>::displacement_shape_matrix(const ElementValues<T, 2>& ev) const
 {
-    // N_w = [ N_i  0  0 ]
+    // Physical displacement u = (0, 0, w): w is the first of the (w, θx, θy) DOFs.
     Matrix<T>& Nw = this->N_w_workspace_;
     const Index Q = ev.results_[0].cols();
     const Index N = ev.results_[0].rows();
-    Nw.setZero(Q, 3 * N);
+    Nw.setZero(3 * Q, 3 * N);
     for (Index q = 0; q < Q; ++q) {
         auto slab0 = ev.results_[0].col(q);
         for (Index i = 0; i < N; ++i) {
-            Nw(q, 3*i) = slab0(i);
+            Nw(3 * q + 2, 3 * i) = slab0(i);
         }
     }
 }

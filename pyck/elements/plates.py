@@ -161,3 +161,48 @@ class ShellReissnerMindlin5p(Element):
         return f"ShellReissnerMindlin5p(material={self._material})"
 
 
+class ShellReissnerMindlin4p(Element):
+    """Four-parameter rotation-free Reissner-Mindlin shell element.
+
+    The curved-surface counterpart of :class:`PlateReissnerMindlinDispl2p`.
+    The director tilt is given a surface Helmholtz split and the transverse
+    displacement a bending-shear split, eliminating the normal displacement
+    and the irrotational tilt onto the bending potential ``w_b``. This leaves
+    four DOFs per control point against five for the standard
+    displacement-rotation shell:
+
+        slot 0..1 : covariant in-plane displacement components (u_1, u_2)
+        slot 2    : bending potential w_b
+        slot 3    : twist potential psi
+
+    The recovered fields are
+
+        w     = w_b - (Kb/Ks) Laplacian(w_b)
+        gamma = -(Kb/Ks) grad(Laplacian(w_b)) + curl(psi) + B . u
+
+    Like the two-parameter plate the shear strain carries third derivatives of
+    ``w_b``, so the basis must be C^2 (degree >= 3). The constant-``psi`` mode
+    is a zero-energy mode (as for the plate) and should be suppressed with a
+    zero-mean Lagrange condition on slot 3.
+
+    See ``report/sections/extra.tex`` for the formulation.
+
+    Parameters
+    ----------
+    material : PlaneStress2d
+        Shell material model.
+    """
+    num_node_dofs: int = 4
+
+    def __init__(self, material: PlaneStress2d) -> None:
+        self._material = material
+        self._cpp_object = _pyck.ShellReissnerMindlin4p(self._material._cpp_object)
+
+    @property
+    def material(self) -> PlaneStress2d:
+        return self._material
+
+    def __repr__(self) -> str:
+        return f"ShellReissnerMindlin4p(material={self._material})"
+
+
