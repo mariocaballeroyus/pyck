@@ -80,14 +80,14 @@ public:
     // === Getters ================================================================
 
     /// @brief Number of node degrees of freedom (displacement + rotation).
-    std::size_t num_node_dofs() const override 
-    { return 3; }
+    std::size_t num_node_dofs() const override { return 3; }
+
     Index basis_order() const override { return 2; }
 
-    unsigned flags() const override { return Flags::Metric | Flags::Christoffels; }
+    unsigned flags() const override { return Flags::Metric; }
 
     unsigned essential_flags() const override { return Flags::None; }
-    unsigned natural_flags()   const override { return Flags::Metric | Flags::Christoffels; }
+    unsigned natural_flags()   const override { return Flags::Metric; }
 
 private:
 
