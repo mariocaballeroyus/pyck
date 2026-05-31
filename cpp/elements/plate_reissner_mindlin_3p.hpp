@@ -36,20 +36,15 @@ public:
      *   rows 5q..5q+2 : curvatures κ_{11}, κ_{22}, 2κ_{12}
      *   rows 5q+3..5q+4 : transverse shears γ_1, γ_2
      *
-     * @param patch Patch.
-     * @param basis Basis derivatives.
-     * @param local Local frame.
-     * @param chr Christoffel symbols.
-     * @return Strain-displacement matrix.
+     * @param ev Per-element evaluation workspace.
      */
     void strain_matrix(const ElementValues<T, 2>& ev) const override;
 
     /**
      * @brief Constitutive D-matrix (5×5 block-diag [Db; Ds]).
      *
-     * @param local Local frame.
+     * @param ev Per-element evaluation workspace.
      * @param q Quadrature point.
-     * @return Constitutive matrix.
      */
     ConstitutiveMatrix<T> constitutive_matrix(const ElementValues<T, 2>& ev, Index q) const override;
 
@@ -58,22 +53,14 @@ public:
     /**
      * @brief Displacement shape matrix.
      *
-     * @param patch Patch.
-     * @param basis Basis derivatives.
-     * @param local Local frame.
-     * @param chr Christoffel symbols.
-     * @return Displacement shape matrix.
+     * @param ev Per-element evaluation workspace.
      */
     void displacement_shape_matrix(const ElementValues<T, 2>& ev) const override;
 
     /**
      * @brief Rotation shape matrix.
      *
-     * @param patch Patch.
-     * @param basis Basis derivatives.
-     * @param local Local frame.
-     * @param chr Christoffel symbols.
-     * @return Rotation shape matrix.
+     * @param ev Per-element evaluation workspace.
      */
     void rotation_shape_matrix(const ElementValues<T, 2>& ev) const override;
 

@@ -35,44 +35,31 @@ public:
     /**
      * @brief Strain-displacement B-matrix.
      *
-     * @param patch Patch.
-     * @param basis Basis derivatives.
-     * @param local Local frame.
-     * @param chr Christoffel symbols.
-     * @return Strain-displacement matrix.
+     * @param ev Per-element evaluation workspace.
      */
     void strain_matrix(const ElementValues<T, 2>& ev) const override;
 
     /**
      * @brief Constitutive D-matrix.
      *
-     * @param local Local frame.
+     * @param ev Per-element evaluation workspace.
      * @param q Quadrature point.
-     * @return Constitutive matrix.
      */
     ConstitutiveMatrix<T> constitutive_matrix(const ElementValues<T, 2>& ev, Index q) const override;
 
     // Shape Matrices =================================================================
 
     /**
-     * @brief Displacement shape matrix stub (returns zero).
+     * @brief Displacement shape matrix.
      *
-     * @param patch Patch.
-     * @param basis Basis derivatives.
-     * @param local Local frame.
-     * @param chr Christoffel symbols.
-     * @return Zero matrix of correct shape.
+     * @param ev Per-element evaluation workspace.
      */
     void displacement_shape_matrix(const ElementValues<T, 2>& ev) const override;
 
     /**
-     * @brief Rotation shape matrix stub (returns zero).
+     * @brief Rotation shape matrix.
      *
-     * @param patch Patch.
-     * @param basis Basis derivatives.
-     * @param local Local frame.
-     * @param chr Christoffel symbols.
-     * @return Zero matrix of correct shape.
+     * @param ev Per-element evaluation workspace.
      */
     void rotation_shape_matrix(const ElementValues<T, 2>& ev) const override;
 
@@ -82,15 +69,14 @@ public:
     std::size_t num_node_dofs() const override
     { return 5; }
 
-    /// @brief Minimum order of basis functions. Christoffels in the bending
-    /// block require second derivatives of the surface position, i.e. an
-    /// order-2 basis evaluation.
+    /// @brief Minimum order of basis functions. The bending block needs the
+    /// second surface derivatives A_{λ,β}, i.e. an order-2 basis evaluation.
     Index basis_order() const override { return 2; }
 
-    unsigned flags() const override { return Flags::Metric | Flags::Christoffels | Flags::Normal | Flags::NormalD1; }
+    unsigned flags() const override { return Flags::Metric | Flags::Normal | Flags::NormalD1; }
 
     unsigned essential_flags() const override { return Flags::None; }
-    unsigned natural_flags()   const override { return Flags::Metric | Flags::Christoffels | Flags::Normal | Flags::NormalD1; }
+    unsigned natural_flags()   const override { return Flags::Metric | Flags::Normal | Flags::NormalD1; }
 
 private:
 
