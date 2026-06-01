@@ -113,13 +113,20 @@ public:
     ///        evaluated to order 3.
     Index basis_order() const override { return 3; }
 
+    // Christoffels/Curvature/Normal/NormalD1 remain for the inline Codazzi ∇B
+    // (the per-qp curvature derivative, not a per-basis kernel); the four kernels
+    // supply the Hessian, recovered transverse □, in-plane covariant gradient,
+    // and Laplace–Beltrami gradient.
     unsigned flags() const override
-    { return Flags::Metric | Flags::Christoffels | Flags::Normal | Flags::NormalD1 | Flags::Curvature; }
+    { return Flags::Metric | Flags::Christoffels | Flags::Normal | Flags::NormalD1 | Flags::Curvature
+           | Flags::KernelHessian | Flags::KernelLB | Flags::KernelVectorGrad | Flags::KernelLBGradient; }
 
     unsigned essential_flags() const override
-    { return Flags::Metric | Flags::Christoffels; }
+    { return Flags::Metric | Flags::Christoffels | Flags::Normal | Flags::NormalD1 | Flags::Curvature
+           | Flags::KernelHessian | Flags::KernelLB | Flags::KernelVectorGrad | Flags::KernelLBGradient; }
     unsigned natural_flags()   const override
-    { return Flags::Metric | Flags::Christoffels | Flags::Normal | Flags::NormalD1 | Flags::Curvature; }
+    { return Flags::Metric | Flags::Christoffels | Flags::Normal | Flags::NormalD1 | Flags::Curvature
+           | Flags::KernelHessian | Flags::KernelLB | Flags::KernelVectorGrad | Flags::KernelLBGradient; }
 
 private:
 

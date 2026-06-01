@@ -1,6 +1,6 @@
 #include "laplace_beltrami.hpp"
 
-#include "../elements/element_values.hpp"
+#include "../multi_index.hpp"
 
 #include <algorithm>
 #include <array>
@@ -34,9 +34,10 @@ sym3(std::size_t i, std::size_t j, std::size_t k)
 
 template <std::floating_point T, std::size_t d>
 LaplaceGradAux<T, d>
-compute_laplace_grad_aux(const ElementValues<T, d>& ev)
+compute_laplace_grad_aux(const std::vector<ColMatrix<T, 3>>& position_data,
+                         const Matrix<T>& g_inv_data)
 {
-    const Index Q = ev.a(0).rows();
+    const Index Q = position_data[0].rows();
 
 
     LaplaceGradAux<T, d> aux;
@@ -52,25 +53,20 @@ compute_laplace_grad_aux(const ElementValues<T, d>& ev)
 
     for (Index q = 0; q < Q; ++q)
     {
-        // Symmetric accessors hiding the upper-tri storage convention.
         auto a1  = [&](std::size_t i) {
-            return ev.a(i).row(q);
+            return position_data[1].row(i * Q + q);
         };
         auto a2  = [&](std::size_t i, std::size_t j) {
             auto [lo, hi] = sym2(i, j);
-            return ev.a_d1(lo, hi).row(q);
+            return position_data[2].row(pack2<d>(lo, hi) * Q + q);
         };
         auto a3  = [&](std::size_t i, std::size_t j, std::size_t k) {
             auto v = sym3(i, j, k);
-            return ev.a_d2(v[0], v[1], v[2]).row(q);
+            return position_data[3].row(pack3<d>(v[0], v[1], v[2]) * Q + q);
         };
         auto G   = [&](std::size_t i, std::size_t j) {
             auto [lo, hi] = sym2(i, j);
-            return ev.g_inv(lo, hi)(q);
-        };
-        auto Gam = [&](std::size_t e, std::size_t i, std::size_t j) {
-            auto [lo, hi] = sym2(i, j);
-            return ev.Gamma(e, lo, hi)(q);
+            return g_inv_data(q, pack2<d>(lo, hi));
         };
 
         // ---- Precompute unique dot products once per q ---------------------
@@ -84,6 +80,15 @@ compute_laplace_grad_aux(const ElementValues<T, d>& ev)
                     dot1[mu][i][j] = v;
                     dot1[mu][j][i] = v;
                 }
+
+        // Second-kind Christoffel formed directly from base vectors:
+        //   Γ^e_{ij} = g^{eε}(a_ε·a_{ij}) = Σ_ε g^{eε} dot1[ε][i][j].
+        auto Gam = [&](std::size_t e, std::size_t i, std::size_t j) -> T {
+            T s = T(0);
+            for (std::size_t eps = 0; eps < d; ++eps)
+                s += G(e, eps) * dot1[eps][i][j];
+            return s;
+        };
 
         // dot2[i][j][k][l] = a_{ij} · a_{kl}, mirrored on (i, j) and (k, l).
         std::array<std::array<std::array<std::array<T, d>, d>, d>, d> dot2{};
@@ -167,11 +172,11 @@ compute_laplace_grad_aux(const ElementValues<T, d>& ev)
 // === Template Instantiations ========================================================
 
 template LaplaceGradAux<double, 2> compute_laplace_grad_aux<double, 2>(
-    const ElementValues<double, 2>&);
+    const std::vector<ColMatrix<double, 3>>&, const Matrix<double>&);
 
 #ifdef PYCK_BUILD_SINGLE_PRECISION
 template LaplaceGradAux<float, 2> compute_laplace_grad_aux<float, 2>(
-    const ElementValues<float, 2>&);
+    const std::vector<ColMatrix<float, 3>>&, const Matrix<float>&);
 #endif
 
 } // namespace pyck

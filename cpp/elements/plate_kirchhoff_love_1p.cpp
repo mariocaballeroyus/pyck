@@ -26,33 +26,13 @@ PlateKirchhoffLove1p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
     B.setZero(3 * Q, N);
 
     for (Index q = 0; q < Q; ++q)
-    {
-        auto slab1 = ev.results_[1].col(q);  // (N · 2)
-        auto slab2 = ev.results_[2].col(q);  // (N · 3)
-
-        const T Gam1_11 = ev.Gamma(0, 0, 0)(q);
-        const T Gam1_12 = ev.Gamma(0, 0, 1)(q);
-        const T Gam1_22 = ev.Gamma(0, 1, 1)(q);
-        const T Gam2_11 = ev.Gamma(1, 0, 0)(q);
-        const T Gam2_12 = ev.Gamma(1, 0, 1)(q);
-        const T Gam2_22 = ev.Gamma(1, 1, 1)(q);
-
         for (Index i = 0; i < N; ++i)
         {
-            const T N_u_i  = slab1(i * 2 + 0);
-            const T N_v_i  = slab1(i * 2 + 1);
-            const T N_uu_i = slab2(i * 3 + 0);    // Voigt: (0,0) → 0
-            const T N_vv_i = slab2(i * 3 + 1);    // Voigt: (1,1) → 1
-            const T N_uv_i = slab2(i * 3 + 2);    // Voigt: (0,1) → 2
-
-            // B_i = [ -N_{i|11}   ]
-            //       [ -N_{i|22}   ]
-            //       [ -2 N_{i|12} ]
-            B(3*q,     i) = -(N_uu_i - Gam1_11 * N_u_i - Gam2_11 * N_v_i);
-            B(3*q + 1, i) = -(N_vv_i - Gam1_22 * N_u_i - Gam2_22 * N_v_i);
-            B(3*q + 2, i) = -T(2) * (N_uv_i - Gam1_12 * N_u_i - Gam2_12 * N_v_i);
+            // Bending strain = −(covariant Hessian of w): B_i = [−H_11; −H_22; −2H_12].
+            B(3*q,     i) = -ev.H(i, 0, 0, q);
+            B(3*q + 1, i) = -ev.H(i, 1, 1, q);
+            B(3*q + 2, i) = -T(2) * ev.H(i, 0, 1, q);
         }
-    }
 }
 
 template <std::floating_point T>

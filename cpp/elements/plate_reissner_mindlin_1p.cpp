@@ -33,7 +33,6 @@ template <std::floating_point T>
 void
 PlateReissnerMindlin1p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
 {
-    auto aux = compute_laplace_grad_aux(ev);
     const T ratio = material_->bending_stiffness() / material_->shear_stiffness();
 
     Matrix<T>& B = this->B_workspace_;
@@ -42,64 +41,17 @@ PlateReissnerMindlin1p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
     B.setZero(5 * Q, N);
 
     for (Index q = 0; q < Q; ++q)
-    {
-        auto slab1 = ev.results_[1].col(q);  // (N · 2)
-        auto slab2 = ev.results_[2].col(q);  // (N · 3) Voigt: ∂uu, ∂vv, ∂uv
-        auto slab3 = ev.results_[3].col(q);  // (N · 4) lex: ∂uuu, ∂uuv, ∂uvv, ∂vvv
-
-        const T Gam1_11 = ev.Gamma(0, 0, 0)(q);
-        const T Gam1_12 = ev.Gamma(0, 0, 1)(q);
-        const T Gam1_22 = ev.Gamma(0, 1, 1)(q);
-        const T Gam2_11 = ev.Gamma(1, 0, 0)(q);
-        const T Gam2_12 = ev.Gamma(1, 0, 1)(q);
-        const T Gam2_22 = ev.Gamma(1, 1, 1)(q);
-        const T G11 = ev.g_inv(0, 0)(q);
-        const T G12 = ev.g_inv(0, 1)(q);
-        const T G22 = ev.g_inv(1, 1)(q);
-        const T G11_d1 = aux.G_inv_d[0][0][0](q);
-        const T G12_d1 = aux.G_inv_d[0][1][0](q);
-        const T G22_d1 = aux.G_inv_d[1][1][0](q);
-        const T G11_d2 = aux.G_inv_d[0][0][1](q);
-        const T G12_d2 = aux.G_inv_d[0][1][1](q);
-        const T G22_d2 = aux.G_inv_d[1][1][1](q);
-        const T c1 = aux.c[0](q),    c2 = aux.c[1](q);
-        const T c1_d1 = aux.c_d[0][0](q), c2_d1 = aux.c_d[1][0](q);
-        const T c1_d2 = aux.c_d[0][1](q), c2_d2 = aux.c_d[1][1](q);
-
         for (Index i = 0; i < N; ++i)
         {
-            const T N_u_i    = slab1(i * 2 + 0);
-            const T N_v_i    = slab1(i * 2 + 1);
-            const T N_uu_i   = slab2(i * 3 + 0);    // Voigt: (0,0) → 0
-            const T N_vv_i   = slab2(i * 3 + 1);    // Voigt: (1,1) → 1
-            const T N_uv_i   = slab2(i * 3 + 2);    // Voigt: (0,1) → 2
-            const T N_uuu_i  = slab3(i * 4 + 0);    // lex: (0,0,0) → 0
-            const T N_uuv_i  = slab3(i * 4 + 1);    // lex: (0,0,1) → 1
-            const T N_uvv_i  = slab3(i * 4 + 2);    // lex: (0,1,1) → 2
-            const T N_vvv_i  = slab3(i * 4 + 3);    // lex: (1,1,1) → 3
+            // Bending = −(covariant Hessian of w): [−H_11; −H_22; −2H_12].
+            B(5*q,     i) = -ev.H(i, 0, 0, q);
+            B(5*q + 1, i) = -ev.H(i, 1, 1, q);
+            B(5*q + 2, i) = -T(2) * ev.H(i, 0, 1, q);
 
-            // B_b = [ -N_{i|11}   ]
-            //       [ -N_{i|22}   ]
-            //       [ -2 N_{i|12} ]
-            B(5*q,     i) = -(N_uu_i - Gam1_11 * N_u_i - Gam2_11 * N_v_i);
-            B(5*q + 1, i) = -(N_vv_i - Gam1_22 * N_u_i - Gam2_22 * N_v_i);
-            B(5*q + 2, i) = -T(2) * (N_uv_i - Gam1_12 * N_u_i - Gam2_12 * N_v_i);
-
-            // B_s = [ -(K_b/K_s) (Δ_g N_i)_{|1} ]
-            //       [ -(K_b/K_s) (Δ_g N_i)_{|2} ]
-            B(5*q + 3, i) = -ratio * (
-                  G11_d1 * N_uu_i  + T(2)*G12_d1 * N_uv_i + G22_d1 * N_vv_i
-                + G11    * N_uuu_i + T(2)*G12    * N_uuv_i + G22    * N_uvv_i
-                - c1_d1  * N_u_i   - c2_d1       * N_v_i
-                - c1     * N_uu_i  - c2          * N_uv_i);
-
-            B(5*q + 4, i) = -ratio * (
-                  G11_d2 * N_uu_i  + T(2)*G12_d2 * N_uv_i + G22_d2 * N_vv_i
-                + G11    * N_uuv_i + T(2)*G12    * N_uvv_i + G22    * N_vvv_i
-                - c1_d2  * N_u_i   - c2_d2       * N_v_i
-                - c1     * N_uv_i  - c2          * N_vv_i);
+            // Shear = −(K_b/K_s)(Δ_g N_i)_{,α} = −ratio · P_{iα}.
+            B(5*q + 3, i) = -ratio * ev.P(i, 0, q);
+            B(5*q + 4, i) = -ratio * ev.P(i, 1, q);
         }
-    }
 }
 
 // === Shape Matrices =================================================================
@@ -118,35 +70,9 @@ PlateReissnerMindlin1p<T>::displacement_shape_matrix(const ElementValues<T, 2>& 
     for (Index q = 0; q < Q; ++q)
     {
         auto slab0 = ev.results_[0].col(q);
-        auto slab1 = ev.results_[1].col(q);
-        auto slab2 = ev.results_[2].col(q);
-
-        const T gi11 = ev.g_inv(0, 0)(q);
-        const T gi12 = ev.g_inv(0, 1)(q);
-        const T gi22 = ev.g_inv(1, 1)(q);
-        const T Gam1_11 = ev.Gamma(0, 0, 0)(q);
-        const T Gam1_12 = ev.Gamma(0, 0, 1)(q);
-        const T Gam1_22 = ev.Gamma(0, 1, 1)(q);
-        const T Gam2_11 = ev.Gamma(1, 0, 0)(q);
-        const T Gam2_12 = ev.Gamma(1, 0, 1)(q);
-        const T Gam2_22 = ev.Gamma(1, 1, 1)(q);
-
         for (Index i = 0; i < N; ++i)
-        {
-            const T N_i    = slab0(i);
-            const T N_u_i  = slab1(i * 2 + 0);
-            const T N_v_i  = slab1(i * 2 + 1);
-            const T N_uu_i = slab2(i * 3 + 0);
-            const T N_vv_i = slab2(i * 3 + 1);
-            const T N_uv_i = slab2(i * 3 + 2);
-
-            const T N11 = N_uu_i - Gam1_11 * N_u_i - Gam2_11 * N_v_i;
-            const T N12 = N_uv_i - Gam1_12 * N_u_i - Gam2_12 * N_v_i;
-            const T N22 = N_vv_i - Gam1_22 * N_u_i - Gam2_22 * N_v_i;
-
-            // w = N_i - (K_b/K_s) Δ_g N_i, placed in the z-component row.
-            Nw(3 * q + 2, i) = N_i - ratio * (gi11 * N11 + T(2) * gi12 * N12 + gi22 * N22);
-        }
+            // w = N_i − (K_b/K_s) Δ_g N_i = N_i − ratio·L_i, in the z-component row.
+            Nw(3 * q + 2, i) = slab0(i) - ratio * ev.L(i, q);
     }
 }
 

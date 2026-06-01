@@ -42,19 +42,10 @@ ShellReissnerMindlin5p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
         const auto A3_d1 = ev.n_d1(0).row(q);
         const auto A3_d2 = ev.n_d1(1).row(q);
 
-        // Second surface derivatives A_{λ,β}
-        const auto A1_d1 = ev.a_d1(0, 0).row(q);   // A_{1,1}
-        const auto A1_d2 = ev.a_d1(0, 1).row(q);   // A_{1,2} = A_{2,1}
-        const auto A2_d2 = ev.a_d1(1, 1).row(q);   // A_{2,2}
-
-        // Metric A_α·A_β
-        const T A11 = A1.dot(A1);   // A_{11}
-        const T A12 = A1.dot(A2);   // A_{12} = A_{21}
-        const T A22 = A2.dot(A2);   // A_{22}
-
-        // Christoffels of the first kind Cα_λβ = A_α·A_{λ,β}
-        const T C1_11 = A1.dot(A1_d1), C1_12 = A1.dot(A1_d2), C1_22 = A1.dot(A2_d2);
-        const T C2_11 = A2.dot(A1_d1), C2_12 = A2.dot(A1_d2), C2_22 = A2.dot(A2_d2);
+        // Midsurface metric A_{αβ} = A_α·A_β (for the transverse-shear tilt φ_α = φ^λ A_{λα}).
+        const T A11 = A1.dot(A1);
+        const T A12 = A1.dot(A2);
+        const T A22 = A2.dot(A2);
 
         for (Index i = 0; i < N; ++i)
         {
@@ -75,18 +66,13 @@ ShellReissnerMindlin5p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
 
             // --- Bending ------------------------------------------------------------
 
-            // Rotations (contravariant)
-
-            // \kappa_{11} = \phi^λ_{,1} * (A_1·A_λ) + \phi^λ * (A_1·A_{λ,1})
-            B(8*q + 3, 5*i + 3) = N_u_i * A11 + N_i * C1_11;
-            B(8*q + 3, 5*i + 4) = N_u_i * A12 + N_i * C1_12;
-            // \kappa_{22} = \phi^λ_{,2} * (A_2·A_λ) + \phi^λ * (A_2·A_{λ,2})
-            B(8*q + 4, 5*i + 3) = N_v_i * A12 + N_i * C2_12;
-            B(8*q + 4, 5*i + 4) = N_v_i * A22 + N_i * C2_22;
-            // 2 \kappa_{12} = \phi^λ_{,2}(A_1·A_λ) + \phi^λ_{,1}(A_2·A_λ)
-            //              + \phi^λ (A_1·A_{λ,2} + A_2·A_{λ,1})
-            B(8*q + 5, 5*i + 3) = N_v_i * A11 + N_u_i * A12 + N_i * (C1_12 + C2_11);
-            B(8*q + 5, 5*i + 4) = N_v_i * A12 + N_u_i * A22 + N_i * (C1_22 + C2_12);
+            // Rotations (contravariant): κ_{αβ} ⊃ φ_{(α|β)} = D_{iλαβ} φ^λ.
+            B(8*q + 3, 5*i + 3) = ev.D(i, 0, 0, 0, q);
+            B(8*q + 3, 5*i + 4) = ev.D(i, 1, 0, 0, q);
+            B(8*q + 4, 5*i + 3) = ev.D(i, 0, 1, 1, q);
+            B(8*q + 4, 5*i + 4) = ev.D(i, 1, 1, 1, q);
+            B(8*q + 5, 5*i + 3) = ev.D(i, 0, 0, 1, q) + ev.D(i, 0, 1, 0, q);
+            B(8*q + 5, 5*i + 4) = ev.D(i, 1, 0, 1, q) + ev.D(i, 1, 1, 0, q);
 
             // Displacements (cartesian)
 

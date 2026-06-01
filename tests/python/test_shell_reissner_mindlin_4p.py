@@ -44,13 +44,14 @@ def _frame_and_shape_operator(patch, uv, h=1e-4):
 def test_4p_shell_shear_has_no_membrane_coupling():
     """The transverse shear must NOT couple to the in-plane displacement DOFs
     (u_1, u_2). The full Reissner-Mindlin shear carries a membrane-curvature term
-    B^g_a u_g, but the rotation-free kinematics cannot relax it: retaining it
-    locks the shear and over-stiffens membrane-bending problems (Scordelis-Lo) by
-    ~4x, converging in both h and p to the wrong answer. It is therefore dropped,
-    consistently with the leading-order w_s closure. This regression guards
-    against it silently returning: on a strongly non-principal doubly-curved
-    patch (B^1_2 != B^2_1, so the bug-prone index would be plainly visible) the
-    shear rows gamma_1, gamma_2 must have zero u_1, u_2 columns."""
+    B^g_a u_g, which the rotation-free kinematics cannot relax: retaining it in the
+    shear locks it and over-stiffens membrane-bending problems (Scordelis-Lo) by
+    ~4x, converging in both h and p to the wrong answer. The deformed-director
+    referencing cancels it from the shear by construction (relocating it, with its
+    grad-B partner, into bending). This regression guards against it reappearing in
+    the shear: on a strongly non-principal doubly-curved patch (B^1_2 != B^2_1, so
+    the bug-prone index would be plainly visible) the shear rows gamma_1, gamma_2
+    must have zero u_1, u_2 columns."""
     el = ck.ShellReissnerMindlin4p(ck.PlaneStress2d(1.0e7, 0.3, 0.05))
     patch = _hypar_patch()
     uv = (0.37, 0.58)                       # generic interior, off-diagonal point

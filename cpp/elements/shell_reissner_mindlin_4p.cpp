@@ -22,7 +22,6 @@ template <std::floating_point T>
 void
 ShellReissnerMindlin4p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
 {
-    auto aux = compute_laplace_grad_aux(ev);
     const T ratio = material_->bending_stiffness() / material_->shear_stiffness();
 
     Matrix<T>& B = this->B_workspace_;
@@ -34,8 +33,6 @@ ShellReissnerMindlin4p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
     {
         auto slab0 = ev.results_[0].col(q);
         auto slab1 = ev.results_[1].col(q);
-        auto slab2 = ev.results_[2].col(q);
-        auto slab3 = ev.results_[3].col(q);
 
         const T G1_11 = ev.Gamma(0, 0, 0)(q);
         const T G1_12 = ev.Gamma(0, 0, 1)(q);
@@ -44,20 +41,16 @@ ShellReissnerMindlin4p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
         const T G2_12 = ev.Gamma(1, 0, 1)(q);
         const T G2_22 = ev.Gamma(1, 1, 1)(q);
 
-        // Contravariant metric (for the Laplace–Beltrami operator) and covariant
-        // metric + Jacobian (for the surface permutation ε_α^β).
-        const T gi11 = ev.g_inv(0, 0)(q);
-        const T gi12 = ev.g_inv(0, 1)(q);
-        const T gi22 = ev.g_inv(1, 1)(q);
-        const T gc11 = ev.g(0, 0)(q);
-        const T gc12 = ev.g(0, 1)(q);
-        const T gc22 = ev.g(1, 1)(q);
+        // Midsurface metric + Jacobian (for the surface permutation ε_α^β).
+        const T A11 = ev.g(0, 0)(q);
+        const T A12 = ev.g(0, 1)(q);
+        const T A22 = ev.g(1, 1)(q);
         const T invJ = T(1) / ev.jac(q);
 
         // Mixed surface permutation ε_α^β = g_{αμ} ϵ^{μβ} / √g, reducing to
         // ε_1^2 = +1, ε_2^1 = −1 on the orthonormal lamina.
-        const T e1_1 = -gc12 * invJ, e1_2 = gc11 * invJ;
-        const T e2_1 = -gc22 * invJ, e2_2 = gc12 * invJ;
+        const T e1_1 = -A12 * invJ, e1_2 = A11 * invJ;
+        const T e2_1 = -A22 * invJ, e2_2 = A12 * invJ;
 
         // Second fundamental form B_{αβ} = b_{αβ} and shape operator B_α^β.
         const T B11 = ev.b(0, 0)(q), B12 = ev.b(0, 1)(q), B22 = ev.b(1, 1)(q);
@@ -76,169 +69,117 @@ ShellReissnerMindlin4p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
         // derivatives and the unit-normal derivatives, then add the connection
         // terms. Vanishes (as a tensor) on constant-curvature surfaces — flat,
         // sphere, cylinder — so it does not perturb those benchmarks.
-        const Eigen::Matrix<T, 3, 1> A3   = ev.n.row(q).transpose();
-        const Eigen::Matrix<T, 3, 1> A3_1 = ev.n_d1(0).row(q).transpose();
-        const Eigen::Matrix<T, 3, 1> A3_2 = ev.n_d1(1).row(q).transpose();
-        const Eigen::Matrix<T, 3, 1> a11 = ev.a_d1(0, 0).row(q).transpose();
-        const Eigen::Matrix<T, 3, 1> a12 = ev.a_d1(0, 1).row(q).transpose();
-        const Eigen::Matrix<T, 3, 1> a22 = ev.a_d1(1, 1).row(q).transpose();
-        const Eigen::Matrix<T, 3, 1> a111 = ev.a_d2(0, 0, 0).row(q).transpose();
-        const Eigen::Matrix<T, 3, 1> a112 = ev.a_d2(0, 0, 1).row(q).transpose();
-        const Eigen::Matrix<T, 3, 1> a122 = ev.a_d2(0, 1, 1).row(q).transpose();
-        const Eigen::Matrix<T, 3, 1> a222 = ev.a_d2(1, 1, 1).row(q).transpose();
+        const Eigen::Matrix<T, 3, 1> A3    = ev.n.row(q).transpose();
+        const Eigen::Matrix<T, 3, 1> A3_d1 = ev.n_d1(0).row(q).transpose();   // A_{3,1}
+        const Eigen::Matrix<T, 3, 1> A3_d2 = ev.n_d1(1).row(q).transpose();   // A_{3,2}
+        const Eigen::Matrix<T, 3, 1> A1_d1 = ev.a_d1(0, 0).row(q).transpose();   // A_{1,1}
+        const Eigen::Matrix<T, 3, 1> A1_d2 = ev.a_d1(0, 1).row(q).transpose();   // A_{1,2} = A_{2,1}
+        const Eigen::Matrix<T, 3, 1> A2_d2 = ev.a_d1(1, 1).row(q).transpose();   // A_{2,2}
+        const Eigen::Matrix<T, 3, 1> A1_d11 = ev.a_d2(0, 0, 0).row(q).transpose();   // A_{1,11}
+        const Eigen::Matrix<T, 3, 1> A1_d12 = ev.a_d2(0, 0, 1).row(q).transpose();   // A_{1,12}
+        const Eigen::Matrix<T, 3, 1> A1_d22 = ev.a_d2(0, 1, 1).row(q).transpose();   // A_{1,22}
+        const Eigen::Matrix<T, 3, 1> A2_d22 = ev.a_d2(1, 1, 1).row(q).transpose();   // A_{2,22}
 
-        // ∂_γ B_{αβ}
-        const T dB11_1 = a111.dot(A3) + a11.dot(A3_1);
-        const T dB11_2 = a112.dot(A3) + a11.dot(A3_2);
-        const T dB12_1 = a112.dot(A3) + a12.dot(A3_1);
-        const T dB12_2 = a122.dot(A3) + a12.dot(A3_2);
-        const T dB22_1 = a122.dot(A3) + a22.dot(A3_1);
-        const T dB22_2 = a222.dot(A3) + a22.dot(A3_2);
+        // Partial ∂_γ B_{αβ} = A_{αβγ}·A_3 + A_{αβ}·A_{3,γ}.
+        const T B11_d1 = A1_d11.dot(A3) + A1_d1.dot(A3_d1);
+        const T B11_d2 = A1_d12.dot(A3) + A1_d1.dot(A3_d2);
+        const T B12_d1 = A1_d12.dot(A3) + A1_d2.dot(A3_d1);
+        const T B12_d2 = A1_d22.dot(A3) + A1_d2.dot(A3_d2);
+        const T B22_d1 = A1_d22.dot(A3) + A2_d2.dot(A3_d1);
+        const T B22_d2 = A2_d22.dot(A3) + A2_d2.dot(A3_d2);
 
-        // B_{αβ|γ} = ∂_γ B_{αβ} − Γ^δ_{αγ}B_{δβ} − Γ^δ_{βγ}B_{αδ}  (Codazzi-symmetric).
-        const T Bc11_1 = dB11_1 - T(2) * (G1_11 * B11 + G2_11 * B12);
-        const T Bc11_2 = dB11_2 - T(2) * (G1_12 * B11 + G2_12 * B12);
-        const T Bc12_1 = dB12_1 - (G1_11 * B12 + G2_11 * B22) - (G1_12 * B11 + G2_12 * B12);
-        const T Bc12_2 = dB12_2 - (G1_12 * B12 + G2_12 * B22) - (G1_22 * B11 + G2_22 * B12);
-        const T Bc22_1 = dB22_1 - T(2) * (G1_12 * B12 + G2_12 * B22);
-        const T Bc22_2 = dB22_2 - T(2) * (G1_22 * B12 + G2_22 * B22);
-
-        // Raise the contracted index: (B_α^γ)_{|β} = A^{γμ} B_{αμ|β}.  DB[g][a][b].
-        const T DB_1_1_1 = gi11 * Bc11_1 + gi12 * Bc12_1;  // (B_1^1)_{|1}
-        const T DB_2_1_1 = gi12 * Bc11_1 + gi22 * Bc12_1;  // (B_1^2)_{|1}
-        const T DB_1_2_2 = gi11 * Bc12_2 + gi12 * Bc22_2;  // (B_2^1)_{|2}
-        const T DB_2_2_2 = gi12 * Bc12_2 + gi22 * Bc22_2;  // (B_2^2)_{|2}
-        const T DB_1_1_2 = gi11 * Bc11_2 + gi12 * Bc12_2;  // (B_1^1)_{|2}
-        const T DB_2_1_2 = gi12 * Bc11_2 + gi22 * Bc12_2;  // (B_1^2)_{|2}
-        const T DB_1_2_1 = gi11 * Bc12_1 + gi12 * Bc22_1;  // (B_2^1)_{|1}
-        const T DB_2_2_1 = gi12 * Bc12_1 + gi22 * Bc22_1;  // (B_2^2)_{|1}
-
-        // Symmetrised ∇B coefficient of û_γ in each bending row:
-        //   κ_{αβ} ⊃ ½((B_α^γ)_{|β} + (B_β^γ)_{|α}) u_γ.
-        const T gradB_11_u1 = DB_1_1_1;                 // κ_11, u_1
-        const T gradB_11_u2 = DB_2_1_1;                 // κ_11, u_2
-        const T gradB_22_u1 = DB_1_2_2;                 // κ_22, u_1
-        const T gradB_22_u2 = DB_2_2_2;                 // κ_22, u_2
-        const T gradB_12_u1 = DB_1_1_2 + DB_1_2_1;      // 2κ_12, u_1
-        const T gradB_12_u2 = DB_2_1_2 + DB_2_2_1;      // 2κ_12, u_2
-
-        const T G11_d1 = aux.G_inv_d[0][0][0](q);
-        const T G12_d1 = aux.G_inv_d[0][1][0](q);
-        const T G22_d1 = aux.G_inv_d[1][1][0](q);
-        const T G11_d2 = aux.G_inv_d[0][0][1](q);
-        const T G12_d2 = aux.G_inv_d[0][1][1](q);
-        const T G22_d2 = aux.G_inv_d[1][1][1](q);
-        const T c1 = aux.c[0](q),    c2 = aux.c[1](q);
-        const T c1_d1 = aux.c_d[0][0](q), c2_d1 = aux.c_d[1][0](q);
-        const T c1_d2 = aux.c_d[0][1](q), c2_d2 = aux.c_d[1][1](q);
+        // Codazzi-symmetric covariant derivative
+        //   B_{αβ|γ} = ∂_γ B_{αβ} − Γ^δ_{αγ}B_{δβ} − Γ^δ_{βγ}B_{αδ}.
+        const T B11_cov1 = B11_d1 - T(2) * (G1_11 * B11 + G2_11 * B12);
+        const T B11_cov2 = B11_d2 - T(2) * (G1_12 * B11 + G2_12 * B12);
+        const T B12_cov1 = B12_d1 - (G1_11 * B12 + G2_11 * B22) - (G1_12 * B11 + G2_12 * B12);
+        const T B12_cov2 = B12_d2 - (G1_12 * B12 + G2_12 * B22) - (G1_22 * B11 + G2_22 * B12);
+        const T B22_cov1 = B22_d1 - T(2) * (G1_12 * B12 + G2_12 * B22);
+        const T B22_cov2 = B22_d2 - T(2) * (G1_22 * B12 + G2_22 * B22);
 
         for (Index i = 0; i < N; ++i)
         {
-            const T N_i    = slab0(i);
-            const T N_u    = slab1(i * 2 + 0);
-            const T N_v    = slab1(i * 2 + 1);
-            const T N_uu   = slab2(i * 3 + 0);
-            const T N_vv   = slab2(i * 3 + 1);
-            const T N_uv   = slab2(i * 3 + 2);
-            const T N_uuu  = slab3(i * 4 + 0);
-            const T N_uuv  = slab3(i * 4 + 1);
-            const T N_uvv  = slab3(i * 4 + 2);
-            const T N_vvv  = slab3(i * 4 + 3);
+            const T N_i = slab0(i);
+            const T N_u = slab1(i * 2 + 0);
+            const T N_v = slab1(i * 2 + 1);
 
-            // Covariant Hessian N_{i|αβ}.
-            const T N11 = N_uu - G1_11 * N_u - G2_11 * N_v;
-            const T N12 = N_uv - G1_12 * N_u - G2_12 * N_v;
-            const T N22 = N_vv - G1_22 * N_u - G2_22 * N_v;
-
-            // Recovered transverse shape □_i = N_i − (K_b/K_s) Δ_g N_i.
-            const T lapN = gi11 * N11 + T(2) * gi12 * N12 + gi22 * N22;
-            const T box  = N_i - ratio * lapN;
-
-            // Surface gradient of the Laplace–Beltrami, (K_b/K_s)(Δ_g N_i)_{,α}.
-            const T lap_1 = ratio * (
-                  G11_d1 * N_uu  + T(2)*G12_d1 * N_uv + G22_d1 * N_vv
-                + gi11   * N_uuu + T(2)*gi12   * N_uuv + gi22   * N_uvv
-                - c1_d1  * N_u   - c2_d1       * N_v
-                - c1     * N_uu  - c2          * N_uv);
-            const T lap_2 = ratio * (
-                  G11_d2 * N_uu  + T(2)*G12_d2 * N_uv + G22_d2 * N_vv
-                + gi11   * N_uuv + T(2)*gi12   * N_uvv + gi22   * N_vvv
-                - c1_d2  * N_u   - c2_d2       * N_v
-                - c1     * N_uv  - c2          * N_vv);
-
+            // Primal DOF indices
             const Index c_u1 = 4 * i + 0;
             const Index c_u2 = 4 * i + 1;
             const Index c_wb = 4 * i + 2;
             const Index c_ps = 4 * i + 3;
 
-            // --- Membrane Strain \varepsilon_{ab} -----------------------------------
+            // w = w_b - Kb/Ks \nabla^2 w_b
+            const T box = N_i - ratio * ev.L(i, q);
 
-            // \varepsilon_{11} = u_{1,1} - \Gamma^1_{11} u_1 
-            //                            - \Gamma^2_{11} u_2 - B_{11} u^3
-            B(8*q + 0, c_u1) =  N_u - G1_11 * N_i;
-            B(8*q + 0, c_u2) =      - G2_11 * N_i;
+            // Covariant Hessian H_{αβ} of the scalar potential, and covariant
+            // gradient D_{λαβ} = ∂(u_{α|β})/∂u^λ of the in-plane field.
+            const T H11 = ev.H(i, 0, 0, q), H12 = ev.H(i, 0, 1, q), H22 = ev.H(i, 1, 1, q);
+            const T D000 = ev.D(i,0,0,0,q), D001 = ev.D(i,0,0,1,q),
+                    D010 = ev.D(i,0,1,0,q), D011 = ev.D(i,0,1,1,q),
+                    D100 = ev.D(i,1,0,0,q), D101 = ev.D(i,1,0,1,q),
+                    D110 = ev.D(i,1,1,0,q), D111 = ev.D(i,1,1,1,q);
+
+            // --- Membrane: ε_{αβ} = ½(u_{α|β}+u_{β|α}) − B_{αβ} □(w_b) --------------
+
+            // In-plane u^λ via the covariant-gradient kernel u_{α|β} = D_{λαβ}.
+            B(8*q + 0, c_u1) =  D000;
+            B(8*q + 0, c_u2) =  D100;
+            B(8*q + 1, c_u1) =  D011;
+            B(8*q + 1, c_u2) =  D111;
+            B(8*q + 2, c_u1) =  D001 + D010;
+            B(8*q + 2, c_u2) =  D101 + D110;
+
+            // Scalar Bending Potential: w_b
+
+            // ε_11 += (A_1 · A_{3,1}) * (w_b - Kb/Ks Δw_b)
             B(8*q + 0, c_wb) = -B11 * box;
-
-            // \varepsilon_{22} = u_{2,2} - \Gamma^1_{22} u_1 
-            //                            - \Gamma^2_{22} u_2 - B_{22} u^3
-            B(8*q + 1, c_u1) =      - G1_22 * N_i;
-            B(8*q + 1, c_u2) =  N_v - G2_22 * N_i;
             B(8*q + 1, c_wb) = -B22 * box;
-
-            // 2 \varepsilon_{12} = u_{1,2} + u_{2,1} - 2 \Gamma^1_{12} u_1 - 
-            //                                          2 \Gamma^2_{12} u_2 - 2 B_{12} u^3
-            B(8*q + 2, c_u1) =  N_v - T(2) * G1_12 * N_i;
-            B(8*q + 2, c_u2) =  N_u - T(2) * G2_12 * N_i;
             B(8*q + 2, c_wb) = -T(2) * B12 * box;
 
-            // --- Bending Strain \kappa_{ab} -----------------------------------------
-            
-            // \kappa_{11} = w_{b|11} - (B^2)_{11} u^3                      // w_b
-            //             - ( e_1^1 * \psi_{|11} + e_1^2 \psi_{|21} )      // psi
-            //             + ( B_1^1 * u_{1|1} + B_1^2 * u_{2|1} )          // u1, u2
-            //             + ( (B_1^1)_{|1} u_1 + (B_1^2)_{|1} u_2 )        // ∇B (deformed director)
-            B(8*q + 3, c_wb) =  N11 - B2_11 * box;
-            B(8*q + 3, c_ps) = - (e1_1 * N11 + e1_2 * N12);
-            B(8*q + 3, c_u1) = - (Bmix11 * G1_11 + Bmix21 * G1_12) * N_i + Bmix11 * N_u + gradB_11_u1 * N_i;
-            B(8*q + 3, c_u2) = - (Bmix11 * G2_11 + Bmix21 * G2_12) * N_i + Bmix21 * N_u + gradB_11_u2 * N_i;
+            // --- Bending ------------------------------------------------------------
 
-            // \kappa_{22} = w_{b|22} - (B^2)_{22} u^3                      // w_b
-            //             - ( e_2^1 * \psi_{|12} + e_2^2 \psi_{|22} )      // psi
-            //             + ( B_2^1 * u_{1|1} + B_2^2 * u_{2|2} )          // u1, u2
-            //             + ( (B_2^1)_{|2} u_1 + (B_2^2)_{|2} u_2 )        // ∇B (deformed director)
-            B(8*q + 4, c_wb) =  N22 - B2_22 * box;
-            B(8*q + 4, c_ps) = - (e2_1 * N12 + e2_2 * N22);
-            B(8*q + 4, c_u1) = - (Bmix12 * G1_12 + Bmix22 * G1_22) * N_i + Bmix12 * N_v + gradB_22_u1 * N_i;
-            B(8*q + 4, c_u2) = - (Bmix12 * G2_12 + Bmix22 * G2_22) * N_i + Bmix22 * N_v + gradB_22_u2 * N_i;
+            // Bending Potential: w_b
 
-            // 2 \kappa_{12} = 2 w_{b|12} - 2 (B^2)_{12} u^3                // w_b
-            //               - ( e_1^1 \psi_{|12} + e_1^2 * \psi_{|22} +    // psi
-            //                   e_2^1 \psi_{|11} + e_2^2 * \psi_{|21} )
-            //               + ( B_1^1 u_{1|2} + B_1^2 u_{2|2} +            // u1, u2
-            //                   B_2^1 u_{1|1} + B_2^2 u_{2|1} )
-            //               + ( ((B_1^γ)_{|2}+(B_2^γ)_{|1}) u_γ )          // ∇B (deformed director)
-            B(8*q + 5, c_wb) =  T(2) * N12 - T(2) * B2_12 * box;
-            B(8*q + 5, c_ps) = - (e1_1 * N12 + e1_2 * N22 + e2_1 * N11 + e2_2 * N12);
-            B(8*q + 5, c_u1) =  Bmix11 * N_v + Bmix12 * N_u
-                             - (Bmix11 * G1_12 + Bmix21 * G1_22 +
-                                Bmix12 * G1_11 + Bmix22 * G1_12) * N_i + gradB_12_u1 * N_i;
-            B(8*q + 5, c_u2) =  Bmix21 * N_v + Bmix22 * N_u
-                             - (Bmix11 * G2_12 + Bmix21 * G2_22 +
-                                Bmix12 * G2_11 + Bmix22 * G2_12) * N_i + gradB_12_u2 * N_i;
+            // κ_{αβ} += w_{b,αβ} - (B^2)_{αβ} * (w_b - Kb/Ks Δw_b)
+            B(8*q + 3, c_wb) =  H11 - B2_11 * box;
+            B(8*q + 4, c_wb) =  H22 - B2_22 * box;
+            B(8*q + 5, c_wb) =  T(2) * H12 - T(2) * B2_12 * box;
+
+            // Twist Potential: ψ
+
+            // κ_{αβ} += e_α^λ * ψ_{,λβ} + e_β^λ * ψ_{,λα}
+            B(8*q + 3, c_ps) = - (e1_1 * H11 + e1_2 * H12);
+            B(8*q + 4, c_ps) = - (e2_1 * H12 + e2_2 * H22);
+            B(8*q + 5, c_ps) = - (e1_1 * H12 + e1_2 * H22 + e2_1 * H11 + e2_2 * H12);
+
+            // Contravariant Membrane Displacements: u^λ
+
+            // κ_{αβ} += B_α^μ u_{μ|β} + B_β^μ u_{μ|α}  (coeff 1 on the symmetric sum),
+            //   B_α^μ u_{μ|β} = B_α^1 D(i,λ,0,β) + B_α^2 D(i,λ,1,β),  B_α^μ = Bmix(μ,α).
+            B(8*q + 3, c_u1) =  T(2) * (Bmix11 * D000 + Bmix21 * D010);
+            B(8*q + 3, c_u2) =  T(2) * (Bmix11 * D100 + Bmix21 * D110);
+            B(8*q + 4, c_u1) =  T(2) * (Bmix12 * D001 + Bmix22 * D011);
+            B(8*q + 4, c_u2) =  T(2) * (Bmix12 * D101 + Bmix22 * D111);
+            B(8*q + 5, c_u1) =  T(2) * (Bmix11 * D001 + Bmix21 * D011 + Bmix12 * D000 + Bmix22 * D010);
+            B(8*q + 5, c_u2) =  T(2) * (Bmix11 * D101 + Bmix21 * D111 + Bmix12 * D100 + Bmix22 * D110);
+
+            // κ_{αβ} += ½(∇_β B_{αλ} + ∇_α B_{βλ}) u^λ   (Codazzi ∇B; relocated shear coupling)
+            B(8*q + 3, c_u1) += N_i * B11_cov1;
+            B(8*q + 3, c_u2) += N_i * B12_cov1;
+            B(8*q + 4, c_u1) += N_i * B12_cov2;
+            B(8*q + 4, c_u2) += N_i * B22_cov2;
+            B(8*q + 5, c_u1) += N_i * (B11_cov2 + B12_cov1);
+            B(8*q + 5, c_u2) += N_i * (B12_cov2 + B22_cov1);
 
             // --- Transverse Shear Strain --------------------------------------------
-            // Deformed-director referencing: θ_α carries −B_α^γ u_γ, which cancels
-            // the membrane–curvature coupling B_{αγ}u^γ here, leaving only the
-            // recovered shear deflection and the twist. Shear-locking-free by
-            // construction; the curvature coupling reappears (consistently, with
-            // its ∇B partner) in the bending block above.
 
             // \gamma_1 = -(K_b/K_s)(Δ_g w_b)_{,1} + ( e_1^1 ψ_{,1} + e_1^2 ψ_{,2} )
-            B(8*q + 6, c_wb) = -lap_1;
+            B(8*q + 6, c_wb) = -ratio * ev.P(i, 0, q);
             B(8*q + 6, c_ps) =  e1_1 * N_u + e1_2 * N_v;
 
             // \gamma_2 = -(K_b/K_s)(Δ_g w_b)_{,2} + ( e_2^1 ψ_{,1} + e_2^2 ψ_{,2} )
-            B(8*q + 7, c_wb) = -lap_2;
+            B(8*q + 7, c_wb) = -ratio * ev.P(i, 1, q);
             B(8*q + 7, c_ps) =  e2_1 * N_u + e2_2 * N_v;
         }
     }
@@ -276,47 +217,23 @@ ShellReissnerMindlin4p<T>::displacement_shape_matrix(const ElementValues<T, 2>& 
 
     for (Index q = 0; q < Q; ++q) {
         auto slab0 = ev.results_[0].col(q);
-        auto slab1 = ev.results_[1].col(q);
-        auto slab2 = ev.results_[2].col(q);
 
-        const T gi11 = ev.g_inv(0, 0)(q);
-        const T gi12 = ev.g_inv(0, 1)(q);
-        const T gi22 = ev.g_inv(1, 1)(q);
-        const T G1_11 = ev.Gamma(0, 0, 0)(q);
-        const T G1_12 = ev.Gamma(0, 0, 1)(q);
-        const T G1_22 = ev.Gamma(0, 1, 1)(q);
-        const T G2_11 = ev.Gamma(1, 0, 0)(q);
-        const T G2_12 = ev.Gamma(1, 0, 1)(q);
-        const T G2_22 = ev.Gamma(1, 1, 1)(q);
-
-        // Contravariant tangents A^α = g^{αβ} A_β and the unit normal A_3.
+        // Covariant tangents A_α and the unit normal A_3.
         const Eigen::Matrix<T, 3, 1> a1 = A1v.row(q).transpose();
         const Eigen::Matrix<T, 3, 1> a2 = A2v.row(q).transpose();
-        const Eigen::Matrix<T, 3, 1> Aup1 = gi11 * a1 + gi12 * a2;
-        const Eigen::Matrix<T, 3, 1> Aup2 = gi12 * a1 + gi22 * a2;
         Eigen::Matrix<T, 3, 1> A3 = a1.cross(a2);
         A3.normalize();
 
         for (Index i = 0; i < N; ++i) {
-            const T N_i  = slab0(i);
-            const T N_u  = slab1(i * 2 + 0);
-            const T N_v  = slab1(i * 2 + 1);
-            const T N_uu = slab2(i * 3 + 0);
-            const T N_vv = slab2(i * 3 + 1);
-            const T N_uv = slab2(i * 3 + 2);
+            const T N_i = slab0(i);
+            // Recovered transverse □_i = N_i − (K_b/K_s) Δ_g N_i = N_i − ratio·L_i.
+            const T box = N_i - ratio * ev.L(i, q);
 
-            const T N11 = N_uu - G1_11 * N_u - G2_11 * N_v;
-            const T N12 = N_uv - G1_12 * N_u - G2_12 * N_v;
-            const T N22 = N_vv - G1_22 * N_u - G2_22 * N_v;
-
-            // Recovered transverse □_i = N_i − (K_b/K_s) Δ_g N_i.
-            const T box = N_i - ratio * (gi11 * N11 + T(2) * gi12 * N12 + gi22 * N22);
-
-            // Physical displacement u = u₁ A^1 + u₂ A^2 + □(w_b) A_3 (ψ does no work).
+            // Physical displacement u = u¹ A_1 + u² A_2 + □(w_b) A_3 (ψ does no work).
             for (Index r = 0; r < 3; ++r) {
-                U(3 * q + r, 4 * i + 0) = Aup1(r) * N_i;
-                U(3 * q + r, 4 * i + 1) = Aup2(r) * N_i;
-                U(3 * q + r, 4 * i + 2) = A3(r)  * box;
+                U(3 * q + r, 4 * i + 0) = a1(r) * N_i;
+                U(3 * q + r, 4 * i + 1) = a2(r) * N_i;
+                U(3 * q + r, 4 * i + 2) = A3(r) * box;
             }
         }
     }
@@ -335,12 +252,12 @@ ShellReissnerMindlin4p<T>::rotation_shape_matrix(const ElementValues<T, 2>& ev) 
     for (Index q = 0; q < Q; ++q) {
         auto slab1 = ev.results_[1].col(q);
 
-        const T gc11 = ev.g(0, 0)(q);
-        const T gc12 = ev.g(0, 1)(q);
-        const T gc22 = ev.g(1, 1)(q);
+        const T A11 = ev.g(0, 0)(q);
+        const T A12 = ev.g(0, 1)(q);
+        const T A22 = ev.g(1, 1)(q);
         const T invJ = T(1) / ev.jac(q);
-        const T e1_1 = -gc12 * invJ, e1_2 = gc11 * invJ;
-        const T e2_1 = -gc22 * invJ, e2_2 = gc12 * invJ;
+        const T e1_1 = -A12 * invJ, e1_2 = A11 * invJ;
+        const T e2_1 = -A22 * invJ, e2_2 = A12 * invJ;
 
         for (Index i = 0; i < N; ++i) {
             const T N_u = slab1(i * 2 + 0);

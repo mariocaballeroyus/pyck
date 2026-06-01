@@ -84,10 +84,13 @@ public:
     { return 1; }
     Index basis_order() const override { return 3; }
 
-    unsigned flags() const override { return Flags::Metric | Flags::Christoffels; }
+    unsigned flags() const override
+    { return Flags::Metric | Flags::KernelHessian | Flags::KernelLB | Flags::KernelLBGradient; }
 
-    unsigned essential_flags() const override { return Flags::Metric | Flags::Christoffels; }
-    unsigned natural_flags()   const override { return Flags::Metric | Flags::Christoffels; }
+    unsigned essential_flags() const override
+    { return Flags::Metric | Flags::KernelHessian | Flags::KernelLB | Flags::KernelLBGradient; }
+    unsigned natural_flags()   const override
+    { return Flags::Metric | Flags::KernelHessian | Flags::KernelLB | Flags::KernelLBGradient; }
 
 private:
 

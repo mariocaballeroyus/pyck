@@ -10,6 +10,7 @@
 #include "../quadrature/quadrature.hpp"
 #include "../geometry/intrinsic_geometry.hpp"
 #include "../geometry/surface_geometry.hpp"
+#include "../geometry/element_kernels.hpp"
 #include "../geometry/patch.hpp"
 #include "../multi_index.hpp"
 #include "../types.hpp"
@@ -34,6 +35,10 @@ namespace Flags
     constexpr unsigned Normal         = 1u << 3;  ///< a_3           (d=2)
     constexpr unsigned NormalD1       = 1u << 4;  ///< ∂_β a_3       (d=2)
     constexpr unsigned Curvature      = 1u << 5;  ///< b_{αβ}, b^α_β (d=2)
+    constexpr unsigned KernelHessian   = 1u << 6;  ///< H_{iαβ}   (per-basis covariant Hessian)
+    constexpr unsigned KernelLB        = 1u << 7;  ///< L_i       (per-basis Laplace–Beltrami)
+    constexpr unsigned KernelVectorGrad= 1u << 8;  ///< D_{iλαβ}  (per-basis covariant vector gradient)
+    constexpr unsigned KernelLBGradient= 1u << 9;  ///< P_{iα}    (per-basis Laplace–Beltrami gradient)
 } // namespace Flags
 
 // === ElementValues ==================================================================
@@ -128,6 +133,19 @@ public:
                 geometry::surface::compute_normal_derivatives<T>(position_data, jac, n, n_d1_data);
             if (flags_ & Flags::Curvature)
                 geometry::surface::compute_curvature<T>(position_data, g_inv_data, n, b_data, b_mixed_data);
+
+            // Per-(qp, basis) kernels (surface elements only). Basis-direct:
+            // connection formed from position derivatives + g_inv, no Christoffels.
+            if (flags_ & Flags::KernelHessian)
+                geometry::kernels::compute_kernel_hessian<T, d>(results_, position_data, g_inv_data, H_kernel_data);
+            if (flags_ & Flags::KernelLB)
+                geometry::kernels::compute_kernel_laplace_beltrami<T, d>(H_kernel_data, g_inv_data, L_kernel_data);
+            if (flags_ & Flags::KernelVectorGrad)
+                geometry::kernels::compute_kernel_vector_gradient<T, d>(results_, position_data, D_kernel_data);
+            if (flags_ & Flags::KernelLBGradient) {
+                lb_aux_ = compute_laplace_grad_aux<T, d>(position_data, g_inv_data);
+                geometry::kernels::compute_kernel_lb_gradient<T, d>(results_, lb_aux_, g_inv_data, P_kernel_data);
+            }
         }
     }
 
@@ -205,6 +223,23 @@ public:
     /// @brief Shape operator b^α_β.
     Matrix<T> b_mixed_data;
 
+    // === Per-(qp, basis) kernel storage =============================================
+
+    /// @brief Covariant Hessian H_{iαβ}, packed (N·n_d2, Q): row i·n_d2 + pack2<d>(α,β).
+    Matrix<T> H_kernel_data;
+
+    /// @brief Laplace–Beltrami L_i = g^{αβ}H_{iαβ}, shape (N, Q).
+    Matrix<T> L_kernel_data;
+
+    /// @brief Covariant vector gradient D_{iλαβ}, dense (N·d³, Q): i·d³ + (λ·d+α)·d+β.
+    Matrix<T> D_kernel_data;
+
+    /// @brief Laplace–Beltrami gradient P_{iα}, shape (N·d, Q): i·d + α.
+    Matrix<T> P_kernel_data;
+
+    /// @brief Cached inverse-metric / connection-trace gradients for P_{iα}.
+    LaplaceGradAux<T, d> lb_aux_;
+
     // === Position-derivative accessors ==============================================
 
     /// @brief Position x(ξ).
@@ -260,13 +295,55 @@ public:
     auto b_mixed(Index alpha, Index beta) const
     { return b_mixed_data.col(alpha * 2 + beta); }
 
+    // === Kernel accessors ===========================================================
+    //
+    // `Value` and the covariant scalar gradient are the raw basis buffers:
+    // N^i(q) = results_[0].col(q)(i), N^i_{,α}(q) = results_[1].col(q)(i·d + α).
+
+    /// @brief Covariant Hessian H_{iαβ}(q) of basis function i. Symmetric in (α, β).
+    T H(Index i, Index alpha, Index beta, Index q) const
+    {
+        constexpr Index n_d2 = d * (d + 1) / 2;
+        return H_kernel_data(i * n_d2 + pack2<d>(alpha, beta), q);
+    }
+
+    /// @brief Laplace–Beltrami L_i(q) of basis function i.
+    T L(Index i, Index q) const { return L_kernel_data(i, q); }
+
+    /// @brief Covariant vector gradient D_{iλαβ}(q): contributes u_{α|β} = D·u^λ.
+    T D(Index i, Index lambda, Index alpha, Index beta, Index q) const
+    {
+        constexpr Index dd = static_cast<Index>(d);
+        return D_kernel_data(i * (dd * dd * dd) + (lambda * dd + alpha) * dd + beta, q);
+    }
+
+    /// @brief Laplace–Beltrami gradient P_{iα}(q) of basis function i.
+    T P(Index i, Index alpha, Index q) const
+    {
+        constexpr Index dd = static_cast<Index>(d);
+        return P_kernel_data(i * dd + alpha, q);
+    }
+
 private:
+
+    /// @brief Expand requested flags with their dependencies so an element only
+    ///        lists the kernels it consumes. Kernels are basis-direct: they need
+    ///        the contravariant metric (and the Hessian for the L–B contraction),
+    ///        but no Christoffel array.
+    static unsigned expand_flags(unsigned f)
+    {
+        if (f & Flags::KernelLB)         f |= Flags::KernelHessian;
+        if (f & Flags::KernelHessian)    f |= Flags::Metric;
+        if (f & Flags::KernelLBGradient) f |= Flags::Metric;
+        // KernelVectorGrad needs only position derivatives (always computed).
+        return f;
+    }
 
     /// @brief Shared init helper used by both public constructors.
     ElementValues(const Patch<T, d>& patch, Index basis_order, unsigned flags,
                   std::size_t Q, const QuadratureRule<T, d>* quadrature)
         : patch_(patch), quadrature_(quadrature),
-          basis_order_(basis_order), flags_(flags)
+          basis_order_(basis_order), flags_(expand_flags(flags))
     {
         const Index Qi = static_cast<Index>(Q);
         mapped_pts_.resize(Qi, static_cast<Index>(d));

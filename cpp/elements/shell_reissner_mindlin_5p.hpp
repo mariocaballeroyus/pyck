@@ -73,10 +73,12 @@ public:
     /// second surface derivatives A_{λ,β}, i.e. an order-2 basis evaluation.
     Index basis_order() const override { return 2; }
 
-    unsigned flags() const override { return Flags::Metric | Flags::Normal | Flags::NormalD1; }
+    unsigned flags() const override
+    { return Flags::Metric | Flags::Normal | Flags::NormalD1 | Flags::KernelVectorGrad; }
 
     unsigned essential_flags() const override { return Flags::None; }
-    unsigned natural_flags()   const override { return Flags::Metric | Flags::Normal | Flags::NormalD1; }
+    unsigned natural_flags()   const override
+    { return Flags::Metric | Flags::Normal | Flags::NormalD1 | Flags::KernelVectorGrad; }
 
 private:
 

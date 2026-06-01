@@ -4,14 +4,12 @@
 #include <array>
 #include <concepts>
 #include <cstddef>
+#include <vector>
 
 #include "../types.hpp"
 
 namespace pyck
 {
-
-// Forward declaration to avoid a circular include via element_values.hpp.
-template <std::floating_point T, std::size_t d> class ElementValues;
 
 /**
  * @brief Per-quadrature-point auxiliary data for ∂_α(Δ_g f).
@@ -34,15 +32,18 @@ struct LaplaceGradAux
 };
 
 /**
- * @brief Build a LaplaceGradAux<T, d> at all quadrature points from a
- *        precomputed IntrinsicGeometry. `ig` must have Order 2 populated
- *        (third derivatives required: the basis must have been evaluated at
- *        order ≥ 3). Christoffels are read from `ig` — caller chooses
- *        the level when building the intrinsic geometry.
+ * @brief Build a LaplaceGradAux<T, d> at all quadrature points from raw
+ *        base-vector data: the position derivatives (must be populated to
+ *        order 3 — the basis evaluated at order ≥ 3) and the contravariant
+ *        metric. The connection is formed internally from base-vector dot
+ *        products `A_ε·A_{,ij}` raised by `g_inv` — no Christoffel array is
+ *        needed. Decoupled from `ElementValues` so this stays a leaf header
+ *        (no circular include) consumable by the kernel layer.
  */
 template <std::floating_point T, std::size_t d>
 LaplaceGradAux<T, d>
-compute_laplace_grad_aux(const ElementValues<T, d>& ev);
+compute_laplace_grad_aux(const std::vector<ColMatrix<T, 3>>& position_data,
+                         const Matrix<T>& g_inv_data);
 
 } // namespace pyck
 
