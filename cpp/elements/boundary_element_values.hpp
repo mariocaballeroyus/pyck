@@ -45,14 +45,14 @@ public:
      * @param quadrature         (d-1)-dim quadrature rule on the boundary span.
      *
      * The boundary-side workspace is hardcoded to `basis_order = 1` and
-     * `Flags::Metric` (the line element `jac` and the boundary tangent `a(0)`
+     * `Flags::Deriv1` (the line element `jac` and the boundary tangent `a(0)`
      * are all any boundary integral consumes).
      */
     BoundaryElementValues(const PatchBoundary<T, d>& boundary,
                           Index parent_basis_order, unsigned parent_flags,
                           const QuadratureRule<T, d - 1>& quadrature)
         : boundary_(boundary),
-          boundary_vals_(boundary, Index(1), Flags::Metric, quadrature),
+          boundary_vals_(boundary, Index(1), Flags::Deriv1, quadrature),
           parent_vals_(*boundary.parent(), parent_basis_order, parent_flags,
                        quadrature.num_points())
     {}

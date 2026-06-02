@@ -13,10 +13,11 @@ using namespace pyck;
 
 // ---------------------------------------------------------------------------
 // The ElementValues kernels (H, L, D, P) must reproduce the inline reference
-// arithmetic the elements use today. The reference uses the *explicit*
-// Christoffel path (ev.Gamma from compute_christoffels) for H, an independent
-// metric contraction for D/L, and the 4p's explicit lap_1/lap_2 expression for
-// P — so a packing/indexing mismatch in any kernel is caught here. Run on a
+// arithmetic the elements use today. The reference forms the connection
+// *explicitly from base vectors* (an independent connection oracle) for
+// H, an independent metric contraction for D/L, and the 4p's explicit
+// lap_1/lap_2 expression for P — so a packing/indexing mismatch in any kernel is
+// caught here. Run on a
 // degree-3, curved, non-separable patch so the connection and A_{1,2} are
 // nonzero (a flat/separable patch would not exercise these terms).
 // ---------------------------------------------------------------------------
@@ -38,8 +39,7 @@ TEST_CASE("ElementValues kernels match inline reference (curved p=3 patch)",
     auto patch = std::make_shared<Patch<double, 2>>(bsp, bsp, P);
 
     GaussLegendre<double, 2> gauss(p + 1);
-    const unsigned flags = Flags::Christoffels             // for the H reference
-                         | Flags::KernelHessian | Flags::KernelLB
+    const unsigned flags = Flags::KernelHessian | Flags::KernelLB
                          | Flags::KernelVectorGrad | Flags::KernelLBGradient;
     ElementValues<double, 2> ev(*patch, 3, flags, gauss);
     ev.reinit(0);
@@ -66,10 +66,15 @@ TEST_CASE("ElementValues kernels match inline reference (curved p=3 patch)",
             const double Nuuu = N3(i * 4 + 0), Nuuv = N3(i * 4 + 1),
                          Nuvv = N3(i * 4 + 2), Nvvv = N3(i * 4 + 3);
 
-            // --- H: covariant Hessian via explicit Christoffels -----------------
+            // --- H: covariant Hessian via an explicit base-vector connection ----
             auto H_ref = [&](Index a, Index b) {
                 const double Nab = N2(i * 3 + pack2<2>(a, b));
-                return Nab - ev.Gamma(0, a, b)(q) * Nu - ev.Gamma(1, a, b)(q) * Nv;
+                // Γ_{γ,ab} = A_γ·A_{,ab}; raise to second kind Γ^m_{ab} = g^{mγ}Γ_{γ,ab}.
+                const double g1 = ev.a(0).row(q).dot(ev.a_d1(a, b).row(q));
+                const double g2 = ev.a(1).row(q).dot(ev.a_d1(a, b).row(q));
+                const double Gam0 = gi00 * g1 + gi01 * g2;   // Γ^0_{ab}
+                const double Gam1 = gi01 * g1 + gi11 * g2;   // Γ^1_{ab}
+                return Nab - Gam0 * Nu - Gam1 * Nv;
             };
             const double H00 = H_ref(0, 0), H11 = H_ref(1, 1), H01 = H_ref(0, 1);
             CHECK(ev.H(i, 0, 0, q) == Approx(H00).margin(tol));

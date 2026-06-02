@@ -203,7 +203,7 @@ public:
     }
 
     Index basis_order() const override { return Index(1); }
-    unsigned flags() const override { return Flags::Metric; }
+    unsigned flags() const override { return Flags::Deriv1; }
     unsigned element_flags(const Element<T, 2>&) const override { return Flags::None; }
 
 private:
@@ -249,12 +249,17 @@ public:
         for (Index q = 0; q < Q; ++q) {
             auto col1 = slab1.col(q);
             auto col2 = slab2.col(q);
-            const T G1_11 = parent.Gamma(0, 0, 0)(q);
-            const T G1_12 = parent.Gamma(0, 0, 1)(q);
-            const T G1_22 = parent.Gamma(0, 1, 1)(q);
-            const T G2_11 = parent.Gamma(1, 0, 0)(q);
-            const T G2_12 = parent.Gamma(1, 0, 1)(q);
-            const T G2_22 = parent.Gamma(1, 1, 1)(q);
+            // Second-kind Christoffel Γ^k_{ij} = g^{kγ}(A_γ·A_{,ij}), in place.
+            auto Gamma2nd = [&](Index k, Index i, Index j) -> T {
+                return parent.g_inv(k, 0)(q) * parent.a(0).row(q).dot(parent.a_d1(i, j).row(q))
+                     + parent.g_inv(k, 1)(q) * parent.a(1).row(q).dot(parent.a_d1(i, j).row(q));
+            };
+            const T G1_11 = Gamma2nd(0, 0, 0);
+            const T G1_12 = Gamma2nd(0, 0, 1);
+            const T G1_22 = Gamma2nd(0, 1, 1);
+            const T G2_11 = Gamma2nd(1, 0, 0);
+            const T G2_12 = Gamma2nd(1, 0, 1);
+            const T G2_22 = Gamma2nd(1, 1, 1);
             const T n1 = n_up_1(q);
             const T n2 = n_up_2(q);
             const T n1n1 = n1 * n1;
@@ -277,7 +282,7 @@ public:
     }
 
     Index basis_order() const override { return Index(2); }
-    unsigned flags() const override { return Flags::Metric | Flags::Christoffels; }
+    unsigned flags() const override { return Flags::Deriv2; }  // reads parent a_d1 (order 2)
     unsigned element_flags(const Element<T, 2>&) const override { return Flags::None; }
 
 private:
@@ -315,7 +320,7 @@ public:
     }
 
     Index basis_order() const override { return Index(0); }
-    unsigned flags() const override { return Flags::Metric; }
+    unsigned flags() const override { return Flags::Deriv1; }
     unsigned element_flags(const Element<T, 2>& e) const override { return e.essential_flags(); }
 };
 
@@ -351,7 +356,7 @@ public:
     }
 
     Index basis_order() const override { return Index(1); }
-    unsigned flags() const override { return Flags::Metric; }
+    unsigned flags() const override { return Flags::Deriv1; }
     unsigned element_flags(const Element<T, 2>& e) const override { return e.essential_flags(); }
 };
 
@@ -389,7 +394,7 @@ public:
     }
 
     Index basis_order() const override { return Index(1); }
-    unsigned flags() const override { return Flags::Metric | Flags::Normal; }
+    unsigned flags() const override { return Flags::Normal; }
     unsigned element_flags(const Element<T, 2>& e) const override { return e.essential_flags(); }
 };
 
@@ -428,7 +433,7 @@ public:
     }
 
     Index basis_order() const override { return Index(0); }
-    unsigned flags() const override { return Flags::Metric; }
+    unsigned flags() const override { return Flags::Deriv1; }
     unsigned element_flags(const Element<T, 2>& e) const override { return e.natural_flags(); }
 };
 
@@ -468,7 +473,7 @@ public:
     }
 
     Index basis_order() const override { return Index(0); }
-    unsigned flags() const override { return Flags::Metric; }
+    unsigned flags() const override { return Flags::Deriv1; }
     unsigned element_flags(const Element<T, 2>& e) const override { return e.natural_flags(); }
 };
 
@@ -513,7 +518,7 @@ public:
     }
 
     Index basis_order() const override { return Index(0); }
-    unsigned flags() const override { return Flags::Metric | Flags::Normal; }
+    unsigned flags() const override { return Flags::Normal; }
     unsigned element_flags(const Element<T, 2>& e) const override { return e.natural_flags(); }
 };
 

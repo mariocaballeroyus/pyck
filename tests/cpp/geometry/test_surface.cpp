@@ -18,6 +18,7 @@
 
 using namespace pyck;
 using pyck::test::element_values_at;
+using pyck::test::christoffel2nd;
 
 // ===========================================================================
 // Test 1: Flat rectangular plate — geometry, Jacobian, partition of unity.
@@ -67,7 +68,7 @@ TEST_CASE("Patch<double, 2>: Flat Rectangular Plate", "[geometry][surface]") {
     SECTION("Metric & Jacobian = Lx · Ly") {
         ColMatrix<double, 2> pts(1, 2);
         pts << 0.3, 0.7;
-        auto local = element_values_at(surf, pts, Index(3), Flags::Metric | Flags::Christoffels | Flags::ChristoffelsD1);
+        auto local = element_values_at(surf, pts, Index(3), Flags::Deriv1);
 
         CHECK(local.g(0, 0)(0) == Approx(Lx * Lx).margin(1e-12));
         CHECK(local.g(0, 1)(0) == Approx(0.0     ).margin(1e-12));
@@ -78,15 +79,15 @@ TEST_CASE("Patch<double, 2>: Flat Rectangular Plate", "[geometry][surface]") {
     SECTION("Christoffels vanish on flat plate") {
         ColMatrix<double, 2> pts(1, 2);
         pts << 0.4, 0.6;
-        auto local = element_values_at(surf, pts, Index(3), Flags::Metric | Flags::Christoffels | Flags::ChristoffelsD1);
+        auto local = element_values_at(surf, pts, Index(3), Flags::Deriv2);
 
         const auto& chr = local;
-        CHECK(chr.Gamma(0, 0, 0)(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.Gamma(0, 0, 1)(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.Gamma(0, 1, 1)(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.Gamma(1, 0, 0)(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.Gamma(1, 0, 1)(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.Gamma(1, 1, 1)(0) == Approx(0.0).margin(1e-14));
+        CHECK(christoffel2nd(chr, 0, 0, 0, 0) == Approx(0.0).margin(1e-14));
+        CHECK(christoffel2nd(chr, 0, 0, 1, 0) == Approx(0.0).margin(1e-14));
+        CHECK(christoffel2nd(chr, 0, 1, 1, 0) == Approx(0.0).margin(1e-14));
+        CHECK(christoffel2nd(chr, 1, 0, 0, 0) == Approx(0.0).margin(1e-14));
+        CHECK(christoffel2nd(chr, 1, 0, 1, 0) == Approx(0.0).margin(1e-14));
+        CHECK(christoffel2nd(chr, 1, 1, 1, 0) == Approx(0.0).margin(1e-14));
     }
 
     SECTION("Partition of unity") {
@@ -158,7 +159,7 @@ TEST_CASE("Patch<double, 2>: Rectangle factory area integral", "[geometry][surfa
             if (zero_vol) continue;
 
             quad.map_to_domain(lo, hi, mp, mw);
-            auto local = element_values_at(surf, mp, Index(1), Flags::Metric);
+            auto local = element_values_at(surf, mp, Index(1), Flags::Deriv1);
 
             for (Eigen::Index q = 0; q < mw.size(); ++q)
                 area += local.jac(q) * mw(q);
@@ -207,7 +208,7 @@ TEST_CASE("Patch<double, 2>: Quadratic Basis — Partition of Unity",
             ColMatrix<double, 2> pts(1, 2);
             pts << u, v;
 
-            auto local = element_values_at(surf, pts, Index(3), Flags::Metric | Flags::Christoffels | Flags::ChristoffelsD1);
+            auto local = element_values_at(surf, pts, Index(3), Flags::Deriv1);
             const auto& b = local.results_;
 
             auto sum_at_0 = [&](Index k_order, Index packed, Index n_k) {
@@ -255,11 +256,11 @@ TEST_CASE("PatchBoundary<double, 2>::eval_outward_normal: flat rectangle",
     Eigen::VectorXd bdy_pts(3);
     bdy_pts << 0.1, 0.5, 0.9;
 
-    auto bdy_local = element_values_at(*bdy, bdy_pts, Index(1), Flags::Metric);
+    auto bdy_local = element_values_at(*bdy, bdy_pts, Index(1), Flags::Deriv1);
 
     const Index parent_flat = bdy->parent_flat_span(boundary_span);
     const auto parent_pts   = bdy->lift_to_parent(bdy_pts);
-    auto parent_local = element_values_at(*surf, parent_pts, Index(1), Flags::Metric);
+    auto parent_local = element_values_at(*surf, parent_pts, Index(1), Flags::Deriv1);
 
     const auto n = bdy->eval_outward_normal(bdy_local, parent_local);
     REQUIRE(n.rows() == bdy_pts.size());
@@ -299,21 +300,24 @@ TEST_CASE("Patch<double, 2>: composable primitives on twisted z=u·v patch",
            0.8, 0.2;
 
     auto local = element_values_at(surf, pts, Index(3),
-        Flags::Metric | Flags::Christoffels | Flags::ChristoffelsD1
-            | Flags::Normal | Flags::NormalD1 | Flags::Curvature);
+        Flags::Normal | Flags::Curvature);
 
     const auto& chr = local;
     const auto& a3     = local.n;
-    const auto& nd_a31 = local.n_d1(0);
-    const auto& nd_a32 = local.n_d1(1);
+
+    // Normal derivatives are no longer cached; compute them in place.
+    ColMatrix<double, 3> n_d1;
+    geometry::surface::compute_normal_derivatives<double>(
+        local.position_data, local.jac, local.n, n_d1);
+    const Eigen::Index Qn = local.n.rows();
+    const auto nd_a31 = n_d1.middleRows(0, Qn);
+    const auto nd_a32 = n_d1.middleRows(Qn, Qn);
 
     REQUIRE(local.a(0).rows() == 3);
     REQUIRE(local.a(1).rows() == 3);
     REQUIRE(local.g(0, 0).size()     == 3);
     REQUIRE(local.g_inv(0, 0).size() == 3);
     REQUIRE(local.jac.size() == 3);
-    REQUIRE(chr.Gamma(0, 0, 0).size() == 3);
-    REQUIRE(chr.Gamma(1, 1, 1).size() == 3);
 
     for (Eigen::Index q = 0; q < pts.rows(); ++q) {
         const double u = pts(q, 0);
@@ -340,12 +344,12 @@ TEST_CASE("Patch<double, 2>: composable primitives on twisted z=u·v patch",
         CHECK(local.jac(q)      == Approx(sqrtD            ).margin(1e-12));
 
         // Christoffels: only Γ¹_{12} = v/D and Γ²_{12} = u/D are non-zero.
-        CHECK(chr.Gamma(0, 0, 0)(q) == Approx(0.0  ).margin(1e-14));
-        CHECK(chr.Gamma(0, 0, 1)(q) == Approx(v / D).margin(1e-12));
-        CHECK(chr.Gamma(0, 1, 1)(q) == Approx(0.0  ).margin(1e-14));
-        CHECK(chr.Gamma(1, 0, 0)(q) == Approx(0.0  ).margin(1e-14));
-        CHECK(chr.Gamma(1, 0, 1)(q) == Approx(u / D).margin(1e-12));
-        CHECK(chr.Gamma(1, 1, 1)(q) == Approx(0.0  ).margin(1e-14));
+        CHECK(christoffel2nd(chr, 0, 0, 0, q) == Approx(0.0  ).margin(1e-14));
+        CHECK(christoffel2nd(chr, 0, 0, 1, q) == Approx(v / D).margin(1e-12));
+        CHECK(christoffel2nd(chr, 0, 1, 1, q) == Approx(0.0  ).margin(1e-14));
+        CHECK(christoffel2nd(chr, 1, 0, 0, q) == Approx(0.0  ).margin(1e-14));
+        CHECK(christoffel2nd(chr, 1, 0, 1, q) == Approx(u / D).margin(1e-12));
+        CHECK(christoffel2nd(chr, 1, 1, 1, q) == Approx(0.0  ).margin(1e-14));
 
         // Surface normal a_3 = (-v, -u, 1) / √D.
         CHECK(a3(q, 0) == Approx(-v   / sqrtD).margin(1e-12));
@@ -377,70 +381,6 @@ TEST_CASE("Patch<double, 2>: composable primitives on twisted z=u·v patch",
 
 
 // ===========================================================================
-// Test 6b: Order-3 Christoffel derivatives ∂_γ Γ^k_{αβ} on the twisted
-// z = u·v patch. Closed-form: only Γ¹_{12} = v/D and Γ²_{12} = u/D are
-// non-zero, so the only non-zero ∂Γ entries are
-//   ∂_u Γ¹_{12} = -2uv / D²
-//   ∂_v Γ¹_{12} = (1 + u² - v²) / D²
-//   ∂_u Γ²_{12} = (1 - u² + v²) / D²
-//   ∂_v Γ²_{12} = -2uv / D²
-// with D = 1 + u² + v².
-// ===========================================================================
-
-TEST_CASE("Patch<double, 2>: ∂Γ on twisted z=u·v patch",
-          "[geometry][surface][primitives]") {
-
-    auto kv = KnotVector<double>(std::vector<double>{0, 0, 1, 1});
-    auto basis_u = std::make_shared<BSpline<double>>(1, kv);
-    auto basis_v = std::make_shared<BSpline<double>>(1, kv);
-
-    Eigen::MatrixXd cp(4, 3);
-    cp.row(0) << 0.0, 0.0, 0.0;
-    cp.row(1) << 1.0, 0.0, 0.0;
-    cp.row(2) << 0.0, 1.0, 0.0;
-    cp.row(3) << 1.0, 1.0, 1.0;
-    Patch<double, 2> surf(basis_u, basis_v, cp);
-    const Index elem_idx = 4;
-
-    ColMatrix<double, 2> pts(3, 2);
-    pts << 0.3, 0.4,
-           0.5, 0.5,
-           0.8, 0.2;
-
-    auto local = element_values_at(surf, pts, Index(3), Flags::Metric | Flags::Christoffels | Flags::ChristoffelsD1);
-
-    const auto& chr = local;
-
-    for (Eigen::Index q = 0; q < pts.rows(); ++q) {
-        const double u  = pts(q, 0);
-        const double v  = pts(q, 1);
-        const double D  = 1.0 + u * u + v * v;
-        const double D2 = D * D;
-
-        // Non-zero entries.
-        CHECK(chr.Gamma_d1(0, 0, 1, 0)(q)
-              == Approx(-2.0 * u * v / D2).margin(1e-12));
-        CHECK(chr.Gamma_d1(0, 0, 1, 1)(q)
-              == Approx((1.0 + u * u - v * v) / D2).margin(1e-12));
-        CHECK(chr.Gamma_d1(1, 0, 1, 0)(q)
-              == Approx((1.0 - u * u + v * v) / D2).margin(1e-12));
-        CHECK(chr.Gamma_d1(1, 0, 1, 1)(q)
-              == Approx(-2.0 * u * v / D2).margin(1e-12));
-
-        // All other entries vanish (the other Γ components are identically 0).
-        CHECK(chr.Gamma_d1(0, 0, 0, 0)(q) == Approx(0.0).margin(1e-13));
-        CHECK(chr.Gamma_d1(0, 0, 0, 1)(q) == Approx(0.0).margin(1e-13));
-        CHECK(chr.Gamma_d1(0, 1, 1, 0)(q) == Approx(0.0).margin(1e-13));
-        CHECK(chr.Gamma_d1(0, 1, 1, 1)(q) == Approx(0.0).margin(1e-13));
-        CHECK(chr.Gamma_d1(1, 0, 0, 0)(q) == Approx(0.0).margin(1e-13));
-        CHECK(chr.Gamma_d1(1, 0, 0, 1)(q) == Approx(0.0).margin(1e-13));
-        CHECK(chr.Gamma_d1(1, 1, 1, 0)(q) == Approx(0.0).margin(1e-13));
-        CHECK(chr.Gamma_d1(1, 1, 1, 1)(q) == Approx(0.0).margin(1e-13));
-    }
-}
-
-
-// ===========================================================================
 // Test 6c: IntrinsicGeometry / ExtrinsicGeometry composition. Verifies that
 // the container builders produce byte-for-byte the same data as calling the
 // underlying free functions individually on the twisted z = u·v patch.
@@ -467,15 +407,14 @@ TEST_CASE("Patch<double, 2>: Intrinsic/Extrinsic containers compose correctly",
            0.8, 0.2;
 
     auto ig = element_values_at(surf, pts, Index(3),
-        Flags::Metric | Flags::Christoffels | Flags::ChristoffelsD1
-            | Flags::Normal | Flags::NormalD1 | Flags::Curvature);
+        Flags::Normal | Flags::Curvature);
     const auto& eg = ig;
 
 
     for (Eigen::Index q = 0; q < pts.rows(); ++q) {
         // Christoffels: the one non-zero on this patch.
-        CHECK(ig.Gamma(0, 0, 1)(q) != 0.0);
-        CHECK(ig.Gamma(1, 0, 1)(q) != 0.0);
+        CHECK(christoffel2nd(ig, 0, 0, 1, q) != 0.0);
+        CHECK(christoffel2nd(ig, 1, 0, 1, q) != 0.0);
 
         // Normal.
         for (Eigen::Index c = 0; c < 3; ++c)
@@ -483,7 +422,10 @@ TEST_CASE("Patch<double, 2>: Intrinsic/Extrinsic containers compose correctly",
 
         // Curvature: b_{12} = 1/√D on this patch (the non-zero one).
         CHECK(std::isfinite(eg.b(0, 1)(q)));
-        CHECK(std::isfinite(eg.b_mixed(0, 1)(q)));
+        // b^α_β is no longer cached; raise in place.
+        const double bmix01 = eg.g_inv(0, 0)(q) * eg.b(0, 1)(q)
+                            + eg.g_inv(0, 1)(q) * eg.b(1, 1)(q);
+        CHECK(std::isfinite(bmix01));
     }
 }
 

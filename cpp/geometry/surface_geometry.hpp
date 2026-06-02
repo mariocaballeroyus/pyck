@@ -90,44 +90,28 @@ inline void compute_normal_derivatives(const std::vector<ColMatrix<T, 3>>& posit
 // === Curvature ======================================================================
 
 /**
- * @brief Fill the second fundamental form b_{αβ} = a_{αβ} · a_3 and the
- *        shape operator b^α_β = g^{αγ} b_{γβ}. Requires the unit normal and
- *        the contravariant metric.
+ * @brief Fill the second fundamental form b_{αβ} = a_{αβ} · a_3 from the
+ *        order-2 position derivatives and the unit normal. The mixed shape
+ *        operator b^α_β = g^{αγ} b_{γβ} is a trivial inverse-metric raise and
+ *        is left to consumers that need it.
  */
 template <std::floating_point T>
 inline void compute_curvature(const std::vector<ColMatrix<T, 3>>& position_data,
-                              const Matrix<T>& g_inv_data,
                               const ColMatrix<T, 3>& n,
-                              Matrix<T>& b_data,
-                              Matrix<T>& b_mixed_data)
+                              Matrix<T>& b_data)
 {
     const Index Q_ = n.rows();
     b_data.resize(Q_, 3);
-    b_mixed_data.resize(Q_, 4);
 
     auto a_d1_view = [&](Index i, Index j) {
         return position_data[2].middleRows(pack2<2>(i, j) * Q_, Q_);
     };
-    auto g_inv = [&](Index i, Index j) {
-        return g_inv_data.col(pack2<2>(i, j));
-    };
 
     for (Index q = 0; q < Q_; ++q)
     {
-        const T b11 = a_d1_view(0, 0).row(q).dot(n.row(q));
-        const T b12 = a_d1_view(0, 1).row(q).dot(n.row(q));
-        const T b22 = a_d1_view(1, 1).row(q).dot(n.row(q));
-        b_data(q, pack2<2>(0, 0)) = b11;
-        b_data(q, pack2<2>(0, 1)) = b12;
-        b_data(q, pack2<2>(1, 1)) = b22;
-
-        const T gi11 = g_inv(0, 0)(q);
-        const T gi12 = g_inv(0, 1)(q);
-        const T gi22 = g_inv(1, 1)(q);
-        b_mixed_data(q, 0 * 2 + 0) = gi11 * b11 + gi12 * b12;
-        b_mixed_data(q, 0 * 2 + 1) = gi11 * b12 + gi12 * b22;
-        b_mixed_data(q, 1 * 2 + 0) = gi12 * b11 + gi22 * b12;
-        b_mixed_data(q, 1 * 2 + 1) = gi12 * b12 + gi22 * b22;
+        b_data(q, pack2<2>(0, 0)) = a_d1_view(0, 0).row(q).dot(n.row(q));
+        b_data(q, pack2<2>(0, 1)) = a_d1_view(0, 1).row(q).dot(n.row(q));
+        b_data(q, pack2<2>(1, 1)) = a_d1_view(1, 1).row(q).dot(n.row(q));
     }
 }
 

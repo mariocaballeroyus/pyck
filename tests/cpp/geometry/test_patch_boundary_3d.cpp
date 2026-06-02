@@ -194,7 +194,7 @@ TEST_CASE("PatchBoundary<double, 3>: outward normal on cube faces",
                 mapped(q, 1) = lv + probes(q, 1) * (hv - lv);
             }
 
-            auto blocal = element_values_at(*bdy, mapped, Index(1), Flags::Metric);
+            auto blocal = element_values_at(*bdy, mapped, Index(1), Flags::Deriv1);
 
             const auto normals = bdy->eval_outward_normal(blocal);
             REQUIRE(normals.rows() == 2);

@@ -82,10 +82,10 @@ public:
     { return 1; }
     Index basis_order() const override { return 2; }
 
-    unsigned flags() const override { return Flags::Metric | Flags::KernelHessian; }
+    unsigned flags() const override { return Flags::Deriv1 | Flags::KernelHessian; }
 
     unsigned essential_flags() const override { return Flags::None; }
-    unsigned natural_flags()   const override { return Flags::Metric | Flags::KernelHessian; }
+    unsigned natural_flags()   const override { return Flags::Deriv1 | Flags::KernelHessian; }
 
 private:
 

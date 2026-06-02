@@ -14,6 +14,7 @@
 
 using namespace pyck;
 using pyck::test::element_values_at;
+using pyck::test::christoffel2nd;
 
 // ===========================================================================
 // Test 1: Flat axis-aligned box — geometry, Jacobian, partition of unity,
@@ -57,7 +58,7 @@ TEST_CASE("Patch<double, 3>: Flat Box", "[geometry][volume]")
         ColMatrix<double, 3> pts(1, 3);
         pts << 0.3, 0.5, 0.7;
         auto local = element_values_at(vol, pts, Index(3),
-            Flags::Metric | Flags::Christoffels | Flags::ChristoffelsD1);
+            Flags::Deriv1);
 
         // Metric layout: (g_11, g_12, g_13, g_22, g_23, g_33).
         CHECK(local.g(0, 0)(0) == Approx(Lx * Lx).margin(1e-12));
@@ -81,27 +82,27 @@ TEST_CASE("Patch<double, 3>: Flat Box", "[geometry][volume]")
         ColMatrix<double, 3> pts(1, 3);
         pts << 0.4, 0.6, 0.2;
         auto local = element_values_at(vol, pts, Index(3),
-            Flags::Metric | Flags::Christoffels | Flags::ChristoffelsD1);
+            Flags::Deriv2);
 
         const auto& chr = local;
-        CHECK(chr.Gamma(0, 0, 0)(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.Gamma(0, 0, 1)(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.Gamma(0, 0, 2)(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.Gamma(0, 1, 1)(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.Gamma(0, 1, 2)(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.Gamma(0, 2, 2)(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.Gamma(1, 0, 0)(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.Gamma(1, 0, 1)(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.Gamma(1, 0, 2)(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.Gamma(1, 1, 1)(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.Gamma(1, 1, 2)(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.Gamma(1, 2, 2)(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.Gamma(2, 0, 0)(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.Gamma(2, 0, 1)(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.Gamma(2, 0, 2)(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.Gamma(2, 1, 1)(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.Gamma(2, 1, 2)(0) == Approx(0.0).margin(1e-14));
-        CHECK(chr.Gamma(2, 2, 2)(0) == Approx(0.0).margin(1e-14));
+        CHECK(christoffel2nd(chr, 0, 0, 0, 0) == Approx(0.0).margin(1e-14));
+        CHECK(christoffel2nd(chr, 0, 0, 1, 0) == Approx(0.0).margin(1e-14));
+        CHECK(christoffel2nd(chr, 0, 0, 2, 0) == Approx(0.0).margin(1e-14));
+        CHECK(christoffel2nd(chr, 0, 1, 1, 0) == Approx(0.0).margin(1e-14));
+        CHECK(christoffel2nd(chr, 0, 1, 2, 0) == Approx(0.0).margin(1e-14));
+        CHECK(christoffel2nd(chr, 0, 2, 2, 0) == Approx(0.0).margin(1e-14));
+        CHECK(christoffel2nd(chr, 1, 0, 0, 0) == Approx(0.0).margin(1e-14));
+        CHECK(christoffel2nd(chr, 1, 0, 1, 0) == Approx(0.0).margin(1e-14));
+        CHECK(christoffel2nd(chr, 1, 0, 2, 0) == Approx(0.0).margin(1e-14));
+        CHECK(christoffel2nd(chr, 1, 1, 1, 0) == Approx(0.0).margin(1e-14));
+        CHECK(christoffel2nd(chr, 1, 1, 2, 0) == Approx(0.0).margin(1e-14));
+        CHECK(christoffel2nd(chr, 1, 2, 2, 0) == Approx(0.0).margin(1e-14));
+        CHECK(christoffel2nd(chr, 2, 0, 0, 0) == Approx(0.0).margin(1e-14));
+        CHECK(christoffel2nd(chr, 2, 0, 1, 0) == Approx(0.0).margin(1e-14));
+        CHECK(christoffel2nd(chr, 2, 0, 2, 0) == Approx(0.0).margin(1e-14));
+        CHECK(christoffel2nd(chr, 2, 1, 1, 0) == Approx(0.0).margin(1e-14));
+        CHECK(christoffel2nd(chr, 2, 1, 2, 0) == Approx(0.0).margin(1e-14));
+        CHECK(christoffel2nd(chr, 2, 2, 2, 0) == Approx(0.0).margin(1e-14));
     }
 
     SECTION("Partition of unity (3D)") {
@@ -163,7 +164,7 @@ TEST_CASE("Patch<double, 3>: Box factory volume integral", "[geometry][volume]")
         GaussLegendre<double, 3> quad(3);
 
         double vol_int = 0.0;
-        ElementValues<double, 3> ev(vol, Index(1), Flags::Metric, quad);
+        ElementValues<double, 3> ev(vol, Index(1), Flags::Deriv1, quad);
         const std::size_t num_live = static_cast<std::size_t>(ev.num_elements());
         for (std::size_t e = 0; e < num_live; ++e)
         {

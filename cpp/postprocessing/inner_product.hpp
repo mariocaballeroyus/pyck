@@ -39,7 +39,7 @@ eval_quadrature_data(const Patch<T, d>& patch,
 {
     const Index Q = static_cast<Index>(quadrature.num_points());
 
-    ElementValues<T, d> ev(patch, Index(1), Flags::Metric, quadrature);
+    ElementValues<T, d> ev(patch, Index(1), Flags::Deriv1, quadrature);
     const std::size_t num_live = static_cast<std::size_t>(ev.num_elements());
 
     ColMatrix<T, d> params_out(num_live * Q, static_cast<Index>(d));

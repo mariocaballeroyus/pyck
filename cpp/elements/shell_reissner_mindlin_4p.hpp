@@ -57,7 +57,7 @@ namespace pyck
  * with its covariant-derivative partner @f$(B_\alpha{}^\gamma)_{|\beta}@f$ — into
  * the bending strain. The @f$\nabla B@f$ term is nonzero only where curvature
  * varies (it vanishes as a tensor on flat / spherical / cylindrical surfaces) and
- * requires third derivatives of the surface (hence @ref Flags::NormalD1).
+ * requires third derivatives of the surface (hence @ref Flags::Deriv3).
  *
  * @tparam T Scalar type.
  */
@@ -113,25 +113,30 @@ public:
     ///        evaluated to order 3.
     Index basis_order() const override { return 3; }
 
-    // Christoffels/Curvature/Normal/NormalD1 remain for the inline Codazzi ∇B
-    // (the per-qp curvature derivative, not a per-basis kernel); the four kernels
-    // supply the Hessian, recovered transverse □, in-plane covariant gradient,
-    // and Laplace–Beltrami gradient.
+    // Normal (A_3) + Curvature (B_{αβ}) + Deriv3 (third surface derivatives for the
+    // inline Codazzi ∇B, whose connection is formed in place from base vectors). The
+    // four kernels supply the Hessian, recovered transverse □, in-plane covariant
+    // gradient, and Laplace–Beltrami gradient. The normal derivatives A_{3,β} and the
+    // shape operator B^α_β are computed in place in strain_matrix, not cached.
     unsigned flags() const override
-    { return Flags::Metric | Flags::Christoffels | Flags::Normal | Flags::NormalD1 | Flags::Curvature
+    { return Flags::Normal | Flags::Curvature | Flags::Deriv3
            | Flags::KernelHessian | Flags::KernelLB | Flags::KernelVectorGrad | Flags::KernelLBGradient; }
 
     unsigned essential_flags() const override
-    { return Flags::Metric | Flags::Christoffels | Flags::Normal | Flags::NormalD1 | Flags::Curvature
+    { return Flags::Normal | Flags::Curvature | Flags::Deriv3
            | Flags::KernelHessian | Flags::KernelLB | Flags::KernelVectorGrad | Flags::KernelLBGradient; }
     unsigned natural_flags()   const override
-    { return Flags::Metric | Flags::Christoffels | Flags::Normal | Flags::NormalD1 | Flags::Curvature
+    { return Flags::Normal | Flags::Curvature | Flags::Deriv3
            | Flags::KernelHessian | Flags::KernelLB | Flags::KernelVectorGrad | Flags::KernelLBGradient; }
 
 private:
 
     /// @brief Shell material properties.
     Ptr<PlaneStress2d<T>> material_;
+
+    /// @brief Scratch for the in-place reference-normal derivatives A_{3,β},
+    ///        packed (Q·2 × 3): block β at rows β·Q.
+    mutable ColMatrix<T, 3> n_d1_ws_;
 };
 
 } // namespace pyck

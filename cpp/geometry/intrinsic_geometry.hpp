@@ -22,15 +22,19 @@ namespace geometry::intrinsic
 
 /**
  * @brief Fill per-order packed position-derivative buffers from a basis and
- *        the active control points. The basis depth `basis.size() - 1`
- *        drives how many position-derivative orders are populated.
+ *        the active control points, up to derivative order @p max_order
+ *        (clamped to the basis depth `basis.size() - 1`). Lower @p max_order
+ *        trims the accumulation when a consumer needs fewer orders than the
+ *        basis was evaluated to.
  */
 template <std::floating_point T, std::size_t d>
 inline void compute_position_derivatives(const std::vector<Matrix<T>>& basis,
                                          const ColMatrix<T, 3>& act_pts,
-                                         std::vector<ColMatrix<T, 3>>& position_data)
+                                         std::vector<ColMatrix<T, 3>>& position_data,
+                                         Index max_order)
 {
-    const Index order = static_cast<Index>(basis.size()) - 1;
+    const Index avail = static_cast<Index>(basis.size()) - 1;
+    const Index order = (max_order < avail) ? max_order : avail;
     const Index Q_    = basis[0].cols();
     const Index N_    = basis[0].rows();
 
@@ -96,139 +100,6 @@ inline void compute_metric(const std::vector<ColMatrix<T, 3>>& position_data,
                 g_inv_data(q, packed) = inv_g(i, j);
             }
         jac(q) = std::sqrt(det_g);
-    }
-}
-
-// === Christoffel symbols ============================================================
-
-/**
- * @brief Compute Γ^k_{ij}(q) = a^k · a_{ij}. Requires position derivatives at
- *        order 2 and the contravariant metric.
- */
-template <std::floating_point T, std::size_t d>
-inline void compute_christoffels(const std::vector<ColMatrix<T, 3>>& position_data,
-                                 const Matrix<T>& g_inv_data,
-                                 Matrix<T>& Gamma_data)
-{
-    constexpr Index n_d2 = d * (d + 1) / 2;
-    const Index Q_ = position_data[1].rows() / static_cast<Index>(d);
-
-    Gamma_data.resize(Q_, d * n_d2);
-
-    auto a_view = [&](Index i) {
-        return position_data[1].middleRows(i * Q_, Q_);
-    };
-    auto a_d1_view = [&](Index i, Index j) {
-        return position_data[2].middleRows(pack2<d>(i, j) * Q_, Q_);
-    };
-    auto g_inv = [&](Index i, Index j) {
-        return g_inv_data.col(pack2<d>(i, j));
-    };
-
-    for (Index q = 0; q < Q_; ++q)
-    {
-        Eigen::Matrix<T, d, d> g_inv_full;
-        for (std::size_t alpha = 0; alpha < d; ++alpha)
-            for (std::size_t beta = alpha; beta < d; ++beta) {
-                g_inv_full(alpha, beta) = g_inv(alpha, beta)(q);
-                if (beta != alpha) g_inv_full(beta, alpha) = g_inv_full(alpha, beta);
-            }
-
-        std::array<Eigen::RowVector<T, 3>, d> aup;
-        for (std::size_t m = 0; m < d; ++m) {
-            aup[m].setZero();
-            for (std::size_t l = 0; l < d; ++l)
-                aup[m] += g_inv_full(m, l) * a_view(l).row(q);
-        }
-
-        for (std::size_t m = 0; m < d; ++m)
-            for (std::size_t i = 0; i < d; ++i)
-                for (std::size_t j = i; j < d; ++j) {
-                    const Index packed = m * n_d2 + pack2<d>(i, j);
-                    Gamma_data(q, packed) = aup[m].dot(a_d1_view(i, j).row(q));
-                }
-    }
-}
-
-/**
- * @brief Compute ∂_γ Γ^k_{ij}(q). Requires position derivatives at order 3
- *        and the contravariant metric.
- */
-template <std::floating_point T, std::size_t d>
-inline void compute_christoffels_d1(const std::vector<ColMatrix<T, 3>>& position_data,
-                                    const Matrix<T>& g_inv_data,
-                                    Matrix<T>& Gamma_d1_data)
-{
-    constexpr Index n_d2 = d * (d + 1) / 2;
-    const Index Q_ = position_data[1].rows() / static_cast<Index>(d);
-
-    Gamma_d1_data.resize(Q_, d * n_d2 * d);
-
-    auto a_view = [&](Index i) {
-        return position_data[1].middleRows(i * Q_, Q_);
-    };
-    auto a_d1_view = [&](Index i, Index j) {
-        return position_data[2].middleRows(pack2<d>(i, j) * Q_, Q_);
-    };
-    auto a_d2_view = [&](Index i, Index j, Index k) {
-        return position_data[3].middleRows(pack3<d>(i, j, k) * Q_, Q_);
-    };
-    auto g_inv = [&](Index i, Index j) {
-        return g_inv_data.col(pack2<d>(i, j));
-    };
-
-    for (Index q = 0; q < Q_; ++q)
-    {
-        Eigen::Matrix<T, d, d> g_inv_full;
-        for (std::size_t alpha = 0; alpha < d; ++alpha)
-            for (std::size_t beta = alpha; beta < d; ++beta) {
-                g_inv_full(alpha, beta) = g_inv(alpha, beta)(q);
-                if (beta != alpha) g_inv_full(beta, alpha) = g_inv_full(alpha, beta);
-            }
-
-        std::array<Eigen::RowVector<T, 3>, d> aup;
-        for (std::size_t m = 0; m < d; ++m) {
-            aup[m].setZero();
-            for (std::size_t l = 0; l < d; ++l)
-                aup[m] += g_inv_full(m, l) * a_view(l).row(q);
-        }
-
-        std::array<Eigen::Matrix<T, d, d>, d> dg;
-        for (std::size_t w = 0; w < d; ++w) {
-            for (std::size_t u = 0; u < d; ++u) {
-                for (std::size_t v = u; v < d; ++v) {
-                    const T val = a_d1_view(u, w).row(q).dot(a_view(v).row(q))
-                                + a_view(u).row(q).dot(a_d1_view(v, w).row(q));
-                    dg[w](u, v) = val;
-                    if (v != u) dg[w](v, u) = val;
-                }
-            }
-        }
-
-        std::array<Eigen::Matrix<T, d, d>, d> dginv;
-        for (std::size_t gam = 0; gam < d; ++gam)
-            dginv[gam].noalias() = -g_inv_full * dg[gam] * g_inv_full;
-
-        std::array<std::array<Eigen::RowVector<T, 3>, d>, d> daup;
-        for (std::size_t m = 0; m < d; ++m) {
-            for (std::size_t gam = 0; gam < d; ++gam) {
-                daup[m][gam].setZero();
-                for (std::size_t l = 0; l < d; ++l) {
-                    daup[m][gam] += dginv[gam](m, l) * a_view(l).row(q);
-                    daup[m][gam] += g_inv_full(m, l) * a_d1_view(l, gam).row(q);
-                }
-            }
-        }
-
-        for (std::size_t m = 0; m < d; ++m)
-            for (std::size_t i = 0; i < d; ++i)
-                for (std::size_t j = i; j < d; ++j)
-                    for (std::size_t gam = 0; gam < d; ++gam) {
-                        const Index packed = m * (n_d2 * d) + pack2<d>(i, j) * d + gam;
-                        Gamma_d1_data(q, packed) =
-                            daup[m][gam].dot(a_d1_view(i, j).row(q))
-                          + aup[m].dot(a_d2_view(i, j, gam).row(q));
-                    }
     }
 }
 

@@ -12,6 +12,7 @@
 
 using namespace pyck;
 using pyck::test::element_values_at;
+using pyck::test::christoffel2nd;
 
 namespace {
 
@@ -36,7 +37,7 @@ CurveDerivs metric_derivs(const std::vector<Matrix<double>>& basis,
     const double g11_15   = g11 * sqrt_g11;
 
     const auto& chr = local;
-    const double Gamma    = chr.Gamma(0, 0, 0)(q);
+    const double Gamma    = christoffel2nd(chr, 0, 0, 0, q);
 
     const double a11_dot_a11 = local.a_d1(0, 0).row(q).squaredNorm();
     const double a1_dot_a111 = local.a(0).row(q).dot(local.a_d2(0, 0, 0).row(q));
@@ -120,7 +121,7 @@ TEST_CASE("Patch<double, 1>: Analytical Push-Forward Verification", "[geometry][
 
             // New-API evaluation.
             auto local = element_values_at(curve, params, Index(3),
-                Flags::Metric | Flags::Christoffels | Flags::ChristoffelsD1);
+                Flags::Deriv3);
             auto md    = metric_derivs(local.results_, local, 0);
 
             CHECK(local.jac(0) == Approx(sqrt_g11).margin(1e-12));
@@ -162,7 +163,7 @@ TEST_CASE("Patch<double, 1>: External AD Numerical Validation", "[geometry][curv
     auto eval_at = [&](double u) {
         ColMatrix<double, 1> params(1, 1); params << u;
         auto local = element_values_at(curve, params, Index(3),
-            Flags::Metric | Flags::Christoffels | Flags::ChristoffelsD1);
+            Flags::Deriv3);
         return metric_derivs(local.results_, local, 0);
     };
 

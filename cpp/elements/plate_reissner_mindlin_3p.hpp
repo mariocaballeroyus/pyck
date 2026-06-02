@@ -71,10 +71,10 @@ public:
 
     Index basis_order() const override { return 2; }
 
-    unsigned flags() const override { return Flags::Metric; }
+    unsigned flags() const override { return Flags::Deriv1; }
 
     unsigned essential_flags() const override { return Flags::None; }
-    unsigned natural_flags()   const override { return Flags::Metric; }
+    unsigned natural_flags()   const override { return Flags::Deriv1; }
 
 private:
 

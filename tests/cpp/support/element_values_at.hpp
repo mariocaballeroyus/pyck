@@ -36,6 +36,23 @@ element_values_at(const Patch<T, d>& patch,
     return ev;
 }
 
+/**
+ * @brief Test helper: second-kind Christoffel Γ^k_{ij}(q) = g^{kγ}(A_γ·A_{,ij}),
+ *        formed from an `ElementValues`' base-vector and inverse-metric accessors.
+ *        `ElementValues` stores no connection — consumers build it in place — so
+ *        this mirrors that computation, letting the closed-form geometry tests
+ *        still assert the connection. Requires `Flags::Deriv2`; symmetric in (i, j).
+ */
+template <std::floating_point T, std::size_t d>
+inline T christoffel2nd(const ElementValues<T, d>& ev,
+                        Index k, Index i, Index j, Index q)
+{
+    T s = T(0);
+    for (Index g = 0; g < static_cast<Index>(d); ++g)
+        s += ev.g_inv(k, g)(q) * ev.a(g).row(q).dot(ev.a_d1(i, j).row(q));
+    return s;
+}
+
 } // namespace pyck::test
 
 #endif // PYCK_TEST_SUPPORT_ELEMENT_VALUES_AT_HPP

@@ -29,6 +29,9 @@ ShellReissnerMindlin5p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
     const Index N = ev.results_[0].rows();
     B.setZero(8 * Q, 5 * N);
 
+    // Reference-normal derivatives A_{3,β}, computed in place (not cached).
+    geometry::surface::compute_normal_derivatives<T>(ev.position_data, ev.jac, ev.n, n_d1_ws_);
+
     for (Index q = 0; q < Q; ++q)
     {
         auto slab0 = ev.results_[0].col(q);
@@ -38,9 +41,9 @@ ShellReissnerMindlin5p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
         const auto A2   = ev.a(1).row(q);   // covariant tangent A_2
         const auto A3 = a_3.row(q);         // unit normal A_3
 
-        // Reference-normal derivatives A_{3,β}
-        const auto A3_d1 = ev.n_d1(0).row(q);
-        const auto A3_d2 = ev.n_d1(1).row(q);
+        // Reference-normal derivatives A_{3,β} (computed in place above)
+        const auto A3_d1 = n_d1_ws_.middleRows(0, Q).row(q);
+        const auto A3_d2 = n_d1_ws_.middleRows(Q, Q).row(q);
 
         // Midsurface metric A_{αβ} = A_α·A_β (for the transverse-shear tilt φ_α = φ^λ A_{λα}).
         const T A11 = A1.dot(A1);
