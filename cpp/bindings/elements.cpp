@@ -8,7 +8,7 @@
 
 #include "element.hpp"
 #include "tensor_product.hpp"
-#include "intrinsic_geometry.hpp"
+#include "primitives_intrinsic.hpp"
 #include "patch.hpp"
 #include "eval_global_shape.hpp"
 #include "plate_kirchhoff_love_1p.hpp"
@@ -17,6 +17,7 @@
 #include "plate_reissner_mindlin_displ_2p.hpp"
 #include "shell_reissner_mindlin_5p.hpp"
 #include "shell_reissner_mindlin_4p.hpp"
+#include "shell_kirchhoff_love_3p.hpp"
 #include "plane_stress_2d.hpp"
 
 namespace py = pybind11;
@@ -197,6 +198,11 @@ void bind_elements(py::module_& m)
 
      py::class_<ShellReissnerMindlin4p<double>, Element2d,
                 Ptr<ShellReissnerMindlin4p<double>>>(m, "ShellReissnerMindlin4p")
+          .def(py::init<Ptr<PlaneStress2d<double>>>(),
+               py::arg("material"));
+
+     py::class_<ShellKirchhoffLove3p<double>, Element2d,
+                Ptr<ShellKirchhoffLove3p<double>>>(m, "ShellKirchhoffLove3p")
           .def(py::init<Ptr<PlaneStress2d<double>>>(),
                py::arg("material"));
 }

@@ -206,3 +206,34 @@ class ShellReissnerMindlin4p(Element):
         return f"ShellReissnerMindlin4p(material={self._material})"
 
 
+class ShellKirchhoffLove3p(Element):
+    """Kirchhoff-Love thin-shell element (rotation-free).
+
+    The curved-surface counterpart of :class:`PlateKirchhoffLove1p`: transverse
+    shear is neglected, the director follows the deformed normal, and bending is
+    the linearized change of the second fundamental form. The only unknowns are
+    the three Cartesian displacement components per control point:
+
+        slot 0..2 : Cartesian displacements (u_x, u_y, u_z)
+
+    Being rotation-free, the basis must be C^1 (degree >= 2).
+
+    Parameters
+    ----------
+    material : PlaneStressShell
+        Shell material model.
+    """
+    num_node_dofs: int = 3
+
+    def __init__(self, material: PlaneStressShell) -> None:
+        self._material = material
+        self._cpp_object = _pyck.ShellKirchhoffLove3p(self._material._cpp_object)
+
+    @property
+    def material(self) -> PlaneStressShell:
+        return self._material
+
+    def __repr__(self) -> str:
+        return f"ShellKirchhoffLove3p(material={self._material})"
+
+
