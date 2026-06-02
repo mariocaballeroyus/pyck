@@ -6,6 +6,8 @@
 #include "../operators/laplace_beltrami.hpp"
 #include "../operators/covariant_gradient.hpp"
 #include "../operators/laplace_beltrami_gradient.hpp"
+#include "../operators/curl.hpp"
+#include "../operators/curl_gradient.hpp"
 
 namespace pyck
 {
@@ -35,30 +37,16 @@ ShellReissnerMindlin4p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
     // Reference-normal derivatives A_{3,β}, computed in place (not cached).
     geometry::surface::compute_normal_derivatives<T>(ev.position_data, ev.jac, ev.n, n_d1_ws_);
 
-    operators::CovariantHessian<T, 2>         hess {ev.results_, ev.position_data, ev.g_inv_data};
-    operators::LaplaceBeltrami<T, 2> lapb {ev.results_, ev.position_data, ev.g_inv_data};
-    operators::CovariantGradient<T, 2>  vgrad{ev.results_, ev.position_data};
+    operators::CovariantHessian<T, 2>        hess{ev.results_, ev.position_data, ev.g_inv_data};
+    operators::LaplaceBeltrami<T, 2>         lapb{ev.results_, ev.position_data, ev.g_inv_data};
+    operators::CovariantGradient<T, 2>       vgrad{ev.results_, ev.position_data};
     operators::LaplaceBeltramiGradient<T, 2> lgrad{ev.results_, ev.lb_grad_conn_, ev.g_inv_data};
+    operators::Curl<T, 2>                    curl{ev.results_, ev.g_data, ev.jac};
+    operators::CurlGradient<T, 2>            curlgrad{ev.results_, ev.position_data, ev.g_data, ev.g_inv_data, ev.jac};
 
     for (Index q = 0; q < Q; ++q)
     {
         auto slab0 = ev.results_[0].col(q);
-        auto slab1 = ev.results_[1].col(q);
-
-        // Midsurface metric + Jacobian (for the surface permutation ε_α^β).
-        const T A11 = ev.g(0, 0)(q);
-        const T A12 = ev.g(0, 1)(q);
-        const T A22 = ev.g(1, 1)(q);
-        const T invJ = T(1) / ev.jac(q);
-
-        // ----------------------------------------------------------------------------
-
-        // Mixed surface permutation ε_α^β = g_{αμ} ϵ^{μβ} / √g, reducing to
-        // ε_1^2 = +1, ε_2^1 = −1 on the orthonormal lamina.
-        const T e1_1 = -A12 * invJ, e1_2 = A11 * invJ;
-        const T e2_1 = -A22 * invJ, e2_2 = A12 * invJ;
-
-        // ----------------------------------------------------------------------------
 
         // Second fundamental form B_{αβ} = b_{αβ} (cached) and shape operator
         // B^α_β = g^{αγ} B_{γβ}, raised in place (b_{21} = b_{12}).
@@ -97,7 +85,7 @@ ShellReissnerMindlin4p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
 
         // ----------------------------------------------------------------------------
 
-        // Second-kind Christoffel Γ^k_{ij} = g^{kγ}(A_γ·A_{,ij}), formed in place.
+        // Second-kind Christoffel Γ^k_{ij} = g^{kγ}(A_γ·A_{,ij})
         auto Gamma2nd = [&](Index k, Index i, Index j) -> T {
             return ev.g_inv(k, 0)(q) * ev.a(0).row(q).dot(ev.a_d1(i, j).row(q))
                  + ev.g_inv(k, 1)(q) * ev.a(1).row(q).dot(ev.a_d1(i, j).row(q));
@@ -110,7 +98,7 @@ ShellReissnerMindlin4p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
         const T G2_22 = Gamma2nd(1, 1, 1);
 
         // Codazzi-symmetric covariant derivative
-        //   B_{αβ|γ} = ∂_γ B_{αβ} − Γ^δ_{αγ}B_{δβ} − Γ^δ_{βγ}B_{αδ}.
+        // B_{αβ|γ} = ∂_γ B_{αβ} − Γ^δ_{αγ}B_{δβ} − Γ^δ_{βγ}B_{αδ}.
         const T B11_cov1 = B11_d1 - T(2) * (G1_11 * B11 + G2_11 * B12);
         const T B11_cov2 = B11_d2 - T(2) * (G1_12 * B11 + G2_12 * B12);
         const T B12_cov1 = B12_d1 - (G1_11 * B12 + G2_11 * B22) - (G1_12 * B11 + G2_12 * B12);
@@ -121,8 +109,6 @@ ShellReissnerMindlin4p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
         for (Index i = 0; i < N; ++i)
         {
             const T N_i = slab0(i);
-            const T N_u = slab1(i * 2 + 0);
-            const T N_v = slab1(i * 2 + 1);
 
             // Primal DOF indices
             const Index c_u1 = 4 * i + 0;
@@ -167,11 +153,11 @@ ShellReissnerMindlin4p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
             B(8*q + 4, c_wb) =  H22 - B2_22 * box;
             B(8*q + 5, c_wb) =  T(2) * H12 - T(2) * B2_12 * box;
 
-            // Symmetric covariant Hessian of the twist potential
-            // κ_{αβ} += (1/2) * ( e_α^λ * ψ_{|λβ} + e_β^λ * ψ_{|λα} )
-            B(8*q + 3, c_ps) = - (e1_1 * H11 + e1_2 * H12);
-            B(8*q + 4, c_ps) = - (e2_1 * H12 + e2_2 * H22);
-            B(8*q + 5, c_ps) = - (e1_1 * H12 + e1_2 * H22 + e2_1 * H11 + e2_2 * H12);
+            // Covariant gradient of the curl of the twist potential
+            // κ_{αβ} += -(1/2)( ε_α^δ ψ_{|δβ} + ε_β^δ ψ_{|δα} ) = -(curl ψ)_{(α|β)}
+            B(8*q + 3, c_ps) = -curlgrad(i, 0, 0, q);
+            B(8*q + 4, c_ps) = -curlgrad(i, 1, 1, q);
+            B(8*q + 5, c_ps) = -(curlgrad(i, 0, 1, q) + curlgrad(i, 1, 0, q));
 
             // Bending coupling of the symmetric contravariant gradient of the 
             // in-plane displacements
@@ -202,9 +188,9 @@ ShellReissnerMindlin4p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
             B(8*q + 7, c_wb) = -ratio * lgrad(i, 1, q);
 
             // Curl of the twist potential
-            // γ_{α} += e_α^λ ψ_{,λ}
-            B(8*q + 6, c_ps) =  e1_1 * N_u + e1_2 * N_v;
-            B(8*q + 7, c_ps) =  e2_1 * N_u + e2_2 * N_v;
+            // γ_{α} += ε_α^β ψ_{,β}
+            B(8*q + 6, c_ps) =  curl(i, 0, q);
+            B(8*q + 7, c_ps) =  curl(i, 1, q);
         }
     }
 }
@@ -275,23 +261,18 @@ ShellReissnerMindlin4p<T>::rotation_shape_matrix(const ElementValues<T, 2>& ev) 
     const Index N = ev.results_[0].rows();
     Nphi.setZero(2 * Q, 4 * N);
 
+    operators::Curl<T, 2> curl{ev.results_, ev.g_data, ev.jac};
+
     for (Index q = 0; q < Q; ++q) {
         auto slab1 = ev.results_[1].col(q);
-
-        const T A11 = ev.g(0, 0)(q);
-        const T A12 = ev.g(0, 1)(q);
-        const T A22 = ev.g(1, 1)(q);
-        const T invJ = T(1) / ev.jac(q);
-        const T e1_1 = -A12 * invJ, e1_2 = A11 * invJ;
-        const T e2_1 = -A22 * invJ, e2_2 = A12 * invJ;
 
         for (Index i = 0; i < N; ++i) {
             const T N_u = slab1(i * 2 + 0);
             const T N_v = slab1(i * 2 + 1);
             Nphi(2*q,     4*i + 2) = -N_u;
-            Nphi(2*q,     4*i + 3) =  e1_1 * N_u + e1_2 * N_v;
+            Nphi(2*q,     4*i + 3) =  curl(i, 0, q);
             Nphi(2*q + 1, 4*i + 2) = -N_v;
-            Nphi(2*q + 1, 4*i + 3) =  e2_1 * N_u + e2_2 * N_v;
+            Nphi(2*q + 1, 4*i + 3) =  curl(i, 1, q);
         }
     }
 }
