@@ -1,6 +1,6 @@
 #include "plate_kirchhoff_love_1p.hpp"
 #include "patch.hpp"
-#include "intrinsic_geometry.hpp"
+#include "primitives_intrinsic.hpp"
 #include "../operators/covariant_hessian.hpp"
 
 namespace pyck

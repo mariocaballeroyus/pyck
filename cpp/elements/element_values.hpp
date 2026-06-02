@@ -9,8 +9,8 @@
 
 #include "../basis/tensor_product.hpp"
 #include "../quadrature/quadrature.hpp"
-#include "../geometry/intrinsic_geometry.hpp"
-#include "../geometry/surface_geometry.hpp"
+#include "../geometry/primitives_intrinsic.hpp"
+#include "../geometry/primitives_surface.hpp"
 #include "../operators/laplace_beltrami_gradient.hpp"
 #include "../geometry/patch.hpp"
 #include "../multi_index.hpp"
@@ -176,7 +176,7 @@ public:
 
     // === Intrinsic geometry storage =================================================
     //
-    // Layout: see intrinsic_geometry.hpp for packing conventions.
+    // Layout: see primitives_intrinsic.hpp for packing conventions.
 
     /// @brief Per-order packed position-derivative storage, populated up to the
     ///        highest derivative order the flags request (`required_position_order`).

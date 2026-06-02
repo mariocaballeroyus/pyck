@@ -1,5 +1,5 @@
-#ifndef PYCK_BOUNDARY_GEOMETRY_HPP
-#define PYCK_BOUNDARY_GEOMETRY_HPP
+#ifndef PYCK_PRIMITIVES_BOUNDARY_HPP
+#define PYCK_PRIMITIVES_BOUNDARY_HPP
 
 #include <concepts>
 #include <cstddef>
@@ -115,4 +115,4 @@ inline void compute_in_surface_tangent(const ColMatrix<T, 3>& a_3,
 
 } // namespace pyck
 
-#endif // PYCK_BOUNDARY_GEOMETRY_HPP
+#endif // PYCK_PRIMITIVES_BOUNDARY_HPP

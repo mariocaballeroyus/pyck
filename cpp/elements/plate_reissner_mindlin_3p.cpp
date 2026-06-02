@@ -1,6 +1,6 @@
 #include "plate_reissner_mindlin_3p.hpp"
 #include "patch.hpp"
-#include "intrinsic_geometry.hpp"
+#include "primitives_intrinsic.hpp"
 
 namespace pyck
 {

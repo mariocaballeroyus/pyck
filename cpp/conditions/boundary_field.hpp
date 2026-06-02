@@ -5,8 +5,8 @@
 
 #include "../elements/element.hpp"
 #include "../elements/boundary_element_values.hpp"
-#include "../geometry/surface_geometry.hpp"
-#include "../geometry/intrinsic_geometry.hpp"
+#include "../geometry/primitives_surface.hpp"
+#include "../geometry/primitives_intrinsic.hpp"
 #include "../geometry/patch_boundary.hpp"
 #include "../types.hpp"
 

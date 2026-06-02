@@ -1,8 +1,7 @@
 #include "shell_reissner_mindlin_5p.hpp"
 #include "patch.hpp"
 #include "tensor_product.hpp"
-#include "intrinsic_geometry.hpp"
-#include "surface_geometry.hpp"
+#include "primitives_intrinsic.hpp"
 #include "../operators/covariant_gradient.hpp"
 
 namespace pyck
@@ -30,9 +29,6 @@ ShellReissnerMindlin5p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
     const Index N = ev.results_[0].rows();
     B.setZero(8 * Q, 5 * N);
 
-    // Reference-normal derivatives A_{3,β}, computed in place (not cached).
-    geometry::surface::compute_normal_derivatives<T>(ev.position_data, ev.jac, ev.n, n_d1_ws_);
-
     operators::CovariantGradient<T, 2> vgrad{ev.results_, ev.position_data};
 
     for (Index q = 0; q < Q; ++q)
@@ -44,9 +40,14 @@ ShellReissnerMindlin5p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
         const auto A2   = ev.a(1).row(q);   // covariant tangent A_2
         const auto A3 = a_3.row(q);         // unit normal A_3
 
-        // Reference-normal derivatives A_{3,β} (computed in place above)
-        const auto A3_d1 = n_d1_ws_.middleRows(0, Q).row(q);
-        const auto A3_d2 = n_d1_ws_.middleRows(Q, Q).row(q);
+        // Reference-normal derivatives via Weingarten: A_{3,β} = −B^α_β A_α,
+        // shape operator B^α_β = g^{αγ} B_{γβ} raised from the cached curvature.
+        const T B11 = ev.b(0, 0)(q), B12 = ev.b(0, 1)(q), B22 = ev.b(1, 1)(q);
+        const T gi11 = ev.g_inv(0, 0)(q), gi12 = ev.g_inv(0, 1)(q), gi22 = ev.g_inv(1, 1)(q);
+        const T Bmix11 = gi11 * B11 + gi12 * B12, Bmix12 = gi11 * B12 + gi12 * B22;
+        const T Bmix21 = gi12 * B11 + gi22 * B12, Bmix22 = gi12 * B12 + gi22 * B22;
+        const Eigen::Matrix<T, 1, 3> A3_d1 = -(Bmix11 * A1 + Bmix21 * A2);
+        const Eigen::Matrix<T, 1, 3> A3_d2 = -(Bmix12 * A1 + Bmix22 * A2);
 
         // Midsurface metric A_{αβ} = A_α·A_β (for the transverse-shear tilt φ_α = φ^λ A_{λα}).
         const T A11 = A1.dot(A1);

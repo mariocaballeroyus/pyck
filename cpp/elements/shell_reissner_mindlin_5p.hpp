@@ -73,24 +73,20 @@ public:
     /// second surface derivatives A_{λ,β}, i.e. an order-2 basis evaluation.
     Index basis_order() const override { return 2; }
 
-    // Normal (A_3) + Deriv2 (order-2 surface derivatives, for the in-place normal
-    // derivatives A_{3,β} and the vector-gradient kernel). Deriv1's metric + jac
-    // come free via Normal. A_{3,β} is computed in place, not cached.
+    // Normal (A_3) + Curvature (B_{αβ}) + Deriv2 (order-2 surface derivatives for the
+    // covariant-gradient operator). The reference-normal derivatives A_{3,β} are the
+    // Weingarten image −B^α_β A_α of the cached curvature, formed in place.
     unsigned flags() const override
-    { return Flags::Normal | Flags::Deriv2; }
+    { return Flags::Normal | Flags::Curvature | Flags::Deriv2; }
 
     unsigned essential_flags() const override { return Flags::None; }
     unsigned natural_flags()   const override
-    { return Flags::Normal | Flags::Deriv2; }
+    { return Flags::Normal | Flags::Curvature | Flags::Deriv2; }
 
 private:
 
     /// @brief Shell material properties.
     Ptr<PlaneStress2d<T>> material_;
-
-    /// @brief Scratch for the in-place reference-normal derivatives A_{3,β},
-    ///        packed (Q·2 × 3): block β at rows β·Q.
-    mutable ColMatrix<T, 3> n_d1_ws_;
 };
 
 } // namespace pyck

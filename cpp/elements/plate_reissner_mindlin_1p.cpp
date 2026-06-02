@@ -1,6 +1,6 @@
 #include "plate_reissner_mindlin_1p.hpp"
 #include "patch.hpp"
-#include "intrinsic_geometry.hpp"
+#include "primitives_intrinsic.hpp"
 #include "../operators/covariant_hessian.hpp"
 #include "../operators/laplace_beltrami.hpp"
 #include "../operators/laplace_beltrami_gradient.hpp"

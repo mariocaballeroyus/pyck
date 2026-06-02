@@ -1,7 +1,6 @@
 #include "shell_reissner_mindlin_4p.hpp"
 #include "patch.hpp"
-#include "intrinsic_geometry.hpp"
-#include "surface_geometry.hpp"
+#include "primitives_intrinsic.hpp"
 #include "../operators/covariant_hessian.hpp"
 #include "../operators/laplace_beltrami.hpp"
 #include "../operators/covariant_gradient.hpp"
@@ -34,9 +33,6 @@ ShellReissnerMindlin4p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
     const Index N = ev.results_[0].rows();
     B.setZero(8 * Q, 4 * N);
 
-    // Reference-normal derivatives A_{3,β}, computed in place (not cached).
-    geometry::surface::compute_normal_derivatives<T>(ev.position_data, ev.jac, ev.n, n_d1_ws_);
-
     operators::CovariantHessian<T, 2>        hess{ev.results_, ev.position_data, ev.g_inv_data};
     operators::LaplaceBeltrami<T, 2>         lapb{ev.results_, ev.position_data, ev.g_inv_data};
     operators::CovariantGradient<T, 2>       vgrad{ev.results_, ev.position_data};
@@ -64,9 +60,12 @@ ShellReissnerMindlin4p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
 
         // ----------------------------------------------------------------------------
 
-        const Eigen::Matrix<T, 3, 1> A3    = ev.n.row(q).transpose();
-        const Eigen::Matrix<T, 3, 1> A3_d1 = n_d1_ws_.middleRows(0, Q).row(q).transpose();   // A_{3,1}
-        const Eigen::Matrix<T, 3, 1> A3_d2 = n_d1_ws_.middleRows(Q, Q).row(q).transpose();   // A_{3,2}
+        const Eigen::Matrix<T, 3, 1> A3 = ev.n.row(q).transpose();
+        const Eigen::Matrix<T, 3, 1> a1 = ev.a(0).row(q).transpose();
+        const Eigen::Matrix<T, 3, 1> a2 = ev.a(1).row(q).transpose();
+        // Weingarten: A_{3,β} = −B^α_β A_α, from the cached second fundamental form.
+        const Eigen::Matrix<T, 3, 1> A3_d1 = -(Bmix11 * a1 + Bmix21 * a2);   // A_{3,1}
+        const Eigen::Matrix<T, 3, 1> A3_d2 = -(Bmix12 * a1 + Bmix22 * a2);   // A_{3,2}
         const Eigen::Matrix<T, 3, 1> A1_d1 = ev.a_d1(0, 0).row(q).transpose();   // A_{1,1}
         const Eigen::Matrix<T, 3, 1> A1_d2 = ev.a_d1(0, 1).row(q).transpose();   // A_{1,2} = A_{2,1}
         const Eigen::Matrix<T, 3, 1> A2_d2 = ev.a_d1(1, 1).row(q).transpose();   // A_{2,2}
@@ -149,9 +148,9 @@ ShellReissnerMindlin4p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
             // Symmetric covariant Hessian of the bending potential with curvature 
             // coupling correction
             // κ_{αβ} += w_{b|αβ} - (B^2)_{αβ} * (w_b - Kb/Ks Δ w_b)
-            B(8*q + 3, c_wb) =  H11 - B2_11 * box;
-            B(8*q + 4, c_wb) =  H22 - B2_22 * box;
-            B(8*q + 5, c_wb) =  T(2) * H12 - T(2) * B2_12 * box;
+            B(8*q + 3, c_wb) =  hess(i, 0, 0, q) - B2_11 * box;
+            B(8*q + 4, c_wb) =  hess(i, 1, 1, q) - B2_22 * box;
+            B(8*q + 5, c_wb) =  T(2) * hess(i, 0, 1, q) - T(2) * B2_12 * box;
 
             // Covariant gradient of the curl of the twist potential
             // κ_{αβ} += -(1/2)( ε_α^δ ψ_{|δβ} + ε_β^δ ψ_{|δα} ) = -(curl ψ)_{(α|β)}

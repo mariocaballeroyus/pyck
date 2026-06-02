@@ -1,5 +1,5 @@
-#ifndef PYCK_INTRINSIC_GEOMETRY_HPP
-#define PYCK_INTRINSIC_GEOMETRY_HPP
+#ifndef PYCK_PRIMITIVES_INTRINSIC_HPP
+#define PYCK_PRIMITIVES_INTRINSIC_HPP
 
 #include <cmath>
 #include <concepts>
@@ -18,42 +18,48 @@ namespace pyck
 namespace geometry::intrinsic
 {
 
-// === Position derivatives ===========================================================
+// === Position Derivatives ===========================================================
 
 /**
- * @brief Fill per-order packed position-derivative buffers from a basis and
- *        the active control points, up to derivative order @p max_order
- *        (clamped to the basis depth `basis.size() - 1`). Lower @p max_order
- *        trims the accumulation when a consumer needs fewer orders than the
- *        basis was evaluated to.
+ * @brief Fill per-order packed position-derivative output arrays from a basis and
+ *        the active control points, up to a derivative order.
+ * 
+ * @param basis        Per-order basis-function values at the quadrature points. basis[k] 
+ *                     holds the k-th order derivatives of every basis function.
+ * @param active_pts   Active control points. 
+ * @param position_out Output array for the evaluated derivatives, indexed by order.
+ * @param max_order    Maximum derivative order to evaluate. Capped to the maximum 
+ *                     degree of the provided basis.
  */
 template <std::floating_point T, std::size_t d>
 inline void compute_position_derivatives(const std::vector<Matrix<T>>& basis,
-                                         const ColMatrix<T, 3>& act_pts,
-                                         std::vector<ColMatrix<T, 3>>& position_data,
+                                         const ColMatrix<T, 3>& active_pts,
+                                         std::vector<ColMatrix<T, 3>>& position_out,
                                          Index max_order)
 {
     const Index avail = static_cast<Index>(basis.size()) - 1;
     const Index order = (max_order < avail) ? max_order : avail;
-    const Index Q_    = basis[0].cols();
-    const Index N_    = basis[0].rows();
+    const Index num_qp = basis[0].cols();
+    const Index num_b  = basis[0].rows();
 
-    position_data.resize(order + 1);
+    // Resize output array
+    position_out.resize(order + 1);
     for (Index k = 0; k <= order; ++k) {
         const Index n_k = num_multi_indices<d>(k);
-        position_data[k].resize(Q_ * n_k, 3);
+        position_out[k].resize(num_qp * n_k, 3);
     }
 
-    for (Index q = 0; q < Q_; ++q) {
+    for (Index q = 0; q < num_qp; ++q) {
         for (Index k = 0; k <= order; ++k) {
             const Index n_k = num_multi_indices<d>(k);
             auto slab = basis[k].col(q);
             for (Index packed = 0; packed < n_k; ++packed) {
                 Eigen::Matrix<T, 1, 3> deriv_q = Eigen::Matrix<T, 1, 3>::Zero();
-                for (Index b = 0; b < N_; ++b) {
-                    deriv_q.noalias() += slab(b * n_k + packed) * act_pts.row(b);
+                for (Index b = 0; b < num_b; ++b) {
+                    // R_{k} = Σ_b (∂^k N_b / ∂ξ_{k}) · P_b
+                    deriv_q.noalias() += slab(b * n_k + packed) * active_pts.row(b);
                 }
-                position_data[k].row(packed * Q_ + q) = deriv_q;
+                position_out[k].row(packed * num_qp + q) = deriv_q;
             }
         }
     }
@@ -64,42 +70,60 @@ inline void compute_position_derivatives(const std::vector<Matrix<T>>& basis,
 /**
  * @brief Compute covariant + contravariant metric and Jacobian from position
  *        derivatives at order 1 (covariant tangents a_α).
+ * 
+ * @param pos_derivs Per-order position derivatives sampled at Q quadrature points.
+ * @param metric_out     Packed covariant metric components A_{αβ} at each point.
+ * @param metric_inv_out Packed contravariant metric components A^{αβ} at each point.
+ * @param jacobian_out   Jacobian at each point.
  */
 template <std::floating_point T, std::size_t d>
-inline void compute_metric(const std::vector<ColMatrix<T, 3>>& position_data,
-                           Matrix<T>& g_data,
-                           Matrix<T>& g_inv_data,
-                           Vector<T>& jac)
+inline void compute_metric(const std::vector<ColMatrix<T, 3>>& pos_derivs,
+                           Matrix<T>& metric_out,
+                           Matrix<T>& metric_inv_out,
+                           Vector<T>& jacobian_out)
 {
+    // Aliases matching differential geometry notation
+    const auto& R = pos_derivs;
+    auto& A       = metric_out;
+    auto& A_inv   = metric_inv_out;
+    auto& J       = jacobian_out;
+    
     constexpr Index n_metric = d * (d + 1) / 2;
-    const Index Q_ = position_data[1].rows() / static_cast<Index>(d);
+    const Index num_qp = R[1].rows() / static_cast<Index>(d);
 
-    g_data.resize(Q_, n_metric);
-    g_inv_data.resize(Q_, n_metric);
-    jac.resize(Q_);
+    // Resize output arrays
+    A.resize(num_qp, n_metric);
+    A_inv.resize(num_qp, n_metric);
+    J.resize(num_qp);
 
-    auto a_view = [&](Index i) {
-        return position_data[1].middleRows(i * Q_, Q_);
+    auto A_d1 = [&](Index i) {
+        return R[1].middleRows(i * num_qp, num_qp);
     };
 
-    for (Index q = 0; q < Q_; ++q)
-    {
-        Eigen::Matrix<T, d, d> g_mat;
+    for (Index q = 0; q < num_qp; ++q) {
+        Eigen::Matrix<T, d, d> A_mat;
         for (Index i = 0; i < d; ++i)
             for (Index j = i; j < d; ++j) {
-                const T g_ij = a_view(i).row(q).dot(a_view(j).row(q));
-                g_mat(i, j) = g_ij;
-                if (j != i) g_mat(j, i) = g_ij;
+                // A_{αβ}   = A_α · A_β
+                const T A_ij = A_d1(i).row(q).dot(A_d1(j).row(q));
+                A_mat(i, j) = A_ij;
+                if (j != i) A_mat(j, i) = A_ij;
             }
-        const Eigen::Matrix<T, d, d> inv_g = g_mat.inverse();
-        const T det_g = g_mat.determinant();
+
+        // A^{αβ} = (A_αβ)^{-1}
+        const Eigen::Matrix<T, d, d> inv_A = A_mat.inverse();
+        // det A_{αβ}
+        const T det_A = A_mat.determinant();
+
         for (Index i = 0; i < d; ++i)
             for (Index j = i; j < d; ++j) {
+                // Allocate results into output arrays
                 const Index packed = pack2<d>(i, j);
-                g_data    (q, packed) = g_mat(i, j);
-                g_inv_data(q, packed) = inv_g(i, j);
+                A    (q, packed) = A_mat(i, j);
+                A_inv(q, packed) = inv_A(i, j);
             }
-        jac(q) = std::sqrt(det_g);
+        // J = \sqrt{ det A_{αβ} }
+        J(q) = std::sqrt(det_A);
     }
 }
 
@@ -151,4 +175,4 @@ inline void project_to_contravariant(const Matrix<T>& v_cov,
 
 } // namespace pyck
 
-#endif // PYCK_INTRINSIC_GEOMETRY_HPP
+#endif // PYCK_PRIMITIVES_INTRINSIC_HPP

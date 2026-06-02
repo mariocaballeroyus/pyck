@@ -8,7 +8,7 @@
 #include "patch_boundary.hpp"
 #include "tensor_product.hpp"
 #include "element_values.hpp"
-#include "surface_geometry.hpp"
+#include "primitives_surface.hpp"
 #include "element_values_at.hpp"
 #include "factories.hpp"
 #include "bspline.hpp"
@@ -305,11 +305,19 @@ TEST_CASE("Patch<double, 2>: composable primitives on twisted z=u·v patch",
     const auto& chr = local;
     const auto& a3     = local.n;
 
-    // Normal derivatives are no longer cached; compute them in place.
-    ColMatrix<double, 3> n_d1;
-    geometry::surface::compute_normal_derivatives<double>(
-        local.position_data, local.jac, local.n, n_d1);
+    // ∂_β A_3 is the Weingarten image of the cached curvature: A_{3,β} = −B^α_β A_α.
     const Eigen::Index Qn = local.n.rows();
+    ColMatrix<double, 3> n_d1(Qn * 2, 3);
+    for (Eigen::Index q = 0; q < Qn; ++q) {
+        const Eigen::Vector3d av0 = local.a(0).row(q).transpose();
+        const Eigen::Vector3d av1 = local.a(1).row(q).transpose();
+        for (int beta = 0; beta < 2; ++beta) {
+            const double b0 = local.b(0, beta)(q), b1 = local.b(1, beta)(q);
+            const double Bm0 = local.g_inv(0, 0)(q) * b0 + local.g_inv(0, 1)(q) * b1;
+            const double Bm1 = local.g_inv(0, 1)(q) * b0 + local.g_inv(1, 1)(q) * b1;
+            n_d1.row(beta * Qn + q) = (-(Bm0 * av0 + Bm1 * av1)).transpose();
+        }
+    }
     const auto nd_a31 = n_d1.middleRows(0, Qn);
     const auto nd_a32 = n_d1.middleRows(Qn, Qn);
 
@@ -366,16 +374,11 @@ TEST_CASE("Patch<double, 2>: composable primitives on twisted z=u·v patch",
         CHECK(nd_a32(q, 1) == Approx( u * v          / D32).margin(1e-12));
         CHECK(nd_a32(q, 2) == Approx(-v             / D32).margin(1e-12));
 
-        // Identity: a_γ · a_{3,β} = -b_{γβ}. Closed form on this patch:
+        // Cached second fundamental form (closed form on this patch):
         //   b_{11} = b_{22} = 0,  b_{12} = 1/√D.
-        const Eigen::Vector3d a1  = local.a(0).row(q).transpose();
-        const Eigen::Vector3d a2  = local.a(1).row(q).transpose();
-        const Eigen::Vector3d a31 = nd_a31.row(q).transpose();
-        const Eigen::Vector3d a32 = nd_a32.row(q).transpose();
-        CHECK(a1.dot(a31) == Approx( 0.0        ).margin(1e-13));
-        CHECK(a1.dot(a32) == Approx(-1.0 / sqrtD).margin(1e-12));
-        CHECK(a2.dot(a31) == Approx(-1.0 / sqrtD).margin(1e-12));
-        CHECK(a2.dot(a32) == Approx( 0.0        ).margin(1e-13));
+        CHECK(local.b(0, 0)(q) == Approx(0.0        ).margin(1e-12));
+        CHECK(local.b(0, 1)(q) == Approx(1.0 / sqrtD).margin(1e-12));
+        CHECK(local.b(1, 1)(q) == Approx(0.0        ).margin(1e-12));
     }
 }
 

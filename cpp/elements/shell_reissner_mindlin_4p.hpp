@@ -130,10 +130,6 @@ private:
 
     /// @brief Shell material properties.
     Ptr<PlaneStress2d<T>> material_;
-
-    /// @brief Scratch for the in-place reference-normal derivatives A_{3,β},
-    ///        packed (Q·2 × 3): block β at rows β·Q.
-    mutable ColMatrix<T, 3> n_d1_ws_;
 };
 
 } // namespace pyck
