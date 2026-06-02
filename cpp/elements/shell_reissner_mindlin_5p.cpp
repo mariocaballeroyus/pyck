@@ -3,6 +3,7 @@
 #include "tensor_product.hpp"
 #include "intrinsic_geometry.hpp"
 #include "surface_geometry.hpp"
+#include "../operators/covariant_gradient.hpp"
 
 namespace pyck
 {
@@ -31,6 +32,8 @@ ShellReissnerMindlin5p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
 
     // Reference-normal derivatives A_{3,β}, computed in place (not cached).
     geometry::surface::compute_normal_derivatives<T>(ev.position_data, ev.jac, ev.n, n_d1_ws_);
+
+    operators::CovariantGradient<T, 2> vgrad{ev.results_, ev.position_data};
 
     for (Index q = 0; q < Q; ++q)
     {
@@ -70,12 +73,12 @@ ShellReissnerMindlin5p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
             // --- Bending ------------------------------------------------------------
 
             // Rotations (contravariant): κ_{αβ} ⊃ φ_{(α|β)} = D_{iλαβ} φ^λ.
-            B(8*q + 3, 5*i + 3) = ev.D(i, 0, 0, 0, q);
-            B(8*q + 3, 5*i + 4) = ev.D(i, 1, 0, 0, q);
-            B(8*q + 4, 5*i + 3) = ev.D(i, 0, 1, 1, q);
-            B(8*q + 4, 5*i + 4) = ev.D(i, 1, 1, 1, q);
-            B(8*q + 5, 5*i + 3) = ev.D(i, 0, 0, 1, q) + ev.D(i, 0, 1, 0, q);
-            B(8*q + 5, 5*i + 4) = ev.D(i, 1, 0, 1, q) + ev.D(i, 1, 1, 0, q);
+            B(8*q + 3, 5*i + 3) = vgrad(i, 0, 0, 0, q);
+            B(8*q + 3, 5*i + 4) = vgrad(i, 1, 0, 0, q);
+            B(8*q + 4, 5*i + 3) = vgrad(i, 0, 1, 1, q);
+            B(8*q + 4, 5*i + 4) = vgrad(i, 1, 1, 1, q);
+            B(8*q + 5, 5*i + 3) = vgrad(i, 0, 0, 1, q) + vgrad(i, 0, 1, 0, q);
+            B(8*q + 5, 5*i + 4) = vgrad(i, 1, 0, 1, q) + vgrad(i, 1, 1, 0, q);
 
             // Displacements (cartesian)
 

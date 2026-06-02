@@ -34,6 +34,12 @@ add_library(pyck_geometry ${PYCK_GEOMETRY_SOURCES})
 target_include_directories(pyck_geometry PUBLIC cpp/geometry cpp/elements)
 target_link_libraries(pyck_geometry PUBLIC pyck_basis pyck_quadrature)
 
+# Operators library (differential-geometry operators on IGA fields)
+file(GLOB PYCK_OPERATORS_SOURCES cpp/operators/*.cpp)
+add_library(pyck_operators ${PYCK_OPERATORS_SOURCES})
+target_include_directories(pyck_operators PUBLIC cpp/operators)
+target_link_libraries(pyck_operators PUBLIC eigen)
+
 # Constraints library
 file(GLOB PYCK_CONSTRAINTS_SOURCES cpp/constraints/*.cpp)
 add_library(pyck_constraints ${PYCK_CONSTRAINTS_SOURCES})
@@ -71,7 +77,7 @@ target_link_libraries(pyck_postprocessing INTERFACE pyck_geometry pyck_quadratur
 file(GLOB PYCK_ELEMENTS_SOURCES cpp/elements/*.cpp)
 add_library(pyck_elements ${PYCK_ELEMENTS_SOURCES})
 target_include_directories(pyck_elements PUBLIC cpp/elements)
-target_link_libraries(pyck_elements PUBLIC pyck_geometry pyck_assembly pyck_materials)
+target_link_libraries(pyck_elements PUBLIC pyck_geometry pyck_operators pyck_assembly pyck_materials)
 
 
 # pybind11
@@ -95,6 +101,7 @@ target_include_directories(pyck_tests PRIVATE tests/cpp/support)
 target_link_libraries(pyck_tests PRIVATE
     pyck_basis
     pyck_geometry
+    pyck_operators
     pyck_elements
     pyck_conditions
     pyck_constraints

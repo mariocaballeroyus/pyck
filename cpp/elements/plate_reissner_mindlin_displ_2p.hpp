@@ -87,12 +87,12 @@ public:
     Index basis_order() const override { return 3; }
 
     unsigned flags() const override
-    { return Flags::Deriv1 | Flags::KernelHessian | Flags::KernelLB | Flags::KernelLBGradient; }
+    { return Flags::LaplaceBeltramiGradient; }
 
     unsigned essential_flags() const override
-    { return Flags::Deriv1 | Flags::KernelHessian | Flags::KernelLB | Flags::KernelLBGradient; }
+    { return Flags::LaplaceBeltramiGradient; }
     unsigned natural_flags()   const override
-    { return Flags::Deriv1 | Flags::KernelHessian | Flags::KernelLB | Flags::KernelLBGradient; }
+    { return Flags::LaplaceBeltramiGradient; }
 
 private:
 

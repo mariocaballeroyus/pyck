@@ -11,7 +11,7 @@
 #include "../quadrature/quadrature.hpp"
 #include "../geometry/intrinsic_geometry.hpp"
 #include "../geometry/surface_geometry.hpp"
-#include "../geometry/element_kernels.hpp"
+#include "../operators/laplace_beltrami_gradient.hpp"
 #include "../geometry/patch.hpp"
 #include "../multi_index.hpp"
 #include "../types.hpp"
@@ -30,18 +30,14 @@ namespace pyck
  */
 namespace Flags
 {
-    constexpr unsigned None      = 0;
-    constexpr unsigned Values    = 1u << 0;  ///< R = x(ξ)                  (position order 0)
-    constexpr unsigned Deriv1    = 1u << 1;  ///< A_α, metric g/g_inv, jac  (position order 1)
-    constexpr unsigned Normal    = 1u << 2;  ///< A_3                       (d=2)
-    constexpr unsigned Deriv2    = 1u << 3;  ///< A_{α,β}                   (position order 2)
-    constexpr unsigned Curvature = 1u << 4;  ///< B_{αβ} = A_{α,β}·A_3      (d=2)
-    constexpr unsigned Deriv3    = 1u << 5;  ///< A_{α,βγ}                  (position order 3)
-
-    constexpr unsigned KernelHessian    = 1u << 6;  ///< H_{iαβ}   (per-basis covariant Hessian)
-    constexpr unsigned KernelLB         = 1u << 7;  ///< L_i       (per-basis Laplace–Beltrami)
-    constexpr unsigned KernelVectorGrad = 1u << 8;  ///< D_{iλαβ}  (per-basis covariant vector gradient)
-    constexpr unsigned KernelLBGradient = 1u << 9;  ///< P_{iα}    (per-basis Laplace–Beltrami gradient)
+    constexpr unsigned None            = 0;
+    constexpr unsigned Values          = 1u << 0;  ///< R = x(ξ)                  (position order 0)
+    constexpr unsigned Deriv1          = 1u << 1;  ///< A_α, metric g/g_inv, jac  (position order 1)
+    constexpr unsigned Normal          = 1u << 2;  ///< A_3                       (d=2)
+    constexpr unsigned Deriv2          = 1u << 3;  ///< A_{α,β}                   (position order 2)
+    constexpr unsigned Curvature       = 1u << 4;  ///< B_{αβ} = A_{α,β}·A_3      (d=2)
+    constexpr unsigned Deriv3          = 1u << 5;  ///< A_{α,βγ}                  (position order 3)
+    constexpr unsigned LaplaceBeltramiGradient = 1u << 6;  ///< cache LaplaceBeltramiGradConn (lb_grad_conn_) for the P operator
 } // namespace Flags
 
 // === ElementValues ==================================================================
@@ -133,11 +129,11 @@ public:
             if (flags_ & Flags::Curvature)
                 geometry::surface::compute_curvature<T>(position_data, n, b_data);
 
-            // The Hessian / vector-gradient kernels are formed on the fly from base
-            // vectors by the H/L/D accessors; only the expensive 3rd-order
-            // Laplace–Beltrami-gradient auxiliary is cached here.
-            if (flags_ & Flags::KernelLBGradient)
-                lb_aux_ = compute_laplace_grad_aux<T, d>(position_data, g_inv_data);
+            // The Hessian / vector-gradient connections are cheap and formed on the
+            // fly by their operators; only the expensive 3rd-order Laplace–Beltrami
+            // gradient connector is cached here.
+            if (flags_ & Flags::LaplaceBeltramiGradient)
+                lb_grad_conn_ = operators::compute_laplace_beltrami_grad_conn<T, d>(position_data, g_inv_data);
         }
     }
 
@@ -206,10 +202,10 @@ public:
     // === Per-(qp) kernel auxiliary storage ==========================================
 
     /// @brief Cached inverse-metric / connection-trace gradients for P_{iα} — the
-    ///        one genuinely expensive 3rd-order kernel quantity. The Hessian /
+    ///        one genuinely expensive 3rd-order connector. The Hessian /
     ///        vector-gradient connections are cheap and formed on the fly from
-    ///        base vectors by the H/L/D accessors (nothing connection-like stored).
-    LaplaceGradAux<T, d> lb_aux_;
+    ///        base vectors by the operators (nothing connection-like stored).
+    operators::LaplaceBeltramiGradConn<T, d> lb_grad_conn_;
 
     // === Position-derivative accessors ==============================================
 
@@ -239,45 +235,29 @@ public:
     auto b(Index alpha, Index beta) const
     { return b_data.col(pack2<2>(alpha, beta)); }
 
-    // === Kernel accessors (formed on the fly from base vectors) =====================
-    //
-    // `Value` and the covariant scalar gradient are the raw basis buffers:
-    // N^i(q) = results_[0].col(q)(i), N^i_{,α}(q) = results_[1].col(q)(i·d + α).
-
-    /// @brief Covariant Hessian H_{iαβ}(q) of basis function i. Symmetric in (α, β).
-    T H(Index i, Index alpha, Index beta, Index q) const
-    { return geometry::kernels::eval_hessian<T, d>(results_, position_data, g_inv_data, i, alpha, beta, q); }
-
-    /// @brief Laplace–Beltrami L_i(q) of basis function i.
-    T L(Index i, Index q) const
-    { return geometry::kernels::eval_laplace_beltrami<T, d>(results_, position_data, g_inv_data, i, q); }
-
-    /// @brief Covariant vector gradient D_{iλαβ}(q): contributes u_{α|β} = D·u^λ.
-    T D(Index i, Index lambda, Index alpha, Index beta, Index q) const
-    { return geometry::kernels::eval_vector_gradient<T, d>(results_, position_data, i, lambda, alpha, beta, q); }
-
-    /// @brief Laplace–Beltrami gradient P_{iα}(q) of basis function i.
-    T P(Index i, Index alpha, Index q) const
-    { return geometry::kernels::eval_lb_gradient<T, d>(results_, lb_aux_, g_inv_data, i, alpha, q); }
+    // Differential operators (covariant Hessian, Laplace–Beltrami, in-plane vector
+    // gradient, Laplace–Beltrami gradient) are NOT exposed here: they live in
+    // `cpp/operators/` and are called by elements on the primitives above
+    // (`results_`, `position_data`, `g_inv_data`, `lb_grad_conn_`).
 
 private:
 
     /// @brief Expand requested flags down the dependency ladder so a consumer
     ///        lists only the top quantities it reads. Each rung pulls in the lower
-    ///        rungs it needs; one top-to-bottom pass settles. Connections are
-    ///        basis-direct (formed from base vectors), so the kernels need only the
-    ///        position derivatives (Deriv2/Deriv3) and the metric (in Deriv1).
+    ///        rungs it needs; one top-to-bottom pass settles. The operators are
+    ///        basis-direct (connections formed from base vectors), so requesting an
+    ///        operator reduces to requesting the position derivatives it reads —
+    ///        `Deriv2` for the Hessian / Laplace–Beltrami / vector gradient. Only
+    ///        the Laplace–Beltrami gradient needs more: its cached connector and the
+    ///        order-3 derivatives behind it.
     static unsigned expand_flags(unsigned f)
     {
-        if (f & Flags::KernelLB)          f |= Flags::KernelHessian;
-        if (f & Flags::KernelLBGradient)  f |= Flags::Deriv3;
-        if (f & Flags::KernelHessian)     f |= Flags::Deriv2;
-        if (f & Flags::KernelVectorGrad)  f |= Flags::Deriv2;
-        if (f & Flags::Curvature)         f |= Flags::Deriv2 | Flags::Normal;
-        if (f & Flags::Deriv3)            f |= Flags::Deriv2;
-        if (f & Flags::Deriv2)            f |= Flags::Deriv1;
-        if (f & Flags::Normal)            f |= Flags::Deriv1;
-        if (f & Flags::Deriv1)            f |= Flags::Values;
+        if (f & Flags::LaplaceBeltramiGradient)  f |= Flags::Deriv3;
+        if (f & Flags::Curvature)        f |= Flags::Deriv2 | Flags::Normal;
+        if (f & Flags::Deriv3)           f |= Flags::Deriv2;
+        if (f & Flags::Deriv2)           f |= Flags::Deriv1;
+        if (f & Flags::Normal)           f |= Flags::Deriv1;
+        if (f & Flags::Deriv1)           f |= Flags::Values;
         return f;
     }
 

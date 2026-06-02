@@ -1,7 +1,9 @@
 #include "plate_reissner_mindlin_displ_2p.hpp"
 #include "patch.hpp"
 #include "intrinsic_geometry.hpp"
-#include "laplace_beltrami.hpp"
+#include "../operators/covariant_hessian.hpp"
+#include "../operators/laplace_beltrami.hpp"
+#include "../operators/laplace_beltrami_gradient.hpp"
 
 namespace pyck
 {
@@ -28,6 +30,9 @@ PlateReissnerMindlinDispl2p<T>::strain_matrix(const ElementValues<T, 2>& ev) con
     const Index N = ev.results_[0].rows();
     B.setZero(5 * Q, 2 * N);
 
+    operators::CovariantHessian<T, 2>         hess {ev.results_, ev.position_data, ev.g_inv_data};
+    operators::LaplaceBeltramiGradient<T, 2> lgrad{ev.results_, ev.lb_grad_conn_, ev.g_inv_data};
+
     for (Index q = 0; q < Q; ++q)
     {
         auto slab1 = ev.results_[1].col(q);
@@ -40,18 +45,18 @@ PlateReissnerMindlinDispl2p<T>::strain_matrix(const ElementValues<T, 2>& ev) con
             // B_b = [ -N_{i|11}    N_{i|12}          ]   κ_{11}
             //       [ -N_{i|22}   -N_{i|12}          ]   κ_{22}
             //       [ -2 N_{i|12}  N_{i|22}−N_{i|11} ]   2κ_{12}
-            B(5*q,     2*i    ) = -ev.H(i, 0, 0, q);
-            B(5*q,     2*i + 1) =  ev.H(i, 0, 1, q);
-            B(5*q + 1, 2*i    ) = -ev.H(i, 1, 1, q);
-            B(5*q + 1, 2*i + 1) = -ev.H(i, 0, 1, q);
-            B(5*q + 2, 2*i    ) = -T(2) * ev.H(i, 0, 1, q);
-            B(5*q + 2, 2*i + 1) =  ev.H(i, 1, 1, q) - ev.H(i, 0, 0, q);
+            B(5*q,     2*i    ) = -hess(i, 0, 0, q);
+            B(5*q,     2*i + 1) =  hess(i, 0, 1, q);
+            B(5*q + 1, 2*i    ) = -hess(i, 1, 1, q);
+            B(5*q + 1, 2*i + 1) = -hess(i, 0, 1, q);
+            B(5*q + 2, 2*i    ) = -T(2) * hess(i, 0, 1, q);
+            B(5*q + 2, 2*i + 1) =  hess(i, 1, 1, q) - hess(i, 0, 0, q);
 
             // B_s = [ -(K_b/K_s) (Δ_g N_i)_{|1}   N_{i|2} ]   γ_1
             //       [ -(K_b/K_s) (Δ_g N_i)_{|2}  -N_{i|1} ]   γ_2
-            B(5*q + 3, 2*i    ) = -ratio * ev.P(i, 0, q);
+            B(5*q + 3, 2*i    ) = -ratio * lgrad(i, 0, q);
             B(5*q + 3, 2*i + 1) =  N_v_i;
-            B(5*q + 4, 2*i    ) = -ratio * ev.P(i, 1, q);
+            B(5*q + 4, 2*i    ) = -ratio * lgrad(i, 1, q);
             B(5*q + 4, 2*i + 1) = -N_u_i;
         }
     }
@@ -80,11 +85,13 @@ PlateReissnerMindlinDispl2p<T>::displacement_shape_matrix(const ElementValues<T,
     const Index N = ev.results_[0].rows();
     Nw.setZero(3 * Q, 2 * N);   // u = (0, 0, w): transverse deflection along +z
 
+    operators::LaplaceBeltrami<T, 2> lapb{ev.results_, ev.position_data, ev.g_inv_data};
+
     for (Index q = 0; q < Q; ++q) {
         auto slab0 = ev.results_[0].col(q);
         for (Index i = 0; i < N; ++i)
             // w = N_i − (K_b/K_s) Δ_g N_i = N_i − ratio·L_i, in the z-component row.
-            Nw(3 * q + 2, 2*i) = slab0(i) - ratio * ev.L(i, q);
+            Nw(3 * q + 2, 2*i) = slab0(i) - ratio * lapb(i, q);
     }
 }
 

@@ -6,7 +6,7 @@ build-backend = "scikit_build_core.build"
 name = "pyck"
 version = "0.1.0"
 requires-python = ">=3.10"
-dependencies = ["numpy"]
+dependencies = ["numpy", "scipy"]
 
 [tool.scikit-build]
 cmake.build-type = "Release"

@@ -1,4 +1,4 @@
-#include "laplace_beltrami.hpp"
+#include "laplace_beltrami_gradient.hpp"
 
 #include "../multi_index.hpp"
 
@@ -7,6 +7,9 @@
 #include <utility>
 
 namespace pyck
+{
+
+namespace operators
 {
 
 namespace {
@@ -33,14 +36,14 @@ sym3(std::size_t i, std::size_t j, std::size_t k)
 }  // namespace
 
 template <std::floating_point T, std::size_t d>
-LaplaceGradAux<T, d>
-compute_laplace_grad_aux(const std::vector<ColMatrix<T, 3>>& position_data,
+LaplaceBeltramiGradConn<T, d>
+compute_laplace_beltrami_grad_conn(const std::vector<ColMatrix<T, 3>>& position_data,
                          const Matrix<T>& g_inv_data)
 {
     const Index Q = position_data[0].rows();
 
 
-    LaplaceGradAux<T, d> aux;
+    LaplaceBeltramiGradConn<T, d> aux;
     for (std::size_t i = 0; i < d; ++i)
         for (std::size_t j = i; j < d; ++j)
             for (std::size_t a = 0; a < d; ++a)
@@ -171,12 +174,14 @@ compute_laplace_grad_aux(const std::vector<ColMatrix<T, 3>>& position_data,
 
 // === Template Instantiations ========================================================
 
-template LaplaceGradAux<double, 2> compute_laplace_grad_aux<double, 2>(
+template LaplaceBeltramiGradConn<double, 2> compute_laplace_beltrami_grad_conn<double, 2>(
     const std::vector<ColMatrix<double, 3>>&, const Matrix<double>&);
 
 #ifdef PYCK_BUILD_SINGLE_PRECISION
-template LaplaceGradAux<float, 2> compute_laplace_grad_aux<float, 2>(
+template LaplaceBeltramiGradConn<float, 2> compute_laplace_beltrami_grad_conn<float, 2>(
     const std::vector<ColMatrix<float, 3>>&, const Matrix<float>&);
 #endif
+
+} // namespace operators
 
 } // namespace pyck

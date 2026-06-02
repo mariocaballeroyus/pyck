@@ -2,7 +2,10 @@
 #include "patch.hpp"
 #include "intrinsic_geometry.hpp"
 #include "surface_geometry.hpp"
-#include "laplace_beltrami.hpp"
+#include "../operators/covariant_hessian.hpp"
+#include "../operators/laplace_beltrami.hpp"
+#include "../operators/covariant_gradient.hpp"
+#include "../operators/laplace_beltrami_gradient.hpp"
 
 namespace pyck
 {
@@ -31,6 +34,11 @@ ShellReissnerMindlin4p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
 
     // Reference-normal derivatives A_{3,β}, computed in place (not cached).
     geometry::surface::compute_normal_derivatives<T>(ev.position_data, ev.jac, ev.n, n_d1_ws_);
+
+    operators::CovariantHessian<T, 2>         hess {ev.results_, ev.position_data, ev.g_inv_data};
+    operators::LaplaceBeltrami<T, 2> lapb {ev.results_, ev.position_data, ev.g_inv_data};
+    operators::CovariantGradient<T, 2>  vgrad{ev.results_, ev.position_data};
+    operators::LaplaceBeltramiGradient<T, 2> lgrad{ev.results_, ev.lb_grad_conn_, ev.g_inv_data};
 
     for (Index q = 0; q < Q; ++q)
     {
@@ -123,15 +131,15 @@ ShellReissnerMindlin4p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
             const Index c_ps = 4 * i + 3;
 
             // w = w_b - Kb/Ks \nabla^2 w_b
-            const T box = N_i - ratio * ev.L(i, q);
+            const T box = N_i - ratio * lapb(i, q);
 
             // Covariant Hessian H_{αβ} of the scalar potential, and covariant
             // gradient D_{λαβ} = ∂(u_{α|β})/∂u^λ of the in-plane field.
-            const T H11 = ev.H(i, 0, 0, q), H12 = ev.H(i, 0, 1, q), H22 = ev.H(i, 1, 1, q);
-            const T D000 = ev.D(i,0,0,0,q), D001 = ev.D(i,0,0,1,q),
-                    D010 = ev.D(i,0,1,0,q), D011 = ev.D(i,0,1,1,q),
-                    D100 = ev.D(i,1,0,0,q), D101 = ev.D(i,1,0,1,q),
-                    D110 = ev.D(i,1,1,0,q), D111 = ev.D(i,1,1,1,q);
+            const T H11 = hess(i, 0, 0, q), H12 = hess(i, 0, 1, q), H22 = hess(i, 1, 1, q);
+            const T D000 = vgrad(i,0,0,0,q), D001 = vgrad(i,0,0,1,q),
+                    D010 = vgrad(i,0,1,0,q), D011 = vgrad(i,0,1,1,q),
+                    D100 = vgrad(i,1,0,0,q), D101 = vgrad(i,1,0,1,q),
+                    D110 = vgrad(i,1,1,0,q), D111 = vgrad(i,1,1,1,q);
 
             // --- Membrane Strain ----------------------------------------------------
 
@@ -190,8 +198,8 @@ ShellReissnerMindlin4p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
 
             // Scaled gradient of the Laplacian of the bending potential
             // γ_{α} = -( Kb/Ks Δ w_b )_{,α}
-            B(8*q + 6, c_wb) = -ratio * ev.P(i, 0, q);
-            B(8*q + 7, c_wb) = -ratio * ev.P(i, 1, q);
+            B(8*q + 6, c_wb) = -ratio * lgrad(i, 0, q);
+            B(8*q + 7, c_wb) = -ratio * lgrad(i, 1, q);
 
             // Curl of the twist potential
             // γ_{α} += e_α^λ ψ_{,λ}
@@ -231,6 +239,8 @@ ShellReissnerMindlin4p<T>::displacement_shape_matrix(const ElementValues<T, 2>& 
     auto A1v = ev.a(0);   // covariant tangent A_1 (Q × 3)
     auto A2v = ev.a(1);   // covariant tangent A_2
 
+    operators::LaplaceBeltrami<T, 2> lapb{ev.results_, ev.position_data, ev.g_inv_data};
+
     for (Index q = 0; q < Q; ++q) {
         auto slab0 = ev.results_[0].col(q);
 
@@ -243,7 +253,7 @@ ShellReissnerMindlin4p<T>::displacement_shape_matrix(const ElementValues<T, 2>& 
         for (Index i = 0; i < N; ++i) {
             const T N_i = slab0(i);
             // Recovered transverse □_i = N_i − (K_b/K_s) Δ_g N_i = N_i − ratio·L_i.
-            const T box = N_i - ratio * ev.L(i, q);
+            const T box = N_i - ratio * lapb(i, q);
 
             // Physical displacement u = u¹ A_1 + u² A_2 + □(w_b) A_3 (ψ does no work).
             for (Index r = 0; r < 3; ++r) {

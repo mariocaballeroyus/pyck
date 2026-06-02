@@ -114,20 +114,17 @@ public:
     Index basis_order() const override { return 3; }
 
     // Normal (A_3) + Curvature (B_{αβ}) + Deriv3 (third surface derivatives for the
-    // inline Codazzi ∇B, whose connection is formed in place from base vectors). The
-    // four kernels supply the Hessian, recovered transverse □, in-plane covariant
-    // gradient, and Laplace–Beltrami gradient. The normal derivatives A_{3,β} and the
-    // shape operator B^α_β are computed in place in strain_matrix, not cached.
+    // inline Codazzi ∇B, formed in place from base vectors) + LaplaceGradient (caches
+    // the P-operator connector). The Hessian / Laplace–Beltrami / vector-gradient
+    // operators are basis-direct views over these primitives; the normal derivatives
+    // A_{3,β} and the shape operator B^α_β are computed in place, not cached.
     unsigned flags() const override
-    { return Flags::Normal | Flags::Curvature | Flags::Deriv3
-           | Flags::KernelHessian | Flags::KernelLB | Flags::KernelVectorGrad | Flags::KernelLBGradient; }
+    { return Flags::Normal | Flags::Curvature | Flags::Deriv3 | Flags::LaplaceBeltramiGradient; }
 
     unsigned essential_flags() const override
-    { return Flags::Normal | Flags::Curvature | Flags::Deriv3
-           | Flags::KernelHessian | Flags::KernelLB | Flags::KernelVectorGrad | Flags::KernelLBGradient; }
+    { return Flags::Normal | Flags::Curvature | Flags::Deriv3 | Flags::LaplaceBeltramiGradient; }
     unsigned natural_flags()   const override
-    { return Flags::Normal | Flags::Curvature | Flags::Deriv3
-           | Flags::KernelHessian | Flags::KernelLB | Flags::KernelVectorGrad | Flags::KernelLBGradient; }
+    { return Flags::Normal | Flags::Curvature | Flags::Deriv3 | Flags::LaplaceBeltramiGradient; }
 
 private:
 

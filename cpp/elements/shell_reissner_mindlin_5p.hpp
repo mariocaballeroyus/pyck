@@ -77,11 +77,11 @@ public:
     // derivatives A_{3,β} and the vector-gradient kernel). Deriv1's metric + jac
     // come free via Normal. A_{3,β} is computed in place, not cached.
     unsigned flags() const override
-    { return Flags::Normal | Flags::Deriv2 | Flags::KernelVectorGrad; }
+    { return Flags::Normal | Flags::Deriv2; }
 
     unsigned essential_flags() const override { return Flags::None; }
     unsigned natural_flags()   const override
-    { return Flags::Normal | Flags::Deriv2 | Flags::KernelVectorGrad; }
+    { return Flags::Normal | Flags::Deriv2; }
 
 private:
 

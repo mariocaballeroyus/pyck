@@ -1,6 +1,7 @@
 #include "plate_kirchhoff_love_1p.hpp"
 #include "patch.hpp"
 #include "intrinsic_geometry.hpp"
+#include "../operators/covariant_hessian.hpp"
 
 namespace pyck
 {
@@ -25,13 +26,15 @@ PlateKirchhoffLove1p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
     const Index N = ev.results_[0].rows();
     B.setZero(3 * Q, N);
 
+    operators::CovariantHessian<T, 2> hess{ev.results_, ev.position_data, ev.g_inv_data};
+
     for (Index q = 0; q < Q; ++q)
         for (Index i = 0; i < N; ++i)
         {
             // Bending strain = −(covariant Hessian of w): B_i = [−H_11; −H_22; −2H_12].
-            B(3*q,     i) = -ev.H(i, 0, 0, q);
-            B(3*q + 1, i) = -ev.H(i, 1, 1, q);
-            B(3*q + 2, i) = -T(2) * ev.H(i, 0, 1, q);
+            B(3*q,     i) = -hess(i, 0, 0, q);
+            B(3*q + 1, i) = -hess(i, 1, 1, q);
+            B(3*q + 2, i) = -T(2) * hess(i, 0, 1, q);
         }
 }
 

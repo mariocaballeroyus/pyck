@@ -7,7 +7,10 @@
 #include "knot_vector.hpp"
 #include "gauss_legendre.hpp"
 #include "element_values.hpp"
+#include "covariant_hessian.hpp"
 #include "laplace_beltrami.hpp"
+#include "covariant_gradient.hpp"
+#include "laplace_beltrami_gradient.hpp"
 
 using namespace pyck;
 
@@ -39,14 +42,18 @@ TEST_CASE("ElementValues kernels match inline reference (curved p=3 patch)",
     auto patch = std::make_shared<Patch<double, 2>>(bsp, bsp, P);
 
     GaussLegendre<double, 2> gauss(p + 1);
-    const unsigned flags = Flags::KernelHessian | Flags::KernelLB
-                         | Flags::KernelVectorGrad | Flags::KernelLBGradient;
+    const unsigned flags = Flags::LaplaceBeltramiGradient;
     ElementValues<double, 2> ev(*patch, 3, flags, gauss);
     ev.reinit(0);
 
     const Index Q = ev.results_[0].cols();
     const Index N = ev.results_[0].rows();
-    const auto aux = compute_laplace_grad_aux<double, 2>(ev.position_data, ev.g_inv_data);
+    const auto aux = operators::compute_laplace_beltrami_grad_conn<double, 2>(ev.position_data, ev.g_inv_data);
+
+    operators::CovariantHessian<double, 2>        hess {ev.results_, ev.position_data, ev.g_inv_data};
+    operators::LaplaceBeltrami<double, 2>         lapb {ev.results_, ev.position_data, ev.g_inv_data};
+    operators::CovariantGradient<double, 2> vgrad{ev.results_, ev.position_data};
+    operators::LaplaceBeltramiGradient<double, 2> lgrad{ev.results_, ev.lb_grad_conn_, ev.g_inv_data};
 
     const double tol = 1e-9;
 
@@ -77,13 +84,13 @@ TEST_CASE("ElementValues kernels match inline reference (curved p=3 patch)",
                 return Nab - Gam0 * Nu - Gam1 * Nv;
             };
             const double H00 = H_ref(0, 0), H11 = H_ref(1, 1), H01 = H_ref(0, 1);
-            CHECK(ev.H(i, 0, 0, q) == Approx(H00).margin(tol));
-            CHECK(ev.H(i, 1, 1, q) == Approx(H11).margin(tol));
-            CHECK(ev.H(i, 0, 1, q) == Approx(H01).margin(tol));
+            CHECK(hess(i, 0, 0, q) == Approx(H00).margin(tol));
+            CHECK(hess(i, 1, 1, q) == Approx(H11).margin(tol));
+            CHECK(hess(i, 0, 1, q) == Approx(H01).margin(tol));
 
             // --- L: Laplace–Beltrami = g^{αβ} H_{αβ} ----------------------------
             const double L_ref = gi00 * H00 + gi11 * H11 + 2.0 * gi01 * H01;
-            CHECK(ev.L(i, q) == Approx(L_ref).margin(tol));
+            CHECK(lapb(i, q) == Approx(L_ref).margin(tol));
 
             // --- D: D_{λαβ} = g_{αλ} N_{,β} + (A_α·A_{λ,β}) N --------------------
             for (Index lam = 0; lam < 2; ++lam)
@@ -92,7 +99,7 @@ TEST_CASE("ElementValues kernels match inline reference (curved p=3 patch)",
                         const double Nb = N1(i * 2 + b);
                         const double conn = ev.a(a).row(q).dot(ev.a_d1(lam, b).row(q));
                         const double D_ref = ev.g(a, lam)(q) * Nb + conn * Ni;
-                        CHECK(ev.D(i, lam, a, b, q) == Approx(D_ref).margin(tol));
+                        CHECK(vgrad(i, lam, a, b, q) == Approx(D_ref).margin(tol));
                     }
 
             // --- P: ∂_α(g^{μν}H_{μν}) via the explicit lap_1/lap_2 formula -------
@@ -110,8 +117,8 @@ TEST_CASE("ElementValues kernels match inline reference (curved p=3 patch)",
             const double P1_ref = G11_d2 * Nuu + 2.0 * G12_d2 * Nuv + G22_d2 * Nvv
                                 + gi00 * Nuuv + 2.0 * gi01 * Nuvv + gi11 * Nvvv
                                 - c1_d2 * Nu - c2_d2 * Nv - c1 * Nuv - c2 * Nvv;
-            CHECK(ev.P(i, 0, q) == Approx(P0_ref).margin(tol));
-            CHECK(ev.P(i, 1, q) == Approx(P1_ref).margin(tol));
+            CHECK(lgrad(i, 0, q) == Approx(P0_ref).margin(tol));
+            CHECK(lgrad(i, 1, q) == Approx(P1_ref).margin(tol));
         }
     }
 
