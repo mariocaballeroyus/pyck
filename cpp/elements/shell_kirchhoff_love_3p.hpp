@@ -14,7 +14,7 @@ namespace pyck
 /**
  * @brief Kirchhoff-Love thin-shell element on a curved surface (rotation-free).
  *
- * The curved-surface counterpart of `PlateKirchhoffLove1p`: transverse shear is
+ * A rotation-free thin shell: transverse shear is
  * neglected, the director is the deformed surface normal, and bending is the
  * linearized change of the second fundamental form. The only unknowns are the
  * three Cartesian displacement components per control point — no rotation DOFs —
@@ -85,15 +85,17 @@ public:
     /// N_{,αβ}, i.e. an order-2 basis evaluation (C¹, degree ≥ 2).
     Index basis_order() const override { return 2; }
 
-    // Normal (A_3) + Curvature (B_{αβ}) + Deriv2 (order-2 surface derivatives A_{α,β}
-    // and the raw N_{,αβ}). Curvature pulls in Deriv2/Normal/Deriv1/Values, which
-    // also supply the membrane base vectors A_α and the metric the constitutive reads.
+    // Normal (A_3) + Deriv2 (order-2 surface derivatives A_{α,β} and the raw N_{,αβ}).
+    // Deriv2 pulls in Deriv1/Values, which also supply the membrane base vectors A_α,
+    // the metric the constitutive reads, and the Jacobian ā₃ = √det A the normal
+    // variation needs. The second fundamental form B_{αβ} is no longer required: the
+    // Kiendl bending forms δA_3 from A_1×A_2 and its length, not from b_{αβ}.
     unsigned flags() const override
-    { return Flags::Normal | Flags::Curvature | Flags::Deriv2; }
+    { return Flags::Normal | Flags::Deriv2; }
 
     unsigned essential_flags() const override { return Flags::None; }
     unsigned natural_flags()   const override
-    { return Flags::Normal | Flags::Curvature | Flags::Deriv2; }
+    { return Flags::Normal | Flags::Deriv2; }
 
 private:
 

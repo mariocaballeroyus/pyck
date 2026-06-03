@@ -11,7 +11,6 @@
 #include "knot_vector.hpp"
 #include "gauss_legendre.hpp"
 #include "plane_stress_2d.hpp"
-#include "plate_kirchhoff_love_1p.hpp"
 #include "shell_kirchhoff_love_3p.hpp"
 
 using namespace pyck;
@@ -123,18 +122,15 @@ TEST_CASE("ShellKL3p: K has exactly 6 near-zero eigenvalues (flat patch)",
 
 
 // ===========================================================================
-// Test 3 — Flat-plate reduction: the u_z block matches PlateKirchhoffLove1p
+// Test 3 — Flat-plate decoupling: membrane and transverse bending separate
 //
-// On a flat axis-aligned unit patch (A_{,αβ}=0, A_3=ẑ, b=0):
-//   - membrane strain of u_z vanishes and bending strain of (u_x, u_y) vanishes,
-//     so the in-plane (u_x, u_y) and transverse u_z DOFs decouple;
-//   - the transverse u_z bending B reduces to −N_{,αβ}, identical to the
-//     Kirchhoff–Love plate (κ = −∇²w), with the same bending constitutive.
-// Hence the shell's u_z sub-block must equal the plate K element-wise — the
-// decisive sign / factor-2 check.
+// On a flat axis-aligned unit patch (A_{,αβ}=0, A_3=ẑ, b=0) the membrane strain
+// of u_z and the bending strain of (u_x, u_y) both vanish, so the in-plane
+// (u_x, u_y) and transverse u_z DOFs decouple; the u_z sub-block is the pure
+// Kirchhoff–Love bending stiffness (κ = −∇²w on a flat patch).
 // ===========================================================================
 
-TEST_CASE("ShellKL3p reduces to PlateKirchhoffLove1p on a flat axis-aligned patch",
+TEST_CASE("ShellKL3p: membrane and transverse bending decouple on a flat patch",
           "[elements][shell-kl3p]") {
 
     auto kv = KnotVector<double>::clamped_uniform(2, 4);
@@ -143,15 +139,9 @@ TEST_CASE("ShellKL3p reduces to PlateKirchhoffLove1p on a flat axis-aligned patc
     auto patch = std::make_shared<Patch<double, 2>>(surf);
     const Index ncp = patch->num_control_pts();
 
-    const double E = 1.0e6, nu = 0.3, t = 0.05, k_s = 5.0 / 6.0;
+    auto material = std::make_shared<PlaneStress2d<double>>(1.0e6, 0.3, 0.05);
+    ShellKirchhoffLove3p<double> shell_el(material);
 
-    auto plate_mat = std::make_shared<PlaneStress2d<double>>(E, nu, t, k_s);
-    PlateKirchhoffLove1p<double> plate_el(plate_mat);
-
-    auto shell_mat = std::make_shared<PlaneStress2d<double>>(E, nu, t, k_s);
-    ShellKirchhoffLove3p<double> shell_el(shell_mat);
-
-    Matrix<double> Kp = assemble_global_K(*patch, plate_el, 3);  //   N ×   N (w)
     Matrix<double> Ks = assemble_global_K(*patch, shell_el, 3);  // 3N × 3N
 
     // Slot order: (u_x, u_y, u_z) per node.
@@ -184,12 +174,9 @@ TEST_CASE("ShellKL3p reduces to PlateKirchhoffLove1p on a flat axis-aligned patc
     for (Index i = 0; i < em.size(); ++i) if (std::abs(em(i)) < tolm) ++num_zero_m;
     CHECK(num_zero_m == 3);
 
-    // 3) The transverse u_z sub-block equals the Kirchhoff–Love plate K
-    //    element-wise — pins the bending sign and the 2κ₁₂ factor.
-    REQUIRE(Kp.rows() == K_uz.rows());
-    CHECK((K_uz - Kp).norm() / Kp.norm() < 1e-9);
-
-    // 4) The u_z block carries the 3 out-of-plane rigid modes.
+    // 3) The transverse u_z bending sub-block is symmetric and carries the 3
+    //    out-of-plane rigid modes (transverse translation + 2 bending rotations).
+    CHECK((K_uz - K_uz.transpose()).norm() / (K_uz.norm() + 1e-30) < 1e-12);
     Eigen::SelfAdjointEigenSolver<Matrix<double>> esb(K_uz);
     REQUIRE(esb.info() == Eigen::Success);
     Vector<double> eb = esb.eigenvalues();

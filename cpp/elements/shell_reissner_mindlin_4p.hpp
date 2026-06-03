@@ -14,7 +14,7 @@ namespace pyck
 /**
  * @brief Four-parameter rotation-free Reissner-Mindlin shell element.
  *
- * The curved-surface counterpart of @ref PlateReissnerMindlinDispl2p. The
+ * A rotation-free Reissner-Mindlin shell. The
  * director tilt references the *deformed* mid-surface normal,
  * @f$\theta_\alpha=-w_{b,\alpha}-B_\alpha{}^\gamma u_\gamma
  *   +\epsilon_\alpha{}^\lambda\psi_{,\lambda}@f$ (a surface Helmholtz split plus
@@ -114,17 +114,17 @@ public:
     Index basis_order() const override { return 3; }
 
     // Normal (A_3) + Curvature (B_{αβ}) + Deriv3 (third surface derivatives for the
-    // inline Codazzi ∇B, formed in place from base vectors) + LaplaceGradient (caches
-    // the P-operator connector). The Hessian / Laplace–Beltrami / vector-gradient
-    // operators are basis-direct views over these primitives; the normal derivatives
-    // A_{3,β} and the shape operator B^α_β are computed in place, not cached.
+    // inline Codazzi ∇B and the order-3 Laplace–Beltrami gradient). The Hessian /
+    // Laplace–Beltrami / vector-gradient / P operators are constructed per quadrature
+    // point over these primitives; the normal derivatives A_{3,β} and the shape operator
+    // B^α_β are computed in place, not cached.
     unsigned flags() const override
-    { return Flags::Normal | Flags::Curvature | Flags::Deriv3 | Flags::LaplaceBeltramiGradient; }
+    { return Flags::Normal | Flags::Curvature | Flags::Deriv3; }
 
     unsigned essential_flags() const override
-    { return Flags::Normal | Flags::Curvature | Flags::Deriv3 | Flags::LaplaceBeltramiGradient; }
+    { return Flags::Normal | Flags::Curvature | Flags::Deriv3; }
     unsigned natural_flags()   const override
-    { return Flags::Normal | Flags::Curvature | Flags::Deriv3 | Flags::LaplaceBeltramiGradient; }
+    { return Flags::Normal | Flags::Curvature | Flags::Deriv3; }
 
 private:
 

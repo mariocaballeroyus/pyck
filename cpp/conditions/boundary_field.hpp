@@ -116,8 +116,8 @@ surface_tangent(const ColMatrix<T, 3>& n,
  * @brief Basis-DOF value field: extracts the spline value of a single DOF
  *        slot within each node block, ignoring all others.
  *
- * Useful when you need to pin a primary DOF directly (e.g. `w_b` at index
- * 0 or `psi` at index 1 on `PlateReissnerMindlinDispl2p`), sidestepping
+ * Useful when you need to pin a primary DOF directly (e.g. `w_b` at slot
+ * 2 or `psi` at slot 3 on `ShellReissnerMindlin4p`), sidestepping
  * the linear-combination identities baked into the element's
  * `displacement_shape_matrix`.
  */

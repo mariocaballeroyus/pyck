@@ -29,12 +29,12 @@ ShellReissnerMindlin5p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
     const Index N = ev.results_[0].rows();
     B.setZero(8 * Q, 5 * N);
 
-    operators::CovariantGradient<T, 2> vgrad{ev.results_, ev.position_data};
-
     for (Index q = 0; q < Q; ++q)
     {
         auto slab0 = ev.results_[0].col(q);
         auto slab1 = ev.results_[1].col(q);
+
+        const operators::CovariantGradient<T, 2> vgrad{ev.results_, ev.position_data, q};
 
         const auto A1   = ev.a(0).row(q);   // covariant tangent A_1
         const auto A2   = ev.a(1).row(q);   // covariant tangent A_2
@@ -74,12 +74,12 @@ ShellReissnerMindlin5p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
             // --- Bending ------------------------------------------------------------
 
             // Rotations (contravariant): κ_{αβ} ⊃ φ_{(α|β)} = D_{iλαβ} φ^λ.
-            B(8*q + 3, 5*i + 3) = vgrad(i, 0, 0, 0, q);
-            B(8*q + 3, 5*i + 4) = vgrad(i, 1, 0, 0, q);
-            B(8*q + 4, 5*i + 3) = vgrad(i, 0, 1, 1, q);
-            B(8*q + 4, 5*i + 4) = vgrad(i, 1, 1, 1, q);
-            B(8*q + 5, 5*i + 3) = vgrad(i, 0, 0, 1, q) + vgrad(i, 0, 1, 0, q);
-            B(8*q + 5, 5*i + 4) = vgrad(i, 1, 0, 1, q) + vgrad(i, 1, 1, 0, q);
+            B(8*q + 3, 5*i + 3) = vgrad(i, 0, 0, 0);
+            B(8*q + 3, 5*i + 4) = vgrad(i, 1, 0, 0);
+            B(8*q + 4, 5*i + 3) = vgrad(i, 0, 1, 1);
+            B(8*q + 4, 5*i + 4) = vgrad(i, 1, 1, 1);
+            B(8*q + 5, 5*i + 3) = vgrad(i, 0, 0, 1) + vgrad(i, 0, 1, 0);
+            B(8*q + 5, 5*i + 4) = vgrad(i, 1, 0, 1) + vgrad(i, 1, 1, 0);
 
             // Displacements (cartesian)
 

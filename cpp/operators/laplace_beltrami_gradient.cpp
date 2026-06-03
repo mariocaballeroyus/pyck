@@ -38,23 +38,11 @@ sym3(std::size_t i, std::size_t j, std::size_t k)
 template <std::floating_point T, std::size_t d>
 LaplaceBeltramiGradConn<T, d>
 compute_laplace_beltrami_grad_conn(const std::vector<ColMatrix<T, 3>>& position_data,
-                         const Matrix<T>& g_inv_data)
+                         const Matrix<T>& g_inv_data, Index q)
 {
     const Index Q = position_data[0].rows();
 
-
     LaplaceBeltramiGradConn<T, d> aux;
-    for (std::size_t i = 0; i < d; ++i)
-        for (std::size_t j = i; j < d; ++j)
-            for (std::size_t a = 0; a < d; ++a)
-                aux.G_inv_d[i][j][a].resize(Q);
-    for (std::size_t delta = 0; delta < d; ++delta) {
-        aux.c[delta].resize(Q);
-        for (std::size_t a = 0; a < d; ++a)
-            aux.c_d[delta][a].resize(Q);
-    }
-
-    for (Index q = 0; q < Q; ++q)
     {
         auto a1  = [&](std::size_t i) {
             return position_data[1].row(i * Q + q);
@@ -136,7 +124,7 @@ compute_laplace_beltrami_grad_conn(const std::vector<ColMatrix<T, 3>>& position_
                             s += G(i, m) * G(j, n) * g_d(m, n, alpha);
                     Gup_d[i][j][alpha] = -s;
                     Gup_d[j][i][alpha] = -s;
-                    aux.G_inv_d[std::min(i, j)][std::max(i, j)][alpha](q) = -s;
+                    aux.G_inv_d[std::min(i, j)][std::max(i, j)][alpha] = -s;
                 }
 
         // Γ^δ_{ij,α} = (g^{δε})_{,α}(a_ε·a_{ij}) + g^{δε}(a_{εα}·a_{ij} + a_ε·a_{ijα}).
@@ -157,7 +145,7 @@ compute_laplace_beltrami_grad_conn(const std::vector<ColMatrix<T, 3>>& position_
             for (std::size_t i = 0; i < d; ++i)
                 for (std::size_t j = 0; j < d; ++j)
                     cv += G(i, j) * Gam(delta, i, j);
-            aux.c[delta](q) = cv;
+            aux.c[delta] = cv;
 
             for (std::size_t alpha = 0; alpha < d; ++alpha) {
                 T s = T(0);
@@ -165,7 +153,7 @@ compute_laplace_beltrami_grad_conn(const std::vector<ColMatrix<T, 3>>& position_
                     for (std::size_t j = 0; j < d; ++j)
                         s += Gup_d[i][j][alpha] * Gam(delta, i, j)
                            + G(i, j) * Gam_d(delta, i, j, alpha);
-                aux.c_d[delta][alpha](q) = s;
+                aux.c_d[delta][alpha] = s;
             }
         }
     }
@@ -175,11 +163,11 @@ compute_laplace_beltrami_grad_conn(const std::vector<ColMatrix<T, 3>>& position_
 // === Template Instantiations ========================================================
 
 template LaplaceBeltramiGradConn<double, 2> compute_laplace_beltrami_grad_conn<double, 2>(
-    const std::vector<ColMatrix<double, 3>>&, const Matrix<double>&);
+    const std::vector<ColMatrix<double, 3>>&, const Matrix<double>&, Index);
 
 #ifdef PYCK_BUILD_SINGLE_PRECISION
 template LaplaceBeltramiGradConn<float, 2> compute_laplace_beltrami_grad_conn<float, 2>(
-    const std::vector<ColMatrix<float, 3>>&, const Matrix<float>&);
+    const std::vector<ColMatrix<float, 3>>&, const Matrix<float>&, Index);
 #endif
 
 } // namespace operators

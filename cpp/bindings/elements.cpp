@@ -11,10 +11,6 @@
 #include "primitives_intrinsic.hpp"
 #include "patch.hpp"
 #include "eval_global_shape.hpp"
-#include "plate_kirchhoff_love_1p.hpp"
-#include "plate_reissner_mindlin_3p.hpp"
-#include "plate_reissner_mindlin_1p.hpp"
-#include "plate_reissner_mindlin_displ_2p.hpp"
 #include "shell_reissner_mindlin_5p.hpp"
 #include "shell_reissner_mindlin_4p.hpp"
 #include "shell_kirchhoff_love_3p.hpp"
@@ -166,28 +162,6 @@ void bind_elements(py::module_& m)
                },
                py::arg("patch"),
                py::arg("params"));
-
-     // === Plate elements ============================================================
-
-     py::class_<PlateKirchhoffLove1p<double>, Element2d,
-               Ptr<PlateKirchhoffLove1p<double>>>(m, "PlateKirchhoffLove1p")
-          .def(py::init<Ptr<PlaneStress2d<double>>>(),
-               py::arg("material"));
-
-     py::class_<PlateReissnerMindlin3p<double>, Element2d,
-                Ptr<PlateReissnerMindlin3p<double>>>(m, "PlateReissnerMindlin3p")
-          .def(py::init<Ptr<PlaneStress2d<double>>>(),
-               py::arg("material"));
-
-     py::class_<PlateReissnerMindlinDispl2p<double>, Element2d,
-                Ptr<PlateReissnerMindlinDispl2p<double>>>(m, "PlateReissnerMindlinDispl2p")
-          .def(py::init<Ptr<PlaneStress2d<double>>>(),
-               py::arg("material"));
-
-     py::class_<PlateReissnerMindlin1p<double>, Element2d,
-                Ptr<PlateReissnerMindlin1p<double>>>(m, "PlateReissnerMindlin1p")
-          .def(py::init<Ptr<PlaneStress2d<double>>>(),
-               py::arg("material"));
 
      // === Shell elements ===========================================================
 

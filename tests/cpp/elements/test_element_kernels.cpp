@@ -42,18 +42,12 @@ TEST_CASE("ElementValues kernels match inline reference (curved p=3 patch)",
     auto patch = std::make_shared<Patch<double, 2>>(bsp, bsp, P);
 
     GaussLegendre<double, 2> gauss(p + 1);
-    const unsigned flags = Flags::LaplaceBeltramiGradient;
+    const unsigned flags = Flags::Deriv3;
     ElementValues<double, 2> ev(*patch, 3, flags, gauss);
     ev.reinit(0);
 
     const Index Q = ev.results_[0].cols();
     const Index N = ev.results_[0].rows();
-    const auto aux = operators::compute_laplace_beltrami_grad_conn<double, 2>(ev.position_data, ev.g_inv_data);
-
-    operators::CovariantHessian<double, 2>        hess {ev.results_, ev.position_data, ev.g_inv_data};
-    operators::LaplaceBeltrami<double, 2>         lapb {ev.results_, ev.position_data, ev.g_inv_data};
-    operators::CovariantGradient<double, 2> vgrad{ev.results_, ev.position_data};
-    operators::LaplaceBeltramiGradient<double, 2> lgrad{ev.results_, ev.lb_grad_conn_, ev.g_inv_data};
 
     const double tol = 1e-9;
 
@@ -62,6 +56,12 @@ TEST_CASE("ElementValues kernels match inline reference (curved p=3 patch)",
         auto N1 = ev.results_[1].col(q);   // N_u, N_v
         auto N2 = ev.results_[2].col(q);   // N_uu, N_vv, N_uv
         auto N3 = ev.results_[3].col(q);   // N_uuu, N_uuv, N_uvv, N_vvv
+
+        const operators::CovariantHessian<double, 2>  hess {ev.results_, ev.position_data, ev.g_inv_data, q};
+        const operators::LaplaceBeltrami<double, 2>   lapb {ev.results_, ev.position_data, ev.g_inv_data, q};
+        const operators::CovariantGradient<double, 2> vgrad{ev.results_, ev.position_data, q};
+        const operators::LaplaceBeltramiGradient<double, 2> lgrad{ev.results_, ev.position_data, ev.g_inv_data, q};
+        const auto aux = operators::compute_laplace_beltrami_grad_conn<double, 2>(ev.position_data, ev.g_inv_data, q);
 
         const double gi00 = ev.g_inv(0, 0)(q), gi01 = ev.g_inv(0, 1)(q), gi11 = ev.g_inv(1, 1)(q);
 
@@ -84,13 +84,13 @@ TEST_CASE("ElementValues kernels match inline reference (curved p=3 patch)",
                 return Nab - Gam0 * Nu - Gam1 * Nv;
             };
             const double H00 = H_ref(0, 0), H11 = H_ref(1, 1), H01 = H_ref(0, 1);
-            CHECK(hess(i, 0, 0, q) == Approx(H00).margin(tol));
-            CHECK(hess(i, 1, 1, q) == Approx(H11).margin(tol));
-            CHECK(hess(i, 0, 1, q) == Approx(H01).margin(tol));
+            CHECK(hess(i, 0, 0) == Approx(H00).margin(tol));
+            CHECK(hess(i, 1, 1) == Approx(H11).margin(tol));
+            CHECK(hess(i, 0, 1) == Approx(H01).margin(tol));
 
             // --- L: Laplace–Beltrami = g^{αβ} H_{αβ} ----------------------------
             const double L_ref = gi00 * H00 + gi11 * H11 + 2.0 * gi01 * H01;
-            CHECK(lapb(i, q) == Approx(L_ref).margin(tol));
+            CHECK(lapb(i) == Approx(L_ref).margin(tol));
 
             // --- D: D_{λαβ} = g_{αλ} N_{,β} + (A_α·A_{λ,β}) N --------------------
             for (Index lam = 0; lam < 2; ++lam)
@@ -99,17 +99,17 @@ TEST_CASE("ElementValues kernels match inline reference (curved p=3 patch)",
                         const double Nb = N1(i * 2 + b);
                         const double conn = ev.a(a).row(q).dot(ev.a_d1(lam, b).row(q));
                         const double D_ref = ev.g(a, lam)(q) * Nb + conn * Ni;
-                        CHECK(vgrad(i, lam, a, b, q) == Approx(D_ref).margin(tol));
+                        CHECK(vgrad(i, lam, a, b) == Approx(D_ref).margin(tol));
                     }
 
             // --- P: ∂_α(g^{μν}H_{μν}) via the explicit lap_1/lap_2 formula -------
-            const double G11_d1 = aux.G_inv_d[0][0][0](q), G12_d1 = aux.G_inv_d[0][1][0](q),
-                         G22_d1 = aux.G_inv_d[1][1][0](q);
-            const double G11_d2 = aux.G_inv_d[0][0][1](q), G12_d2 = aux.G_inv_d[0][1][1](q),
-                         G22_d2 = aux.G_inv_d[1][1][1](q);
-            const double c1 = aux.c[0](q), c2 = aux.c[1](q);
-            const double c1_d1 = aux.c_d[0][0](q), c2_d1 = aux.c_d[1][0](q);
-            const double c1_d2 = aux.c_d[0][1](q), c2_d2 = aux.c_d[1][1](q);
+            const double G11_d1 = aux.G_inv_d[0][0][0], G12_d1 = aux.G_inv_d[0][1][0],
+                         G22_d1 = aux.G_inv_d[1][1][0];
+            const double G11_d2 = aux.G_inv_d[0][0][1], G12_d2 = aux.G_inv_d[0][1][1],
+                         G22_d2 = aux.G_inv_d[1][1][1];
+            const double c1 = aux.c[0], c2 = aux.c[1];
+            const double c1_d1 = aux.c_d[0][0], c2_d1 = aux.c_d[1][0];
+            const double c1_d2 = aux.c_d[0][1], c2_d2 = aux.c_d[1][1];
 
             const double P0_ref = G11_d1 * Nuu + 2.0 * G12_d1 * Nuv + G22_d1 * Nvv
                                 + gi00 * Nuuu + 2.0 * gi01 * Nuuv + gi11 * Nuvv
@@ -117,8 +117,8 @@ TEST_CASE("ElementValues kernels match inline reference (curved p=3 patch)",
             const double P1_ref = G11_d2 * Nuu + 2.0 * G12_d2 * Nuv + G22_d2 * Nvv
                                 + gi00 * Nuuv + 2.0 * gi01 * Nuvv + gi11 * Nvvv
                                 - c1_d2 * Nu - c2_d2 * Nv - c1 * Nuv - c2 * Nvv;
-            CHECK(lgrad(i, 0, q) == Approx(P0_ref).margin(tol));
-            CHECK(lgrad(i, 1, q) == Approx(P1_ref).margin(tol));
+            CHECK(lgrad(i, 0) == Approx(P0_ref).margin(tol));
+            CHECK(lgrad(i, 1) == Approx(P1_ref).margin(tol));
         }
     }
 

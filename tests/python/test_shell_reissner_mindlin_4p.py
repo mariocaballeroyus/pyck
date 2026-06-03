@@ -2,16 +2,6 @@ import numpy as np
 import pyck as ck
 
 
-def _dense(K):
-    return np.asarray(K.todense()) if hasattr(K, "todense") else np.asarray(K)
-
-
-def _assemble_stiffness(surface, element):
-    problem = ck.LinearElasticProblem([surface], element, ck.GaussLegendre.from_patch(surface))
-    K, _f = problem.assemble()
-    return _dense(K)
-
-
 def _hypar_patch(deg=3, n=6, a=1.5, b=-1.0, c=2.0, L=2.0):
     """Doubly-curved patch z = a x^2 + b y^2 + c x y over [0,L]^2. The cross
     term makes the parametrisation non-principal, so g_12 != 0 and B_12 != 0
@@ -73,33 +63,6 @@ def test_4p_shell_shear_has_no_membrane_coupling():
     scale = np.abs(B[6:8, 2::4]).max()
     assert scale > 0
     assert np.abs(shear_u).max() / scale < 1e-12
-
-
-def test_4p_shell_reduces_to_2p_plate_on_flat_patch():
-    """On a flat square patch the 4-parameter shell must reduce to the
-    two-parameter plate: the (w_b, psi) sub-block of its stiffness equals the
-    plate stiffness exactly (the bending block negates and cancels in B^T D B),
-    and the in-plane membrane DOFs decouple from (w_b, psi) since B_{ab} = 0."""
-    E, nu, t = 1.0e7, 0.3, 0.02
-    deg, n = 3, 6
-    mat = ck.PlaneStress2d(E, nu, t)
-
-    # Square -> orthonormal parametric frame, where the 4p shell's curvilinear
-    # twist permutation coincides with the plate's.
-    surface = ck.SurfacePatch.rectangle(1.0, 1.0, nu=n, nv=n, deg=deg, name="flat")
-    ncp = surface.num_control_pts
-
-    K4 = _assemble_stiffness(surface, ck.ShellReissnerMindlin4p(mat))
-    K2 = _assemble_stiffness(surface, ck.PlateReissnerMindlinDispl2p(mat))
-
-    # (w_b, psi) live in slots 2,3 of the 4p element and 0,1 of the 2p element.
-    idx_wp = np.array([[4 * i + 2, 4 * i + 3] for i in range(ncp)]).ravel()
-    idx_u = np.array([[4 * i + 0, 4 * i + 1] for i in range(ncp)]).ravel()
-
-    scale = np.abs(K2).max()
-    assert np.abs(K4[np.ix_(idx_wp, idx_wp)] - K2).max() / scale < 1e-10
-    # Membrane DOFs decouple from (w_b, psi) on a flat patch.
-    assert np.abs(K4[np.ix_(idx_u, idx_wp)]).max() / scale < 1e-10
 
 
 def test_4p_shell_pressurized_cylinder_membrane():

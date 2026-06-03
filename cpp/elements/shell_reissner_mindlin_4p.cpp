@@ -33,16 +33,18 @@ ShellReissnerMindlin4p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
     const Index N = ev.results_[0].rows();
     B.setZero(8 * Q, 4 * N);
 
-    operators::CovariantHessian<T, 2>        hess{ev.results_, ev.position_data, ev.g_inv_data};
-    operators::LaplaceBeltrami<T, 2>         lapb{ev.results_, ev.position_data, ev.g_inv_data};
-    operators::CovariantGradient<T, 2>       vgrad{ev.results_, ev.position_data};
-    operators::LaplaceBeltramiGradient<T, 2> lgrad{ev.results_, ev.lb_grad_conn_, ev.g_inv_data};
-    operators::Curl<T, 2>                    curl{ev.results_, ev.g_data, ev.jac};
-    operators::CurlGradient<T, 2>            curlgrad{ev.results_, ev.position_data, ev.g_data, ev.g_inv_data, ev.jac};
-
     for (Index q = 0; q < Q; ++q)
     {
         auto slab0 = ev.results_[0].col(q);
+
+        const operators::CovariantGradient<T, 2> vgrad{ev.results_, ev.position_data, q};
+        const operators::Curl<T, 2>              curl {ev.results_, ev.g_data, ev.jac, q};
+        const operators::CovariantHessian<T, 2>  hess {ev.results_, ev.position_data, ev.g_inv_data, q};
+        const operators::LaplaceBeltrami<T, 2>   lapb {ev.results_, ev.position_data, ev.g_inv_data, q};
+        const operators::CurlGradient<T, 2>      curlgrad{
+            ev.results_, ev.position_data, ev.g_data, ev.g_inv_data, ev.jac, q};
+        const operators::LaplaceBeltramiGradient<T, 2> lgrad{
+            ev.results_, ev.position_data, ev.g_inv_data, q};
 
         // Second fundamental form B_{αβ} = b_{αβ} (cached) and shape operator
         // B^α_β = g^{αγ} B_{γβ}, raised in place (b_{21} = b_{12}).
@@ -84,7 +86,9 @@ ShellReissnerMindlin4p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
 
         // ----------------------------------------------------------------------------
 
-        // Second-kind Christoffel Γ^k_{ij} = g^{kγ}(A_γ·A_{,ij})
+        // Second-kind Christoffel Γ^k_{ij} = g^{kγ}(A_γ·A_{,ij}). Formed here per qp
+        // (the same connection `hess` hoists, but kept explicit: reading hess.Gamma
+        // instead perturbs K at ~1e-18 via FMA contraction, breaking bit-exactness).
         auto Gamma2nd = [&](Index k, Index i, Index j) -> T {
             return ev.g_inv(k, 0)(q) * ev.a(0).row(q).dot(ev.a_d1(i, j).row(q))
                  + ev.g_inv(k, 1)(q) * ev.a(1).row(q).dot(ev.a_d1(i, j).row(q));
@@ -116,15 +120,15 @@ ShellReissnerMindlin4p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
             const Index c_ps = 4 * i + 3;
 
             // w = w_b - Kb/Ks \nabla^2 w_b
-            const T box = N_i - ratio * lapb(i, q);
+            const T box = N_i - ratio * lapb(i);
 
             // Covariant Hessian H_{αβ} of the scalar potential, and covariant
             // gradient D_{λαβ} = ∂(u_{α|β})/∂u^λ of the in-plane field.
-            const T H11 = hess(i, 0, 0, q), H12 = hess(i, 0, 1, q), H22 = hess(i, 1, 1, q);
-            const T D000 = vgrad(i,0,0,0,q), D001 = vgrad(i,0,0,1,q),
-                    D010 = vgrad(i,0,1,0,q), D011 = vgrad(i,0,1,1,q),
-                    D100 = vgrad(i,1,0,0,q), D101 = vgrad(i,1,0,1,q),
-                    D110 = vgrad(i,1,1,0,q), D111 = vgrad(i,1,1,1,q);
+            const T H11 = hess(i, 0, 0), H12 = hess(i, 0, 1), H22 = hess(i, 1, 1);
+            const T D000 = vgrad(i,0,0,0), D001 = vgrad(i,0,0,1),
+                    D010 = vgrad(i,0,1,0), D011 = vgrad(i,0,1,1),
+                    D100 = vgrad(i,1,0,0), D101 = vgrad(i,1,0,1),
+                    D110 = vgrad(i,1,1,0), D111 = vgrad(i,1,1,1);
 
             // --- Membrane Strain ----------------------------------------------------
 
@@ -148,15 +152,15 @@ ShellReissnerMindlin4p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
             // Symmetric covariant Hessian of the bending potential with curvature 
             // coupling correction
             // κ_{αβ} += w_{b|αβ} - (B^2)_{αβ} * (w_b - Kb/Ks Δ w_b)
-            B(8*q + 3, c_wb) =  hess(i, 0, 0, q) - B2_11 * box;
-            B(8*q + 4, c_wb) =  hess(i, 1, 1, q) - B2_22 * box;
-            B(8*q + 5, c_wb) =  T(2) * hess(i, 0, 1, q) - T(2) * B2_12 * box;
+            B(8*q + 3, c_wb) =  hess(i, 0, 0) - B2_11 * box;
+            B(8*q + 4, c_wb) =  hess(i, 1, 1) - B2_22 * box;
+            B(8*q + 5, c_wb) =  T(2) * hess(i, 0, 1) - T(2) * B2_12 * box;
 
             // Covariant gradient of the curl of the twist potential
             // κ_{αβ} += -(1/2)( ε_α^δ ψ_{|δβ} + ε_β^δ ψ_{|δα} ) = -(curl ψ)_{(α|β)}
-            B(8*q + 3, c_ps) = -curlgrad(i, 0, 0, q);
-            B(8*q + 4, c_ps) = -curlgrad(i, 1, 1, q);
-            B(8*q + 5, c_ps) = -(curlgrad(i, 0, 1, q) + curlgrad(i, 1, 0, q));
+            B(8*q + 3, c_ps) = -curlgrad(i, 0, 0);
+            B(8*q + 4, c_ps) = -curlgrad(i, 1, 1);
+            B(8*q + 5, c_ps) = -(curlgrad(i, 0, 1) + curlgrad(i, 1, 0));
 
             // Bending coupling of the symmetric contravariant gradient of the 
             // in-plane displacements
@@ -183,13 +187,13 @@ ShellReissnerMindlin4p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
 
             // Scaled gradient of the Laplacian of the bending potential
             // γ_{α} = -( Kb/Ks Δ w_b )_{,α}
-            B(8*q + 6, c_wb) = -ratio * lgrad(i, 0, q);
-            B(8*q + 7, c_wb) = -ratio * lgrad(i, 1, q);
+            B(8*q + 6, c_wb) = -ratio * lgrad(i, 0);
+            B(8*q + 7, c_wb) = -ratio * lgrad(i, 1);
 
             // Curl of the twist potential
             // γ_{α} += ε_α^β ψ_{,β}
-            B(8*q + 6, c_ps) =  curl(i, 0, q);
-            B(8*q + 7, c_ps) =  curl(i, 1, q);
+            B(8*q + 6, c_ps) =  curl(i, 0);
+            B(8*q + 7, c_ps) =  curl(i, 1);
         }
     }
 }
@@ -224,10 +228,10 @@ ShellReissnerMindlin4p<T>::displacement_shape_matrix(const ElementValues<T, 2>& 
     auto A1v = ev.a(0);   // covariant tangent A_1 (Q × 3)
     auto A2v = ev.a(1);   // covariant tangent A_2
 
-    operators::LaplaceBeltrami<T, 2> lapb{ev.results_, ev.position_data, ev.g_inv_data};
-
     for (Index q = 0; q < Q; ++q) {
         auto slab0 = ev.results_[0].col(q);
+
+        const operators::LaplaceBeltrami<T, 2> lapb{ev.results_, ev.position_data, ev.g_inv_data, q};
 
         // Covariant tangents A_α and the unit normal A_3.
         const Eigen::Matrix<T, 3, 1> a1 = A1v.row(q).transpose();
@@ -238,7 +242,7 @@ ShellReissnerMindlin4p<T>::displacement_shape_matrix(const ElementValues<T, 2>& 
         for (Index i = 0; i < N; ++i) {
             const T N_i = slab0(i);
             // Recovered transverse □_i = N_i − (K_b/K_s) Δ_g N_i = N_i − ratio·L_i.
-            const T box = N_i - ratio * lapb(i, q);
+            const T box = N_i - ratio * lapb(i);
 
             // Physical displacement u = u¹ A_1 + u² A_2 + □(w_b) A_3 (ψ does no work).
             for (Index r = 0; r < 3; ++r) {
@@ -260,18 +264,18 @@ ShellReissnerMindlin4p<T>::rotation_shape_matrix(const ElementValues<T, 2>& ev) 
     const Index N = ev.results_[0].rows();
     Nphi.setZero(2 * Q, 4 * N);
 
-    operators::Curl<T, 2> curl{ev.results_, ev.g_data, ev.jac};
-
     for (Index q = 0; q < Q; ++q) {
         auto slab1 = ev.results_[1].col(q);
+
+        const operators::Curl<T, 2> curl{ev.results_, ev.g_data, ev.jac, q};
 
         for (Index i = 0; i < N; ++i) {
             const T N_u = slab1(i * 2 + 0);
             const T N_v = slab1(i * 2 + 1);
             Nphi(2*q,     4*i + 2) = -N_u;
-            Nphi(2*q,     4*i + 3) =  curl(i, 0, q);
+            Nphi(2*q,     4*i + 3) =  curl(i, 0);
             Nphi(2*q + 1, 4*i + 2) = -N_v;
-            Nphi(2*q + 1, 4*i + 3) =  curl(i, 1, q);
+            Nphi(2*q + 1, 4*i + 3) =  curl(i, 1);
         }
     }
 }

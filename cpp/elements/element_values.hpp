@@ -11,7 +11,6 @@
 #include "../quadrature/quadrature.hpp"
 #include "../geometry/primitives_intrinsic.hpp"
 #include "../geometry/primitives_surface.hpp"
-#include "../operators/laplace_beltrami_gradient.hpp"
 #include "../geometry/patch.hpp"
 #include "../multi_index.hpp"
 #include "../types.hpp"
@@ -37,7 +36,6 @@ namespace Flags
     constexpr unsigned Deriv2          = 1u << 3;  ///< A_{α,β}                   (position order 2)
     constexpr unsigned Curvature       = 1u << 4;  ///< B_{αβ} = A_{α,β}·A_3      (d=2)
     constexpr unsigned Deriv3          = 1u << 5;  ///< A_{α,βγ}                  (position order 3)
-    constexpr unsigned LaplaceBeltramiGradient = 1u << 6;  ///< cache LaplaceBeltramiGradConn (lb_grad_conn_) for the P operator
 } // namespace Flags
 
 // === ElementValues ==================================================================
@@ -128,12 +126,6 @@ public:
                 geometry::surface::compute_normal<T>(position_data, jac, n);
             if (flags_ & Flags::Curvature)
                 geometry::surface::compute_curvature<T>(position_data, n, b_data);
-
-            // The Hessian / vector-gradient connections are cheap and formed on the
-            // fly by their operators; only the expensive 3rd-order Laplace–Beltrami
-            // gradient connector is cached here.
-            if (flags_ & Flags::LaplaceBeltramiGradient)
-                lb_grad_conn_ = operators::compute_laplace_beltrami_grad_conn<T, d>(position_data, g_inv_data);
         }
     }
 
@@ -199,14 +191,6 @@ public:
     /// @brief Second fundamental form b_{αβ}.
     Matrix<T> b_data;
 
-    // === Per-(qp) kernel auxiliary storage ==========================================
-
-    /// @brief Cached inverse-metric / connection-trace gradients for P_{iα} — the
-    ///        one genuinely expensive 3rd-order connector. The Hessian /
-    ///        vector-gradient connections are cheap and formed on the fly from
-    ///        base vectors by the operators (nothing connection-like stored).
-    operators::LaplaceBeltramiGradConn<T, d> lb_grad_conn_;
-
     // === Position-derivative accessors ==============================================
 
     /// @brief Position x(ξ).
@@ -237,22 +221,20 @@ public:
 
     // Differential operators (covariant Hessian, Laplace–Beltrami, in-plane vector
     // gradient, Laplace–Beltrami gradient) are NOT exposed here: they live in
-    // `cpp/operators/` and are called by elements on the primitives above
-    // (`results_`, `position_data`, `g_inv_data`, `lb_grad_conn_`).
+    // `cpp/operators/`, are constructed per quadrature point inside the element loop,
+    // and read the primitives above (`results_`, `position_data`, `g_inv_data`).
 
 private:
 
     /// @brief Expand requested flags down the dependency ladder so a consumer
     ///        lists only the top quantities it reads. Each rung pulls in the lower
     ///        rungs it needs; one top-to-bottom pass settles. The operators are
-    ///        basis-direct (connections formed from base vectors), so requesting an
-    ///        operator reduces to requesting the position derivatives it reads —
-    ///        `Deriv2` for the Hessian / Laplace–Beltrami / vector gradient. Only
-    ///        the Laplace–Beltrami gradient needs more: its cached connector and the
-    ///        order-3 derivatives behind it.
+    ///        basis-direct (connections built per qp from base vectors), so requesting
+    ///        an operator reduces to requesting the position derivatives it reads —
+    ///        `Deriv2` for the Hessian / Laplace–Beltrami / vector gradient, `Deriv3`
+    ///        for the Laplace–Beltrami gradient.
     static unsigned expand_flags(unsigned f)
     {
-        if (f & Flags::LaplaceBeltramiGradient)  f |= Flags::Deriv3;
         if (f & Flags::Curvature)        f |= Flags::Deriv2 | Flags::Normal;
         if (f & Flags::Deriv3)           f |= Flags::Deriv2;
         if (f & Flags::Deriv2)           f |= Flags::Deriv1;

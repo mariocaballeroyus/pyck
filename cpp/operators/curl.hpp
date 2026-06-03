@@ -1,6 +1,7 @@
 #ifndef PYCK_CURL_HPP
 #define PYCK_CURL_HPP
 
+#include <array>
 #include <concepts>
 #include <cstddef>
 #include <vector>
@@ -22,26 +23,36 @@ namespace operators
  *        (so @f$ \varepsilon_\alpha{}^0 = -g_{\alpha 1}/\sqrt{g} @f$,
  *        @f$ \varepsilon_\alpha{}^1 = g_{\alpha 0}/\sqrt{g} @f$).
  *
- * The divergence-free (rotational) counterpart of @ref CovariantGradient in a
- * surface Helmholtz split. A non-owning view over the basis gradient, the covariant
- * metric, and the Jacobian. Surface operator (d = 2).
+ * The divergence-free (rotational) counterpart of @ref CovariantGradient in a surface
+ * Helmholtz split. Owning operator: the constructor forms the mixed permutation once for
+ * the fixed qp @p q; each call is a contraction. Surface operator (d = 2).
  */
 template <std::floating_point T, std::size_t d>
 struct Curl
 {
-    const std::vector<Matrix<T>>& results;
-    const Matrix<T>&              g_data;
-    const Vector<T>&              jac;
+    const std::vector<Matrix<T>>&   results;
+    Index                           q;
+    std::array<std::array<T, d>, d> eps;   ///< ε_α^β.
 
-    /// @brief @f$ (\mathrm{curl}\,N^i)_\alpha(q) @f$.
-    T operator()(Index i, Index alpha, Index q) const
+    /// @brief Build for quadrature point @p q, forming the mixed permutation once.
+    Curl(const std::vector<Matrix<T>>& results,
+         const Matrix<T>& g_data, const Vector<T>& jac, Index q)
+        : results(results), q(q)
+    {
+        const T invJ = T(1) / jac(q);
+        for (std::size_t a = 0; a < d; ++a) {
+            eps[a][0] = -g_data(q, pack2<d>(static_cast<Index>(a), 1)) * invJ;   // ε_α^0
+            eps[a][1] =  g_data(q, pack2<d>(static_cast<Index>(a), 0)) * invJ;   // ε_α^1
+        }
+    }
+
+    /// @brief @f$ (\mathrm{curl}\,N^i)_\alpha @f$.
+    T operator()(Index i, Index alpha) const
     {
         constexpr Index dd = static_cast<Index>(d);
-        const T invJ = T(1) / jac(q);
-        const T eps0 = -g_data(q, pack2<d>(alpha, 1)) * invJ;   // ε_α^0
-        const T eps1 =  g_data(q, pack2<d>(alpha, 0)) * invJ;   // ε_α^1
-        return eps0 * results[1](i * dd + 0, q)
-             + eps1 * results[1](i * dd + 1, q);
+        const std::size_t a = static_cast<std::size_t>(alpha);
+        return eps[a][0] * results[1](i * dd + 0, q)
+             + eps[a][1] * results[1](i * dd + 1, q);
     }
 };
 
