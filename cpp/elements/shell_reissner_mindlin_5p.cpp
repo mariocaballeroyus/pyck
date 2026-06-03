@@ -25,25 +25,26 @@ ShellReissnerMindlin5p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
     const ColMatrix<T, 3>& a_3 = ev.n;
 
     Matrix<T>& B = this->B_workspace_;
-    const Index Q = ev.results_[0].cols();
-    const Index N = ev.results_[0].rows();
+    const Index Q = ev.basis_derivs[0].cols();
+    const Index N = ev.basis_derivs[0].rows();
     B.setZero(8 * Q, 5 * N);
 
     for (Index q = 0; q < Q; ++q)
     {
-        auto slab0 = ev.results_[0].col(q);
-        auto slab1 = ev.results_[1].col(q);
+        auto slab0 = ev.basis_derivs[0].col(q);
+        auto slab1 = ev.basis_derivs[1].col(q);
 
-        const operators::CovariantGradient<T, 2> vgrad{ev.results_, ev.position_data, q};
+        const operators::CovariantGradient<T, 2> vgrad{ev.basis_derivs, 
+                                                       ev.position_derivs, q};
 
         const auto A1   = ev.a(0).row(q);   // covariant tangent A_1
         const auto A2   = ev.a(1).row(q);   // covariant tangent A_2
         const auto A3 = a_3.row(q);         // unit normal A_3
 
         // Reference-normal derivatives via Weingarten: A_{3,β} = −B^α_β A_α,
-        // shape operator B^α_β = g^{αγ} B_{γβ} raised from the cached curvature.
-        const T B11 = ev.b(0, 0)(q), B12 = ev.b(0, 1)(q), B22 = ev.b(1, 1)(q);
-        const T gi11 = ev.g_inv(0, 0)(q), gi12 = ev.g_inv(0, 1)(q), gi22 = ev.g_inv(1, 1)(q);
+        // shape operator B^α_β = A^{αγ} B_{γβ} raised from the cached curvature.
+        const T B11 = ev.b(q, 0), B12 = ev.b(q, 2), B22 = ev.b(q, 1);
+        const T gi11 = ev.metric_inv(q, 0), gi12 = ev.metric_inv(q, 2), gi22 = ev.metric_inv(q, 1);
         const T Bmix11 = gi11 * B11 + gi12 * B12, Bmix12 = gi11 * B12 + gi12 * B22;
         const T Bmix21 = gi12 * B11 + gi22 * B12, Bmix22 = gi12 * B12 + gi22 * B22;
         const Eigen::Matrix<T, 1, 3> A3_d1 = -(Bmix11 * A1 + Bmix21 * A2);
@@ -122,12 +123,12 @@ ShellReissnerMindlin5p<T>::constitutive_matrix(const ElementValues<T, 2>& ev, In
     // D = [ D_m  0    0   ]
     //     [ 0    D_b  0   ]
     //     [ 0    0    D_s ]
-    const Eigen::Matrix<T, 3, 1> g_inv_q = g_inv_voigt(ev, q);
-    const Eigen::Matrix<T, 3, 3> C  = material_->elasticity_voigt(g_inv_q);
+    const StaticVector<T, 3> metric_inv_q = ev.metric_inv_voigt(q);
+    const Eigen::Matrix<T, 3, 3> C  = material_->elasticity_voigt(metric_inv_q);
     const T t = material_->thickness();
     const Eigen::Matrix<T, 3, 3> Dm = t * C;
     const Eigen::Matrix<T, 3, 3> Db = (t * t * t / T(12)) * C;
-    const Eigen::Matrix<T, 2, 2> Ds = material_->shear_voigt(g_inv_q);
+    const Eigen::Matrix<T, 2, 2> Ds = material_->shear_voigt(metric_inv_q);
 
     ConstitutiveMatrix<T> D = ConstitutiveMatrix<T>::Zero(8, 8);
     D.template block<3, 3>(0, 0) = Dm;
@@ -143,12 +144,12 @@ void
 ShellReissnerMindlin5p<T>::displacement_shape_matrix(const ElementValues<T, 2>& ev) const
 {
     // Physical displacement u = (u_x, u_y, u_z): the three Cartesian DOFs.
-    const Index Q = ev.results_[0].cols();
-    const Index N = ev.results_[0].rows();
+    const Index Q = ev.basis_derivs[0].cols();
+    const Index N = ev.basis_derivs[0].rows();
     Matrix<T>& U = this->N_w_workspace_;
     U.setZero(3 * Q, 5 * N);
     for (Index q = 0; q < Q; ++q) {
-        auto slab0 = ev.results_[0].col(q);
+        auto slab0 = ev.basis_derivs[0].col(q);
         for (Index i = 0; i < N; ++i) {
             const T Ni = slab0(i);
             U(3 * q + 0, 5 * i + 0) = Ni;   // u_x

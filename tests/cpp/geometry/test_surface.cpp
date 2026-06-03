@@ -70,9 +70,9 @@ TEST_CASE("Patch<double, 2>: Flat Rectangular Plate", "[geometry][surface]") {
         pts << 0.3, 0.7;
         auto local = element_values_at(surf, pts, Index(3), Flags::Deriv1);
 
-        CHECK(local.g(0, 0)(0) == Approx(Lx * Lx).margin(1e-12));
-        CHECK(local.g(0, 1)(0) == Approx(0.0     ).margin(1e-12));
-        CHECK(local.g(1, 1)(0) == Approx(Ly * Ly).margin(1e-12));
+        CHECK(local.metric(0, 0) == Approx(Lx * Lx).margin(1e-12));
+        CHECK(local.metric(0, 2) == Approx(0.0     ).margin(1e-12));
+        CHECK(local.metric(0, 1) == Approx(Ly * Ly).margin(1e-12));
         CHECK(local.jac(0)  == Approx(Lx * Ly).margin(1e-12));
     }
 
@@ -209,7 +209,7 @@ TEST_CASE("Patch<double, 2>: Quadratic Basis — Partition of Unity",
             pts << u, v;
 
             auto local = element_values_at(surf, pts, Index(3), Flags::Deriv1);
-            const auto& b = local.results_;
+            const auto& b = local.basis_derivs;
 
             auto sum_at_0 = [&](Index k_order, Index packed, Index n_k) {
                 auto slab = b[k_order].col(0);
@@ -312,9 +312,9 @@ TEST_CASE("Patch<double, 2>: composable primitives on twisted z=u·v patch",
         const Eigen::Vector3d av0 = local.a(0).row(q).transpose();
         const Eigen::Vector3d av1 = local.a(1).row(q).transpose();
         for (int beta = 0; beta < 2; ++beta) {
-            const double b0 = local.b(0, beta)(q), b1 = local.b(1, beta)(q);
-            const double Bm0 = local.g_inv(0, 0)(q) * b0 + local.g_inv(0, 1)(q) * b1;
-            const double Bm1 = local.g_inv(0, 1)(q) * b0 + local.g_inv(1, 1)(q) * b1;
+            const double b0 = local.b(q, pack2<2>(0, beta)), b1 = local.b(q, pack2<2>(1, beta));
+            const double Bm0 = local.metric_inv(q, 0) * b0 + local.metric_inv(q, 2) * b1;
+            const double Bm1 = local.metric_inv(q, 2) * b0 + local.metric_inv(q, 1) * b1;
             n_d1.row(beta * Qn + q) = (-(Bm0 * av0 + Bm1 * av1)).transpose();
         }
     }
@@ -323,8 +323,8 @@ TEST_CASE("Patch<double, 2>: composable primitives on twisted z=u·v patch",
 
     REQUIRE(local.a(0).rows() == 3);
     REQUIRE(local.a(1).rows() == 3);
-    REQUIRE(local.g(0, 0).size()     == 3);
-    REQUIRE(local.g_inv(0, 0).size() == 3);
+    REQUIRE(local.metric.col(0).size()     == 3);
+    REQUIRE(local.metric_inv.col(0).size() == 3);
     REQUIRE(local.jac.size() == 3);
 
     for (Eigen::Index q = 0; q < pts.rows(); ++q) {
@@ -343,12 +343,12 @@ TEST_CASE("Patch<double, 2>: composable primitives on twisted z=u·v patch",
         CHECK(local.a(1)(q, 2) == Approx(u  ).margin(1e-14));
 
         // Metric and Jacobian.
-        CHECK(local.g(0, 0)(q)     == Approx(1.0 + v * v).margin(1e-12));
-        CHECK(local.g(0, 1)(q)     == Approx(u * v       ).margin(1e-12));
-        CHECK(local.g(1, 1)(q)     == Approx(1.0 + u * u).margin(1e-12));
-        CHECK(local.g_inv(0, 0)(q) == Approx((1.0 + u * u) / D).margin(1e-12));
-        CHECK(local.g_inv(0, 1)(q) == Approx(-u * v / D       ).margin(1e-12));
-        CHECK(local.g_inv(1, 1)(q) == Approx((1.0 + v * v) / D).margin(1e-12));
+        CHECK(local.metric(q, 0)     == Approx(1.0 + v * v).margin(1e-12));
+        CHECK(local.metric(q, 2)     == Approx(u * v       ).margin(1e-12));
+        CHECK(local.metric(q, 1)     == Approx(1.0 + u * u).margin(1e-12));
+        CHECK(local.metric_inv(q, 0) == Approx((1.0 + u * u) / D).margin(1e-12));
+        CHECK(local.metric_inv(q, 2) == Approx(-u * v / D       ).margin(1e-12));
+        CHECK(local.metric_inv(q, 1) == Approx((1.0 + v * v) / D).margin(1e-12));
         CHECK(local.jac(q)      == Approx(sqrtD            ).margin(1e-12));
 
         // Christoffels: only Γ¹_{12} = v/D and Γ²_{12} = u/D are non-zero.
@@ -376,9 +376,9 @@ TEST_CASE("Patch<double, 2>: composable primitives on twisted z=u·v patch",
 
         // Cached second fundamental form (closed form on this patch):
         //   b_{11} = b_{22} = 0,  b_{12} = 1/√D.
-        CHECK(local.b(0, 0)(q) == Approx(0.0        ).margin(1e-12));
-        CHECK(local.b(0, 1)(q) == Approx(1.0 / sqrtD).margin(1e-12));
-        CHECK(local.b(1, 1)(q) == Approx(0.0        ).margin(1e-12));
+        CHECK(local.b(q, 0) == Approx(0.0        ).margin(1e-12));
+        CHECK(local.b(q, 2) == Approx(1.0 / sqrtD).margin(1e-12));
+        CHECK(local.b(q, 1) == Approx(0.0        ).margin(1e-12));
     }
 }
 
@@ -424,10 +424,10 @@ TEST_CASE("Patch<double, 2>: Intrinsic/Extrinsic containers compose correctly",
             CHECK(std::isfinite(eg.n(q, c)));
 
         // Curvature: b_{12} = 1/√D on this patch (the non-zero one).
-        CHECK(std::isfinite(eg.b(0, 1)(q)));
+        CHECK(std::isfinite(eg.b(q, 2)));
         // b^α_β is no longer cached; raise in place.
-        const double bmix01 = eg.g_inv(0, 0)(q) * eg.b(0, 1)(q)
-                            + eg.g_inv(0, 1)(q) * eg.b(1, 1)(q);
+        const double bmix01 = eg.metric_inv(q, 0) * eg.b(q, 2)
+                            + eg.metric_inv(q, 2) * eg.b(q, 1);
         CHECK(std::isfinite(bmix01));
     }
 }

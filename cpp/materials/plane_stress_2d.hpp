@@ -10,8 +10,8 @@ namespace pyck
  * @brief Isotropic linear-elastic plane-stress material for plates and shells.
  *
  *        The material stiffness (constitutive) tensor is given by:
- *        C^{αβγδ} = (E/(1−ν²)) [ ½(1−ν)(g^{αγ}g^{βδ} + g^{αδ}g^{βγ})
- *                              + ν g^{αβ} g^{γδ} ]
+ *        C^{αβγδ} = (E/(1−ν²)) [ ½(1−ν)(A^{αγ}A^{βδ} + A^{αδ}A^{βγ})
+ *                              + ν A^{αβ} A^{γδ} ]
  *
  * @tparam T Scalar type.
  */
@@ -76,15 +76,15 @@ public:
 
     /**
      * @brief 3×3 Voigt form of the surface elasticity (stiffness) tensor
-     *        C^{αβγδ} = λ̃ g^{αβ} g^{γδ} + μ (g^{αγ} g^{βδ} + g^{αδ} g^{βγ}),
+     *        C^{αβγδ} = λ̃ A^{αβ} A^{γδ} + μ (A^{αγ} A^{βδ} + A^{αδ} A^{βγ}),
      *        with plane-stress Lamé coefficients μ = E/(2(1+ν)) and
      *        λ̃ = Eν/(1-ν²).
      */
-    Eigen::Matrix<T, 3, 3> elasticity_voigt(const Eigen::Matrix<T, 3, 1>& g_inv) const
+    Eigen::Matrix<T, 3, 3> elasticity_voigt(const StaticVector<T, 3>& metric_inv) const
     {
-        const T g11 = g_inv(0);
-        const T g12 = g_inv(1);
-        const T g22 = g_inv(2);
+        const T g11 = metric_inv(0);
+        const T g12 = metric_inv(1);
+        const T g22 = metric_inv(2);
 
         Eigen::Matrix<T, 3, 3> D;
         D(0, 0) = lp2m_ * g11 * g11;
@@ -100,25 +100,25 @@ public:
     }
 
     /// Membrane Voigt 3×3 D_m = t · C at one quadrature point.
-    Eigen::Matrix<T, 3, 3> membrane_voigt(const Eigen::Matrix<T, 3, 1>& g_inv) const
+    Eigen::Matrix<T, 3, 3> membrane_voigt(const StaticVector<T, 3>& metric_inv) const
     {
-        return t_ * elasticity_voigt(g_inv);
+        return t_ * elasticity_voigt(metric_inv);
     }
 
     /// Bending Voigt 3×3 D_b = t³/12 · C at one quadrature point.
-    Eigen::Matrix<T, 3, 3> bending_voigt(const Eigen::Matrix<T, 3, 1>& g_inv) const
+    Eigen::Matrix<T, 3, 3> bending_voigt(const StaticVector<T, 3>& metric_inv) const
     {
-        return bending_scale_ * elasticity_voigt(g_inv);
+        return bending_scale_ * elasticity_voigt(metric_inv);
     }
 
-    /// Transverse-shear Voigt 2×2 D_s = κ_s G t · g^{αβ} at one quadrature point.
-    Eigen::Matrix<T, 2, 2> shear_voigt(const Eigen::Matrix<T, 3, 1>& g_inv) const
+    /// Transverse-shear Voigt 2×2 D_s = κ_s G t · A^{αβ} at one quadrature point.
+    Eigen::Matrix<T, 2, 2> shear_voigt(const StaticVector<T, 3>& metric_inv) const
     {
         Eigen::Matrix<T, 2, 2> Ds;
-        Ds(0, 0) = shear_scale_ * g_inv(0);
-        Ds(0, 1) = shear_scale_ * g_inv(1);
+        Ds(0, 0) = shear_scale_ * metric_inv(0);
+        Ds(0, 1) = shear_scale_ * metric_inv(1);
         Ds(1, 0) = Ds(0, 1);
-        Ds(1, 1) = shear_scale_ * g_inv(2);
+        Ds(1, 1) = shear_scale_ * metric_inv(2);
         return Ds;
     }
 

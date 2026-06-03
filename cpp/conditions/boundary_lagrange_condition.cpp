@@ -106,7 +106,7 @@ LagrangeBoundaryCondition<T, d>::apply(SystemAssembler<T>& assembler,
                 const T ds = bd_values.boundary_vals_.jac(q) * 
                              bd_values.boundary_vals_.mapped_weights_(q);
                 // Get the multiplier shape
-                auto N_lambda_i = bd_values.boundary_vals_.results_[0].col(q);
+                auto N_lambda_i = bd_values.boundary_vals_.basis_derivs[0].col(q);
 
                 // Add contributions to the local coupling block and constraint vector
                 // G += N_λ * N_w * ds

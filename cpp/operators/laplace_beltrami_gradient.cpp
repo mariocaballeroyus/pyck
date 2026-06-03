@@ -37,27 +37,27 @@ sym3(std::size_t i, std::size_t j, std::size_t k)
 
 template <std::floating_point T, std::size_t d>
 LaplaceBeltramiGradConn<T, d>
-compute_laplace_beltrami_grad_conn(const std::vector<ColMatrix<T, 3>>& position_data,
-                         const Matrix<T>& g_inv_data, Index q)
+compute_laplace_beltrami_grad_conn(const std::vector<ColMatrix<T, 3>>& position_derivs,
+                         const Matrix<T>& metric_inv, Index q)
 {
-    const Index Q = position_data[0].rows();
+    const Index Q = position_derivs[0].rows();
 
     LaplaceBeltramiGradConn<T, d> aux;
     {
         auto a1  = [&](std::size_t i) {
-            return position_data[1].row(i * Q + q);
+            return position_derivs[1].row(i * Q + q);
         };
         auto a2  = [&](std::size_t i, std::size_t j) {
             auto [lo, hi] = sym2(i, j);
-            return position_data[2].row(pack2<d>(lo, hi) * Q + q);
+            return position_derivs[2].row(pack2<d>(lo, hi) * Q + q);
         };
         auto a3  = [&](std::size_t i, std::size_t j, std::size_t k) {
             auto v = sym3(i, j, k);
-            return position_data[3].row(pack3<d>(v[0], v[1], v[2]) * Q + q);
+            return position_derivs[3].row(pack3<d>(v[0], v[1], v[2]) * Q + q);
         };
         auto G   = [&](std::size_t i, std::size_t j) {
             auto [lo, hi] = sym2(i, j);
-            return g_inv_data(q, pack2<d>(lo, hi));
+            return metric_inv(q, pack2<d>(lo, hi));
         };
 
         // ---- Precompute unique dot products once per q ---------------------
@@ -73,7 +73,7 @@ compute_laplace_beltrami_grad_conn(const std::vector<ColMatrix<T, 3>>& position_
                 }
 
         // Second-kind Christoffel formed directly from base vectors:
-        //   Γ^e_{ij} = g^{eε}(a_ε·a_{ij}) = Σ_ε g^{eε} dot1[ε][i][j].
+        //   Γ^e_{ij} = A^{eε}(a_ε·a_{ij}) = Σ_ε A^{eε} dot1[ε][i][j].
         auto Gam = [&](std::size_t e, std::size_t i, std::size_t j) -> T {
             T s = T(0);
             for (std::size_t eps = 0; eps < d; ++eps)
@@ -108,12 +108,12 @@ compute_laplace_beltrami_grad_conn(const std::vector<ColMatrix<T, 3>>& position_
 
         // ---- Scalar arithmetic on the tables -------------------------------
 
-        // g_{ij,α} = a_{iα}·a_j + a_i·a_{jα}, sym in (i, j).
+        // A_{ij,α} = a_{iα}·a_j + a_i·a_{jα}, sym in (i, j).
         auto g_d = [&](std::size_t i, std::size_t j, std::size_t alpha) -> T {
             return dot1[j][i][alpha] + dot1[i][j][alpha];
         };
 
-        // (g^{ij})_{,α} = -g^{im} g^{jn} g_{mn,α}, sym in (i, j).
+        // (A^{ij})_{,α} = -A^{im} A^{jn} A_{mn,α}, sym in (i, j).
         std::array<std::array<std::array<T, d>, d>, d> Gup_d{};
         for (std::size_t i = 0; i < d; ++i)
             for (std::size_t j = i; j < d; ++j)
@@ -127,7 +127,7 @@ compute_laplace_beltrami_grad_conn(const std::vector<ColMatrix<T, 3>>& position_
                     aux.G_inv_d[std::min(i, j)][std::max(i, j)][alpha] = -s;
                 }
 
-        // Γ^δ_{ij,α} = (g^{δε})_{,α}(a_ε·a_{ij}) + g^{δε}(a_{εα}·a_{ij} + a_ε·a_{ijα}).
+        // Γ^δ_{ij,α} = (A^{δε})_{,α}(a_ε·a_{ij}) + A^{δε}(a_{εα}·a_{ij} + a_ε·a_{ijα}).
         auto Gam_d = [&](std::size_t delta, std::size_t i,
                          std::size_t j, std::size_t alpha) -> T {
             T s = T(0);
@@ -139,7 +139,7 @@ compute_laplace_beltrami_grad_conn(const std::vector<ColMatrix<T, 3>>& position_
             return s;
         };
 
-        // c^δ = g^{ij} Γ^δ_{ij} and (c^δ)_{,α}.
+        // c^δ = A^{ij} Γ^δ_{ij} and (c^δ)_{,α}.
         for (std::size_t delta = 0; delta < d; ++delta) {
             T cv = T(0);
             for (std::size_t i = 0; i < d; ++i)

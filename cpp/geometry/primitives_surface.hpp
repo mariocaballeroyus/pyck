@@ -50,10 +50,10 @@ inline void compute_normal(const std::vector<ColMatrix<T, 3>>& pos_derivs,
         // Compute cross product A_1 × A_2
         const auto A1 = a_view(0).row(q).transpose();
         const auto A2 = a_view(1).row(q).transpose();
-        Eigen::Matrix<T, 3, 1> v = A1.cross(A2);
+        Vector3<T> v = A1.cross(A2);
         // A_3 = (A_1 × A_2) / \sqrt{ det A_{αβ} }
         if (J > T(1e-14)) v /= J;
-        else              v = Eigen::Matrix<T, 3, 1>(T(0), T(0), T(1));
+        else              v = Vector3<T>(T(0), T(0), T(1));
         // Fill output array
         A3.row(q) = v.transpose();
     }

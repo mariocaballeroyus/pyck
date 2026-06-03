@@ -152,7 +152,7 @@ void
 Element<T, d>::stress_matrix(const ElementValues<T, d>& ev) const
 {
     strain_matrix(ev);
-    const Index Q        = ev.results_[0].cols();
+    const Index Q        = ev.basis_derivs[0].cols();
     const Index n_strain = B_workspace_.rows() / Q;
     const Index K        = B_workspace_.cols();
 
@@ -168,13 +168,13 @@ template <std::floating_point T, std::size_t d>
 void
 Element<T, d>::primal_shape_matrix(const ElementValues<T, d>& ev) const
 {
-    const Index Q    = ev.results_[0].cols();
-    const Index N    = ev.results_[0].rows();
+    const Index Q    = ev.basis_derivs[0].cols();
+    const Index N    = ev.basis_derivs[0].rows();
     const Index ndof = static_cast<Index>(num_node_dofs());
     Matrix<T>& Np    = N_primal_workspace_;
     Np.setZero(ndof * Q, ndof * N);
     for (Index q = 0; q < Q; ++q) {
-        auto slab0 = ev.results_[0].col(q);
+        auto slab0 = ev.basis_derivs[0].col(q);
         for (Index i = 0; i < N; ++i)
             for (Index v = 0; v < ndof; ++v)
                 Np(ndof * q + v, i * ndof + v) = slab0(i);
@@ -212,7 +212,7 @@ Element<T, d>::compute_local_domain_load(const ElementValues<T, d>& ev,
     const Matrix<T>& U = N_w_workspace_;
 
     // Body force at the element's physical quadrature-point coordinates (Q × 3).
-    const Matrix<T> b = load_fn(ev.position_data[0]);
+    const Matrix<T> b = load_fn(ev.position_derivs[0]);
 
     const Index Q = ev.mapped_weights_.size();
     f_local.setZero(U.cols());

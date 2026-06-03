@@ -16,10 +16,10 @@ namespace operators
 {
 
 /**
- * @brief Laplace–Beltrami operator @f$ L_i = g^{\alpha\beta} H_{i\alpha\beta} @f$
+ * @brief Laplace–Beltrami operator @f$ L_i = A^{\alpha\beta} H_{i\alpha\beta} @f$
  *        — the inverse-metric contraction of the covariant Hessian (off-diagonal
  *        Voigt components doubled). Owning: holds a @ref CovariantHessian (its
- *        connection hoisted in the ctor) plus the Voigt-weighted @f$ g^{\alpha\beta} @f$
+ *        connection hoisted in the ctor) plus the Voigt-weighted @f$ A^{\alpha\beta} @f$
  *        weights, both formed once for the fixed qp @p q.
  */
 template <std::floating_point T, std::size_t d>
@@ -28,17 +28,17 @@ struct LaplaceBeltrami
     static constexpr std::size_t n_d2 = d * (d + 1) / 2;
 
     CovariantHessian<T, d> hess;
-    std::array<T, n_d2>    w;     ///< Voigt-weighted g^{αβ}: w[p] = (p<d?1:2)·g^{p}.
+    std::array<T, n_d2>    w;     ///< Voigt-weighted A^{αβ}: w[p] = (p<d?1:2)·A^{p}.
 
     /// @brief Build for quadrature point @p q.
-    LaplaceBeltrami(const std::vector<Matrix<T>>&       results,
-                    const std::vector<ColMatrix<T, 3>>& position_data,
-                    const Matrix<T>&                    g_inv_data,
+    LaplaceBeltrami(const std::vector<Matrix<T>>&       basis_derivs,
+                    const std::vector<ColMatrix<T, 3>>& position_derivs,
+                    const Matrix<T>&                    metric_inv,
                     Index                               q)
-        : hess(results, position_data, g_inv_data, q)
+        : hess(basis_derivs, position_derivs, metric_inv, q)
     {
         for (std::size_t p = 0; p < n_d2; ++p)
-            w[p] = ((p < d) ? T(1) : T(2)) * g_inv_data(q, static_cast<Index>(p));
+            w[p] = ((p < d) ? T(1) : T(2)) * metric_inv(q, static_cast<Index>(p));
     }
 
     /// @brief Laplace–Beltrami @f$ L_i @f$ of basis function i.

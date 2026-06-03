@@ -61,21 +61,21 @@ TEST_CASE("Patch<double, 3>: Flat Box", "[geometry][volume]")
             Flags::Deriv1);
 
         // Metric layout: (g_11, g_12, g_13, g_22, g_23, g_33).
-        CHECK(local.g(0, 0)(0) == Approx(Lx * Lx).margin(1e-12));
-        CHECK(local.g(0, 1)(0) == Approx(0.0     ).margin(1e-12));
-        CHECK(local.g(0, 2)(0) == Approx(0.0     ).margin(1e-12));
-        CHECK(local.g(1, 1)(0) == Approx(Ly * Ly).margin(1e-12));
-        CHECK(local.g(1, 2)(0) == Approx(0.0     ).margin(1e-12));
-        CHECK(local.g(2, 2)(0) == Approx(Lz * Lz).margin(1e-12));
+        CHECK(local.metric(0, 0) == Approx(Lx * Lx).margin(1e-12));
+        CHECK(local.metric(0, 2) == Approx(0.0     ).margin(1e-12));
+        CHECK(local.metric(0, pack2<2>(0, 2)) == Approx(0.0     ).margin(1e-12));
+        CHECK(local.metric(0, 1) == Approx(Ly * Ly).margin(1e-12));
+        CHECK(local.metric(0, pack2<2>(1, 2)) == Approx(0.0     ).margin(1e-12));
+        CHECK(local.metric(0, pack2<2>(2, 2)) == Approx(Lz * Lz).margin(1e-12));
         CHECK(local.jac(0)  == Approx(Lx * Ly * Lz).margin(1e-12));
 
         // Inverse metric: diagonal entries are reciprocals of diagonal g.
-        CHECK(local.g_inv(0, 0)(0) == Approx(1.0 / (Lx * Lx)).margin(1e-12));
-        CHECK(local.g_inv(1, 1)(0) == Approx(1.0 / (Ly * Ly)).margin(1e-12));
-        CHECK(local.g_inv(2, 2)(0) == Approx(1.0 / (Lz * Lz)).margin(1e-12));
-        CHECK(local.g_inv(0, 1)(0) == Approx(0.0).margin(1e-12));
-        CHECK(local.g_inv(0, 2)(0) == Approx(0.0).margin(1e-12));
-        CHECK(local.g_inv(1, 2)(0) == Approx(0.0).margin(1e-12));
+        CHECK(local.metric_inv(0, 0) == Approx(1.0 / (Lx * Lx)).margin(1e-12));
+        CHECK(local.metric_inv(0, 1) == Approx(1.0 / (Ly * Ly)).margin(1e-12));
+        CHECK(local.metric_inv(0, pack2<2>(2, 2)) == Approx(1.0 / (Lz * Lz)).margin(1e-12));
+        CHECK(local.metric_inv(0, 2) == Approx(0.0).margin(1e-12));
+        CHECK(local.metric_inv(0, pack2<2>(0, 2)) == Approx(0.0).margin(1e-12));
+        CHECK(local.metric_inv(0, pack2<2>(1, 2)) == Approx(0.0).margin(1e-12));
     }
 
     SECTION("Christoffels vanish on flat box") {

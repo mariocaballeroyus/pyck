@@ -31,7 +31,7 @@ namespace Flags
 {
     constexpr unsigned None            = 0;
     constexpr unsigned Values          = 1u << 0;  ///< R = x(ξ)                  (position order 0)
-    constexpr unsigned Deriv1          = 1u << 1;  ///< A_α, metric g/g_inv, jac  (position order 1)
+    constexpr unsigned Deriv1          = 1u << 1;  ///< A_α, metric + inv, jac    (position order 1)
     constexpr unsigned Normal          = 1u << 2;  ///< A_3                       (d=2)
     constexpr unsigned Deriv2          = 1u << 3;  ///< A_{α,β}                   (position order 2)
     constexpr unsigned Curvature       = 1u << 4;  ///< B_{αβ} = A_{α,β}·A_3      (d=2)
@@ -106,7 +106,7 @@ public:
 
         // Basis evaluation
         patch_.tensor_product().eval_on_span(pts, spans, basis_order_,
-                                             uni_results_, results_);
+                                             uni_basis_derivs, basis_derivs);
 
         // Active control points
         patch_.dof_mapper().get_element_cps(spans, elem_cps_);
@@ -117,15 +117,15 @@ public:
 
         // Geometric quantities (gated by the flag ladder)
         geometry::intrinsic::compute_position_derivatives<T, d>(
-            results_, act_pts_, position_data, required_position_order(flags_));
+            basis_derivs, act_pts_, position_derivs, required_position_order(flags_));
         if (flags_ & Flags::Deriv1)
-            geometry::intrinsic::compute_metric<T, d>(position_data, g_data, g_inv_data, jac);
+            geometry::intrinsic::compute_metric<T, d>(position_derivs, metric, metric_inv, jac);
 
         if constexpr (d == 2) {
             if (flags_ & Flags::Normal)
-                geometry::surface::compute_normal<T>(position_data, jac, n);
+                geometry::surface::compute_normal<T>(position_derivs, jac, n);
             if (flags_ & Flags::Curvature)
-                geometry::surface::compute_curvature<T>(position_data, n, b_data);
+                geometry::surface::compute_curvature<T>(position_derivs, n, b);
         }
     }
 
@@ -135,7 +135,7 @@ public:
     std::array<Index, d> span_indices_;
 
     /// @brief Active control-point indices for the current element, in
-    ///        tensor-product column order (matches `results_` row ordering).
+    ///        tensor-product column order (matches `basis_derivs` row ordering).
     std::vector<Index> elem_cps_;
 
     /// @brief Gathered active control-point coordinates, shape `(p+1)^d × 3`.
@@ -149,11 +149,11 @@ public:
 
     /// @brief Per-direction univariate basis values + derivatives at the
     ///        current element's quadrature points.
-    std::array<std::vector<Matrix<T>>, d> uni_results_;
+    std::array<std::vector<Matrix<T>>, d> uni_basis_derivs;
 
     /// @brief Basis values and derivatives at the current element's quadrature
     ///        points, per-order packed (TensorProduct::eval_on_span layout).
-    std::vector<Matrix<T>> results_;
+    std::vector<Matrix<T>> basis_derivs;
 
     // === Quadrature =================================================================
 
@@ -172,15 +172,15 @@ public:
 
     /// @brief Per-order packed position-derivative storage, populated up to the
     ///        highest derivative order the flags request (`required_position_order`).
-    std::vector<ColMatrix<T, 3>> position_data;
+    std::vector<ColMatrix<T, 3>> position_derivs;
 
-    /// @brief Packed covariant metric g_{αβ}.
-    Matrix<T> g_data;
+    /// @brief Packed covariant metric A_{αβ}.
+    Matrix<T> metric;
 
-    /// @brief Packed contravariant metric g^{αβ}.
-    Matrix<T> g_inv_data;
+    /// @brief Packed contravariant metric A^{αβ}.
+    Matrix<T> metric_inv;
 
-    /// @brief Jacobian √det g, length Q.
+    /// @brief Jacobian √det A, length Q.
     Vector<T> jac;
 
     // === Extrinsic geometry storage (meaningful for d == 2 only) =====================
@@ -189,7 +189,7 @@ public:
     ColMatrix<T, 3> n;
 
     /// @brief Second fundamental form b_{αβ}.
-    Matrix<T> b_data;
+    Matrix<T> b;
 
     // === Position-derivative accessors ==============================================
 
@@ -205,24 +205,24 @@ public:
     /// @brief Symmetric third derivative a_{αβγ} = ∂_{αβγ} x.
     auto a_d2(Index i, Index j, Index k) const  { return view_pos(3, pack3<d>(i, j, k)); }
 
-    // === Metric accessors ===========================================================
+    // The packed metric / inverse-metric / curvature buffers (`metric`, `metric_inv`,
+    // `b`) are public Matrices, shape (Q, d(d+1)/2). Index a component at quadrature
+    // point q as `ev.metric_inv(q, pack2<d>(α,β))` (a single value) or
+    // `ev.metric_inv.col(pack2<d>(α,β))` (the per-q column).
 
-    /// @brief Covariant metric g_{αβ}(q). Symmetric in (α, β).
-    auto g(Index i, Index j) const     { return g_data.col(pack2<d>(i, j)); }
-
-    /// @brief Contravariant metric g^{αβ}(q). Symmetric in (α, β).
-    auto g_inv(Index i, Index j) const { return g_inv_data.col(pack2<d>(i, j)); }
-
-    // === Extrinsic accessors (d == 2 only meaningful) ===============================
-
-    /// @brief b_{αβ}(q). Symmetric in (α, β).
-    auto b(Index alpha, Index beta) const
-    { return b_data.col(pack2<2>(alpha, beta)); }
-
-    // Differential operators (covariant Hessian, Laplace–Beltrami, in-plane vector
-    // gradient, Laplace–Beltrami gradient) are NOT exposed here: they live in
-    // `cpp/operators/`, are constructed per quadrature point inside the element loop,
-    // and read the primitives above (`results_`, `position_data`, `g_inv_data`).
+    /// @brief The inverse metric at q in the material's Voigt order — upper-triangular
+    ///        lexicographic (for d=2: A¹¹, A¹², A²²). NOTE this REORDERS: the `metric_inv`
+    ///        buffer is packed diagonals-first (`pack2`: A¹¹, A²², A¹²), which is not the
+    ///        order `PlaneStress2d`'s `*_voigt` reads — so it is an adapter, not a row copy.
+    Eigen::Matrix<T, d * (d + 1) / 2, 1> metric_inv_voigt(Index q) const
+    {
+        Eigen::Matrix<T, d * (d + 1) / 2, 1> v;
+        std::size_t flat = 0;
+        for (std::size_t i = 0; i < d; ++i)
+            for (std::size_t j = i; j < d; ++j)
+                v(flat++) = metric_inv(q, pack2<d>(static_cast<Index>(i), static_cast<Index>(j)));
+        return v;
+    }
 
 private:
 
@@ -272,12 +272,12 @@ private:
             const Index Ni = static_cast<Index>(patch.basis(i).degree()) + 1;
             N *= Ni;
 
-            uni_results_[i].resize(basis_order + 1);
+            uni_basis_derivs[i].resize(basis_order + 1);
             for (Index k = 0; k <= basis_order; ++k) {
-                uni_results_[i][k].resize(Ni, Qi);
+                uni_basis_derivs[i][k].resize(Ni, Qi);
             }
         }
-        resize_basis_buffer<T, d>(results_, N, Qi, basis_order);
+        resize_basis_buffer<T, d>(basis_derivs, N, Qi, basis_order);
 
         elem_cps_.reserve(static_cast<std::size_t>(N));
         act_pts_.resize(N, 3);
@@ -287,8 +287,8 @@ private:
     ///        order-@p ord storage.
     auto view_pos(Index ord, Index packed) const
     {
-        const Index Q_ = static_cast<Index>(position_data[0].rows());
-        return position_data[ord].middleRows(packed * Q_, Q_);
+        const Index Q_ = static_cast<Index>(position_derivs[0].rows());
+        return position_derivs[ord].middleRows(packed * Q_, Q_);
     }
 
     const Patch<T, d>&          patch_;
@@ -296,38 +296,6 @@ private:
     Index                       basis_order_;
     unsigned                    flags_;
 };
-
-// === Voigt-packed metric helpers ====================================================
-
-/**
- * @brief Pack the upper-triangular metric components into a column vector at
- *        q-point @p q. For d=2 this is (g11, g12, g22)ᵀ; for d=3
- *        (g11, g12, g13, g22, g23, g33)ᵀ.
- */
-template <std::floating_point T, std::size_t d>
-Eigen::Matrix<T, d * (d + 1) / 2, 1>
-g_voigt(const ElementValues<T, d>& ev, Index q)
-{
-    Eigen::Matrix<T, d * (d + 1) / 2, 1> v;
-    std::size_t flat = 0;
-    for (std::size_t i = 0; i < d; ++i)
-        for (std::size_t j = i; j < d; ++j)
-            v(flat++) = ev.g(i, j)(q);
-    return v;
-}
-
-/// @brief Same packing as @ref g_voigt, applied to the inverse metric.
-template <std::floating_point T, std::size_t d>
-Eigen::Matrix<T, d * (d + 1) / 2, 1>
-g_inv_voigt(const ElementValues<T, d>& ev, Index q)
-{
-    Eigen::Matrix<T, d * (d + 1) / 2, 1> v;
-    std::size_t flat = 0;
-    for (std::size_t i = 0; i < d; ++i)
-        for (std::size_t j = i; j < d; ++j)
-            v(flat++) = ev.g_inv(i, j)(q);
-    return v;
-}
 
 } // namespace pyck
 

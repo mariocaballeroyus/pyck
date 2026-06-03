@@ -29,27 +29,27 @@ ShellReissnerMindlin4p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
     const T ratio = material_->bending_stiffness() / material_->shear_stiffness();
 
     Matrix<T>& B = this->B_workspace_;
-    const Index Q = ev.results_[0].cols();
-    const Index N = ev.results_[0].rows();
+    const Index Q = ev.basis_derivs[0].cols();
+    const Index N = ev.basis_derivs[0].rows();
     B.setZero(8 * Q, 4 * N);
 
     for (Index q = 0; q < Q; ++q)
     {
-        auto slab0 = ev.results_[0].col(q);
+        auto slab0 = ev.basis_derivs[0].col(q);
 
-        const operators::CovariantGradient<T, 2> vgrad{ev.results_, ev.position_data, q};
-        const operators::Curl<T, 2>              curl {ev.results_, ev.g_data, ev.jac, q};
-        const operators::CovariantHessian<T, 2>  hess {ev.results_, ev.position_data, ev.g_inv_data, q};
-        const operators::LaplaceBeltrami<T, 2>   lapb {ev.results_, ev.position_data, ev.g_inv_data, q};
+        const operators::CovariantGradient<T, 2> vgrad{ev.basis_derivs, ev.position_derivs, q};
+        const operators::Curl<T, 2>              curl {ev.basis_derivs, ev.metric, ev.jac, q};
+        const operators::CovariantHessian<T, 2>  hess {ev.basis_derivs, ev.position_derivs, ev.metric_inv, q};
+        const operators::LaplaceBeltrami<T, 2>   lapb {ev.basis_derivs, ev.position_derivs, ev.metric_inv, q};
         const operators::CurlGradient<T, 2>      curlgrad{
-            ev.results_, ev.position_data, ev.g_data, ev.g_inv_data, ev.jac, q};
+            ev.basis_derivs, ev.position_derivs, ev.metric, ev.metric_inv, ev.jac, q};
         const operators::LaplaceBeltramiGradient<T, 2> lgrad{
-            ev.results_, ev.position_data, ev.g_inv_data, q};
+            ev.basis_derivs, ev.position_derivs, ev.metric_inv, q};
 
         // Second fundamental form B_{αβ} = b_{αβ} (cached) and shape operator
-        // B^α_β = g^{αγ} B_{γβ}, raised in place (b_{21} = b_{12}).
-        const T B11 = ev.b(0, 0)(q), B12 = ev.b(0, 1)(q), B22 = ev.b(1, 1)(q);
-        const T gi11 = ev.g_inv(0, 0)(q), gi12 = ev.g_inv(0, 1)(q), gi22 = ev.g_inv(1, 1)(q);
+        // B^α_β = A^{αγ} B_{γβ}, raised in place (b_{21} = b_{12}).
+        const T B11 = ev.b(q, 0), B12 = ev.b(q, 2), B22 = ev.b(q, 1);
+        const T gi11 = ev.metric_inv(q, 0), gi12 = ev.metric_inv(q, 2), gi22 = ev.metric_inv(q, 1);
         const T Bmix11 = gi11 * B11 + gi12 * B12;  // B^1_1
         const T Bmix12 = gi11 * B12 + gi12 * B22;  // B^1_2
         const T Bmix21 = gi12 * B11 + gi22 * B12;  // B^2_1
@@ -62,19 +62,19 @@ ShellReissnerMindlin4p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
 
         // ----------------------------------------------------------------------------
 
-        const Eigen::Matrix<T, 3, 1> A3 = ev.n.row(q).transpose();
-        const Eigen::Matrix<T, 3, 1> a1 = ev.a(0).row(q).transpose();
-        const Eigen::Matrix<T, 3, 1> a2 = ev.a(1).row(q).transpose();
+        const Vector3<T> A3 = ev.n.row(q).transpose();
+        const Vector3<T> a1 = ev.a(0).row(q).transpose();
+        const Vector3<T> a2 = ev.a(1).row(q).transpose();
         // Weingarten: A_{3,β} = −B^α_β A_α, from the cached second fundamental form.
-        const Eigen::Matrix<T, 3, 1> A3_d1 = -(Bmix11 * a1 + Bmix21 * a2);   // A_{3,1}
-        const Eigen::Matrix<T, 3, 1> A3_d2 = -(Bmix12 * a1 + Bmix22 * a2);   // A_{3,2}
-        const Eigen::Matrix<T, 3, 1> A1_d1 = ev.a_d1(0, 0).row(q).transpose();   // A_{1,1}
-        const Eigen::Matrix<T, 3, 1> A1_d2 = ev.a_d1(0, 1).row(q).transpose();   // A_{1,2} = A_{2,1}
-        const Eigen::Matrix<T, 3, 1> A2_d2 = ev.a_d1(1, 1).row(q).transpose();   // A_{2,2}
-        const Eigen::Matrix<T, 3, 1> A1_d11 = ev.a_d2(0, 0, 0).row(q).transpose();   // A_{1,11}
-        const Eigen::Matrix<T, 3, 1> A1_d12 = ev.a_d2(0, 0, 1).row(q).transpose();   // A_{1,12}
-        const Eigen::Matrix<T, 3, 1> A1_d22 = ev.a_d2(0, 1, 1).row(q).transpose();   // A_{1,22}
-        const Eigen::Matrix<T, 3, 1> A2_d22 = ev.a_d2(1, 1, 1).row(q).transpose();   // A_{2,22}
+        const Vector3<T> A3_d1 = -(Bmix11 * a1 + Bmix21 * a2);   // A_{3,1}
+        const Vector3<T> A3_d2 = -(Bmix12 * a1 + Bmix22 * a2);   // A_{3,2}
+        const Vector3<T> A1_d1 = ev.a_d1(0, 0).row(q).transpose();   // A_{1,1}
+        const Vector3<T> A1_d2 = ev.a_d1(0, 1).row(q).transpose();   // A_{1,2} = A_{2,1}
+        const Vector3<T> A2_d2 = ev.a_d1(1, 1).row(q).transpose();   // A_{2,2}
+        const Vector3<T> A1_d11 = ev.a_d2(0, 0, 0).row(q).transpose();   // A_{1,11}
+        const Vector3<T> A1_d12 = ev.a_d2(0, 0, 1).row(q).transpose();   // A_{1,12}
+        const Vector3<T> A1_d22 = ev.a_d2(0, 1, 1).row(q).transpose();   // A_{1,22}
+        const Vector3<T> A2_d22 = ev.a_d2(1, 1, 1).row(q).transpose();   // A_{2,22}
 
         // Partial ∂_γ B_{αβ} = A_{αβγ}·A_3 + A_{αβ}·A_{3,γ}.
         const T B11_d1 = A1_d11.dot(A3) + A1_d1.dot(A3_d1);
@@ -86,12 +86,12 @@ ShellReissnerMindlin4p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
 
         // ----------------------------------------------------------------------------
 
-        // Second-kind Christoffel Γ^k_{ij} = g^{kγ}(A_γ·A_{,ij}). Formed here per qp
+        // Second-kind Christoffel Γ^k_{ij} = A^{kγ}(A_γ·A_{,ij}). Formed here per qp
         // (the same connection `hess` hoists, but kept explicit: reading hess.Gamma
         // instead perturbs K at ~1e-18 via FMA contraction, breaking bit-exactness).
         auto Gamma2nd = [&](Index k, Index i, Index j) -> T {
-            return ev.g_inv(k, 0)(q) * ev.a(0).row(q).dot(ev.a_d1(i, j).row(q))
-                 + ev.g_inv(k, 1)(q) * ev.a(1).row(q).dot(ev.a_d1(i, j).row(q));
+            return ev.metric_inv(q, pack2<2>(k, 0)) * ev.a(0).row(q).dot(ev.a_d1(i, j).row(q))
+                 + ev.metric_inv(q, pack2<2>(k, 1)) * ev.a(1).row(q).dot(ev.a_d1(i, j).row(q));
         };
         const T G1_11 = Gamma2nd(0, 0, 0);
         const T G1_12 = Gamma2nd(0, 0, 1);
@@ -203,12 +203,12 @@ ConstitutiveMatrix<T>
 ShellReissnerMindlin4p<T>::constitutive_matrix(const ElementValues<T, 2>& ev, Index q) const
 {
     // D = blockdiag(D_m, D_b, D_s), identical to the 5-parameter shell.
-    const Eigen::Matrix<T, 3, 1> g_inv_q = g_inv_voigt(ev, q);
+    const StaticVector<T, 3> metric_inv_q = ev.metric_inv_voigt(q);   // Voigt (A¹¹,A¹²,A²²), not a Vector3
 
     ConstitutiveMatrix<T> D = ConstitutiveMatrix<T>::Zero(8, 8);
-    D.template block<3, 3>(0, 0) = material_->membrane_voigt(g_inv_q);
-    D.template block<3, 3>(3, 3) = material_->bending_voigt(g_inv_q);
-    D.template block<2, 2>(6, 6) = material_->shear_voigt(g_inv_q);
+    D.template block<3, 3>(0, 0) = material_->membrane_voigt(metric_inv_q);
+    D.template block<3, 3>(3, 3) = material_->bending_voigt(metric_inv_q);
+    D.template block<2, 2>(6, 6) = material_->shear_voigt(metric_inv_q);
     return D;
 }
 
@@ -221,22 +221,22 @@ ShellReissnerMindlin4p<T>::displacement_shape_matrix(const ElementValues<T, 2>& 
     const T ratio = material_->bending_stiffness() / material_->shear_stiffness();
 
     Matrix<T>& U = this->N_w_workspace_;
-    const Index Q = ev.results_[0].cols();
-    const Index N = ev.results_[0].rows();
+    const Index Q = ev.basis_derivs[0].cols();
+    const Index N = ev.basis_derivs[0].rows();
     U.setZero(3 * Q, 4 * N);
 
     auto A1v = ev.a(0);   // covariant tangent A_1 (Q × 3)
     auto A2v = ev.a(1);   // covariant tangent A_2
 
     for (Index q = 0; q < Q; ++q) {
-        auto slab0 = ev.results_[0].col(q);
+        auto slab0 = ev.basis_derivs[0].col(q);
 
-        const operators::LaplaceBeltrami<T, 2> lapb{ev.results_, ev.position_data, ev.g_inv_data, q};
+        const operators::LaplaceBeltrami<T, 2> lapb{ev.basis_derivs, ev.position_derivs, ev.metric_inv, q};
 
         // Covariant tangents A_α and the unit normal A_3.
-        const Eigen::Matrix<T, 3, 1> a1 = A1v.row(q).transpose();
-        const Eigen::Matrix<T, 3, 1> a2 = A2v.row(q).transpose();
-        Eigen::Matrix<T, 3, 1> A3 = a1.cross(a2);
+        const Vector3<T> a1 = A1v.row(q).transpose();
+        const Vector3<T> a2 = A2v.row(q).transpose();
+        Vector3<T> A3 = a1.cross(a2);
         A3.normalize();
 
         for (Index i = 0; i < N; ++i) {
@@ -260,14 +260,14 @@ ShellReissnerMindlin4p<T>::rotation_shape_matrix(const ElementValues<T, 2>& ev) 
 {
     // Director tilt w_α = −w_{b,α} + ε_α^β ψ_{,β}.
     Matrix<T>& Nphi = this->N_phi_workspace_;
-    const Index Q = ev.results_[0].cols();
-    const Index N = ev.results_[0].rows();
+    const Index Q = ev.basis_derivs[0].cols();
+    const Index N = ev.basis_derivs[0].rows();
     Nphi.setZero(2 * Q, 4 * N);
 
     for (Index q = 0; q < Q; ++q) {
-        auto slab1 = ev.results_[1].col(q);
+        auto slab1 = ev.basis_derivs[1].col(q);
 
-        const operators::Curl<T, 2> curl{ev.results_, ev.g_data, ev.jac, q};
+        const operators::Curl<T, 2> curl{ev.basis_derivs, ev.metric, ev.jac, q};
 
         for (Index i = 0; i < N; ++i) {
             const T N_u = slab1(i * 2 + 0);

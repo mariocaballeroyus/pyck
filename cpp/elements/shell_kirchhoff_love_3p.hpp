@@ -12,18 +12,10 @@ namespace pyck
 {
 
 /**
- * @brief Kirchhoff-Love thin-shell element on a curved surface (rotation-free).
- *
- * A rotation-free thin shell: transverse shear is
- * neglected, the director is the deformed surface normal, and bending is the
- * linearized change of the second fundamental form. The only unknowns are the
- * three Cartesian displacement components per control point — no rotation DOFs —
- * so the basis must be C¹ (degree ≥ 2). Membrane and bending share the
- * displacement field exactly as in `ShellReissnerMindlin5p`, but the rotation
- * DOFs and the two transverse-shear strain rows are dropped.
- *
- * Generalised strain (Voigt, 6 components):
- *     (ε₁₁, ε₂₂, 2ε₁₂, κ₁₁, κ₂₂, 2κ₁₂),  with κ_{αβ} = −δb_{αβ}.
+ * @brief Kirchhoff-Love thin-shell element.
+ * 
+ * @details Displacement-based thin-shell element with three Cartesian 
+ *          displacement DOFs per node (u_x, u_y, u_z). 
  *
  * @tparam T Scalar type.
  */
@@ -41,61 +33,51 @@ public:
      */
     explicit ShellKirchhoffLove3p(Ptr<PlaneStress2d<T>> material);
 
-    // === Matrix Operators =======================================================
+    // === Matrix Operators ===========================================================
 
     /**
      * @brief Strain-displacement B-matrix.
      *
-     * @param ev Per-element evaluation workspace.
+     * @param ev Precomputed per-element geometric primitives.
      */
     void strain_matrix(const ElementValues<T, 2>& ev) const override;
 
     /**
      * @brief Constitutive D-matrix.
      *
-     * @param ev Per-element evaluation workspace.
+     * @param ev Precomputed per-element geometric primitives.
      * @param q Quadrature point.
      */
-    ConstitutiveMatrix<T> constitutive_matrix(const ElementValues<T, 2>& ev, Index q) const override;
+    ConstitutiveMatrix<T> constitutive_matrix(const ElementValues<T, 2>& ev, 
+                                              Index q) const override;
 
     // Shape Matrices =================================================================
 
     /**
      * @brief Displacement shape matrix.
      *
-     * @param ev Per-element evaluation workspace.
+     * @param ev Precomputed per-element geometric primitives.
      */
     void displacement_shape_matrix(const ElementValues<T, 2>& ev) const override;
 
     /**
      * @brief Rotation shape matrix (not implemented — rotation-free element).
      *
-     * @param ev Per-element evaluation workspace.
+     * @param ev Precomputed per-element geometric primitives.
      */
     void rotation_shape_matrix(const ElementValues<T, 2>& ev) const override;
 
-    // === Getters ================================================================
+    // === Properties =================================================================
 
     /// @brief Number of node degrees of freedom (3 Cartesian displacements).
-    std::size_t num_node_dofs() const override
-    { return 3; }
+    std::size_t num_node_dofs() const override { return 3; }
 
-    /// @brief Minimum order of basis functions. The bending block reads the
-    /// second surface derivatives A_{α,β} and the raw second basis derivatives
-    /// N_{,αβ}, i.e. an order-2 basis evaluation (C¹, degree ≥ 2).
+    /// @brief Minimum order of basis functions.
     Index basis_order() const override { return 2; }
 
-    // Normal (A_3) + Deriv2 (order-2 surface derivatives A_{α,β} and the raw N_{,αβ}).
-    // Deriv2 pulls in Deriv1/Values, which also supply the membrane base vectors A_α,
-    // the metric the constitutive reads, and the Jacobian ā₃ = √det A the normal
-    // variation needs. The second fundamental form B_{αβ} is no longer required: the
-    // Kiendl bending forms δA_3 from A_1×A_2 and its length, not from b_{αβ}.
-    unsigned flags() const override
-    { return Flags::Normal | Flags::Deriv2; }
-
+    unsigned flags()           const override { return Flags::Normal | Flags::Deriv2; }
     unsigned essential_flags() const override { return Flags::None; }
-    unsigned natural_flags()   const override
-    { return Flags::Normal | Flags::Deriv2; }
+    unsigned natural_flags()   const override { return Flags::Normal | Flags::Deriv2; }
 
 private:
 

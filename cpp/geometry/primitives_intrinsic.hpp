@@ -135,14 +135,14 @@ inline void compute_metric(const std::vector<ColMatrix<T, 3>>& pos_derivs,
  */
 template <std::floating_point T, std::size_t d>
 inline void project_to_covariant(const ColMatrix<T, 3>& v,
-                                 const std::vector<ColMatrix<T, 3>>& position_data,
+                                 const std::vector<ColMatrix<T, 3>>& position_derivs,
                                  Matrix<T>& v_cov)
 {
     const Index Q = v.rows();
     v_cov.resize(Q, d);
 
     auto a_view = [&](Index i) {
-        return position_data[1].middleRows(i * Q, Q);
+        return position_derivs[1].middleRows(i * Q, Q);
     };
 
     for (Index q = 0; q < Q; ++q)
@@ -152,11 +152,11 @@ inline void project_to_covariant(const ColMatrix<T, 3>& v,
 
 /**
  * @brief Raise covariant components to contravariant via the inverse metric:
- *        v^α(q) = g^{αβ}(q) v_β(q). Output is (Q × d).
+ *        v^α(q) = A^{αβ}(q) v_β(q). Output is (Q × d).
  */
 template <std::floating_point T, std::size_t d>
 inline void project_to_contravariant(const Matrix<T>& v_cov,
-                                     const Matrix<T>& g_inv_data,
+                                     const Matrix<T>& metric_inv,
                                      Matrix<T>& v_up)
 {
     const Index Q = v_cov.rows();
@@ -166,7 +166,7 @@ inline void project_to_contravariant(const Matrix<T>& v_cov,
         for (std::size_t alpha = 0; alpha < d; ++alpha) {
             T sum = T(0);
             for (std::size_t beta = 0; beta < d; ++beta)
-                sum += g_inv_data(q, pack2<d>(alpha, beta)) * v_cov(q, beta);
+                sum += metric_inv(q, pack2<d>(alpha, beta)) * v_cov(q, beta);
             v_up(q, alpha) = sum;
         }
 }

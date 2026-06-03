@@ -32,7 +32,7 @@ CurveDerivs metric_derivs(const std::vector<Matrix<double>>& basis,
                           const ElementValues<double, 1>& local,
                           Index q)
 {
-    const double g11      = local.g(0, 0)(q);
+    const double g11      = local.metric(q, 0);
     const double sqrt_g11 = std::sqrt(g11);
     const double g11_15   = g11 * sqrt_g11;
 
@@ -122,7 +122,7 @@ TEST_CASE("Patch<double, 1>: Analytical Push-Forward Verification", "[geometry][
             // New-API evaluation.
             auto local = element_values_at(curve, params, Index(3),
                 Flags::Deriv3);
-            auto md    = metric_derivs(local.results_, local, 0);
+            auto md    = metric_derivs(local.basis_derivs, local, 0);
 
             CHECK(local.jac(0) == Approx(sqrt_g11).margin(1e-12));
 
@@ -164,7 +164,7 @@ TEST_CASE("Patch<double, 1>: External AD Numerical Validation", "[geometry][curv
         ColMatrix<double, 1> params(1, 1); params << u;
         auto local = element_values_at(curve, params, Index(3),
             Flags::Deriv3);
-        return metric_derivs(local.results_, local, 0);
+        return metric_derivs(local.basis_derivs, local, 0);
     };
 
     SECTION("Evaluation at u = 0.15") {

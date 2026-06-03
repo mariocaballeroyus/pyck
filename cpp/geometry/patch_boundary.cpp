@@ -156,16 +156,16 @@ PatchBoundary<T, d>::eval_outward_normal(const ElementValues<T, d - 1>& boundary
     for (Index q = 0; q < Q; ++q)
     {
         // Parent surface normal a_3 = (a_1 × a_2) / ‖a_1 × a_2‖.
-        Eigen::Matrix<T, 3, 1> pa1 = parent_vals.a(0).row(q).transpose();
-        Eigen::Matrix<T, 3, 1> pa2 = parent_vals.a(1).row(q).transpose();
-        Eigen::Matrix<T, 3, 1> a3 = pa1.cross(pa2);
+        Vector3<T> pa1 = parent_vals.a(0).row(q).transpose();
+        Vector3<T> pa2 = parent_vals.a(1).row(q).transpose();
+        Vector3<T> a3 = pa1.cross(pa2);
         const T jac_p = parent_vals.jac(q);
         if (jac_p > T(1e-14)) a3 /= jac_p;
-        else a3 = Eigen::Matrix<T, 3, 1>(T(0), T(0), T(1));
+        else a3 = Vector3<T>(T(0), T(0), T(1));
 
         // Outward in-surface normal n = sign_n · (a_1^bd × a_3) / ‖…‖.
-        Eigen::Matrix<T, 3, 1> t = boundary_vals.a(0).row(q).transpose();
-        Eigen::Matrix<T, 3, 1> n_vec = sign_n_ * t.cross(a3);
+        Vector3<T> t = boundary_vals.a(0).row(q).transpose();
+        Vector3<T> n_vec = sign_n_ * t.cross(a3);
         const T n_norm = n_vec.norm();
         if (n_norm > T(1e-14)) n_vec /= n_norm;
         n_mat.row(q) = n_vec.transpose();
@@ -184,9 +184,9 @@ PatchBoundary<T, d>::eval_outward_normal(const ElementValues<T, d - 1>& boundary
 
     for (Index q = 0; q < Q; ++q)
     {
-        Eigen::Matrix<T, 3, 1> a1 = boundary_vals.a(0).row(q).transpose();
-        Eigen::Matrix<T, 3, 1> a2 = boundary_vals.a(1).row(q).transpose();
-        Eigen::Matrix<T, 3, 1> n_vec = sign_n_ * a1.cross(a2);
+        Vector3<T> a1 = boundary_vals.a(0).row(q).transpose();
+        Vector3<T> a2 = boundary_vals.a(1).row(q).transpose();
+        Vector3<T> n_vec = sign_n_ * a1.cross(a2);
         const T n_norm = n_vec.norm();
         if (n_norm > T(1e-14)) n_vec /= n_norm;
         n_mat.row(q) = n_vec.transpose();

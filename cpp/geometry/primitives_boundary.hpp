@@ -43,15 +43,15 @@ inline void compute_outward_normal(const std::vector<ColMatrix<T, 3>>& boundary_
 
     for (Index q = 0; q < Q; ++q)
     {
-        Eigen::Matrix<T, 3, 1> pa1 = par_a(0).row(q).transpose();
-        Eigen::Matrix<T, 3, 1> pa2 = par_a(1).row(q).transpose();
-        Eigen::Matrix<T, 3, 1> a3  = pa1.cross(pa2);
+        Vector3<T> pa1 = par_a(0).row(q).transpose();
+        Vector3<T> pa2 = par_a(1).row(q).transpose();
+        Vector3<T> a3  = pa1.cross(pa2);
         const T jac_p = parent_jac(q);
         if (jac_p > T(1e-14)) a3 /= jac_p;
-        else                  a3 = Eigen::Matrix<T, 3, 1>(T(0), T(0), T(1));
+        else                  a3 = Vector3<T>(T(0), T(0), T(1));
 
-        Eigen::Matrix<T, 3, 1> t = boundary_position_data[1].row(q).transpose();
-        Eigen::Matrix<T, 3, 1> n_vec = sign * t.cross(a3);
+        Vector3<T> t = boundary_position_data[1].row(q).transpose();
+        Vector3<T> n_vec = sign * t.cross(a3);
         const T n_norm = n_vec.norm();
         if (n_norm > T(1e-14)) n_vec /= n_norm;
         n_out.row(q) = n_vec.transpose();
@@ -81,9 +81,9 @@ inline void compute_outward_normal(const std::vector<ColMatrix<T, 3>>& boundary_
 
     for (Index q = 0; q < Q; ++q)
     {
-        Eigen::Matrix<T, 3, 1> a1 = bdy_a(0).row(q).transpose();
-        Eigen::Matrix<T, 3, 1> a2 = bdy_a(1).row(q).transpose();
-        Eigen::Matrix<T, 3, 1> n_vec = sign * a1.cross(a2);
+        Vector3<T> a1 = bdy_a(0).row(q).transpose();
+        Vector3<T> a2 = bdy_a(1).row(q).transpose();
+        Vector3<T> n_vec = sign * a1.cross(a2);
         const T n_norm = n_vec.norm();
         if (n_norm > T(1e-14)) n_vec /= n_norm;
         n_out.row(q) = n_vec.transpose();
@@ -105,8 +105,8 @@ inline void compute_in_surface_tangent(const ColMatrix<T, 3>& a_3,
     const Index Q = a_3.rows();
     s_out.resize(Q, 3);
     for (Index q = 0; q < Q; ++q) {
-        const Eigen::Matrix<T, 3, 1> a3q = a_3.row(q).transpose();
-        const Eigen::Matrix<T, 3, 1> nq  = n.row(q).transpose();
+        const Vector3<T> a3q = a_3.row(q).transpose();
+        const Vector3<T> nq  = n.row(q).transpose();
         s_out.row(q) = a3q.cross(nq).transpose();
     }
 }

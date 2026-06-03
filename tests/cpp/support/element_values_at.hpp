@@ -49,7 +49,7 @@ inline T christoffel2nd(const ElementValues<T, d>& ev,
 {
     T s = T(0);
     for (Index g = 0; g < static_cast<Index>(d); ++g)
-        s += ev.g_inv(k, g)(q) * ev.a(g).row(q).dot(ev.a_d1(i, j).row(q));
+        s += ev.metric_inv(q, pack2<2>(k, g)) * ev.a(g).row(q).dot(ev.a_d1(i, j).row(q));
     return s;
 }
 

@@ -72,7 +72,7 @@ covariant_components(const ColMatrix<T, 3>& v,
 }
 
 /// Contravariant components of a 3D in-surface vector v in the parent surface:
-///   v^α = g^{αβ} (v · a_β).
+///   v^α = A^{αβ} (v · a_β).
 /// Pairs naturally with covariant strains/derivatives (θ_α, N_{,α}, N_{|αβ}).
 template <std::floating_point T>
 inline std::pair<Vector<T>, Vector<T>>
@@ -83,9 +83,9 @@ contravariant_components(const ColMatrix<T, 3>& v,
     const Index Q = v.rows();
     Vector<T> v_up_1(Q), v_up_2(Q);
     for (Index q = 0; q < Q; ++q) {
-        const T gi11 = local.g_inv(0, 0)(q);
-        const T gi12 = local.g_inv(0, 1)(q);
-        const T gi22 = local.g_inv(1, 1)(q);
+        const T gi11 = local.metric_inv(q, 0);
+        const T gi12 = local.metric_inv(q, 2);
+        const T gi22 = local.metric_inv(q, 1);
         v_up_1(q) = gi11 * v_cov_1(q) + gi12 * v_cov_2(q);
         v_up_2(q) = gi12 * v_cov_1(q) + gi22 * v_cov_2(q);
     }
@@ -103,8 +103,8 @@ surface_tangent(const ColMatrix<T, 3>& n,
     const Index Q = n.rows();
     ColMatrix<T, 3> s(Q, 3);
     for (Index q = 0; q < Q; ++q) {
-        const Eigen::Matrix<T, 3, 1> a3q = a_3.row(q).transpose();
-        const Eigen::Matrix<T, 3, 1> nq  = n.row(q).transpose();
+        const Vector3<T> a3q = a_3.row(q).transpose();
+        const Vector3<T> nq  = n.row(q).transpose();
         s.row(q) = a3q.cross(nq).transpose();
     }
     return s;
@@ -131,7 +131,7 @@ public:
                        const BoundaryElementValues<T, 2>& bvals) const override
     {
         const Index ndof = static_cast<Index>(element.num_node_dofs());
-        const Matrix<T>& slab0 = bvals.parent_vals_.results_[0];
+        const Matrix<T>& slab0 = bvals.parent_vals_.basis_derivs[0];
         const Index Q = slab0.cols();
         const Index N = slab0.rows();
         const Index slot = static_cast<Index>(dof_index_);
@@ -176,8 +176,8 @@ public:
                        const BoundaryElementValues<T, 2>& bvals) const override
     {
         const Index ndof = static_cast<Index>(element.num_node_dofs());
-        const Matrix<T>& slab0 = bvals.parent_vals_.results_[0];
-        const Matrix<T>& slab1 = bvals.parent_vals_.results_[1];
+        const Matrix<T>& slab0 = bvals.parent_vals_.basis_derivs[0];
+        const Matrix<T>& slab1 = bvals.parent_vals_.basis_derivs[1];
         const Index Q = slab0.cols();
         const Index N = slab0.rows();
         const Index slot = static_cast<Index>(dof_index_);
@@ -232,9 +232,9 @@ public:
                        const BoundaryElementValues<T, 2>& bvals) const override
     {
         const Index ndof = static_cast<Index>(element.num_node_dofs());
-        const Matrix<T>& slab0 = bvals.parent_vals_.results_[0];
-        const Matrix<T>& slab1 = bvals.parent_vals_.results_[1];
-        const Matrix<T>& slab2 = bvals.parent_vals_.results_[2];
+        const Matrix<T>& slab0 = bvals.parent_vals_.basis_derivs[0];
+        const Matrix<T>& slab1 = bvals.parent_vals_.basis_derivs[1];
+        const Matrix<T>& slab2 = bvals.parent_vals_.basis_derivs[2];
         const Index Q = slab0.cols();
         const Index N = slab0.rows();
         const Index slot = static_cast<Index>(dof_index_);
@@ -249,10 +249,10 @@ public:
         for (Index q = 0; q < Q; ++q) {
             auto col1 = slab1.col(q);
             auto col2 = slab2.col(q);
-            // Second-kind Christoffel Γ^k_{ij} = g^{kγ}(A_γ·A_{,ij}), in place.
+            // Second-kind Christoffel Γ^k_{ij} = A^{kγ}(A_γ·A_{,ij}), in place.
             auto Gamma2nd = [&](Index k, Index i, Index j) -> T {
-                return parent.g_inv(k, 0)(q) * parent.a(0).row(q).dot(parent.a_d1(i, j).row(q))
-                     + parent.g_inv(k, 1)(q) * parent.a(1).row(q).dot(parent.a_d1(i, j).row(q));
+                return parent.metric_inv(q, pack2<2>(k, 0)) * parent.a(0).row(q).dot(parent.a_d1(i, j).row(q))
+                     + parent.metric_inv(q, pack2<2>(k, 1)) * parent.a(1).row(q).dot(parent.a_d1(i, j).row(q));
             };
             const T G1_11 = Gamma2nd(0, 0, 0);
             const T G1_12 = Gamma2nd(0, 0, 1);
@@ -306,13 +306,13 @@ public:
 
         // Project onto the unit surface normal to recover the scalar transverse
         // (normal) displacement w = n · u.
-        const Index Q = static_cast<Index>(ev.results_[0].cols());
+        const Index Q = static_cast<Index>(ev.basis_derivs[0].cols());
         const Index K = static_cast<Index>(U.cols());
         Matrix<T> Nw(Q, K);
         for (Index q = 0; q < Q; ++q) {
-            const Eigen::Matrix<T, 3, 1> a1 = ev.a(0).row(q).transpose();
-            const Eigen::Matrix<T, 3, 1> a2 = ev.a(1).row(q).transpose();
-            Eigen::Matrix<T, 3, 1> n = a1.cross(a2);
+            const Vector3<T> a1 = ev.a(0).row(q).transpose();
+            const Vector3<T> a2 = ev.a(1).row(q).transpose();
+            Vector3<T> n = a1.cross(a2);
             n.normalize();
             Nw.row(q) = n.transpose() * U.middleRows(3 * q, 3);
         }

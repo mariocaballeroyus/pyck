@@ -63,6 +63,14 @@ using RowMatrix = Eigen::Matrix<T, Rows, Eigen::Dynamic>;
 template <std::floating_point T, std::size_t N>
 using StaticVector = Eigen::Vector<T, N>;
 
+/// @brief Vector in physical (3D Euclidean) space — base vectors A_α, the normal
+///        A_3, positions, cross products. The library embeds all geometry in R³, so
+///        this is the canonical small vector. NOT for Voigt-packed tensors: the
+///        3-component symmetric metric/strain in 2D is a `StaticVector<T, 3>`, a
+///        coincidentally-3-long vector in parametric tensor space, not a Vector3.
+template <std::floating_point T>
+using Vector3 = Eigen::Vector<T, 3>;
+
 /// @brief Maximum strain dimension across all Element<T,2> overrides.
 ///        Used as the storage bound for ConstitutiveMatrix.
 ///        Bump when introducing an element whose strain dim exceeds this.

@@ -36,18 +36,18 @@ struct CurlGradient
     std::array<std::array<T, d>, d> eps;   ///< ε_α^β.
 
     /// @brief Build for quadrature point @p q.
-    CurlGradient(const std::vector<Matrix<T>>&       results,
-                 const std::vector<ColMatrix<T, 3>>& position_data,
-                 const Matrix<T>&                    g_data,
-                 const Matrix<T>&                    g_inv_data,
+    CurlGradient(const std::vector<Matrix<T>>&       basis_derivs,
+                 const std::vector<ColMatrix<T, 3>>& position_derivs,
+                 const Matrix<T>&                    metric,
+                 const Matrix<T>&                    metric_inv,
                  const Vector<T>&                    jac,
                  Index                               q)
-        : hess(results, position_data, g_inv_data, q)
+        : hess(basis_derivs, position_derivs, metric_inv, q)
     {
         const T invJ = T(1) / jac(q);
         for (std::size_t a = 0; a < d; ++a) {
-            eps[a][0] = -g_data(q, pack2<d>(static_cast<Index>(a), 1)) * invJ;   // ε_α^0
-            eps[a][1] =  g_data(q, pack2<d>(static_cast<Index>(a), 0)) * invJ;   // ε_α^1
+            eps[a][0] = -metric(q, pack2<d>(static_cast<Index>(a), 1)) * invJ;   // ε_α^0
+            eps[a][1] =  metric(q, pack2<d>(static_cast<Index>(a), 0)) * invJ;   // ε_α^1
         }
     }
 
