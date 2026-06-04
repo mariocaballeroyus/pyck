@@ -88,6 +88,69 @@ class LoadBoundaryCondition:
                                 np.asarray(value, dtype=float).ravel()))
         return self
 
+    def add_force(
+        self,
+        traction: "npt.ArrayLike",
+        frame: str = "global",
+    ) -> "LoadBoundaryCondition":
+        """Add a distributed force per unit boundary length.
+
+        A force conjugates to the full 3D displacement, so a single 3-vector
+        covers both in-plane (membrane / axial) and out-of-plane (transverse
+        shear) loading; the element's internal membrane/shear split is
+        irrelevant to an applied load.
+
+        Parameters
+        ----------
+        traction : array_like, shape (3,)
+            Force per unit length. In the ``"global"`` frame these are Cartesian
+            components ``(t_x, t_y, t_z)``; in the ``"local"`` frame they are
+            ``(t_n, t_s, t_3)`` along the outward in-surface normal, the
+            in-surface tangent ``s = a_3 x n``, and the surface director ``a_3``.
+        frame : {"global", "local"}, optional
+            Coordinate frame the components are given in (default ``"global"``).
+        """
+        if self._cpp_object is not None:
+            raise RuntimeError(
+                "Cannot add fields after the condition has been bound to a problem."
+            )
+        try:
+            local = {"global": False, "local": True}[frame]
+        except KeyError:
+            raise ValueError(
+                f"Unknown frame {frame!r}. Expected 'global' or 'local'."
+            ) from None
+        vec = np.asarray(traction, dtype=float).ravel()
+        if vec.size != 3:
+            raise ValueError("traction must have 3 components.")
+        self._terms.append((_pyck.ForceTraction(vec, local), 1.0))
+        return self
+
+    def add_moment(
+        self,
+        m_n: float = 0.0,
+        m_s: float = 0.0,
+    ) -> "LoadBoundaryCondition":
+        """Add a distributed edge moment per unit boundary length.
+
+        Moments conjugate to the rotation field and are given in the local
+        boundary frame: ``m_n`` (bending) acts about the outward normal and
+        pairs with the normal rotation; ``m_s`` (twist) acts about the tangent
+        and pairs with the tangential rotation. Zero components are skipped.
+
+        Parameters
+        ----------
+        m_n : float, optional
+            Bending moment per unit length (conjugate to the normal rotation).
+        m_s : float, optional
+            Twisting moment per unit length (conjugate to the tangential rotation).
+        """
+        if m_n:
+            self.add("rot_n", m_n)
+        if m_s:
+            self.add("rot_s", m_s)
+        return self
+
     def bind(self, _: "QuadratureRule", element: "Element") -> None:
         """Build the C++ object using the element from the parent problem."""
         rule = self._quadrature if self._quadrature is not None else self._boundary.quadrature

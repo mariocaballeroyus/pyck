@@ -4,7 +4,7 @@ import numpy
 import numpy.typing
 import scipy.sparse
 import typing
-__all__: list[str] = ['BSpline', 'Basis', 'BasisNormalCurvature', 'BasisNormalSlope', 'BasisValue', 'BoundaryField', 'Condition1d', 'Condition2d', 'Constraint', 'DirectConstraint', 'Element1d', 'Element2d', 'FieldType', 'Function1d', 'Function2d', 'GaussLegendre1d', 'GaussLegendre2d', 'LagrangeBoundaryCondition2d', 'LinearConstraint', 'LinearElasticProblem1d', 'LinearElasticProblem2d', 'LoadBoundaryCondition2d', 'Material1d', 'Material2d', 'NURBS', 'NormalBendingMoment', 'NormalRotation', 'NormalTransverseShear', 'Patch1d', 'Patch2d', 'PatchBoundary2d', 'PenaltyBoundaryCondition2d', 'PlaneStress2d', 'QuadratureRule1d', 'QuadratureRule2d', 'ShellKirchhoffLove3p', 'ShellReissnerMindlin4p', 'ShellReissnerMindlin5p', 'TangentialRotation', 'TransverseDisplacement', 'TwistingMoment', 'UniaxialStress1d', 'eval_quadrature_data', 'inner_product']
+__all__: list[str] = ['BSpline', 'Basis', 'BasisNormalCurvature', 'BasisNormalSlope', 'BasisValue', 'BoundaryField', 'Condition1d', 'Condition2d', 'Constraint', 'DirectConstraint', 'Element1d', 'Element2d', 'FieldType', 'ForceTraction', 'Function1d', 'Function2d', 'GaussLegendre1d', 'GaussLegendre2d', 'LagrangeBoundaryCondition2d', 'LinearConstraint', 'LinearElasticProblem1d', 'LinearElasticProblem2d', 'LoadBoundaryCondition2d', 'Material1d', 'Material2d', 'NURBS', 'NormalBendingMoment', 'NormalRotation', 'NormalTransverseShear', 'Patch1d', 'Patch2d', 'PatchBoundary2d', 'PenaltyBoundaryCondition2d', 'PlaneStress2d', 'QuadratureRule1d', 'QuadratureRule2d', 'ShellKirchhoffLove3p', 'ShellReissnerMindlin4p', 'ShellReissnerMindlin5p', 'TangentialRotation', 'TransverseDisplacement', 'TwistingMoment', 'UniaxialStress1d', 'eval_quadrature_data', 'inner_product']
 class BSpline(Basis):
     @staticmethod
     def clamped_uniform(degree: typing.SupportsInt | typing.SupportsIndex, num_basis: typing.SupportsInt | typing.SupportsIndex) -> BSpline:
@@ -131,6 +131,9 @@ class FieldType:
         ...
     @property
     def value(self) -> int:
+        ...
+class ForceTraction(BoundaryField):
+    def __init__(self, traction: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[3, 1]"], local: bool = False) -> None:
         ...
 class Function1d:
     def __call__(self, params: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 1]"]) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]"]:

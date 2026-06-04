@@ -21,6 +21,7 @@ from pyck.materials import (
 )
 from pyck.conditions import (
     BoundaryField,
+    ForceTraction,
     NormalBendingMoment,
     NormalRotation,
     NormalTransverseShear,
@@ -85,6 +86,7 @@ __all__ = [
     "PlaneStress2d",
     "UniaxialStress1d",
     "BoundaryField",
+    "ForceTraction",
     "NormalBendingMoment",
     "NormalRotation",
     "NormalTransverseShear",

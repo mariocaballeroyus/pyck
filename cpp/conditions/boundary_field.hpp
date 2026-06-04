@@ -329,6 +329,70 @@ public:
 };
 
 /**
+ * @brief Unified force traction, conjugate to the full 3D displacement field.
+ *
+ * Assembles a force-per-unit-length edge load `∫ δu · t dΓ` against the
+ * element's displacement shape matrix `N_w_` (3Q × K). Because an applied force
+ * does not distinguish the element's internal membrane / transverse-shear split,
+ * a single 3-vector covers both in-plane (membrane / axial) and out-of-plane
+ * (transverse shear) loading.
+ *
+ * The traction components are read either in global Cartesian coordinates
+ * (`local = false`: `t = (t_x, t_y, t_z)`) or in the local boundary frame
+ * (`local = true`: `t = (t_n, t_s, t_3)` on the outward in-surface normal `n`,
+ * the in-surface tangent `s = a_3 × n`, and the surface director `a_3`). In the
+ * local frame the direction is rebuilt per quadrature point, so a constant local
+ * traction on a curved edge is a spatially-varying global load. The local
+ * `a_3` component reproduces `TransverseDisplacement` (`w = n · u`) exactly.
+ */
+template <std::floating_point T>
+class ForceTraction : public BoundaryField<T>
+{
+public:
+    explicit ForceTraction(const Vector3<T>& traction, bool local = false)
+        : t_(traction), local_(local) {}
+
+    Matrix<T> evaluate(const Element<T, 2>& element,
+                       const BoundaryElementValues<T, 2>& bvals) const override
+    {
+        const auto& ev = bvals.parent_vals_;
+        element.displacement_shape_matrix(ev);
+        const Matrix<T>& U = element.N_w_;   // 3D displacement shape (3Q × K)
+
+        const Index Q = static_cast<Index>(ev.basis_derivs[0].cols());
+        const Index K = static_cast<Index>(U.cols());
+        Matrix<T> C(Q, K);
+
+        if (!local_) {
+            for (Index q = 0; q < Q; ++q) {
+                C.row(q) = t_.transpose() * U.middleRows(3 * q, 3);
+            }
+            return C;
+        }
+
+        const ColMatrix<T, 3> n =
+            bvals.boundary().eval_outward_normal(bvals.boundary_vals_, ev);
+        const ColMatrix<T, 3>& a_3 = ev.A3_;
+        const ColMatrix<T, 3> s = detail::surface_tangent(n, a_3);
+        for (Index q = 0; q < Q; ++q) {
+            const Vector3<T> dir = t_(0) * n.row(q).transpose()
+                                 + t_(1) * s.row(q).transpose()
+                                 + t_(2) * a_3.row(q).transpose();
+            C.row(q) = dir.transpose() * U.middleRows(3 * q, 3);
+        }
+        return C;
+    }
+
+    Index basis_order() const override { return Index(0); }
+    unsigned flags() const override { return Flags::Normal; }
+    unsigned element_flags(const Element<T, 2>& e) const override { return e.essential_flags(); }
+
+private:
+    Vector3<T> t_;
+    bool local_;
+};
+
+/**
  * @brief Rotation projected onto the outward boundary normal: θ_n = n · θ.
  *
  * Computed intrinsically as `n^α θ_α` where θ_α are the element's covariant

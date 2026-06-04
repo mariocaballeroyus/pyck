@@ -30,6 +30,11 @@ void bind_conditions(py::module_& m)
                Ptr<TransverseDisplacement<double>>>(m, "TransverseDisplacement")
         .def(py::init<>());
 
+    py::class_<ForceTraction<double>, BoundaryField<double>,
+               Ptr<ForceTraction<double>>>(m, "ForceTraction")
+        .def(py::init<const Vector3<double>&, bool>(),
+             py::arg("traction"), py::arg("local") = false);
+
     py::class_<NormalRotation<double>, BoundaryField<double>,
                Ptr<NormalRotation<double>>>(m, "NormalRotation")
         .def(py::init<>());

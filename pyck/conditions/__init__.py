@@ -3,6 +3,7 @@
 from pyck.conditions.condition import BindableCondition, Condition
 from pyck.conditions.boundary_field import (
     BoundaryField,
+    ForceTraction,
     NormalBendingMoment,
     NormalRotation,
     NormalTransverseShear,
@@ -28,6 +29,7 @@ __all__ = [
     "Condition",
     "BindableCondition",
     "BoundaryField",
+    "ForceTraction",
     "NormalBendingMoment",
     "NormalRotation",
     "NormalTransverseShear",

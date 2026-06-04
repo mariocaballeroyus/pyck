@@ -8,6 +8,7 @@ import pyck._pyck as _pyck
 
 BoundaryField = _pyck.BoundaryField
 TransverseDisplacement = _pyck.TransverseDisplacement
+ForceTraction = _pyck.ForceTraction
 NormalRotation = _pyck.NormalRotation
 TangentialRotation = _pyck.TangentialRotation
 NormalTransverseShear = _pyck.NormalTransverseShear
