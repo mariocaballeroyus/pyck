@@ -16,9 +16,8 @@ from pyck.elements import (
     ShellReissnerMindlin5p,
 )
 from pyck.materials import (
-    SlenderBeam1d,
     PlaneStress2d,
-    PlaneStressShell,
+    UniaxialStress1d,
 )
 from pyck.conditions import (
     BoundaryField,
@@ -83,9 +82,8 @@ __all__ = [
     "ShellKirchhoffLove3p",
     "ShellReissnerMindlin4p",
     "ShellReissnerMindlin5p",
-    "SlenderBeam1d",
     "PlaneStress2d",
-    "PlaneStressShell",
+    "UniaxialStress1d",
     "BoundaryField",
     "NormalBendingMoment",
     "NormalRotation",

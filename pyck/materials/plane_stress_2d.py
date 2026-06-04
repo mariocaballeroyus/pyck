@@ -47,12 +47,6 @@ class PlaneStress2d:
         # G = E / (2 * (1 + nu))
         return self._E / (2.0 * (1.0 + self._nu))
 
-    def bending_matrix(self):
-        return self._cpp_object.bending_matrix()
-
-    def shear_matrix(self):
-        return self._cpp_object.shear_matrix()
-
     def bending_stiffness(self) -> float:
         return self._cpp_object.bending_stiffness()
 

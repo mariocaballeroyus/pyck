@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pyck._pyck as _pyck
-from pyck.materials import Material
+from pyck.materials.material import Material
 
 
 class UniaxialStress1d(Material):

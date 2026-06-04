@@ -1,7 +1,7 @@
 """Finite element formulations."""
 
 from pyck.elements.element import Element
-from pyck.elements.plates import (
+from pyck.elements.shells import (
     ShellKirchhoffLove3p,
     ShellReissnerMindlin4p,
     ShellReissnerMindlin5p,
@@ -10,7 +10,6 @@ from pyck.elements.plates import (
 
 __all__ = [
     "Element",
-    # Shell elements
     "ShellKirchhoffLove3p",
     "ShellReissnerMindlin4p",
     "ShellReissnerMindlin5p",
