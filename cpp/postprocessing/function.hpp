@@ -73,11 +73,11 @@ public:
                                      const ElementValues<T, d>& ev)
                                      -> const Matrix<T>& {
             switch (field) {
-                case FieldType::PRIMAL:       e.primal_shape_matrix(ev);       return e.N_primal_workspace_;
-                case FieldType::DISPLACEMENT: e.displacement_shape_matrix(ev); return e.N_w_workspace_;
-                case FieldType::ROTATION:     e.rotation_shape_matrix(ev);     return e.N_phi_workspace_;
-                case FieldType::STRAIN:       e.strain_matrix(ev);             return e.B_workspace_;
-                case FieldType::STRESS:       e.stress_matrix(ev);             return e.N_sigma_workspace_;
+                case FieldType::PRIMAL:       e.primal_shape_matrix(ev);       return e.N_primal_;
+                case FieldType::DISPLACEMENT: e.displacement_shape_matrix(ev); return e.N_w_;
+                case FieldType::ROTATION:     e.rotation_shape_matrix(ev);     return e.N_phi_;
+                case FieldType::STRAIN:       e.strain_matrix(ev);             return e.B_voigt_;
+                case FieldType::STRESS:       e.stress_matrix(ev);             return e.N_sigma_;
             }
             throw std::runtime_error("Function: unknown FieldType.");
         };

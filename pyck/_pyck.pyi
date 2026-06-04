@@ -5,7 +5,7 @@ import numpy
 import numpy.typing
 import typing
 
-__all__: list[str] = ['BSpline', 'Basis', 'BeamEulerBernoulli1p', 'BeamTimoshenko1p', 'BeamTimoshenko2p', 'BoundaryField', 'PatchBoundary1d', 'PatchBoundary2d', 'Condition', 'Constraint', 'CurvePatch', 'DirectConstraint', 'DofMapper1d', 'DofMapper2d', 'Element1d', 'Element2d', 'GaussLegendre', 'GaussLegendre2d', 'GaussLegendre3d', 'KnotVector', 'LagrangeMultiplierCondition2d', 'LinearConstraint', 'LinearElasticProblem1d', 'LinearElasticProblem2d', 'LoadCondition1d', 'LoadCondition2d', 'Material1d', 'Material2d', 'NitscheCondition2d', 'NormalBendingMoment', 'NormalRotation', 'NormalTransverseShear', 'Patch1d', 'Patch2d', 'PenaltyCondition2d', 'PlaneStress2d', 'PlateKirchhoffLove1p', 'PlateReissnerMindlin1p', 'PlateReissnerMindlin3p', 'PlateReissnerMindlinDispl3p', 'PlateReissnerMindlinDispl2p', 'QuadratureRule1d', 'QuadratureRule2d', 'QuadratureRule3d', 'SlenderBeam1d', 'SurfacePatch', 'TangentialRotation', 'TransverseDisplacement', 'TwistingMoment', 'line_segment', 'rectangle', 'tensor_product', 'tensor_product_1d', 'tensor_product_2d', 'eval_shape_at', 'eval_geometry_at']
+__all__: list[str] = ['BSpline', 'Basis', 'BeamEulerBernoulli1p', 'BeamTimoshenko1p', 'BeamTimoshenko2p', 'BoundaryField', 'PatchBoundary1d', 'PatchBoundary2d', 'Condition', 'Constraint', 'CurvePatch', 'DirectConstraint', 'DofMapper1d', 'DofMapper2d', 'Element1d', 'Element2d', 'GaussLegendre', 'GaussLegendre2d', 'GaussLegendre3d', 'KnotVector', 'LagrangeMultiplierCondition2d', 'LinearConstraint', 'LinearElasticProblem1d', 'LinearElasticProblem2d', 'LoadCondition1d', 'LoadCondition2d', 'Material1d', 'Material2d', 'NitscheCondition2d', 'NormalBendingMoment', 'NormalRotation', 'NormalTransverseShear', 'Patch1d', 'Patch2d', 'PenaltyCondition2d', 'PlaneStress2d', 'QuadratureRule1d', 'QuadratureRule2d', 'QuadratureRule3d', 'SlenderBeam1d', 'SurfacePatch', 'TangentialRotation', 'TransverseDisplacement', 'TwistingMoment', 'line_segment', 'rectangle', 'tensor_product', 'tensor_product_1d', 'tensor_product_2d', 'eval_shape_at', 'eval_geometry_at']
 
 class BoundaryField:
     pass
@@ -382,28 +382,6 @@ class PlaneStress2d(Material2d):
     def shear_correction_factor(self) -> float:
         ...
     def thickness(self) -> float:
-        ...
-
-class PlateKirchhoffLove1p(Element2d):
-    def __init__(self, material: PlaneStress2d) -> None:
-        ...
-
-class PlateReissnerMindlin1p(Element2d):
-    def __init__(self, material: PlaneStress2d) -> None:
-        ...
-
-class PlateReissnerMindlin3p(Element2d):
-    def __init__(self, material: PlaneStress2d) -> None:
-        ...
-    def rotation_shape_matrix(self, shape_derivs: list[numpy.typing.NDArray[numpy.float64]]) -> numpy.typing.NDArray[numpy.float64]:
-        ...
-
-class PlateReissnerMindlinDispl3p(Element2d):
-    def __init__(self, material: PlaneStress2d) -> None:
-        ...
-
-class PlateReissnerMindlinDispl2p(Element2d):
-    def __init__(self, material: PlaneStress2d) -> None:
         ...
 
 class QuadratureRule1d:

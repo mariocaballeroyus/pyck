@@ -11,10 +11,6 @@ from pyck.geometry import (
     SurfacePatch,
 )
 from pyck.elements import (
-    PlateKirchhoffLove1p,
-    PlateReissnerMindlin3p,
-    PlateReissnerMindlinDispl2p,
-    PlateReissnerMindlin1p,
     ShellKirchhoffLove3p,
     ShellReissnerMindlin4p,
     ShellReissnerMindlin5p,
@@ -53,7 +49,6 @@ from pyck.assembly import (
 from pyck.io import (
     basis as io_basis,
     curve as io_curve,
-    export_field_vtk,
     export_bezier_vtu,
     bezier_anchor_params,
 )
@@ -85,10 +80,6 @@ __all__ = [
     "NURBS",
     "CurvePatch",
     "SurfacePatch",
-    "PlateKirchhoffLove1p",
-    "PlateReissnerMindlin3p",
-    "PlateReissnerMindlinDispl2p",
-    "PlateReissnerMindlin1p",
     "ShellKirchhoffLove3p",
     "ShellReissnerMindlin4p",
     "ShellReissnerMindlin5p",
@@ -117,7 +108,6 @@ __all__ = [
     "LinearElasticProblem",
     "io_basis",
     "io_curve",
-    "export_field_vtk",
     "export_bezier_vtu",
     "bezier_anchor_params",
     "solve",

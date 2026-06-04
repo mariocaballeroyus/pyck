@@ -1,11 +1,10 @@
 #ifndef PYCK_COVARIANT_GRADIENT_HPP
 #define PYCK_COVARIANT_GRADIENT_HPP
 
-#include <array>
 #include <concepts>
 #include <cstddef>
-#include <vector>
 
+#include "../elements/element_values.hpp"
 #include "../multi_index.hpp"
 #include "../types.hpp"
 
@@ -18,49 +17,31 @@ namespace operators
 /**
  * @brief Covariant gradient of a contravariant in-plane vector field:
  *        @f$ D_{i\lambda\alpha\beta} = A_{\alpha\lambda} N^i_{,\beta}
- *            + (\mathbf{A}_\alpha\cdot\mathbf{A}_{\lambda,\beta}) N^i @f$,
+ *            + \Gamma_{\alpha,(\lambda\beta)} N^i @f$,
  *        so that @f$ u_{\alpha|\beta} = D_{i\lambda\alpha\beta}\, u^{\lambda}_i @f$.
  *
- * Owning operator: the constructor forms the per-quadrature-point connectivity — the
- * covariant metric @f$ A_{\alpha\lambda} @f$ and the first-kind connection
- * @f$ \mathbf{A}_\alpha\cdot\mathbf{A}_{\lambda,\beta} @f$ (both plain base-vector dot
- * products, no inverse metric) — once for the fixed qp @p q, so each call is a pure
- * contraction. Build once per qp on the stack, evaluate per basis function.
+ * Reads the covariant metric @f$ A_{\alpha\lambda} @f$ and the first-kind Christoffel
+ * @f$ \Gamma_{\alpha,(\lambda\beta)} = \mathbf{A}_\alpha\cdot\mathbf{A}_{\lambda,\beta} @f$
+ * straight from the cached buffers — no inverse metric, no symbol re-formed. Non-owning
+ * view; each call is a contraction.
  */
 template <std::floating_point T, std::size_t d>
 struct CovariantGradient
 {
     static constexpr std::size_t n_d2 = d * (d + 1) / 2;
 
-    const std::vector<Matrix<T>>&      basis_derivs;
-    Index                              q;
-    std::array<T, n_d2>                metric;  ///< A_{αλ}, Voigt-packed.
-    std::array<std::array<T, n_d2>, d> conn;    ///< conn[α][p] = A_α·A_{,p}.
+    const ElementValues<T, d>& ev;
+    Index                      q;
 
-    /// @brief Build for quadrature point @p q, forming the metric and first-kind
-    ///        connection once from base vectors.
-    CovariantGradient(const std::vector<Matrix<T>>&       basis_derivs,
-                      const std::vector<ColMatrix<T, 3>>& position_derivs,
-                      Index                               q)
-        : basis_derivs(basis_derivs), q(q)
-    {
-        const Index Q = position_derivs[0].rows();
-        for (std::size_t a = 0; a < d; ++a)
-            for (std::size_t l = a; l < d; ++l)
-                metric[pack2<d>(a, l)] = position_derivs[1].row(static_cast<Index>(a) * Q + q)
-                                           .dot(position_derivs[1].row(static_cast<Index>(l) * Q + q));
-        for (std::size_t a = 0; a < d; ++a)
-            for (std::size_t p = 0; p < n_d2; ++p)
-                conn[a][p] = position_derivs[1].row(static_cast<Index>(a) * Q + q)
-                               .dot(position_derivs[2].row(static_cast<Index>(p) * Q + q));
-    }
+    CovariantGradient(const ElementValues<T, d>& ev, Index q) : ev(ev), q(q) {}
 
     /// @brief @f$ D_{i\lambda\alpha\beta} @f$.
     T operator()(Index i, Index lambda, Index alpha, Index beta) const
     {
         constexpr Index dd = static_cast<Index>(d);
-        return metric[pack2<d>(alpha, lambda)] * basis_derivs[1](i * dd + beta, q)
-             + conn[static_cast<std::size_t>(alpha)][pack2<d>(lambda, beta)] * basis_derivs[0](i, q);
+        return ev.metric(q, pack2<d>(alpha, lambda)) * ev.basis_derivs[1](i * dd + beta, q)
+             + ev.christoffel_first(q, alpha * static_cast<Index>(n_d2) + pack2<d>(lambda, beta))
+                 * ev.basis_derivs[0](i, q);
     }
 };
 

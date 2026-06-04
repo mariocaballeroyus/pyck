@@ -35,7 +35,7 @@ void bind_elements(py::module_& m)
                    return eval_global_shape<double, 1>(patch, elem,
                        [](const Element1d& e, const ElementValues<double, 1>& ev) -> const Matrix<double>& {
                            e.primal_shape_matrix(ev);
-                           return e.N_primal_workspace_;
+                           return e.N_primal_;
                        }, params);
                },
                py::arg("patch"),
@@ -48,7 +48,7 @@ void bind_elements(py::module_& m)
                    return eval_global_shape<double, 1>(patch, elem,
                        [](const Element1d& e, const ElementValues<double, 1>& ev) -> const Matrix<double>& {
                            e.displacement_shape_matrix(ev);
-                           return e.N_w_workspace_;
+                           return e.N_w_;
                        }, params);
                },
                py::arg("patch"),
@@ -61,7 +61,7 @@ void bind_elements(py::module_& m)
                    return eval_global_shape<double, 1>(patch, elem,
                        [](const Element1d& e, const ElementValues<double, 1>& ev) -> const Matrix<double>& {
                            e.rotation_shape_matrix(ev);
-                           return e.N_phi_workspace_;
+                           return e.N_phi_;
                        }, params);
                },
                py::arg("patch"),
@@ -74,7 +74,7 @@ void bind_elements(py::module_& m)
                    return eval_global_shape<double, 1>(patch, elem,
                        [](const Element1d& e, const ElementValues<double, 1>& ev) -> const Matrix<double>& {
                            e.strain_matrix(ev);
-                           return e.B_workspace_;
+                           return e.B_voigt_;
                        }, params);
                },
                py::arg("patch"),
@@ -87,7 +87,7 @@ void bind_elements(py::module_& m)
                    return eval_global_shape<double, 1>(patch, elem,
                        [](const Element1d& e, const ElementValues<double, 1>& ev) -> const Matrix<double>& {
                            e.stress_matrix(ev);
-                           return e.N_sigma_workspace_;
+                           return e.N_sigma_;
                        }, params);
                },
                py::arg("patch"),
@@ -105,7 +105,7 @@ void bind_elements(py::module_& m)
                    return eval_global_shape<double, 2>(patch, elem,
                        [](const Element2d& e, const ElementValues<double, 2>& ev) -> const Matrix<double>& {
                            e.primal_shape_matrix(ev);
-                           return e.N_primal_workspace_;
+                           return e.N_primal_;
                        }, params);
                },
                py::arg("patch"),
@@ -118,7 +118,7 @@ void bind_elements(py::module_& m)
                    return eval_global_shape<double, 2>(patch, elem,
                        [](const Element2d& e, const ElementValues<double, 2>& ev) -> const Matrix<double>& {
                            e.displacement_shape_matrix(ev);
-                           return e.N_w_workspace_;
+                           return e.N_w_;
                        }, params);
                },
                py::arg("patch"),
@@ -131,7 +131,7 @@ void bind_elements(py::module_& m)
                    return eval_global_shape<double, 2>(patch, elem,
                        [](const Element2d& e, const ElementValues<double, 2>& ev) -> const Matrix<double>& {
                            e.rotation_shape_matrix(ev);
-                           return e.N_phi_workspace_;
+                           return e.N_phi_;
                        }, params);
                },
                py::arg("patch"),
@@ -144,7 +144,7 @@ void bind_elements(py::module_& m)
                    return eval_global_shape<double, 2>(patch, elem,
                        [](const Element2d& e, const ElementValues<double, 2>& ev) -> const Matrix<double>& {
                            e.strain_matrix(ev);
-                           return e.B_workspace_;
+                           return e.B_voigt_;
                        }, params);
                },
                py::arg("patch"),
@@ -157,7 +157,7 @@ void bind_elements(py::module_& m)
                    return eval_global_shape<double, 2>(patch, elem,
                        [](const Element2d& e, const ElementValues<double, 2>& ev) -> const Matrix<double>& {
                            e.stress_matrix(ev);
-                           return e.N_sigma_workspace_;
+                           return e.N_sigma_;
                        }, params);
                },
                py::arg("patch"),

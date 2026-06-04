@@ -75,7 +75,7 @@ public:
     /// @brief Minimum order of basis functions.
     Index basis_order() const override { return 2; }
 
-    unsigned flags()           const override { return Flags::Normal | Flags::Deriv2; }
+    unsigned flags()           const override { return Flags::Normal | Flags::Deriv2 | Flags::Connection; }
     unsigned essential_flags() const override { return Flags::None; }
     unsigned natural_flags()   const override { return Flags::Normal | Flags::Deriv2; }
 

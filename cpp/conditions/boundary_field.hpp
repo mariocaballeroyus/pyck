@@ -65,8 +65,9 @@ covariant_components(const ColMatrix<T, 3>& v,
     const Index Q = v.rows();
     Vector<T> v_cov_1(Q), v_cov_2(Q);
     for (Index q = 0; q < Q; ++q) {
-        v_cov_1(q) = v.row(q).dot(local.a(0).row(q));
-        v_cov_2(q) = v.row(q).dot(local.a(1).row(q));
+        const auto a = local.cov_basis(q);
+        v_cov_1(q) = v.row(q).dot(a(0));
+        v_cov_2(q) = v.row(q).dot(a(1));
     }
     return {std::move(v_cov_1), std::move(v_cov_2)};
 }
@@ -250,9 +251,11 @@ public:
             auto col1 = slab1.col(q);
             auto col2 = slab2.col(q);
             // Second-kind Christoffel Γ^k_{ij} = A^{kγ}(A_γ·A_{,ij}), in place.
+            const auto pcb  = parent.cov_basis(q);
+            const auto pcbd = parent.cov_basis_d(q);
             auto Gamma2nd = [&](Index k, Index i, Index j) -> T {
-                return parent.metric_inv(q, pack2<2>(k, 0)) * parent.a(0).row(q).dot(parent.a_d1(i, j).row(q))
-                     + parent.metric_inv(q, pack2<2>(k, 1)) * parent.a(1).row(q).dot(parent.a_d1(i, j).row(q));
+                return parent.metric_inv(q, pack2<2>(k, 0)) * pcb(0).dot(pcbd(i, j))
+                     + parent.metric_inv(q, pack2<2>(k, 1)) * pcb(1).dot(pcbd(i, j));
             };
             const T G1_11 = Gamma2nd(0, 0, 0);
             const T G1_12 = Gamma2nd(0, 0, 1);
@@ -302,7 +305,7 @@ public:
     {
         const auto& ev = bvals.parent_vals_;
         element.displacement_shape_matrix(ev);
-        const Matrix<T>& U = element.N_w_workspace_;   // 3D displacement shape (3Q × K)
+        const Matrix<T>& U = element.N_w_;   // 3D displacement shape (3Q × K)
 
         // Project onto the unit surface normal to recover the scalar transverse
         // (normal) displacement w = n · u.
@@ -310,8 +313,9 @@ public:
         const Index K = static_cast<Index>(U.cols());
         Matrix<T> Nw(Q, K);
         for (Index q = 0; q < Q; ++q) {
-            const Vector3<T> a1 = ev.a(0).row(q).transpose();
-            const Vector3<T> a2 = ev.a(1).row(q).transpose();
+            const auto A = ev.cov_basis(q);
+            const Vector3<T> a1 = A(0);
+            const Vector3<T> a2 = A(1);
             Vector3<T> n = a1.cross(a2);
             n.normalize();
             Nw.row(q) = n.transpose() * U.middleRows(3 * q, 3);
@@ -340,7 +344,7 @@ public:
                        const BoundaryElementValues<T, 2>& bvals) const override
     {
         element.rotation_shape_matrix(bvals.parent_vals_);
-        const Matrix<T>& Nrot = element.N_phi_workspace_;
+        const Matrix<T>& Nrot = element.N_phi_;
         const ColMatrix<T, 3> n =
             bvals.boundary().eval_outward_normal(bvals.boundary_vals_,
                                                  bvals.parent_vals_);
@@ -376,11 +380,11 @@ public:
                        const BoundaryElementValues<T, 2>& bvals) const override
     {
         element.rotation_shape_matrix(bvals.parent_vals_);
-        const Matrix<T>& Nrot = element.N_phi_workspace_;
+        const Matrix<T>& Nrot = element.N_phi_;
         const ColMatrix<T, 3> n =
             bvals.boundary().eval_outward_normal(bvals.boundary_vals_,
                                                  bvals.parent_vals_);
-        const ColMatrix<T, 3>& a_3 = bvals.parent_vals_.n;
+        const ColMatrix<T, 3>& a_3 = bvals.parent_vals_.A3_;
         const ColMatrix<T, 3> s = detail::surface_tangent(n, a_3);
         const auto [s_up_1, s_up_2] =
             detail::contravariant_components(s, bvals.parent_vals_);
@@ -417,7 +421,7 @@ public:
                        const BoundaryElementValues<T, 2>& bvals) const override
     {
         element.stress_matrix(bvals.parent_vals_);
-        const Matrix<T>& Nsigma = element.N_sigma_workspace_;
+        const Matrix<T>& Nsigma = element.N_sigma_;
         const ColMatrix<T, 3> n =
             bvals.boundary().eval_outward_normal(bvals.boundary_vals_,
                                                  bvals.parent_vals_);
@@ -453,7 +457,7 @@ public:
                        const BoundaryElementValues<T, 2>& bvals) const override
     {
         element.stress_matrix(bvals.parent_vals_);
-        const Matrix<T>& Nsigma = element.N_sigma_workspace_;
+        const Matrix<T>& Nsigma = element.N_sigma_;
         const ColMatrix<T, 3> n =
             bvals.boundary().eval_outward_normal(bvals.boundary_vals_,
                                                  bvals.parent_vals_);
@@ -494,11 +498,11 @@ public:
                        const BoundaryElementValues<T, 2>& bvals) const override
     {
         element.stress_matrix(bvals.parent_vals_);
-        const Matrix<T>& Nsigma = element.N_sigma_workspace_;
+        const Matrix<T>& Nsigma = element.N_sigma_;
         const ColMatrix<T, 3> n =
             bvals.boundary().eval_outward_normal(bvals.boundary_vals_,
                                                  bvals.parent_vals_);
-        const ColMatrix<T, 3>& a_3 = bvals.parent_vals_.n;
+        const ColMatrix<T, 3>& a_3 = bvals.parent_vals_.A3_;
         const ColMatrix<T, 3> s = detail::surface_tangent(n, a_3);
         const auto [n_cov_1, n_cov_2] =
             detail::covariant_components(n, bvals.parent_vals_);

@@ -73,9 +73,9 @@ public:
 
     /**
      * @brief Generalised-stress shape matrix S = D B. Writes into this
-     *        element's own @ref N_sigma_workspace_; read the result via
-     *        `element.N_sigma_workspace_` after the call. Internally
-     *        reuses @ref B_workspace_ as scratch for B.
+     *        element's own @ref N_sigma_; read the result via
+     *        `element.N_sigma_` after the call. Internally
+     *        reuses @ref B_voigt_ as scratch for B.
      */
     virtual void stress_matrix(const ElementValues<T, d>& ev) const;
 
@@ -108,7 +108,7 @@ public:
 
     /**
      * @brief Strain-displacement operator B, row-stacked per qp. Writes
-     *        into this element's own @ref B_workspace_.
+     *        into this element's own @ref B_voigt_.
      */
     virtual void strain_matrix(const ElementValues<T, d>& ev) const = 0;
 
@@ -122,28 +122,28 @@ public:
 
     /**
      * @brief Transverse-displacement shape matrix N_w (Q × K). Writes into
-     *        @ref N_w_workspace_.
+     *        @ref N_w_.
      */
     virtual void displacement_shape_matrix(const ElementValues<T, d>& ev) const = 0;
 
     /**
-     * @brief Rotation shape matrix N_φ. Writes into @ref N_phi_workspace_.
+     * @brief Rotation shape matrix N_φ. Writes into @ref N_phi_.
      */
     virtual void rotation_shape_matrix(const ElementValues<T, d>& ev) const = 0;
 
     // === Preallocated scratch =======================================================
     //
-    // Per-formulation workspaces for the per-element shape matrices. Public
+    // Per-formulation output matrices for the per-element shape/strain kernels. Public
     // because in-process callers (boundary fields, the assembler's hot loop)
     // write into them through a `const Element&` to get heap-free per-call
     // behaviour. `mutable` since they're scratch — the formulation's logical
     // state is unchanged.
 
-    mutable Matrix<T> B_workspace_;        ///< strain_matrix output / stress_matrix scratch
-    mutable Matrix<T> N_w_workspace_;      ///< displacement_shape_matrix output
-    mutable Matrix<T> N_phi_workspace_;    ///< rotation_shape_matrix output
-    mutable Matrix<T> N_sigma_workspace_;  ///< stress_matrix output
-    mutable Matrix<T> N_primal_workspace_; ///< primal_shape_matrix output
+    mutable Matrix<T> B_voigt_;        ///< strain_matrix output / stress_matrix scratch
+    mutable Matrix<T> N_w_;      ///< displacement_shape_matrix output
+    mutable Matrix<T> N_phi_;    ///< rotation_shape_matrix output
+    mutable Matrix<T> N_sigma_;  ///< stress_matrix output
+    mutable Matrix<T> N_primal_; ///< primal_shape_matrix output
 };
 
 
@@ -153,14 +153,14 @@ Element<T, d>::stress_matrix(const ElementValues<T, d>& ev) const
 {
     strain_matrix(ev);
     const Index Q        = ev.basis_derivs[0].cols();
-    const Index n_strain = B_workspace_.rows() / Q;
-    const Index K        = B_workspace_.cols();
+    const Index n_strain = B_voigt_.rows() / Q;
+    const Index K        = B_voigt_.cols();
 
-    N_sigma_workspace_.setZero(n_strain * Q, K);
+    N_sigma_.setZero(n_strain * Q, K);
     for (Index q = 0; q < Q; ++q) {
         const auto D = constitutive_matrix(ev, q);
-        N_sigma_workspace_.middleRows(n_strain * q, n_strain).noalias() =
-            D * B_workspace_.middleRows(n_strain * q, n_strain);
+        N_sigma_.middleRows(n_strain * q, n_strain).noalias() =
+            D * B_voigt_.middleRows(n_strain * q, n_strain);
     }
 }
 
@@ -171,7 +171,7 @@ Element<T, d>::primal_shape_matrix(const ElementValues<T, d>& ev) const
     const Index Q    = ev.basis_derivs[0].cols();
     const Index N    = ev.basis_derivs[0].rows();
     const Index ndof = static_cast<Index>(num_node_dofs());
-    Matrix<T>& Np    = N_primal_workspace_;
+    Matrix<T>& Np    = N_primal_;
     Np.setZero(ndof * Q, ndof * N);
     for (Index q = 0; q < Q; ++q) {
         auto slab0 = ev.basis_derivs[0].col(q);
@@ -187,7 +187,7 @@ Element<T, d>::compute_local_stiffness(const ElementValues<T, d>& ev,
                                        Matrix<T>& stiffness) const
 {
     strain_matrix(ev);
-    const Matrix<T>& B   = B_workspace_;
+    const Matrix<T>& B   = B_voigt_;
     const Index Q        = ev.mapped_weights_.size();
     const Index n_strain = B.rows() / Q;
     const Index K        = B.cols();
@@ -196,8 +196,8 @@ Element<T, d>::compute_local_stiffness(const ElementValues<T, d>& ev,
     for (Index q = 0; q < Q; ++q) {
         const T dV = ev.mapped_weights_(q) * ev.jac(q);
         const auto D = constitutive_matrix(ev, q);
-        const auto B_q = B.middleRows(n_strain * q, n_strain);
-        stiffness.noalias() += dV * (B_q.transpose() * D * B_q);
+        const auto B_voigt_q = B.middleRows(n_strain * q, n_strain);
+        stiffness.noalias() += dV * (B_voigt_q.transpose() * D * B_voigt_q);
     }
 }
 
@@ -209,7 +209,7 @@ Element<T, d>::compute_local_domain_load(const ElementValues<T, d>& ev,
 {
     // f_local = \int{ U^T b d\Omega }, with U the 3D displacement shape (3Q × K).
     displacement_shape_matrix(ev);
-    const Matrix<T>& U = N_w_workspace_;
+    const Matrix<T>& U = N_w_;
 
     // Body force at the element's physical quadrature-point coordinates (Q × 3).
     const Matrix<T> b = load_fn(ev.position_derivs[0]);

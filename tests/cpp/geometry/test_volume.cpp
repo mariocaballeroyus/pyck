@@ -60,22 +60,22 @@ TEST_CASE("Patch<double, 3>: Flat Box", "[geometry][volume]")
         auto local = element_values_at(vol, pts, Index(3),
             Flags::Deriv1);
 
-        // Metric layout: (g_11, g_12, g_13, g_22, g_23, g_33).
-        CHECK(local.metric(0, 0) == Approx(Lx * Lx).margin(1e-12));
-        CHECK(local.metric(0, 2) == Approx(0.0     ).margin(1e-12));
-        CHECK(local.metric(0, pack2<2>(0, 2)) == Approx(0.0     ).margin(1e-12));
-        CHECK(local.metric(0, 1) == Approx(Ly * Ly).margin(1e-12));
-        CHECK(local.metric(0, pack2<2>(1, 2)) == Approx(0.0     ).margin(1e-12));
-        CHECK(local.metric(0, pack2<2>(2, 2)) == Approx(Lz * Lz).margin(1e-12));
+        // Stretched axis-aligned box: A_{αβ} = diag(Lx², Ly², Lz²), no shear.
+        CHECK(local.metric(0, pack2<3>(0, 0)) == Approx(Lx * Lx).margin(1e-12));
+        CHECK(local.metric(0, pack2<3>(1, 1)) == Approx(Ly * Ly).margin(1e-12));
+        CHECK(local.metric(0, pack2<3>(2, 2)) == Approx(Lz * Lz).margin(1e-12));
+        CHECK(local.metric(0, pack2<3>(0, 1)) == Approx(0.0     ).margin(1e-12));
+        CHECK(local.metric(0, pack2<3>(0, 2)) == Approx(0.0     ).margin(1e-12));
+        CHECK(local.metric(0, pack2<3>(1, 2)) == Approx(0.0     ).margin(1e-12));
         CHECK(local.jac(0)  == Approx(Lx * Ly * Lz).margin(1e-12));
 
-        // Inverse metric: diagonal entries are reciprocals of diagonal g.
-        CHECK(local.metric_inv(0, 0) == Approx(1.0 / (Lx * Lx)).margin(1e-12));
-        CHECK(local.metric_inv(0, 1) == Approx(1.0 / (Ly * Ly)).margin(1e-12));
-        CHECK(local.metric_inv(0, pack2<2>(2, 2)) == Approx(1.0 / (Lz * Lz)).margin(1e-12));
-        CHECK(local.metric_inv(0, 2) == Approx(0.0).margin(1e-12));
-        CHECK(local.metric_inv(0, pack2<2>(0, 2)) == Approx(0.0).margin(1e-12));
-        CHECK(local.metric_inv(0, pack2<2>(1, 2)) == Approx(0.0).margin(1e-12));
+        // Inverse metric: diagonal reciprocals, zero shear.
+        CHECK(local.metric_inv(0, pack2<3>(0, 0)) == Approx(1.0 / (Lx * Lx)).margin(1e-12));
+        CHECK(local.metric_inv(0, pack2<3>(1, 1)) == Approx(1.0 / (Ly * Ly)).margin(1e-12));
+        CHECK(local.metric_inv(0, pack2<3>(2, 2)) == Approx(1.0 / (Lz * Lz)).margin(1e-12));
+        CHECK(local.metric_inv(0, pack2<3>(0, 1)) == Approx(0.0).margin(1e-12));
+        CHECK(local.metric_inv(0, pack2<3>(0, 2)) == Approx(0.0).margin(1e-12));
+        CHECK(local.metric_inv(0, pack2<3>(1, 2)) == Approx(0.0).margin(1e-12));
     }
 
     SECTION("Christoffels vanish on flat box") {

@@ -100,6 +100,57 @@ inline void compute_curvature(const std::vector<ColMatrix<T, 3>>& pos_derivs,
     }
 }
 
+// === Normal Derivative (Weingarten) =================================================
+
+/**
+ * @brief Fill the first derivatives of the unit normal A_{3,β} from the Weingarten
+ *        relation A_{3,β} = −B^α_β A_α, with the shape operator B^α_β = A^{αγ}B_{γβ}
+ *        raised from the *already cached* second fundamental form and inverse metric.
+ *        Nothing is recomputed: B_{αβ} and A^{αβ} are read, not rebuilt.
+ *
+ * @param pos_derivs       Per-order position derivatives at Q quadrature points.
+ * @param curvature        Packed second fundamental form B_{αβ} (pack2<2> order).
+ * @param metric_inv       Packed inverse metric A^{αβ} (pack2<2> order).
+ * @param normal_deriv_out Output A_{3,β}, β-major: A_{3,β} at q in row β·Q + q.
+ */
+template <std::floating_point T>
+inline void compute_normal_derivative(const std::vector<ColMatrix<T, 3>>& pos_derivs,
+                                      const Matrix<T>& curvature,
+                                      const Matrix<T>& metric_inv,
+                                      ColMatrix<T, 3>& normal_deriv_out)
+{
+    const auto& R   = pos_derivs;
+    auto&       dA3 = normal_deriv_out;
+
+    const Index n_gp = curvature.rows();
+    dA3.resize(2 * n_gp, 3);
+
+    auto a_view = [&](Index i) {
+        return R[1].middleRows(i * n_gp, n_gp);
+    };
+
+    for (Index q = 0; q < n_gp; ++q) {
+        // Cached second fundamental form B_{αβ} and inverse metric A^{αβ}.
+        const T B11 = curvature(q, pack2<2>(0, 0)), B12 = curvature(q, pack2<2>(0, 1)),
+                B22 = curvature(q, pack2<2>(1, 1));
+        const T gi11 = metric_inv(q, pack2<2>(0, 0)), gi12 = metric_inv(q, pack2<2>(0, 1)),
+                gi22 = metric_inv(q, pack2<2>(1, 1));
+
+        // Shape operator B^α_β = A^{αγ} B_{γβ}.
+        const T Bmix11 = gi11 * B11 + gi12 * B12;   // B^1_1
+        const T Bmix12 = gi11 * B12 + gi12 * B22;   // B^1_2
+        const T Bmix21 = gi12 * B11 + gi22 * B12;   // B^2_1
+        const T Bmix22 = gi12 * B12 + gi22 * B22;   // B^2_2
+
+        const auto A1 = a_view(0).row(q);
+        const auto A2 = a_view(1).row(q);
+
+        // Weingarten: A_{3,β} = −B^α_β A_α.
+        dA3.row(0 * n_gp + q) = -(Bmix11 * A1 + Bmix21 * A2);   // A_{3,1}
+        dA3.row(1 * n_gp + q) = -(Bmix12 * A1 + Bmix22 * A2);   // A_{3,2}
+    }
+}
+
 } // namespace geometry::surface
 
 } // namespace pyck

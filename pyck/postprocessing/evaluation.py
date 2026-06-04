@@ -99,7 +99,7 @@ def evaluate_field(
     Parameters
     ----------
     element
-        2D plate/shell element wrapper (e.g. ``PlateReissnerMindlinDispl2p``).
+        2D shell element wrapper (e.g. ``ShellReissnerMindlin4p``).
     patch : Patch
         Surface patch the field lives on.
     params : np.ndarray, shape (Q, 2)

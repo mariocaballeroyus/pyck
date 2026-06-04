@@ -150,21 +150,22 @@ ColMatrix<T, 3>
 PatchBoundary<T, d>::eval_outward_normal(const ElementValues<T, d - 1>& boundary_vals,
                                          const ElementValues<T, d>& parent_vals) const requires(d == 2)
 {
-    const Index Q = boundary_vals.a(0).rows();
+    const Index Q = boundary_vals.num_points();
     ColMatrix<T, 3> n_mat(Q, 3);
 
     for (Index q = 0; q < Q; ++q)
     {
         // Parent surface normal a_3 = (a_1 × a_2) / ‖a_1 × a_2‖.
-        Vector3<T> pa1 = parent_vals.a(0).row(q).transpose();
-        Vector3<T> pa2 = parent_vals.a(1).row(q).transpose();
+        const auto pcb = parent_vals.cov_basis(q);
+        Vector3<T> pa1 = pcb(0);
+        Vector3<T> pa2 = pcb(1);
         Vector3<T> a3 = pa1.cross(pa2);
         const T jac_p = parent_vals.jac(q);
         if (jac_p > T(1e-14)) a3 /= jac_p;
         else a3 = Vector3<T>(T(0), T(0), T(1));
 
         // Outward in-surface normal n = sign_n · (a_1^bd × a_3) / ‖…‖.
-        Vector3<T> t = boundary_vals.a(0).row(q).transpose();
+        Vector3<T> t = boundary_vals.cov_basis(q)(0);
         Vector3<T> n_vec = sign_n_ * t.cross(a3);
         const T n_norm = n_vec.norm();
         if (n_norm > T(1e-14)) n_vec /= n_norm;
@@ -179,13 +180,14 @@ PatchBoundary<T, d>::eval_outward_normal(const ElementValues<T, d - 1>& boundary
 {
     // Boundary is a 2D surface in 3D physical space; outward normal is the
     // boundary's own surface normal a_3 = a_1^bd × a_2^bd / ‖…‖, signed.
-    const Index Q = boundary_vals.a(0).rows();
+    const Index Q = boundary_vals.num_points();
     ColMatrix<T, 3> n_mat(Q, 3);
 
     for (Index q = 0; q < Q; ++q)
     {
-        Vector3<T> a1 = boundary_vals.a(0).row(q).transpose();
-        Vector3<T> a2 = boundary_vals.a(1).row(q).transpose();
+        const auto bcb = boundary_vals.cov_basis(q);
+        Vector3<T> a1 = bcb(0);
+        Vector3<T> a2 = bcb(1);
         Vector3<T> n_vec = sign_n_ * a1.cross(a2);
         const T n_norm = n_vec.norm();
         if (n_norm > T(1e-14)) n_vec /= n_norm;

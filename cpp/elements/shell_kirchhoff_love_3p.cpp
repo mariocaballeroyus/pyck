@@ -22,41 +22,36 @@ template <std::floating_point T>
 void
 ShellKirchhoffLove3p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
 {
-    // Reset preallocated matrix
-    Matrix<T>& B = this->B_workspace_;
+    // Number of points and basis
     const Index Q = ev.basis_derivs[0].cols();
     const Index N = ev.basis_derivs[0].rows();
-    B.setZero(6 * Q, 3 * N);
+    // Reset strain matrix values
+    Matrix<T>& B_voigt = this->B_voigt_;
+    B_voigt.setZero(6 * Q, 3 * N);
 
     for (Index q = 0; q < Q; ++q) {
-        // Precomputed geometric primitives
-        auto derivs1 = ev.basis_derivs[1].col(q);
-        const Vector3<T> A1 = ev.a(0).row(q).transpose(); // reference basis A_1
-        const Vector3<T> A2 = ev.a(1).row(q).transpose(); // reference basis A_2
-        const Vector3<T> A3 = ev.n.row(q).transpose();    // unit normal A_3
-        // Discrete operators
-        const operators::CovariantHessian<T, 2> hess{ev.basis_derivs, 
-                                                     ev.position_derivs, 
-                                                     ev.metric_inv, q};
+        // Covariant basis
+        const auto A = ev.cov_basis(q);
+        const Vector3<T> A1 = A(0), A2 = A(1), A3 = ev.normal(q);
+        
+        // Shape gradient N^i_{,α} 
+        const auto grad = ev.dN(q);
+        // Covariant Hessian H^i_{αβ}
+        const operators::CovariantHessian<T, 2> hess{ev, q};
 
         for (Index i = 0; i < N; ++i) {
-            // Shape gradient G_{α} = N^i_{,α}
-            const T G1 = derivs1(i * 2 + 0);
-            const T G2 = derivs1(i * 2 + 1);
-            // Covariant Hessian H_{αβ} = -(1/2)(u_{|αβ}·A_3 + u_{|βα}·A_3)
-            const T H11 = hess(i, 0, 0);
-            const T H22 = hess(i, 1, 1);
-            const T H12 = hess(i, 0, 1);
+            const T G1i = grad(i, 0), G2i = grad(i, 1);
+            const T H11i = hess(i, 0, 0), H22i = hess(i, 1, 1), H12i = hess(i, 0, 1);
 
             for (Index k = 0; k < 3; ++k) {
                 // Membrane ε_{αβ} = (1/2)(u_{,α}·A_β + u_{,β}·A_α)
-                B(6*q,     3*i + k) = G1 * A1(k);
-                B(6*q + 1, 3*i + k) = G2 * A2(k);
-                B(6*q + 2, 3*i + k) = G1 * A2(k) + G2 * A1(k);
+                B_voigt(6*q,     3*i + k) = G1i * A1(k);
+                B_voigt(6*q + 1, 3*i + k) = G2i * A2(k);
+                B_voigt(6*q + 2, 3*i + k) = G1i * A2(k) + G2i * A1(k);
                 // Bending κ_{αβ} = -(1/2)(u_{|αβ}·A_3 + u_{|βα}·A_3)
-                B(6*q + 3, 3*i + k) = -H11 * A3(k);
-                B(6*q + 4, 3*i + k) = -H22 * A3(k);
-                B(6*q + 5, 3*i + k) = -T(2) * H12 * A3(k);
+                B_voigt(6*q + 3, 3*i + k) = -H11i * A3(k);
+                B_voigt(6*q + 4, 3*i + k) = -H22i * A3(k);
+                B_voigt(6*q + 5, 3*i + k) = -T(2) * H12i * A3(k);
             }
         }
     }
@@ -66,12 +61,20 @@ template <std::floating_point T>
 ConstitutiveMatrix<T>
 ShellKirchhoffLove3p<T>::constitutive_matrix(const ElementValues<T, 2>& ev, Index q) const
 {
-    const StaticVector<T, 3> metric_inv_q = ev.metric_inv_voigt(q);
+    // Transform elasticity matrix into curvilinear coordinate system
+    const StaticVector<T, 3> metric_inv = ev.metric_inv_voigt(q);
+    const Eigen::Matrix<T, 3, 3> C = material_->elasticity_voigt(metric_inv);
 
-    ConstitutiveMatrix<T> D = ConstitutiveMatrix<T>::Zero(6, 6);
-    D.template block<3, 3>(0, 0) = material_->membrane_voigt(metric_inv_q);   // t·C
-    D.template block<3, 3>(3, 3) = material_->bending_voigt (metric_inv_q);   // (t³/12)·C
-    return D;
+    // Scale material matrices (no shear for KL)
+    const T t = material_->thickness();
+    const Eigen::Matrix<T, 3, 3> Dm = t * C;
+    const Eigen::Matrix<T, 3, 3> Db = (t * t * t / T(12)) * C;
+
+    // Assemble into full consitutive matrix
+    ConstitutiveMatrix<T> D_voigt = ConstitutiveMatrix<T>::Zero(6, 6);
+    D_voigt.template block<3, 3>(0, 0) = Dm;
+    D_voigt.template block<3, 3>(3, 3) = Db;
+    return D_voigt;
 }
 
 // === Shape Matrices =================================================================
@@ -80,17 +83,22 @@ template <std::floating_point T>
 void
 ShellKirchhoffLove3p<T>::displacement_shape_matrix(const ElementValues<T, 2>& ev) const
 {
-    // Reset preallocated matrix
+    // Number of basis and points
     const Index Q = ev.basis_derivs[0].cols();
     const Index N = ev.basis_derivs[0].rows();
-    Matrix<T>& Nw = this->N_w_workspace_;
-    Nw.setZero(3 * Q, 3 * N);
+    // Reset strain matrix values
+    Matrix<T>& N_w = this->N_w_;
+    N_w.setZero(3 * Q, 3 * N);
 
     for (Index q = 0; q < Q; ++q) {
+        // Shape values N^i
+        const auto Nf = ev.N(q);
+
         for (Index i = 0; i < N; ++i) {
+            const T Ni = Nf(i);
             for (Index k = 0; k < 3; ++k) {
                 // Cartesian displacement u
-                Nw(3 * q + k, 3 * i + k) = ev.basis_derivs[0].col(q)(i);
+                N_w(3 * q + k, 3 * i + k) = Ni;
             }
         }
     }
@@ -98,10 +106,32 @@ ShellKirchhoffLove3p<T>::displacement_shape_matrix(const ElementValues<T, 2>& ev
 
 template <std::floating_point T>
 void
-ShellKirchhoffLove3p<T>::rotation_shape_matrix(const ElementValues<T, 2>&) const
+ShellKirchhoffLove3p<T>::rotation_shape_matrix(const ElementValues<T, 2>& ev) const
 {
-    throw std::runtime_error("ShellKirchhoffLove3p::rotation_shape_matrix: "
-                             "not implemented.");
+    // Number of points and basis
+    const Index Q = ev.basis_derivs[0].cols();
+    const Index N = ev.basis_derivs[0].rows();
+    // Reset shape matrix values
+    Matrix<T>& N_phi = this->N_phi_;
+    N_phi.setZero(2 * Q, 3 * N);
+
+    for (Index q = 0; q < Q; ++q) {
+        // Unit normal
+        const Vector3<T> A3 = ev.normal(q);
+
+        // Shape gradient N^i_{,α} 
+        const auto grad = ev.dN(q);
+
+        for (Index i = 0; i < N; ++i) {
+            const T G1i = grad(i, 0), G2i = grad(i, 1);
+
+            for (Index k = 0; k < 3; ++k) {
+                // θ_α = −N^i_{,α} (A_3)_k u_k
+                N_phi(2*q,     3*i + k) = -G1i * A3(k);
+                N_phi(2*q + 1, 3*i + k) = -G2i * A3(k);
+            }
+        }
+    }
 }
 
 // === Template Instantiations ========================================================

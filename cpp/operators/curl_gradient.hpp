@@ -4,9 +4,9 @@
 #include <array>
 #include <concepts>
 #include <cstddef>
-#include <vector>
 
 #include "covariant_hessian.hpp"
+#include "../elements/element_values.hpp"
 #include "../multi_index.hpp"
 #include "../types.hpp"
 
@@ -20,12 +20,10 @@ namespace operators
  * @brief Covariant gradient of the surface @ref Curl of a scalar basis function:
  *        @f$ (\mathrm{curl}\,N^i)_{\alpha|\beta}
  *            = \varepsilon_\alpha{}^\delta H_{i\delta\beta} @f$, where @f$ H @f$ is the
- *        @ref CovariantHessian and the permutation tensor is covariantly constant
- *        (so @f$ \varepsilon_\alpha{}^\delta\,\psi_{|\delta\beta}
- *           = (\varepsilon_\alpha{}^\delta\,\psi_{|\delta})_{|\beta} @f$).
+ *        @ref CovariantHessian and the permutation tensor is covariantly constant.
  *
- * Owning: holds a @ref CovariantHessian (connection hoisted in the ctor) plus the mixed
- * permutation, both formed once for the fixed qp @p q. Returns the (non-symmetric)
+ * Non-owning view: holds a @ref CovariantHessian (connection raised in its ctor) plus the
+ * mixed permutation, both formed once for the fixed qp. Returns the (non-symmetric)
  * (α, β) component; consumers symmetrise as the strain measure requires. Surface
  * operator (d = 2).
  */
@@ -35,19 +33,13 @@ struct CurlGradient
     CovariantHessian<T, d>          hess;
     std::array<std::array<T, d>, d> eps;   ///< ε_α^β.
 
-    /// @brief Build for quadrature point @p q.
-    CurlGradient(const std::vector<Matrix<T>>&       basis_derivs,
-                 const std::vector<ColMatrix<T, 3>>& position_derivs,
-                 const Matrix<T>&                    metric,
-                 const Matrix<T>&                    metric_inv,
-                 const Vector<T>&                    jac,
-                 Index                               q)
-        : hess(basis_derivs, position_derivs, metric_inv, q)
+    /// @brief Build at point @p q.
+    CurlGradient(const ElementValues<T, d>& ev, Index q) : hess(ev, q)
     {
-        const T invJ = T(1) / jac(q);
+        const T invJ = T(1) / ev.jac(q);
         for (std::size_t a = 0; a < d; ++a) {
-            eps[a][0] = -metric(q, pack2<d>(static_cast<Index>(a), 1)) * invJ;   // ε_α^0
-            eps[a][1] =  metric(q, pack2<d>(static_cast<Index>(a), 0)) * invJ;   // ε_α^1
+            eps[a][0] = -ev.metric(q, pack2<d>(static_cast<Index>(a), 1)) * invJ;   // ε_α^0
+            eps[a][1] =  ev.metric(q, pack2<d>(static_cast<Index>(a), 0)) * invJ;   // ε_α^1
         }
     }
 

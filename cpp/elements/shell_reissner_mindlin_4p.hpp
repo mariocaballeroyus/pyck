@@ -116,15 +116,15 @@ public:
     // Normal (A_3) + Curvature (B_{αβ}) + Deriv3 (third surface derivatives for the
     // inline Codazzi ∇B and the order-3 Laplace–Beltrami gradient). The Hessian /
     // Laplace–Beltrami / vector-gradient / P operators are constructed per quadrature
-    // point over these primitives; the normal derivatives A_{3,β} and the shape operator
-    // B^α_β are computed in place, not cached.
+    // point over these primitives; A_{3,β} comes cached via NormalDeriv1 (Weingarten),
+    // while the shape operator B^α_β is still formed in place for the B² / coupling terms.
     unsigned flags() const override
-    { return Flags::Normal | Flags::Curvature | Flags::Deriv3; }
+    { return Flags::Normal | Flags::Curvature | Flags::NormalDeriv1 | Flags::Deriv3 | Flags::Connection; }
 
     unsigned essential_flags() const override
-    { return Flags::Normal | Flags::Curvature | Flags::Deriv3; }
+    { return Flags::Normal | Flags::Curvature | Flags::NormalDeriv1 | Flags::Deriv3 | Flags::Connection; }
     unsigned natural_flags()   const override
-    { return Flags::Normal | Flags::Curvature | Flags::Deriv3; }
+    { return Flags::Normal | Flags::Curvature | Flags::NormalDeriv1 | Flags::Deriv3 | Flags::Connection; }
 
 private:
 

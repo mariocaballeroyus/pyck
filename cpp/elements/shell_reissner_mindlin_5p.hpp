@@ -73,15 +73,15 @@ public:
     /// second surface derivatives A_{λ,β}, i.e. an order-2 basis evaluation.
     Index basis_order() const override { return 2; }
 
-    // Normal (A_3) + Curvature (B_{αβ}) + Deriv2 (order-2 surface derivatives for the
-    // covariant-gradient operator). The reference-normal derivatives A_{3,β} are the
-    // Weingarten image −B^α_β A_α of the cached curvature, formed in place.
+    // Normal (A_3) + NormalDeriv1 (A_{3,β}, the cached Weingarten image −B^α_β A_α,
+    // which pulls in Curvature) + Deriv2 (order-2 surface derivatives for the
+    // covariant-gradient operator).
     unsigned flags() const override
-    { return Flags::Normal | Flags::Curvature | Flags::Deriv2; }
+    { return Flags::Normal | Flags::NormalDeriv1 | Flags::Deriv2 | Flags::Connection; }
 
     unsigned essential_flags() const override { return Flags::None; }
     unsigned natural_flags()   const override
-    { return Flags::Normal | Flags::Curvature | Flags::Deriv2; }
+    { return Flags::Normal | Flags::NormalDeriv1 | Flags::Deriv2; }
 
 private:
 

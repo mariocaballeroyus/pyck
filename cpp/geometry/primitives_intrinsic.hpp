@@ -127,6 +127,32 @@ inline void compute_metric(const std::vector<ColMatrix<T, 3>>& pos_derivs,
     }
 }
 
+// === Connection =====================================================================
+
+/**
+ * @brief Christoffel symbols of the first kind Γ_{ε,(αβ)} = A_ε·A_{,αβ} (base-vector
+ *        dots) at each quadrature point, packed (Q × d·n_d2): column ε·n_d2 + p with
+ *        p = pack2(α,β). Needs position derivatives of orders 1 and 2.
+ */
+template <std::floating_point T, std::size_t d>
+inline void compute_christoffel_first(const std::vector<ColMatrix<T, 3>>& pos_derivs,
+                                      Matrix<T>& first_out)
+{
+    constexpr Index n_d2 = d * (d + 1) / 2;
+    const Index dd = static_cast<Index>(d);
+    const Index Q  = pos_derivs[1].rows() / dd;
+
+    first_out.resize(Q, dd * n_d2);
+
+    auto a    = [&](Index e) { return pos_derivs[1].middleRows(e * Q, Q); };  // A_ε
+    auto a_dd = [&](Index p) { return pos_derivs[2].middleRows(p * Q, Q); };  // A_{,p}
+
+    for (Index q = 0; q < Q; ++q)
+        for (Index e = 0; e < dd; ++e)
+            for (Index p = 0; p < n_d2; ++p)
+                first_out(q, e * n_d2 + p) = a(e).row(q).dot(a_dd(p).row(q));
+}
+
 // === Projections ====================================================================
 
 /**

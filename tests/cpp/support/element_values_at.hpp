@@ -48,8 +48,10 @@ inline T christoffel2nd(const ElementValues<T, d>& ev,
                         Index k, Index i, Index j, Index q)
 {
     T s = T(0);
+    const auto a  = ev.cov_basis(q);
+    const auto ad = ev.cov_basis_d(q);
     for (Index g = 0; g < static_cast<Index>(d); ++g)
-        s += ev.metric_inv(q, pack2<2>(k, g)) * ev.a(g).row(q).dot(ev.a_d1(i, j).row(q));
+        s += ev.metric_inv(q, pack2<2>(k, g)) * a(g).dot(ad(i, j));
     return s;
 }
 

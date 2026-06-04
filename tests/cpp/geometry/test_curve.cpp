@@ -39,8 +39,8 @@ CurveDerivs metric_derivs(const std::vector<Matrix<double>>& basis,
     const auto& chr = local;
     const double Gamma    = christoffel2nd(chr, 0, 0, 0, q);
 
-    const double a11_dot_a11 = local.a_d1(0, 0).row(q).squaredNorm();
-    const double a1_dot_a111 = local.a(0).row(q).dot(local.a_d2(0, 0, 0).row(q));
+    const double a11_dot_a11 = local.cov_basis_d(q)(0, 0).squaredNorm();
+    const double a1_dot_a111 = local.cov_basis(q)(0).dot(local.cov_basis_dd(q)(0, 0, 0));
     const double Gamma_u     = (a11_dot_a11 + a1_dot_a111) / g11 - 2.0 * Gamma * Gamma;
 
     // For d=1, slabs are N-length (n_k = 1 for all orders): slab(i) is the

@@ -300,31 +300,20 @@ TEST_CASE("Patch<double, 2>: composable primitives on twisted z=u·v patch",
            0.8, 0.2;
 
     auto local = element_values_at(surf, pts, Index(3),
-        Flags::Normal | Flags::Curvature);
+        Flags::Normal | Flags::Curvature | Flags::NormalDeriv1);
 
     const auto& chr = local;
-    const auto& a3     = local.n;
+    const auto& a3     = local.A3_;
 
-    // ∂_β A_3 is the Weingarten image of the cached curvature: A_{3,β} = −B^α_β A_α.
-    const Eigen::Index Qn = local.n.rows();
-    ColMatrix<double, 3> n_d1(Qn * 2, 3);
-    for (Eigen::Index q = 0; q < Qn; ++q) {
-        const Eigen::Vector3d av0 = local.a(0).row(q).transpose();
-        const Eigen::Vector3d av1 = local.a(1).row(q).transpose();
-        for (int beta = 0; beta < 2; ++beta) {
-            const double b0 = local.b(q, pack2<2>(0, beta)), b1 = local.b(q, pack2<2>(1, beta));
-            const double Bm0 = local.metric_inv(q, 0) * b0 + local.metric_inv(q, 2) * b1;
-            const double Bm1 = local.metric_inv(q, 2) * b0 + local.metric_inv(q, 1) * b1;
-            n_d1.row(beta * Qn + q) = (-(Bm0 * av0 + Bm1 * av1)).transpose();
-        }
-    }
-    const auto nd_a31 = n_d1.middleRows(0, Qn);
-    const auto nd_a32 = n_d1.middleRows(Qn, Qn);
+    // ∂_β A_3 cached by ElementValues via the Weingarten relation A_{3,β} = −B^α_β A_α,
+    // packed β-major in A3_d_: A_{3,0} in the first Q rows, A_{3,1} in the next Q.
+    const Eigen::Index Qn = local.A3_.rows();
+    const auto nd_a31 = local.A3_d_.middleRows(0, Qn);
+    const auto nd_a32 = local.A3_d_.middleRows(Qn, Qn);
 
-    REQUIRE(local.a(0).rows() == 3);
-    REQUIRE(local.a(1).rows() == 3);
-    REQUIRE(local.metric.col(0).size()     == 3);
-    REQUIRE(local.metric_inv.col(0).size() == 3);
+    REQUIRE(local.num_points() == 3);
+    REQUIRE(local.metric_.col(0).size()     == 3);
+    REQUIRE(local.metric_inv_.col(0).size() == 3);
     REQUIRE(local.jac.size() == 3);
 
     for (Eigen::Index q = 0; q < pts.rows(); ++q) {
@@ -335,12 +324,13 @@ TEST_CASE("Patch<double, 2>: composable primitives on twisted z=u·v patch",
         const double D32 = D * sqrtD;
 
         // Tangents: a_1 = (1, 0, v), a_2 = (0, 1, u).
-        CHECK(local.a(0)(q, 0) == Approx(1.0).margin(1e-14));
-        CHECK(local.a(0)(q, 1) == Approx(0.0).margin(1e-14));
-        CHECK(local.a(0)(q, 2) == Approx(v  ).margin(1e-14));
-        CHECK(local.a(1)(q, 0) == Approx(0.0).margin(1e-14));
-        CHECK(local.a(1)(q, 1) == Approx(1.0).margin(1e-14));
-        CHECK(local.a(1)(q, 2) == Approx(u  ).margin(1e-14));
+        const auto cb = local.cov_basis(q);
+        CHECK(cb(0)(0) == Approx(1.0).margin(1e-14));
+        CHECK(cb(0)(1) == Approx(0.0).margin(1e-14));
+        CHECK(cb(0)(2) == Approx(v  ).margin(1e-14));
+        CHECK(cb(1)(0) == Approx(0.0).margin(1e-14));
+        CHECK(cb(1)(1) == Approx(1.0).margin(1e-14));
+        CHECK(cb(1)(2) == Approx(u  ).margin(1e-14));
 
         // Metric and Jacobian.
         CHECK(local.metric(q, 0)     == Approx(1.0 + v * v).margin(1e-12));
@@ -376,9 +366,9 @@ TEST_CASE("Patch<double, 2>: composable primitives on twisted z=u·v patch",
 
         // Cached second fundamental form (closed form on this patch):
         //   b_{11} = b_{22} = 0,  b_{12} = 1/√D.
-        CHECK(local.b(q, 0) == Approx(0.0        ).margin(1e-12));
-        CHECK(local.b(q, 2) == Approx(1.0 / sqrtD).margin(1e-12));
-        CHECK(local.b(q, 1) == Approx(0.0        ).margin(1e-12));
+        CHECK(local.curvature(q, 0) == Approx(0.0        ).margin(1e-12));
+        CHECK(local.curvature(q, 2) == Approx(1.0 / sqrtD).margin(1e-12));
+        CHECK(local.curvature(q, 1) == Approx(0.0        ).margin(1e-12));
     }
 }
 
@@ -421,13 +411,13 @@ TEST_CASE("Patch<double, 2>: Intrinsic/Extrinsic containers compose correctly",
 
         // Normal.
         for (Eigen::Index c = 0; c < 3; ++c)
-            CHECK(std::isfinite(eg.n(q, c)));
+            CHECK(std::isfinite(eg.normal(q)(c)));
 
         // Curvature: b_{12} = 1/√D on this patch (the non-zero one).
-        CHECK(std::isfinite(eg.b(q, 2)));
+        CHECK(std::isfinite(eg.curvature(q, 2)));
         // b^α_β is no longer cached; raise in place.
-        const double bmix01 = eg.metric_inv(q, 0) * eg.b(q, 2)
-                            + eg.metric_inv(q, 2) * eg.b(q, 1);
+        const double bmix01 = eg.metric_inv(q, 0) * eg.curvature(q, 2)
+                            + eg.metric_inv(q, 2) * eg.curvature(q, 1);
         CHECK(std::isfinite(bmix01));
     }
 }

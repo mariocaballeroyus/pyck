@@ -42,7 +42,7 @@ TEST_CASE("ElementValues kernels match inline reference (curved p=3 patch)",
     auto patch = std::make_shared<Patch<double, 2>>(bsp, bsp, P);
 
     GaussLegendre<double, 2> gauss(p + 1);
-    const unsigned flags = Flags::Deriv3;
+    const unsigned flags = Flags::Deriv3 | Flags::Connection;
     ElementValues<double, 2> ev(*patch, 3, flags, gauss);
     ev.reinit(0);
 
@@ -57,11 +57,11 @@ TEST_CASE("ElementValues kernels match inline reference (curved p=3 patch)",
         auto N2 = ev.basis_derivs[2].col(q);   // N_uu, N_vv, N_uv
         auto N3 = ev.basis_derivs[3].col(q);   // N_uuu, N_uuv, N_uvv, N_vvv
 
-        const operators::CovariantHessian<double, 2>  hess {ev.basis_derivs, ev.position_derivs, ev.metric_inv, q};
-        const operators::LaplaceBeltrami<double, 2>   lapb {ev.basis_derivs, ev.position_derivs, ev.metric_inv, q};
-        const operators::CovariantGradient<double, 2> vgrad{ev.basis_derivs, ev.position_derivs, q};
-        const operators::LaplaceBeltramiGradient<double, 2> lgrad{ev.basis_derivs, ev.position_derivs, ev.metric_inv, q};
-        const auto aux = operators::compute_laplace_beltrami_grad_conn<double, 2>(ev.position_derivs, ev.metric_inv, q);
+        const operators::CovariantHessian<double, 2>  hess {ev, q};
+        const operators::LaplaceBeltrami<double, 2>   lapb {ev, q};
+        const operators::CovariantGradient<double, 2> vgrad{ev, q};
+        const operators::LaplaceBeltramiGradient<double, 2> lgrad{ev, q};
+        const auto aux = operators::compute_laplace_beltrami_grad_conn<double, 2>(ev.christoffel_first, ev.position_derivs, ev.metric_inv_, q);
 
         const double gi00 = ev.metric_inv(q, 0), gi01 = ev.metric_inv(q, 2), gi11 = ev.metric_inv(q, 1);
 
@@ -77,8 +77,8 @@ TEST_CASE("ElementValues kernels match inline reference (curved p=3 patch)",
             auto H_ref = [&](Index a, Index b) {
                 const double Nab = N2(i * 3 + pack2<2>(a, b));
                 // Γ_{γ,ab} = A_γ·A_{,ab}; raise to second kind Γ^m_{ab} = g^{mγ}Γ_{γ,ab}.
-                const double g1 = ev.a(0).row(q).dot(ev.a_d1(a, b).row(q));
-                const double g2 = ev.a(1).row(q).dot(ev.a_d1(a, b).row(q));
+                const double g1 = ev.cov_basis(q)(0).dot(ev.cov_basis_d(q)(a, b));
+                const double g2 = ev.cov_basis(q)(1).dot(ev.cov_basis_d(q)(a, b));
                 const double Gam0 = gi00 * g1 + gi01 * g2;   // Γ^0_{ab}
                 const double Gam1 = gi01 * g1 + gi11 * g2;   // Γ^1_{ab}
                 return Nab - Gam0 * Nu - Gam1 * Nv;
@@ -97,7 +97,7 @@ TEST_CASE("ElementValues kernels match inline reference (curved p=3 patch)",
                 for (Index a = 0; a < 2; ++a)
                     for (Index b = 0; b < 2; ++b) {
                         const double Nb = N1(i * 2 + b);
-                        const double conn = ev.a(a).row(q).dot(ev.a_d1(lam, b).row(q));
+                        const double conn = ev.cov_basis(q)(a).dot(ev.cov_basis_d(q)(lam, b));
                         const double D_ref = ev.metric(q, pack2<2>(a, lam)) * Nb + conn * Ni;
                         CHECK(vgrad(i, lam, a, b) == Approx(D_ref).margin(tol));
                     }
@@ -126,6 +126,6 @@ TEST_CASE("ElementValues kernels match inline reference (curved p=3 patch)",
     // curvature — otherwise the test is vacuous (cf. the cylinder blind spot).
     double max_conn = 0.0;
     for (Index q = 0; q < Q; ++q)
-        max_conn = std::max(max_conn, std::abs(ev.a(0).row(q).dot(ev.a_d1(1, 1).row(q))));
+        max_conn = std::max(max_conn, std::abs(ev.cov_basis(q)(0).dot(ev.cov_basis_d(q)(1, 1))));
     CHECK(max_conn > 1e-3);
 }

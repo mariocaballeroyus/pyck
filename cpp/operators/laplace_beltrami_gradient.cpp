@@ -37,9 +37,11 @@ sym3(std::size_t i, std::size_t j, std::size_t k)
 
 template <std::floating_point T, std::size_t d>
 LaplaceBeltramiGradConn<T, d>
-compute_laplace_beltrami_grad_conn(const std::vector<ColMatrix<T, 3>>& position_derivs,
+compute_laplace_beltrami_grad_conn(const Matrix<T>& christoffel_first,
+                         const std::vector<ColMatrix<T, 3>>& position_derivs,
                          const Matrix<T>& metric_inv, Index q)
 {
+    constexpr Index n_d2 = static_cast<Index>(d * (d + 1) / 2);
     const Index Q = position_derivs[0].rows();
 
     LaplaceBeltramiGradConn<T, d> aux;
@@ -62,12 +64,13 @@ compute_laplace_beltrami_grad_conn(const std::vector<ColMatrix<T, 3>>& position_
 
         // ---- Precompute unique dot products once per q ---------------------
 
-        // dot1[μ][i][j] = a_μ · a_{ij}, symmetric in (i, j).
+        // dot1[μ][i][j] = a_μ · a_{ij} = first-kind Christoffel Γ_{μ,(ij)}, read from the
+        // cached buffer (column μ·n_d2 + pack2(i,j)) rather than re-dotted here.
         std::array<std::array<std::array<T, d>, d>, d> dot1{};
         for (std::size_t mu = 0; mu < d; ++mu)
             for (std::size_t i = 0; i < d; ++i)
                 for (std::size_t j = i; j < d; ++j) {
-                    const T v = a1(mu).dot(a2(i, j));
+                    const T v = christoffel_first(q, static_cast<Index>(mu) * n_d2 + pack2<d>(i, j));
                     dot1[mu][i][j] = v;
                     dot1[mu][j][i] = v;
                 }
@@ -163,11 +166,11 @@ compute_laplace_beltrami_grad_conn(const std::vector<ColMatrix<T, 3>>& position_
 // === Template Instantiations ========================================================
 
 template LaplaceBeltramiGradConn<double, 2> compute_laplace_beltrami_grad_conn<double, 2>(
-    const std::vector<ColMatrix<double, 3>>&, const Matrix<double>&, Index);
+    const Matrix<double>&, const std::vector<ColMatrix<double, 3>>&, const Matrix<double>&, Index);
 
 #ifdef PYCK_BUILD_SINGLE_PRECISION
 template LaplaceBeltramiGradConn<float, 2> compute_laplace_beltrami_grad_conn<float, 2>(
-    const std::vector<ColMatrix<float, 3>>&, const Matrix<float>&, Index);
+    const Matrix<float>&, const std::vector<ColMatrix<float, 3>>&, const Matrix<float>&, Index);
 #endif
 
 } // namespace operators

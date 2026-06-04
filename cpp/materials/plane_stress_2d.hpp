@@ -99,18 +99,6 @@ public:
         return D;
     }
 
-    /// Membrane Voigt 3×3 D_m = t · C at one quadrature point.
-    Eigen::Matrix<T, 3, 3> membrane_voigt(const StaticVector<T, 3>& metric_inv) const
-    {
-        return t_ * elasticity_voigt(metric_inv);
-    }
-
-    /// Bending Voigt 3×3 D_b = t³/12 · C at one quadrature point.
-    Eigen::Matrix<T, 3, 3> bending_voigt(const StaticVector<T, 3>& metric_inv) const
-    {
-        return bending_scale_ * elasticity_voigt(metric_inv);
-    }
-
     /// Transverse-shear Voigt 2×2 D_s = κ_s G t · A^{αβ} at one quadrature point.
     Eigen::Matrix<T, 2, 2> shear_voigt(const StaticVector<T, 3>& metric_inv) const
     {

@@ -34,11 +34,11 @@ add_library(pyck_geometry ${PYCK_GEOMETRY_SOURCES})
 target_include_directories(pyck_geometry PUBLIC cpp/geometry cpp/elements)
 target_link_libraries(pyck_geometry PUBLIC pyck_basis pyck_quadrature)
 
-# Operators library (differential-geometry operators on IGA fields)
+# Operators library (differential-geometry operators on IGA fields)s
 file(GLOB PYCK_OPERATORS_SOURCES cpp/operators/*.cpp)
 add_library(pyck_operators ${PYCK_OPERATORS_SOURCES})
 target_include_directories(pyck_operators PUBLIC cpp/operators)
-target_link_libraries(pyck_operators PUBLIC eigen)
+target_link_libraries(pyck_operators PUBLIC eigen pyck_geometry)
 
 # Constraints library
 file(GLOB PYCK_CONSTRAINTS_SOURCES cpp/constraints/*.cpp)

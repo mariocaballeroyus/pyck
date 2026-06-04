@@ -22,96 +22,70 @@ template <std::floating_point T>
 void
 ShellReissnerMindlin5p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
 {
-    const ColMatrix<T, 3>& a_3 = ev.n;
-
-    Matrix<T>& B = this->B_workspace_;
+    // Number of points and basis
     const Index Q = ev.basis_derivs[0].cols();
     const Index N = ev.basis_derivs[0].rows();
-    B.setZero(8 * Q, 5 * N);
+    // Reset strain matrix values
+    Matrix<T>& B_voigt = this->B_voigt_;
+    B_voigt.setZero(8 * Q, 5 * N);
 
-    for (Index q = 0; q < Q; ++q)
-    {
-        auto slab0 = ev.basis_derivs[0].col(q);
-        auto slab1 = ev.basis_derivs[1].col(q);
+    for (Index q = 0; q < Q; ++q) {
+        // Covariant basis, unit normal, and its first derivative
+        const auto cov = ev.cov_basis(q);
+        const Vector3<T> A1 = cov(0), A2 = cov(1), A3 = ev.normal(q);
+        // Unit normal 1st derivative
+        const auto nd  = ev.normal_deriv(q);
+        const Vector3<T> A3_d1 = nd(0), A3_d2 = nd(1);
+        // Midsurface metric
+        const auto A = ev.metric(q);
+        const T A11 = A(0, 0), A22 = A(1, 1), A12 = A(0, 1);
 
-        const operators::CovariantGradient<T, 2> vgrad{ev.basis_derivs, 
-                                                       ev.position_derivs, q};
+        // Shape N^i
+        const auto Nf = ev.N(q);
+        // Shape gradient N^i_{,α}
+        const auto G  = ev.dN(q);
+        // Covariant vector gradient  u_{α|β} = A_{αλ} N^i_{,β} u^λ_i 
+        //                                + Γ_{α,(λβ)} N^i u^λ_i
+        const operators::CovariantGradient<T, 2> vgrad{ev, q};
 
-        const auto A1   = ev.a(0).row(q);   // covariant tangent A_1
-        const auto A2   = ev.a(1).row(q);   // covariant tangent A_2
-        const auto A3 = a_3.row(q);         // unit normal A_3
+        for (Index i = 0; i < N; ++i) {
+            const T Ni  = Nf(i);
+            const T G1i = G(i, 0), G2i = G(i, 1);
+            const T D111 = vgrad(i, 0, 0, 0), D112 = vgrad(i, 0, 0, 1),
+                    D121 = vgrad(i, 0, 1, 0), D122 = vgrad(i, 0, 1, 1),
+                    D211 = vgrad(i, 1, 0, 0), D212 = vgrad(i, 1, 0, 1),
+                    D221 = vgrad(i, 1, 1, 0), D222 = vgrad(i, 1, 1, 1);
 
-        // Reference-normal derivatives via Weingarten: A_{3,β} = −B^α_β A_α,
-        // shape operator B^α_β = A^{αγ} B_{γβ} raised from the cached curvature.
-        const T B11 = ev.b(q, 0), B12 = ev.b(q, 2), B22 = ev.b(q, 1);
-        const T gi11 = ev.metric_inv(q, 0), gi12 = ev.metric_inv(q, 2), gi22 = ev.metric_inv(q, 1);
-        const T Bmix11 = gi11 * B11 + gi12 * B12, Bmix12 = gi11 * B12 + gi12 * B22;
-        const T Bmix21 = gi12 * B11 + gi22 * B12, Bmix22 = gi12 * B12 + gi22 * B22;
-        const Eigen::Matrix<T, 1, 3> A3_d1 = -(Bmix11 * A1 + Bmix21 * A2);
-        const Eigen::Matrix<T, 1, 3> A3_d2 = -(Bmix12 * A1 + Bmix22 * A2);
-
-        // Midsurface metric A_{αβ} = A_α·A_β (for the transverse-shear tilt φ_α = φ^λ A_{λα}).
-        const T A11 = A1.dot(A1);
-        const T A12 = A1.dot(A2);
-        const T A22 = A2.dot(A2);
-
-        for (Index i = 0; i < N; ++i)
-        {
-            const T N_i   = slab0(i);
-            const T N_u_i = slab1(i * 2 + 0);
-            const T N_v_i = slab1(i * 2 + 1);
-
-            // --- Membrane -----------------------------------------------------------
+            // Cartesian displacements
 
             for (Index k = 0; k < 3; ++k) {
-                // \varepsilon_{11} = u_{i,1} · A_1
-                B(8*q,     5*i + k) = N_u_i * A1(k);
-                // \varepsilon_{22}  = u_{i,2} · A_2
-                B(8*q + 1, 5*i + k) = N_v_i * A2(k);
-                // 2\varepsilon_{12} = u_{i,1} · A_2 + u_{i,2} · A_1
-                B(8*q + 2, 5*i + k) = N_u_i * A2(k) + N_v_i * A1(k);
+                // Membrane ε_{αβ} = (1/2)(u_{,α}·A_β + u_{,β}·A_α)
+                B_voigt(8*q,     5*i + k) = G1i * A1(k);
+                B_voigt(8*q + 1, 5*i + k) = G2i * A2(k);
+                B_voigt(8*q + 2, 5*i + k) = G1i * A2(k) + G2i * A1(k);
+                // Bending κ_{αβ} += (1/2)(u_{,α}·A_{3,β} + u_{,β}·A_{3,α})
+                B_voigt(8*q + 3, 5*i + k) = G1i * A3_d1(k);
+                B_voigt(8*q + 4, 5*i + k) = G2i * A3_d2(k);
+                B_voigt(8*q + 5, 5*i + k) = G1i * A3_d2(k) + G2i * A3_d1(k);
+                // Transverse Shear 2ε_{α3} += u_{,α}·A_3
+                B_voigt(8*q + 6, 5*i + k) = G1i * A3(k);
+                B_voigt(8*q + 7, 5*i + k) = G2i * A3(k);
             }
 
-            // --- Bending ------------------------------------------------------------
+            // Contravariant rotations
 
-            // Rotations (contravariant): κ_{αβ} ⊃ φ_{(α|β)} = D_{iλαβ} φ^λ.
-            B(8*q + 3, 5*i + 3) = vgrad(i, 0, 0, 0);
-            B(8*q + 3, 5*i + 4) = vgrad(i, 1, 0, 0);
-            B(8*q + 4, 5*i + 3) = vgrad(i, 0, 1, 1);
-            B(8*q + 4, 5*i + 4) = vgrad(i, 1, 1, 1);
-            B(8*q + 5, 5*i + 3) = vgrad(i, 0, 0, 1) + vgrad(i, 0, 1, 0);
-            B(8*q + 5, 5*i + 4) = vgrad(i, 1, 0, 1) + vgrad(i, 1, 1, 0);
-
-            // Displacements (cartesian)
-
-            for (Index k = 0; k < 3; ++k) {
-                // \kappa_{11} += u_{k,1} (A_{3,1})_k
-                B(8*q + 3, 5*i + k) = N_u_i * A3_d1(k);
-                // \kappa_{22} += u_{k,2} (A_{3,2})_k
-                B(8*q + 4, 5*i + k) = N_v_i * A3_d2(k);
-                // 2 \kappa_{12} += u_{k,1}(A_{3,2})_k + u_{k,2}(A_{3,1})_k
-                B(8*q + 5, 5*i + k) = N_u_i * A3_d2(k) + N_v_i * A3_d1(k);
-            }
-
-            // --- Transverse shear ---------------------------------------------------
-
-            // Rotations (contravariant)
- 
-            // 2 \varepsilon_{13} = \phi^1 A_11 + \phi^2 A_21
-            B(8*q + 6, 5*i + 3) = N_i * A11;
-            B(8*q + 6, 5*i + 4) = N_i * A12;
-            // 2 \varepsilon_{23} = \phi^1 A_12 + \phi^2 A_22
-            B(8*q + 7, 5*i + 3) = N_i * A12;
-            B(8*q + 7, 5*i + 4) = N_i * A22;
-
-            // Displacements (cartesian)
-
-            for (Index k = 0; k < 3; ++k) {
-                // 2ε_13 = u_{k,1} (A_3)_k
-                B(8*q + 6, 5*i + k) = N_u_i * A3(k);
-                // 2ε_23 = u_{k,2} (A_3)_k
-                B(8*q + 7, 5*i + k) = N_v_i * A3(k);
-            }
+            // Bending κ_{αβ} += (1/2)(φ_{α|β} + φ_{β|α})
+            B_voigt(8*q + 3, 5*i + 3) = D111;
+            B_voigt(8*q + 3, 5*i + 4) = D211;
+            B_voigt(8*q + 4, 5*i + 3) = D122;
+            B_voigt(8*q + 4, 5*i + 4) = D222;
+            B_voigt(8*q + 5, 5*i + 3) = D112 + D121;
+            B_voigt(8*q + 5, 5*i + 4) = D212 + D221;
+            // Transverse Shear 2ε_{α3} += φ_α = φ^λ A_{λα}
+            B_voigt(8*q + 6, 5*i + 3) = Ni * A11;
+            B_voigt(8*q + 6, 5*i + 4) = Ni * A12;
+            B_voigt(8*q + 7, 5*i + 3) = Ni * A12;
+            B_voigt(8*q + 7, 5*i + 4) = Ni * A22;
         }
     }
 }
@@ -120,16 +94,18 @@ template <std::floating_point T>
 ConstitutiveMatrix<T>
 ShellReissnerMindlin5p<T>::constitutive_matrix(const ElementValues<T, 2>& ev, Index q) const
 {
-    // D = [ D_m  0    0   ]
-    //     [ 0    D_b  0   ]
-    //     [ 0    0    D_s ]
-    const StaticVector<T, 3> metric_inv_q = ev.metric_inv_voigt(q);
-    const Eigen::Matrix<T, 3, 3> C  = material_->elasticity_voigt(metric_inv_q);
+    // Transform elasticity matrices into curvilinear coordinate system
+    const StaticVector<T, 3> metric_inv = ev.metric_inv_voigt(q);
+    const Eigen::Matrix<T, 3, 3> C  = material_->elasticity_voigt(metric_inv);
+    const Eigen::Matrix<T, 2, 2> Cs = material_->shear_voigt(metric_inv);
+
+    // Scale material matrices
     const T t = material_->thickness();
     const Eigen::Matrix<T, 3, 3> Dm = t * C;
     const Eigen::Matrix<T, 3, 3> Db = (t * t * t / T(12)) * C;
-    const Eigen::Matrix<T, 2, 2> Ds = material_->shear_voigt(metric_inv_q);
+    const Eigen::Matrix<T, 2, 2> Ds = Cs;
 
+    // Assemble into full constitutive matrix
     ConstitutiveMatrix<T> D = ConstitutiveMatrix<T>::Zero(8, 8);
     D.template block<3, 3>(0, 0) = Dm;
     D.template block<3, 3>(3, 3) = Db;
@@ -143,28 +119,59 @@ template <std::floating_point T>
 void
 ShellReissnerMindlin5p<T>::displacement_shape_matrix(const ElementValues<T, 2>& ev) const
 {
-    // Physical displacement u = (u_x, u_y, u_z): the three Cartesian DOFs.
+    // Number of points and basis
     const Index Q = ev.basis_derivs[0].cols();
     const Index N = ev.basis_derivs[0].rows();
-    Matrix<T>& U = this->N_w_workspace_;
-    U.setZero(3 * Q, 5 * N);
+    // Reset shape matrix values
+    Matrix<T>& N_w = this->N_w_;
+    N_w.setZero(3 * Q, 5 * N);
+
     for (Index q = 0; q < Q; ++q) {
-        auto slab0 = ev.basis_derivs[0].col(q);
+        // Shape N^i
+        const auto Nf = ev.N(q);
+
         for (Index i = 0; i < N; ++i) {
-            const T Ni = slab0(i);
-            U(3 * q + 0, 5 * i + 0) = Ni;   // u_x
-            U(3 * q + 1, 5 * i + 1) = Ni;   // u_y
-            U(3 * q + 2, 5 * i + 2) = Ni;   // u_z
+            const T Ni = Nf(i);
+
+            // Cartesian displacement u
+            N_w(3 * q + 0, 5 * i + 0) = Ni;
+            N_w(3 * q + 1, 5 * i + 1) = Ni;
+            N_w(3 * q + 2, 5 * i + 2) = Ni;
         }
     }
 }
 
 template <std::floating_point T>
 void
-ShellReissnerMindlin5p<T>::rotation_shape_matrix(const ElementValues<T, 2>&) const
+ShellReissnerMindlin5p<T>::rotation_shape_matrix(const ElementValues<T, 2>& ev) const
 {
-    throw std::runtime_error("ShellReissnerMindlin5p::rotation_shape_matrix: "
-                             "not implemented.");
+    // Number of points and basis
+    const Index Q = ev.basis_derivs[0].cols();
+    const Index N = ev.basis_derivs[0].rows();
+
+    // Reset shape matrix values
+    Matrix<T>& N_phi = this->N_phi_;
+    N_phi.setZero(2 * Q, 5 * N);
+
+    for (Index q = 0; q < Q; ++q) {
+        // Covariant metric
+        const auto A = ev.metric(q);
+        const T A11 = A(0, 0), A22 = A(1, 1), A12 = A(0, 1);
+
+        // Shape N^i
+        const auto Nf = ev.N(q);
+
+        for (Index i = 0; i < N; ++i) {
+            const T Ni = Nf(i);
+
+            // θ_1 = φ^1 A_{11} + φ^2 A_{21}
+            N_phi(2*q,     5*i + 3) = Ni * A11;
+            N_phi(2*q,     5*i + 4) = Ni * A12;
+            // θ_2 = φ^1 A_{12} + φ^2 A_{22}
+            N_phi(2*q + 1, 5*i + 3) = Ni * A12;
+            N_phi(2*q + 1, 5*i + 4) = Ni * A22;
+        }
+    }
 }
 
 // === Template Instantiations ========================================================
