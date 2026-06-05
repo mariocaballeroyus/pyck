@@ -41,6 +41,7 @@ from pyck.io import (
     curve as io_curve,
     export_bezier_vtu,
     bezier_anchor_params,
+    BezierVtuWriter,
 )
 from pyck.solver import solve
 import pyck.solver as solver
@@ -90,6 +91,7 @@ __all__ = [
     "io_curve",
     "export_bezier_vtu",
     "bezier_anchor_params",
+    "BezierVtuWriter",
     "solve",
     "solver",
     "postprocessing",

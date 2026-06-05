@@ -7,6 +7,7 @@
 #include <vector>
 
 #include "vtk_export.hpp"
+#include "vtk_multiblock.hpp"
 
 namespace py = pybind11;
 
@@ -20,6 +21,15 @@ void bind_io(py::module_& m)
           py::arg("patches"),
           py::arg("point_data"),
           py::arg("point_data_extracted"),
+          py::arg("title"),
+          py::arg("binary"));
+
+    m.def("export_bezier_vtm", &io::export_bezier_vtm<double>,
+          py::arg("path"),
+          py::arg("patches"),
+          py::arg("point_data"),
+          py::arg("point_data_extracted"),
+          py::arg("patch_names"),
           py::arg("title"),
           py::arg("binary"));
 

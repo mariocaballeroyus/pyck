@@ -11,13 +11,15 @@ Python field-dict API and marshals to the native writer.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Mapping, Sequence
+from typing import Callable, Mapping, Sequence, TypeVar
 
 import numpy as np
 import numpy.typing as npt
 
 import pyck._pyck as _pyck
 from pyck.geometry.surface_patch import SurfacePatch
+
+_V = TypeVar("_V")
 
 
 # === Bezier-element export =======================================================
@@ -33,8 +35,12 @@ def export_bezier_vtu(
     point_data_extracted: Mapping[str, npt.ArrayLike]
               | Sequence[Mapping[str, npt.ArrayLike] | None]
               | None = None,
+    functions: Mapping[str, Callable[[npt.ArrayLike], npt.ArrayLike]]
+              | Sequence[Mapping[str, Callable[[npt.ArrayLike], npt.ArrayLike]] | None]
+              | None = None,
     title: str = "pyck bezier",
     binary: bool = True,
+    multiblock: bool = False,
 ) -> Path:
     """Export one or more surface patches as rational-Bezier elements (.vtu).
 
@@ -70,11 +76,23 @@ def export_bezier_vtu(
         evaluate the field at ``bezier_anchor_params(patch)`` (Greville
         abscissae of the extracted basis); ParaView then interpolates via
         the same rational Bernstein form as the geometry.
+    functions : dict or list of dicts, optional
+        Derived fields given as callables ``field(params) -> (Q, k)`` — e.g. a
+        :class:`pyck.Function` (or any composite field expression). Each is
+        sampled internally at ``bezier_anchor_params(patch)`` and added to
+        ``point_data_extracted``, so you can pass strain/stress evaluators
+        directly without sampling them yourself. Names must not collide with
+        ``point_data_extracted``.
     title : str, optional
         XML header comment (default ``"pyck bezier"``).
     binary : bool, optional
         Write array data as raw appended binary (default *True*) — compact and
         fast to load in ParaView. Set *False* for human-readable inline ASCII.
+    multiblock : bool, optional
+        Write a VTK multiblock dataset (``.vtm`` + one ``.vtu`` per patch in a
+        sibling directory) instead of merging all patches into one ``.vtu``
+        piece. Keeps patches individually selectable in ParaView (default
+        *False*).
 
     Returns
     -------
@@ -84,15 +102,156 @@ def export_bezier_vtu(
     patches, pd_list = _normalise_per_patch(surf, point_data, "point_data")
     _, pde_list = _normalise_per_patch(surf, point_data_extracted,
                                        "point_data_extracted")
+    _, fn_list = _normalise_per_patch(surf, functions, "functions")
 
     cpp_patches = [p._cpp_object for p in patches]
     pd_maps = [_to_field_map(d) for d in pd_list]
     pde_maps = [_to_field_map(d) for d in pde_list]
 
+    # Sample callable (Function) fields at each patch's extracted anchors and
+    # fold them into the extracted point data.
+    for patch, fns, pde in zip(patches, fn_list, pde_maps):
+        if not fns:
+            continue
+        anchors = bezier_anchor_params(patch)
+        for name, field in fns.items():
+            if name in pde:
+                raise ValueError(
+                    f"field '{name}' is given in both 'functions' and "
+                    f"'point_data_extracted'; choose one source."
+                )
+            vals = np.ascontiguousarray(np.asarray(field(anchors), dtype=np.float64))
+            pde[name] = vals.reshape(-1, 1) if vals.ndim == 1 else vals
+
     out = Path(path)
-    _pyck.export_bezier_vtu(str(out), cpp_patches, pd_maps, pde_maps,
-                            title, bool(binary))
+    if multiblock:
+        names = [p.name for p in patches]
+        _pyck.export_bezier_vtm(str(out), cpp_patches, pd_maps, pde_maps,
+                                names, title, bool(binary))
+    else:
+        _pyck.export_bezier_vtu(str(out), cpp_patches, pd_maps, pde_maps,
+                                title, bool(binary))
     return out
+
+
+class BezierVtuWriter:
+    """Context manager that accumulates patches + fields and writes on exit.
+
+    A thin, Pythonic front for :func:`export_bezier_vtu`: add patches and their
+    fields incrementally, and the file is written when the ``with`` block exits
+    cleanly (or via an explicit :meth:`write`).
+
+    Examples
+    --------
+    Single patch, one derived field::
+
+        with BezierVtuWriter("beam.vtu", patch) as w:
+            w.add_field("displacement", disp_fn)   # a pyck.Function
+
+    Multiple patches into a multiblock ``.vtm``::
+
+        with BezierVtuWriter("model.vtm", multiblock=True) as w:
+            w.add(patch_a, functions={"disp": disp_a})
+            w.add(patch_b, functions={"disp": disp_b})
+
+    Parameters
+    ----------
+    path : str or Path
+        Output filename (``.vtu``, or ``.vtm`` when ``multiblock``).
+    surf : SurfacePatch, optional
+        If given, the first patch is added immediately so :meth:`add_field`
+        can target it without an explicit :meth:`add`.
+    title : str, optional
+        XML header comment.
+    binary : bool, optional
+        Raw appended binary (default *True*) vs inline ASCII.
+    multiblock : bool, optional
+        Write a ``.vtm`` multiblock dataset (one selectable block per patch)
+        instead of merging patches into one ``.vtu`` piece.
+    """
+
+    def __init__(
+        self,
+        path: str | Path,
+        surf: SurfacePatch | None = None,
+        *,
+        title: str = "pyck bezier",
+        binary: bool = True,
+        multiblock: bool = False,
+    ) -> None:
+        self.path = Path(path)
+        self.title = title
+        self.binary = binary
+        self.multiblock = multiblock
+        self._patches: list[SurfacePatch] = []
+        self._point_data: list[dict[str, npt.ArrayLike]] = []
+        self._extracted: list[dict[str, npt.ArrayLike]] = []
+        self._functions: list[dict[str, Callable[[npt.ArrayLike], npt.ArrayLike]]] = []
+        if surf is not None:
+            self.add(surf)
+
+    def add(
+        self,
+        surf: SurfacePatch,
+        *,
+        point_data: Mapping[str, npt.ArrayLike] | None = None,
+        point_data_extracted: Mapping[str, npt.ArrayLike] | None = None,
+        functions: Mapping[str, Callable[[npt.ArrayLike], npt.ArrayLike]] | None = None,
+    ) -> BezierVtuWriter:
+        """Add a patch and (optionally) its fields. Returns *self* for chaining."""
+        self._patches.append(surf)
+        self._point_data.append(dict(point_data) if point_data else {})
+        self._extracted.append(dict(point_data_extracted) if point_data_extracted else {})
+        self._functions.append(dict(functions) if functions else {})
+        return self
+
+    def add_field(
+        self,
+        name: str,
+        field: npt.ArrayLike | Callable[[npt.ArrayLike], npt.ArrayLike],
+        *,
+        extracted: bool = False,
+    ) -> BezierVtuWriter:
+        """Add one field to the most recently added patch. Returns *self*.
+
+        A callable (e.g. a :class:`pyck.Function`) is sampled at the extracted
+        anchors; an array on the control-point basis is taken as ``point_data``,
+        or as ``point_data_extracted`` when ``extracted=True``.
+        """
+        if not self._patches:
+            raise RuntimeError(
+                "no patch to attach the field to; pass surf= to the constructor "
+                "or call add(patch) first."
+            )
+        if callable(field):
+            self._functions[-1][name] = field
+        elif extracted:
+            self._extracted[-1][name] = field
+        else:
+            self._point_data[-1][name] = field
+        return self
+
+    def write(self) -> Path:
+        """Write the accumulated patches/fields to disk and return the path."""
+        if not self._patches:
+            raise RuntimeError("nothing to write: no patches were added.")
+        single = len(self._patches) == 1
+        surf = self._patches[0] if single else self._patches
+        return export_bezier_vtu(
+            self.path, surf,
+            point_data=(self._point_data[0] if single else self._point_data),
+            point_data_extracted=(self._extracted[0] if single else self._extracted),
+            functions=(self._functions[0] if single else self._functions),
+            title=self.title, binary=self.binary, multiblock=self.multiblock,
+        )
+
+    def __enter__(self) -> BezierVtuWriter:
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> bool:
+        if exc_type is None:
+            self.write()
+        return False
 
 
 def bezier_anchor_params(surf: SurfacePatch) -> npt.NDArray[np.float64]:
@@ -138,12 +297,11 @@ def _to_field_map(
 
 def _normalise_per_patch(
     surf: SurfacePatch | Sequence[SurfacePatch],
-    data: Mapping[str, npt.ArrayLike]
-        | Sequence[Mapping[str, npt.ArrayLike] | None]
-        | None,
+    data: Mapping[str, _V] | Sequence[Mapping[str, _V] | None] | None,
     kw_name: str,
-) -> tuple[list[SurfacePatch], list[Mapping[str, npt.ArrayLike] | None]]:
+) -> tuple[list[SurfacePatch], list[Mapping[str, _V] | None]]:
     """Coerce `surf` to a list and `data` to a parallel list of dicts."""
+    out: list[Mapping[str, _V] | None]
     if isinstance(surf, SurfacePatch):
         patches = [surf]
         out = [data if isinstance(data, Mapping) else None]

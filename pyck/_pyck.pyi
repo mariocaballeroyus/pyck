@@ -4,7 +4,7 @@ import numpy
 import numpy.typing
 import scipy.sparse
 import typing
-__all__: list[str] = ['BSpline', 'Basis', 'BoundaryValue', 'Condition1d', 'Condition2d', 'Constraint', 'DirectConstraint', 'Element1d', 'Element2d', 'Field', 'FieldType', 'Function1d', 'Function2d', 'GaussLegendre1d', 'GaussLegendre2d', 'LagrangeBoundaryCondition2d', 'LinearConstraint', 'LinearElasticProblem1d', 'LinearElasticProblem2d', 'LoadBoundaryCondition2d', 'Material1d', 'Material2d', 'NURBS', 'Patch1d', 'Patch2d', 'PatchBoundary2d', 'PenaltyBoundaryCondition2d', 'PlaneStress2d', 'QuadratureRule1d', 'QuadratureRule2d', 'ShellKirchhoffLove3p', 'ShellReissnerMindlin4p', 'ShellReissnerMindlin5p', 'UniaxialStress1d', 'eval_quadrature_data', 'inner_product']
+__all__: list[str] = ['BSpline', 'Basis', 'BoundaryValue', 'Condition1d', 'Condition2d', 'Constraint', 'DirectConstraint', 'Element1d', 'Element2d', 'Field', 'FieldType', 'Function1d', 'Function2d', 'GaussLegendre1d', 'GaussLegendre2d', 'LagrangeBoundaryCondition2d', 'LinearConstraint', 'LinearElasticProblem1d', 'LinearElasticProblem2d', 'LoadBoundaryCondition2d', 'Material1d', 'Material2d', 'NURBS', 'Patch1d', 'Patch2d', 'PatchBoundary2d', 'PenaltyBoundaryCondition2d', 'PlaneStress2d', 'QuadratureRule1d', 'QuadratureRule2d', 'ShellKirchhoffLove3p', 'ShellReissnerMindlin4p', 'ShellReissnerMindlin5p', 'UniaxialStress1d', 'bezier_anchor_params', 'eval_quadrature_data', 'export_bezier_vtm', 'export_bezier_vtu', 'inner_product']
 class BSpline(Basis):
     @staticmethod
     def clamped_uniform(degree: typing.SupportsInt | typing.SupportsIndex, num_basis: typing.SupportsInt | typing.SupportsIndex) -> BSpline:
@@ -327,6 +327,12 @@ class ShellReissnerMindlin5p(Element2d):
 class UniaxialStress1d(Material1d):
     def __init__(self, E: typing.SupportsFloat | typing.SupportsIndex, nu: typing.SupportsFloat | typing.SupportsIndex, A: typing.SupportsFloat | typing.SupportsIndex, I22: typing.SupportsFloat | typing.SupportsIndex, k22: typing.SupportsFloat | typing.SupportsIndex = 0.8333333333333334, rho: typing.SupportsFloat | typing.SupportsIndex = 0.0, I33: typing.SupportsFloat | typing.SupportsIndex = 0.0, k33: typing.SupportsFloat | typing.SupportsIndex = 0.0, J: typing.SupportsFloat | typing.SupportsIndex = 0.0) -> None:
         ...
+def bezier_anchor_params(patch: Patch2d) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 2]"]:
+    ...
+def export_bezier_vtm(path: str, patches: collections.abc.Sequence[Patch2d], point_data: collections.abc.Sequence[collections.abc.Mapping[str, typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, n]"]]], point_data_extracted: collections.abc.Sequence[collections.abc.Mapping[str, typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, n]"]]], patch_names: collections.abc.Sequence[str], title: str, binary: bool) -> None:
+    ...
+def export_bezier_vtu(path: str, patches: collections.abc.Sequence[Patch2d], point_data: collections.abc.Sequence[collections.abc.Mapping[str, typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, n]"]]], point_data_extracted: collections.abc.Sequence[collections.abc.Mapping[str, typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, n]"]]], title: str, binary: bool) -> None:
+    ...
 @typing.overload
 def eval_quadrature_data(patch: Patch1d, quadrature: QuadratureRule1d) -> tuple[typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"], typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]]:
     ...
