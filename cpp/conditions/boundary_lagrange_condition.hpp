@@ -4,7 +4,7 @@
 #include <Eigen/Dense>
 #include <vector>
 
-#include "boundary_field.hpp"
+#include "boundary_value.hpp"
 #include "condition.hpp"
 #include "patch_boundary.hpp"
 #include "element.hpp"
@@ -36,12 +36,12 @@ public:
     // === Utility ====================================================================
 
     /**
-     * @brief Register a field to be enforced on this boundary.
+     * @brief Register a boundary value to be enforced on this boundary.
      *
-     * @param field  Physical field (e.g. transverse displacement, normal rotation).
+     * @param field  Boundary value (e.g. displacement / rotation projection).
      * @param value  Prescribed value.
      */
-    LagrangeBoundaryCondition& add(Ptr<const BoundaryField<T>> field,
+    LagrangeBoundaryCondition& add(BoundaryValue<T> field,
                                    T value = T(0));
 
     /**
@@ -71,7 +71,7 @@ private:
 
     /// @brief A single field constraint registered on this boundary.
     struct Term {
-        Ptr<const BoundaryField<T>> field;   ///< Field whose trace is constrained.
+        BoundaryValue<T> field;              ///< Boundary value whose trace is constrained.
         T value;                             ///< Prescribed value on the boundary.
         DofLayout::BlockId block_id = 0;     ///< Multiplier block, set in allocate_dofs.
     };

@@ -2,10 +2,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Protocol, runtime_checkable
 
+import pyck._pyck as _pyck
 from pyck.assembly.quadrature import QuadratureRule
 
 if TYPE_CHECKING:
     from pyck.elements.element import Element
+
+# Public boundary-value selector. `Field.U_X` etc. pick a projection; a condition
+# turns the selected `Field` into an internal `_pyck.BoundaryValue` (not exposed).
+Field = _pyck.Field
 
 
 @runtime_checkable

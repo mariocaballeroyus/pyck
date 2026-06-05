@@ -2,7 +2,7 @@
 #include <pybind11/stl.h>
 #include <pybind11/eigen.h>
 
-#include "boundary_field.hpp"
+#include "boundary_value.hpp"
 #include "condition.hpp"
 #include "load_boundary_condition.hpp"
 #include "boundary_lagrange_condition.hpp"
@@ -24,61 +24,33 @@ void bind_conditions(py::module_& m)
     py::class_<Condition<double, 1>, Ptr<Condition<double, 1>>>(m, "Condition1d");
     py::class_<Condition<double, 2>, Ptr<Condition<double, 2>>>(m, "Condition2d");
 
-    py::class_<BoundaryField<double>, Ptr<BoundaryField<double>>>(m, "BoundaryField");
+    py::enum_<Field>(m, "Field")
+        .value("U_X", Field::U_X)
+        .value("U_Y", Field::U_Y)
+        .value("U_Z", Field::U_Z)
+        .value("U_N", Field::U_N)
+        .value("U_S", Field::U_S)
+        .value("ROT_X", Field::ROT_X)
+        .value("ROT_Y", Field::ROT_Y)
+        .value("ROT_Z", Field::ROT_Z)
+        .value("ROT_N", Field::ROT_N)
+        .value("ROT_S", Field::ROT_S);
 
-    py::class_<TransverseDisplacement<double>, BoundaryField<double>,
-               Ptr<TransverseDisplacement<double>>>(m, "TransverseDisplacement")
-        .def(py::init<>());
-
-    py::class_<ForceTraction<double>, BoundaryField<double>,
-               Ptr<ForceTraction<double>>>(m, "ForceTraction")
-        .def(py::init<const Vector3<double>&, bool>(),
-             py::arg("traction"), py::arg("local") = false);
-
-    py::class_<NormalRotation<double>, BoundaryField<double>,
-               Ptr<NormalRotation<double>>>(m, "NormalRotation")
-        .def(py::init<>());
-
-    py::class_<TangentialRotation<double>, BoundaryField<double>,
-               Ptr<TangentialRotation<double>>>(m, "TangentialRotation")
-        .def(py::init<>());
-
-    py::class_<NormalTransverseShear<double>, BoundaryField<double>,
-               Ptr<NormalTransverseShear<double>>>(m, "NormalTransverseShear")
-        .def(py::init<>());
-
-    py::class_<NormalBendingMoment<double>, BoundaryField<double>,
-               Ptr<NormalBendingMoment<double>>>(m, "NormalBendingMoment")
-        .def(py::init<>());
-
-    py::class_<TwistingMoment<double>, BoundaryField<double>,
-               Ptr<TwistingMoment<double>>>(m, "TwistingMoment")
-        .def(py::init<>());
-
-    py::class_<BasisValue<double>, BoundaryField<double>,
-               Ptr<BasisValue<double>>>(m, "BasisValue")
-        .def(py::init<std::size_t>(), py::arg("dof_index") = 0);
-
-    py::class_<BasisNormalSlope<double>, BoundaryField<double>,
-               Ptr<BasisNormalSlope<double>>>(m, "BasisNormalSlope")
-        .def(py::init<std::size_t>(), py::arg("dof_index") = 0);
-
-    py::class_<BasisNormalCurvature<double>, BoundaryField<double>,
-               Ptr<BasisNormalCurvature<double>>>(m, "BasisNormalCurvature")
-        .def(py::init<std::size_t>(), py::arg("dof_index") = 0);
+    py::class_<BoundaryValue<double>>(m, "BoundaryValue")
+        .def(py::init<Field>(), py::arg("field"));
 
     using LoadBoundaryCondition2d = LoadBoundaryCondition<double, 2>;
     py::class_<LoadBoundaryCondition2d, Condition<double, 2>, Ptr<LoadBoundaryCondition2d>>(m, "LoadBoundaryCondition2d")
         .def(py::init<const PatchBoundary2d&, const Element2d&, const QuadratureRule1d&>(),
              py::arg("boundary"), py::arg("element"), py::arg("quadrature"))
         .def("add",
-             [](LoadBoundaryCondition2d& self, Ptr<const BoundaryField<double>> field, double value) -> LoadBoundaryCondition2d& {
+             [](LoadBoundaryCondition2d& self, BoundaryValue<double> field, double value) -> LoadBoundaryCondition2d& {
                  return self.add(std::move(field), value);
              },
              py::arg("field"), py::arg("value") = 0.0,
              py::return_value_policy::reference)
         .def("add",
-             [](LoadBoundaryCondition2d& self, Ptr<const BoundaryField<double>> field, const Vector<double>& values) -> LoadBoundaryCondition2d& {
+             [](LoadBoundaryCondition2d& self, BoundaryValue<double> field, const Vector<double>& values) -> LoadBoundaryCondition2d& {
                  return self.add(std::move(field), values);
              },
              py::arg("field"), py::arg("values"),
@@ -89,7 +61,7 @@ void bind_conditions(py::module_& m)
         .def(py::init<const PatchBoundary2d&, const Element2d&, const QuadratureRule1d&>(),
              py::arg("boundary"), py::arg("element"), py::arg("quadrature"))
         .def("add",
-             [](PenaltyBoundaryCondition2d& self, Ptr<const BoundaryField<double>> field,
+             [](PenaltyBoundaryCondition2d& self, BoundaryValue<double> field,
                 double penalty, double value) -> PenaltyBoundaryCondition2d& {
                  return self.add(std::move(field), penalty, value);
              },
@@ -101,7 +73,7 @@ void bind_conditions(py::module_& m)
         .def(py::init<const PatchBoundary2d&, const Element2d&, const QuadratureRule1d&>(),
              py::arg("boundary"), py::arg("element"), py::arg("quadrature"))
         .def("add",
-             [](LagrangeBoundaryCondition2d& self, Ptr<const BoundaryField<double>> field, double value) -> LagrangeBoundaryCondition2d& {
+             [](LagrangeBoundaryCondition2d& self, BoundaryValue<double> field, double value) -> LagrangeBoundaryCondition2d& {
                  return self.add(std::move(field), value);
              },
              py::arg("field"), py::arg("value") = 0.0,

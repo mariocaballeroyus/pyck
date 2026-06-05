@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import pyck._pyck as _pyck
-from pyck.conditions.boundary_field import FieldName, resolve_field
+from pyck.conditions.condition import Field
 
 if TYPE_CHECKING:
     from pyck.assembly.quadrature import QuadratureRule
@@ -36,20 +36,20 @@ class LagrangeBoundaryCondition:
 
         self._boundary = boundary
         self._quadrature = quadrature
-        self._terms: list[tuple[_pyck.BoundaryField, float]] = []
+        self._terms: list[tuple[_pyck.BoundaryValue, float]] = []
         self._cpp_object = None
 
     def add(
         self,
-        field: FieldName | _pyck.BoundaryField,
+        field: Field,
         value: float = 0.0,
     ) -> "LagrangeBoundaryCondition":
-        """Add a field to enforce on this boundary.
+        """Add a boundary value to enforce on this boundary.
 
         Parameters
         ----------
-        field : str or BoundaryField
-            Field to enforce (e.g. ``"w"``, ``"rot_n"``, ``"rot_s"``).
+        field : Field
+            Value to enforce (e.g. ``Field.U_X``, ``Field.ROT_N``).
         value : float, optional
             Prescribed value (default 0.0).
 
@@ -62,7 +62,7 @@ class LagrangeBoundaryCondition:
             raise RuntimeError(
                 "Cannot add fields after the condition has been bound to a problem."
             )
-        self._terms.append((resolve_field(field), float(value)))
+        self._terms.append((_pyck.BoundaryValue(field), float(value)))
         return self
 
     def bind(self, _: "QuadratureRule", element: "Element") -> None:

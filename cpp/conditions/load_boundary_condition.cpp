@@ -23,46 +23,27 @@ LoadBoundaryCondition<T, d>::LoadBoundaryCondition(const PatchBoundary<T, d>& bo
 
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-LoadBoundaryCondition<T, d>& LoadBoundaryCondition<T, d>::add(Ptr<const BoundaryField<T>> field, 
-                                                              T value)
+LoadBoundaryCondition<T, d>& LoadBoundaryCondition<T, d>::add(BoundaryValue<T> field, T value)
 {
-    if (!field) {
-        throw std::invalid_argument("LoadBoundaryCondition::add: "
-                                    "field must not be null.");
-    }
-
-    Term term;
-    term.field = std::move(field);
-    term.varying = false;
-    term.constant_value = value;
-    terms_.push_back(std::move(term));
+    terms_.push_back(Term{std::move(field), false, value, Vector<T>()});
     return *this;
 }
 
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-LoadBoundaryCondition<T, d>& LoadBoundaryCondition<T, d>::add(Ptr<const BoundaryField<T>> field, 
-                                                              const Vector<T>& values_at_qpts)
+LoadBoundaryCondition<T, d>& LoadBoundaryCondition<T, d>::add(BoundaryValue<T> field,
+                                                             const Vector<T>& values_at_qpts)
 {
-    if (!field) {
-        throw std::invalid_argument("LoadBoundaryCondition::add: "
-                                    "field must not be null.");
-    }
-
     const Index nq = num_active_qpts();
 
     if (values_at_qpts.size() != static_cast<Eigen::Index>(nq)) {
         throw std::runtime_error("LoadBoundaryCondition::add: "
-                                 "values_at_qpts has size " + 
+                                 "values_at_qpts has size " +
                                  std::to_string(values_at_qpts.size()) +
                                  " but expected " + std::to_string(nq));
     }
 
-    Term term;
-    term.field = std::move(field);
-    term.varying = true;
-    term.values_at_qpts = values_at_qpts;
-    terms_.push_back(std::move(term));
+    terms_.push_back(Term{std::move(field), true, T(0), values_at_qpts});
     return *this;
 }
 
@@ -78,9 +59,9 @@ void LoadBoundaryCondition<T, d>::apply(SystemAssembler<T>& assembler,
     Index    order = element_.basis_order();
     unsigned flags = Flags::None;
     for (const auto& term : terms_) {
-        order = std::max(order, term.field->basis_order());
-        flags |= term.field->flags();
-        flags |= term.field->element_flags(element_);
+        order = std::max(order, term.field.basis_order());
+        flags |= term.field.flags();
+        flags |= term.field.element_flags(element_);
     }
 
     // Get the number of elements, primal DOFs and boundary Gauss points
@@ -109,7 +90,7 @@ void LoadBoundaryCondition<T, d>::apply(SystemAssembler<T>& assembler,
         for (const auto& term : terms_) {
             // Evaluate the field (w) at the boundary quadrature points
             // Boundary values (N_w) size = (n_gp,n_primal)
-            Matrix<T> N_w = term.field->evaluate(element_, bd_values);
+            Matrix<T> N_w = term.field.evaluate(element_, bd_values);
 
             // Loop over quadrature points
             for (Index q = 0; q < n_gp; ++q) {

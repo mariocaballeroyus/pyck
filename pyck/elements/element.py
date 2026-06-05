@@ -62,7 +62,7 @@ class Element(ABC):
             self._cpp_object.strain_matrix(patch._cpp_object, params)
         )
 
-    def stress_matrix(
+    def stress_shape_matrix(
         self, patch: "Patch", params: npt.NDArray[np.float64]
     ) -> npt.NDArray[np.float64]:
         """Global stress (D B) matrix evaluated at parametric points.
@@ -70,5 +70,5 @@ class Element(ABC):
         Shape: ``(num_stress_components * Q, num_global_dofs)``.
         """
         return np.asarray(
-            self._cpp_object.stress_matrix(patch._cpp_object, params)
+            self._cpp_object.stress_shape_matrix(patch._cpp_object, params)
         )

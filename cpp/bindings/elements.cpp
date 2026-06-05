@@ -80,13 +80,13 @@ void bind_elements(py::module_& m)
                py::arg("patch"),
                py::arg("params"))
 
-          .def("stress_matrix",
+          .def("stress_shape_matrix",
                [](const Element1d& elem,
                   const Patch<double, 1>& patch,
                   const ColMatrix<double, 1>& params) -> Matrix<double> {
                    return eval_global_shape<double, 1>(patch, elem,
                        [](const Element1d& e, const ElementValues<double, 1>& ev) -> const Matrix<double>& {
-                           e.stress_matrix(ev);
+                           e.stress_shape_matrix(ev);
                            return e.N_sigma_;
                        }, params);
                },
@@ -150,13 +150,13 @@ void bind_elements(py::module_& m)
                py::arg("patch"),
                py::arg("params"))
 
-          .def("stress_matrix",
+          .def("stress_shape_matrix",
                [](const Element2d& elem,
                   const Patch<double, 2>& patch,
                   const ColMatrix<double, 2>& params) -> Matrix<double> {
                    return eval_global_shape<double, 2>(patch, elem,
                        [](const Element2d& e, const ElementValues<double, 2>& ev) -> const Matrix<double>& {
-                           e.stress_matrix(ev);
+                           e.stress_shape_matrix(ev);
                            return e.N_sigma_;
                        }, params);
                },

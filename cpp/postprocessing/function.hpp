@@ -77,7 +77,7 @@ public:
                 case FieldType::DISPLACEMENT: e.displacement_shape_matrix(ev); return e.N_w_;
                 case FieldType::ROTATION:     e.rotation_shape_matrix(ev);     return e.N_phi_;
                 case FieldType::STRAIN:       e.strain_matrix(ev);             return e.B_voigt_;
-                case FieldType::STRESS:       e.stress_matrix(ev);             return e.N_sigma_;
+                case FieldType::STRESS:       e.stress_shape_matrix(ev);             return e.N_sigma_;
             }
             throw std::runtime_error("Function: unknown FieldType.");
         };

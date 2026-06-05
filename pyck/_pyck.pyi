@@ -4,7 +4,7 @@ import numpy
 import numpy.typing
 import scipy.sparse
 import typing
-__all__: list[str] = ['BSpline', 'Basis', 'BasisNormalCurvature', 'BasisNormalSlope', 'BasisValue', 'BoundaryField', 'Condition1d', 'Condition2d', 'Constraint', 'DirectConstraint', 'Element1d', 'Element2d', 'FieldType', 'ForceTraction', 'Function1d', 'Function2d', 'GaussLegendre1d', 'GaussLegendre2d', 'LagrangeBoundaryCondition2d', 'LinearConstraint', 'LinearElasticProblem1d', 'LinearElasticProblem2d', 'LoadBoundaryCondition2d', 'Material1d', 'Material2d', 'NURBS', 'NormalBendingMoment', 'NormalRotation', 'NormalTransverseShear', 'Patch1d', 'Patch2d', 'PatchBoundary2d', 'PenaltyBoundaryCondition2d', 'PlaneStress2d', 'QuadratureRule1d', 'QuadratureRule2d', 'ShellKirchhoffLove3p', 'ShellReissnerMindlin4p', 'ShellReissnerMindlin5p', 'TangentialRotation', 'TransverseDisplacement', 'TwistingMoment', 'UniaxialStress1d', 'eval_quadrature_data', 'inner_product']
+__all__: list[str] = ['BSpline', 'Basis', 'BoundaryValue', 'Condition1d', 'Condition2d', 'Constraint', 'DirectConstraint', 'Element1d', 'Element2d', 'Field', 'FieldType', 'Function1d', 'Function2d', 'GaussLegendre1d', 'GaussLegendre2d', 'LagrangeBoundaryCondition2d', 'LinearConstraint', 'LinearElasticProblem1d', 'LinearElasticProblem2d', 'LoadBoundaryCondition2d', 'Material1d', 'Material2d', 'NURBS', 'Patch1d', 'Patch2d', 'PatchBoundary2d', 'PenaltyBoundaryCondition2d', 'PlaneStress2d', 'QuadratureRule1d', 'QuadratureRule2d', 'ShellKirchhoffLove3p', 'ShellReissnerMindlin4p', 'ShellReissnerMindlin5p', 'UniaxialStress1d', 'eval_quadrature_data', 'inner_product']
 class BSpline(Basis):
     @staticmethod
     def clamped_uniform(degree: typing.SupportsInt | typing.SupportsIndex, num_basis: typing.SupportsInt | typing.SupportsIndex) -> BSpline:
@@ -28,17 +28,9 @@ class Basis:
         ...
     def num_intervals(self) -> int:
         ...
-class BasisNormalCurvature(BoundaryField):
-    def __init__(self, dof_index: typing.SupportsInt | typing.SupportsIndex = 0) -> None:
+class BoundaryValue:
+    def __init__(self, field: Field) -> None:
         ...
-class BasisNormalSlope(BoundaryField):
-    def __init__(self, dof_index: typing.SupportsInt | typing.SupportsIndex = 0) -> None:
-        ...
-class BasisValue(BoundaryField):
-    def __init__(self, dof_index: typing.SupportsInt | typing.SupportsIndex = 0) -> None:
-        ...
-class BoundaryField:
-    pass
 class Condition1d:
     pass
 class Condition2d:
@@ -65,7 +57,7 @@ class Element1d:
         ...
     def strain_matrix(self, patch: Patch1d, params: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 1]"]) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]"]:
         ...
-    def stress_matrix(self, patch: Patch1d, params: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 1]"]) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]"]:
+    def stress_shape_matrix(self, patch: Patch1d, params: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 1]"]) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]"]:
         ...
 class Element2d:
     def displacement_shape_matrix(self, patch: Patch2d, params: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 2]"]) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]"]:
@@ -76,7 +68,29 @@ class Element2d:
         ...
     def strain_matrix(self, patch: Patch2d, params: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 2]"]) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]"]:
         ...
-    def stress_matrix(self, patch: Patch2d, params: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 2]"]) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]"]:
+    def stress_shape_matrix(self, patch: Patch2d, params: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 2]"]) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]"]:
+        ...
+class Field:
+    U_X: typing.ClassVar[Field]
+    U_Y: typing.ClassVar[Field]
+    U_Z: typing.ClassVar[Field]
+    U_N: typing.ClassVar[Field]
+    U_S: typing.ClassVar[Field]
+    ROT_X: typing.ClassVar[Field]
+    ROT_Y: typing.ClassVar[Field]
+    ROT_Z: typing.ClassVar[Field]
+    ROT_N: typing.ClassVar[Field]
+    ROT_S: typing.ClassVar[Field]
+    __members__: typing.ClassVar[dict[str, Field]]
+    def __init__(self, value: typing.SupportsInt | typing.SupportsIndex) -> None:
+        ...
+    def __int__(self) -> int:
+        ...
+    @property
+    def name(self) -> str:
+        ...
+    @property
+    def value(self) -> int:
         ...
 class FieldType:
     """
@@ -132,9 +146,6 @@ class FieldType:
     @property
     def value(self) -> int:
         ...
-class ForceTraction(BoundaryField):
-    def __init__(self, traction: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[3, 1]"], local: bool = False) -> None:
-        ...
 class Function1d:
     def __call__(self, params: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 1]"]) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, n]"]:
         ...
@@ -154,7 +165,7 @@ class GaussLegendre2d(QuadratureRule2d):
 class LagrangeBoundaryCondition2d(Condition2d):
     def __init__(self, boundary: PatchBoundary2d, element: Element2d, quadrature: QuadratureRule1d) -> None:
         ...
-    def add(self, field: BoundaryField, value: typing.SupportsFloat | typing.SupportsIndex = 0.0) -> LagrangeBoundaryCondition2d:
+    def add(self, field: BoundaryValue, value: typing.SupportsFloat | typing.SupportsIndex = 0.0) -> LagrangeBoundaryCondition2d:
         ...
 class LinearConstraint(Constraint):
     def __init__(self, slaves: typing.Annotated[numpy.typing.ArrayLike, numpy.int32, "[m, 1]"], masters: typing.Annotated[numpy.typing.ArrayLike, numpy.int32, "[m, n]"], weights: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 1]"], constant: typing.SupportsFloat | typing.SupportsIndex) -> None:
@@ -224,10 +235,10 @@ class LoadBoundaryCondition2d(Condition2d):
     def __init__(self, boundary: PatchBoundary2d, element: Element2d, quadrature: QuadratureRule1d) -> None:
         ...
     @typing.overload
-    def add(self, field: BoundaryField, value: typing.SupportsFloat | typing.SupportsIndex = 0.0) -> LoadBoundaryCondition2d:
+    def add(self, field: BoundaryValue, value: typing.SupportsFloat | typing.SupportsIndex = 0.0) -> LoadBoundaryCondition2d:
         ...
     @typing.overload
-    def add(self, field: BoundaryField, values: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 1]"]) -> LoadBoundaryCondition2d:
+    def add(self, field: BoundaryValue, values: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 1]"]) -> LoadBoundaryCondition2d:
         ...
 class Material1d:
     def bending_stiffness(self) -> float:
@@ -246,15 +257,6 @@ class NURBS(Basis):
     def clamped_uniform(degree: typing.SupportsInt | typing.SupportsIndex, num_basis: typing.SupportsInt | typing.SupportsIndex, weights: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 1]"]) -> NURBS:
         ...
     def weights(self) -> typing.Annotated[numpy.typing.NDArray[numpy.float64], "[m, 1]"]:
-        ...
-class NormalBendingMoment(BoundaryField):
-    def __init__(self) -> None:
-        ...
-class NormalRotation(BoundaryField):
-    def __init__(self) -> None:
-        ...
-class NormalTransverseShear(BoundaryField):
-    def __init__(self) -> None:
         ...
 class Patch1d:
     def __init__(self, basis: Basis, control_points: typing.Annotated[numpy.typing.ArrayLike, numpy.float64, "[m, 3]"]) -> None:
@@ -292,7 +294,7 @@ class PatchBoundary2d(Patch1d):
 class PenaltyBoundaryCondition2d(Condition2d):
     def __init__(self, boundary: PatchBoundary2d, element: Element2d, quadrature: QuadratureRule1d) -> None:
         ...
-    def add(self, field: BoundaryField, penalty: typing.SupportsFloat | typing.SupportsIndex, value: typing.SupportsFloat | typing.SupportsIndex = 0.0) -> PenaltyBoundaryCondition2d:
+    def add(self, field: BoundaryValue, penalty: typing.SupportsFloat | typing.SupportsIndex, value: typing.SupportsFloat | typing.SupportsIndex = 0.0) -> PenaltyBoundaryCondition2d:
         ...
 class PlaneStress2d(Material2d):
     def __init__(self, E: typing.SupportsFloat | typing.SupportsIndex, nu: typing.SupportsFloat | typing.SupportsIndex, t: typing.SupportsFloat | typing.SupportsIndex, k: typing.SupportsFloat | typing.SupportsIndex = 0.8333333333333334, rho: typing.SupportsFloat | typing.SupportsIndex = 0.0) -> None:
@@ -321,15 +323,6 @@ class ShellReissnerMindlin4p(Element2d):
         ...
 class ShellReissnerMindlin5p(Element2d):
     def __init__(self, material: PlaneStress2d) -> None:
-        ...
-class TangentialRotation(BoundaryField):
-    def __init__(self) -> None:
-        ...
-class TransverseDisplacement(BoundaryField):
-    def __init__(self) -> None:
-        ...
-class TwistingMoment(BoundaryField):
-    def __init__(self) -> None:
         ...
 class UniaxialStress1d(Material1d):
     def __init__(self, E: typing.SupportsFloat | typing.SupportsIndex, nu: typing.SupportsFloat | typing.SupportsIndex, A: typing.SupportsFloat | typing.SupportsIndex, I22: typing.SupportsFloat | typing.SupportsIndex, k22: typing.SupportsFloat | typing.SupportsIndex = 0.8333333333333334, rho: typing.SupportsFloat | typing.SupportsIndex = 0.0, I33: typing.SupportsFloat | typing.SupportsIndex = 0.0, k33: typing.SupportsFloat | typing.SupportsIndex = 0.0, J: typing.SupportsFloat | typing.SupportsIndex = 0.0) -> None:

@@ -23,13 +23,9 @@ PenaltyBoundaryCondition<T, d>::PenaltyBoundaryCondition(const PatchBoundary<T, 
 
 template <std::floating_point T, std::size_t d>
 requires (d > 1)
-PenaltyBoundaryCondition<T, d>& PenaltyBoundaryCondition<T, d>::add(Ptr<const BoundaryField<T>> field, 
+PenaltyBoundaryCondition<T, d>& PenaltyBoundaryCondition<T, d>::add(BoundaryValue<T> field,
                                                                     T penalty, T value)
 {
-    if (!field) {
-        throw std::invalid_argument("PenaltyBoundaryCondition::add: "
-                                    "field must not be null.");
-    }
     terms_.push_back({std::move(field), penalty, value});
     return *this;
 }
@@ -46,9 +42,9 @@ void PenaltyBoundaryCondition<T, d>::apply(SystemAssembler<T>& assembler,
     Index    order = element_.basis_order();
     unsigned flags = Flags::None;
     for (const auto& term : terms_) {
-        order = std::max(order, term.field->basis_order());
-        flags |= term.field->flags();
-        flags |= term.field->element_flags(element_);
+        order = std::max(order, term.field.basis_order());
+        flags |= term.field.flags();
+        flags |= term.field.element_flags(element_);
     }
 
     // Get the number of elements, primal DOFs and boundary Gauss points
@@ -77,7 +73,7 @@ void PenaltyBoundaryCondition<T, d>::apply(SystemAssembler<T>& assembler,
 
         for (const auto& term : terms_) {
             // Evaluate the field (w) at the boundary quadrature points
-            Matrix<T> N_w = term.field->evaluate(element_, bd_values);
+            Matrix<T> N_w = term.field.evaluate(element_, bd_values);
 
             // Loop over quadrature points
             for (Index q = 0; q < n_gp; ++q) {

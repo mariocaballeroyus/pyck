@@ -63,6 +63,14 @@ public:
     /// @brief Boundary this workspace is bound to.
     const PatchBoundary<T, d>& boundary() const { return boundary_; }
 
+    /// @brief Outward in-surface unit normal n at the current span's quadrature
+    ///        points (Q × 3), cached by `reinit`. (d == 2 only.)
+    const ColMatrix<T, 3>& outward_normal() const { return outward_normal_; }
+
+    /// @brief In-surface tangent s = a_3 × n at the current span's quadrature
+    ///        points (Q × 3), cached by `reinit`. (d == 2 only.)
+    const ColMatrix<T, 3>& surface_tangent() const { return surface_tangent_; }
+
     /**
      * @brief Refresh per-span data for the given live boundary-span index.
      *        Drives the boundary workspace through its standard `reinit`
@@ -88,6 +96,17 @@ public:
             parent_vals_.patch().decode_span(parent_flat_span);
         // 5. Parent side: basis + intrinsic + extrinsic geometry at lifted points
         parent_vals_.reinit_on_pts(parent_spans, lifted);
+        // 6. Cache the boundary frame the projection fields contract against.
+        if constexpr (d == 2) {
+            outward_normal_ = boundary_.eval_outward_normal(boundary_vals_, parent_vals_);
+            const Index Q = static_cast<Index>(outward_normal_.rows());
+            surface_tangent_.resize(Q, 3);
+            for (Index q = 0; q < Q; ++q) {
+                const Vector3<T> a3 = parent_vals_.A3_.row(q).transpose();
+                const Vector3<T> n  = outward_normal_.row(q).transpose();
+                surface_tangent_.row(q) = a3.cross(n).transpose();
+            }
+        }
     }
 
     ElementValues<T, d - 1> boundary_vals_;
@@ -97,6 +116,12 @@ public:
 private:
 
     const PatchBoundary<T, d>& boundary_;
+
+    /// @brief Cached outward in-surface unit normal n (Q × 3), refreshed per span.
+    ColMatrix<T, 3> outward_normal_;
+
+    /// @brief Cached in-surface tangent s = a_3 × n (Q × 3), refreshed per span.
+    ColMatrix<T, 3> surface_tangent_;
 };
 
 } // namespace pyck

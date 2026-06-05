@@ -4,7 +4,7 @@
 #include <vector>
 #include <Eigen/Dense>
 
-#include "boundary_field.hpp"
+#include "boundary_value.hpp"
 #include "condition.hpp"
 #include "patch_boundary.hpp"
 #include "element.hpp"
@@ -36,20 +36,20 @@ public:
     // === Utility ====================================================================
 
     /**
-     * @brief Register a traction to be enforced on this boundary.
+     * @brief Register a constant traction conjugate to the field.
      *
-     * @param field Physical traction.
+     * @param field Projected field the traction is work-conjugate to.
      * @param value Prescribed value.
      */
-    LoadBoundaryCondition& add(Ptr<const BoundaryField<T>> field, T value);
+    LoadBoundaryCondition& add(BoundaryValue<T> field, T value = T(0));
 
     /**
      * @brief Register pre-evaluated per-quadrature-point traction values.
-     * 
-     * @param field Physical traction.
+     *
+     * @param field          Projected field the traction is work-conjugate to.
      * @param values_at_qpts Pre-evaluated values at quadrature points.
-     */ 
-    LoadBoundaryCondition& add(Ptr<const BoundaryField<T>> field,
+     */
+    LoadBoundaryCondition& add(BoundaryValue<T> field,
                                const Vector<T>& values_at_qpts);
 
     /**
@@ -75,7 +75,7 @@ private:
 
     /// @brief A single traction term registered on this boundary.
     struct Term {
-        Ptr<const BoundaryField<T>> field;   ///< Work-conjugate field for the traction.
+        BoundaryValue<T> field;              ///< Work-conjugate value for the traction.
         bool varying = false;                ///< True if the traction varies per qp.
         T constant_value = T(0);             ///< Constant traction (when not varying).
         Vector<T> values_at_qpts;            ///< Per-qp traction; size num_active_qpts().

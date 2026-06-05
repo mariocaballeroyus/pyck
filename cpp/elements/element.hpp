@@ -2,6 +2,7 @@
 #define PYCK_ELEMENT_HPP
 
 #include <stdexcept>
+#include <utility>
 #include <Eigen/Dense>
 
 #include "patch.hpp"
@@ -63,7 +64,7 @@ public:
     ///        unknowns (displacements, rotations).
     virtual unsigned essential_flags() const = 0;
 
-    /// @brief Flags this element's `stress_matrix` reads (= what its
+    /// @brief Flags this element's `stress_shape_matrix` reads (= what its
     ///        `strain_matrix` + `constitutive_matrix` consume). Used by
     ///        *natural*-boundary fields — those applying work-conjugate
     ///        tractions (shear, bending moment, twisting moment).
@@ -77,7 +78,7 @@ public:
      *        `element.N_sigma_` after the call. Internally
      *        reuses @ref B_voigt_ as scratch for B.
      */
-    virtual void stress_matrix(const ElementValues<T, d>& ev) const;
+    virtual void stress_shape_matrix(const ElementValues<T, d>& ev) const;
 
     /**
      * @brief Primal-DOF shape matrix N_p.
@@ -131,6 +132,36 @@ public:
      */
     virtual void rotation_shape_matrix(const ElementValues<T, d>& ev) const = 0;
 
+    // === Boundary Shape Traces ======================================================
+    //
+    // Trace of the recovered displacement / rotation projected onto a direction,
+    // consumed by the boundary conditions: one scalar row per qp. The direction
+    // `dir` (Q × 3 Cartesian, one per qp) is supplied by the caller — a global
+    // axis ê_x/ê_y/ê_z for the Cartesian components, the boundary frame n / s for
+    // the in-surface ones. A `Field` selection (U_X, U_N, ROT_S, …) is therefore
+    // just a choice of `dir` in the `BoundaryValue` layer.
+    //
+    // Base defaults route through `displacement_shape_matrix` /
+    // `rotation_shape_matrix`, so they are correct for every formulation. `dir`
+    // is a raw `ColMatrix<T,3>` rather than a `BoundaryElementValues`, so these
+    // stay boundary-agnostic and compile for every parametric dimension `d`.
+
+    virtual void displacement(const ElementValues<T, d>& parent,
+                              const ColMatrix<T, 3>& dir, Matrix<T>& out) const;
+
+    virtual void rotation(const ElementValues<T, d>& parent,
+                          const ColMatrix<T, 3>& dir, Matrix<T>& out) const;
+
+protected:
+
+    /// @brief Contravariant surface components (d^1, d^2) of a 3D direction at qp
+    ///        q: d^α = A^{αβ} (d · A_β). Pairs with the covariant tilt rows θ_α
+    ///        for the rotation projections. (d == 2 only.)
+    std::pair<T, T> contravariant_dir(const ElementValues<T, d>& parent, Index q,
+                                      const Vector3<T>& dvec) const;
+
+public:
+
     // === Preallocated scratch =======================================================
     //
     // Per-formulation output matrices for the per-element shape/strain kernels. Public
@@ -139,17 +170,17 @@ public:
     // behaviour. `mutable` since they're scratch — the formulation's logical
     // state is unchanged.
 
-    mutable Matrix<T> B_voigt_;        ///< strain_matrix output / stress_matrix scratch
+    mutable Matrix<T> B_voigt_;        ///< strain_matrix output / stress_shape_matrix scratch
     mutable Matrix<T> N_w_;      ///< displacement_shape_matrix output
     mutable Matrix<T> N_phi_;    ///< rotation_shape_matrix output
-    mutable Matrix<T> N_sigma_;  ///< stress_matrix output
+    mutable Matrix<T> N_sigma_;  ///< stress_shape_matrix output
     mutable Matrix<T> N_primal_; ///< primal_shape_matrix output
 };
 
 
 template <std::floating_point T, std::size_t d>
 void
-Element<T, d>::stress_matrix(const ElementValues<T, d>& ev) const
+Element<T, d>::stress_shape_matrix(const ElementValues<T, d>& ev) const
 {
     strain_matrix(ev);
     const Index Q        = ev.basis_derivs[0].cols();
@@ -220,6 +251,58 @@ Element<T, d>::compute_local_domain_load(const ElementValues<T, d>& ev,
         const T dV = ev.mapped_weights_(q) * ev.jac(q);
         f_local.noalias() += dV *
             (U.middleRows(3 * q, 3).transpose() * b.row(q).transpose());
+    }
+}
+
+// === Boundary Shape Traces ==========================================================
+
+template <std::floating_point T, std::size_t d>
+std::pair<T, T>
+Element<T, d>::contravariant_dir(const ElementValues<T, d>& parent, Index q,
+                                 const Vector3<T>& dvec) const
+{
+    const auto A = parent.cov_basis(q);
+    const Vector3<T> A1 = A(0), A2 = A(1);
+    const T dc1 = dvec.dot(A1), dc2 = dvec.dot(A2);
+    const T gi11 = parent.metric_inv(q, 0);
+    const T gi22 = parent.metric_inv(q, 1);
+    const T gi12 = parent.metric_inv(q, 2);
+    return { gi11 * dc1 + gi12 * dc2, gi12 * dc1 + gi22 * dc2 };
+}
+
+template <std::floating_point T, std::size_t d>
+void
+Element<T, d>::displacement(const ElementValues<T, d>& parent,
+                            const ColMatrix<T, 3>& dir, Matrix<T>& out) const
+{
+    // u·dir from the recovered Cartesian displacement shape (3 rows/qp = N_w_).
+    displacement_shape_matrix(parent);
+    const Matrix<T>& Nw = N_w_;
+    const Index Q = parent.num_points();
+    out.resize(Q, Nw.cols());
+    for (Index q = 0; q < Q; ++q)
+        out.row(q).noalias() = dir.row(q) * Nw.middleRows(3 * q, 3);
+}
+
+template <std::floating_point T, std::size_t d>
+void
+Element<T, d>::rotation(const ElementValues<T, d>& parent,
+                        const ColMatrix<T, 3>& dir, Matrix<T>& out) const
+{
+    // θ·dir = d^α θ_α: contravariant raise of `dir` contracted with the covariant
+    // tilt rows (2/qp = N_phi_).
+    rotation_shape_matrix(parent);
+    const Matrix<T>& Np = N_phi_;
+    const Index Q = parent.num_points();
+    out.resize(Q, Np.cols());
+    if constexpr (d == 2) {
+        for (Index q = 0; q < Q; ++q) {
+            const Vector3<T> dq = dir.row(q).transpose();
+            const auto [du1, du2] = contravariant_dir(parent, q, dq);
+            out.row(q) = du1 * Np.row(2 * q) + du2 * Np.row(2 * q + 1);
+        }
+    } else {
+        out.setZero();
     }
 }
 

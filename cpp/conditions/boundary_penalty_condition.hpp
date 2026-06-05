@@ -4,7 +4,7 @@
 #include <Eigen/Dense>
 #include <vector>
 
-#include "boundary_field.hpp"
+#include "boundary_value.hpp"
 #include "condition.hpp"
 #include "patch_boundary.hpp"
 #include "element.hpp"
@@ -35,13 +35,13 @@ public:
     // === Utility ====================================================================
 
     /**
-     * @brief Register a field to be enforced on this boundary.
+     * @brief Register a boundary value to be enforced on this boundary.
      *
-     * @param field    Physical field (e.g. transverse displacement, normal rotation).
+     * @param field    Boundary value (e.g. displacement / rotation projection).
      * @param penalty  Penalty factor.
      * @param value    Prescribed value.
      */
-    PenaltyBoundaryCondition& add(Ptr<const BoundaryField<T>> field,
+    PenaltyBoundaryCondition& add(BoundaryValue<T> field,
                                   T penalty, T value = T(0));
 
                  
@@ -64,7 +64,7 @@ public:
 private:
     /// @brief A single penalised field constraint registered on this boundary.
     struct Term {
-        Ptr<const BoundaryField<T>> field;   ///< Field whose trace is penalised.
+        BoundaryValue<T> field;              ///< Boundary value whose trace is penalised.
         T penalty;                           ///< Penalty weight α.
         T value;                             ///< Prescribed value on the boundary.
     };
