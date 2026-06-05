@@ -130,13 +130,58 @@ public:
     /**
      * @brief Refine the basis by elevating the polynomial degree by one.
      *
-     * @details Continuity at every existing internal knot is preserved. Each 
+     * @details Continuity at every existing internal knot is preserved. Each
      *          unique knot's multiplicity is incremented by one.
      *
      * @return  A pair of (refined basis, control-point transform matrix).
      *         The transform maps old CPs to new ones.
      */
     virtual std::pair<Ptr<Basis<T>>, Matrix<T>> elevate_degree() const = 0;
+
+    /// @brief Polymorphic deep copy (used by basis-level refinement helpers).
+    virtual Ptr<Basis<T>> clone() const = 0;
+
+    /**
+     * @brief C⁰ Bezier extraction: refine until every interior knot reaches
+     *        multiplicity `degree`, so the basis splits into independent
+     *        Bernstein segments — one per non-empty knot span.
+     *
+     * @details This is the standard operator behind per-element Bezier
+     *          representations (e.g. VTK Bezier cells). It is rational-aware:
+     *          on a NURBS basis the returned basis carries the extracted
+     *          weights and the transform is the rational (Euclidean→Euclidean)
+     *          operator, so each segment is a rational Bezier.
+     *
+     * @return A pair of (extracted basis, transform `C`). `C` is `(n_ext × n)`
+     *         and maps this basis's control values to the extracted ones:
+     *         `ext = C · old`.
+     */
+    std::pair<Ptr<Basis<T>>, Matrix<T>> bezier_extract() const
+    {
+        const Index p = degree_;
+        Ptr<Basis<T>> current = clone();
+        Matrix<T> C = Matrix<T>::Identity(num_basis(), num_basis());
+
+        const T lo = knots_.front();
+        const T hi = knots_.back();
+        for (Index i = 0; i < knots_.size(); ++i) {
+            const T u = knots_[i];
+            if (u <= lo || u >= hi)        continue;  // boundary knot
+            if (i > 0 && knots_[i - 1] == u) continue;  // visit each value once
+
+            Index mult = 0;
+            const KnotVector<T>& kv = current->knot_vector();
+            for (Index j = 0; j < kv.size(); ++j)
+                if (kv[j] == u) ++mult;
+
+            for (Index r = mult; r < p; ++r) {
+                auto [refined, step] = current->insert_knot(u);
+                C = step * C;
+                current = std::move(refined);
+            }
+        }
+        return {std::move(current), std::move(C)};
+    }
 
     // === Properties =================================================================
 

@@ -73,6 +73,12 @@ add_library(pyck_postprocessing INTERFACE)
 target_include_directories(pyck_postprocessing INTERFACE cpp/postprocessing)
 target_link_libraries(pyck_postprocessing INTERFACE pyck_geometry pyck_quadrature)
 
+# IO library (Bezier extraction + VTK export)
+file(GLOB PYCK_IO_SOURCES cpp/io/*.cpp)
+add_library(pyck_io ${PYCK_IO_SOURCES})
+target_include_directories(pyck_io PUBLIC cpp/io)
+target_link_libraries(pyck_io PUBLIC pyck_basis pyck_geometry)
+
 # Elements library
 file(GLOB PYCK_ELEMENTS_SOURCES cpp/elements/*.cpp)
 add_library(pyck_elements ${PYCK_ELEMENTS_SOURCES})
@@ -86,7 +92,7 @@ add_subdirectory(external/pybind11)
 # Python module
 file(GLOB PYCK_BINDINGS_SOURCES cpp/bindings/*.cpp)
 pybind11_add_module(_pyck ${PYCK_BINDINGS_SOURCES})
-target_link_libraries(_pyck PRIVATE pyck_basis pyck_geometry pyck_elements pyck_conditions pyck_constraints pyck_assembly pyck_materials pyck_postprocessing)
+target_link_libraries(_pyck PRIVATE pyck_basis pyck_geometry pyck_elements pyck_conditions pyck_constraints pyck_assembly pyck_materials pyck_postprocessing pyck_io)
 set_target_properties(_pyck PROPERTIES LIBRARY_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/pyck")
 install(TARGETS _pyck DESTINATION pyck)
 
@@ -109,6 +115,7 @@ target_link_libraries(pyck_tests PRIVATE
     pyck_materials
     pyck_quadrature
     pyck_postprocessing
+    pyck_io
     catch
 )
 

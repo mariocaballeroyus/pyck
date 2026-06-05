@@ -79,6 +79,10 @@ public:
      */
     std::pair<Ptr<Basis<T>>, Matrix<T>> elevate_degree() const override;
 
+    /// @brief Polymorphic deep copy.
+    Ptr<Basis<T>> clone() const override
+    { return std::make_shared<NURBS<T>>(this->degree_, this->knots_, weights_); }
+
     // === Properties =================================================================
 
     /// @brief Per-basis-function weights.

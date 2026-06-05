@@ -3,7 +3,9 @@
 ``export_bezier_vtu`` — rational-Bezier exporter. Bezier-extracts the patch (one
 ``VTK_BEZIER_QUADRILATERAL`` cell per knot span) and writes any user fields on the
 same extracted basis, so ParaView 5.9+ renders the geometry and fields exactly
-(no sampling artefact).
+(no sampling artefact). Extraction, packing and serialization are done in C++
+(:mod:`pyck._pyck`); this module is the ergonomic front door that normalizes the
+Python field-dict API and marshals to the native writer.
 """
 
 from __future__ import annotations
@@ -14,11 +16,8 @@ from typing import Mapping, Sequence
 import numpy as np
 import numpy.typing as npt
 
-from pyck.basis import Basis
+import pyck._pyck as _pyck
 from pyck.geometry.surface_patch import SurfacePatch
-
-
-_VTK_BEZIER_QUADRILATERAL = 77
 
 
 # === Bezier-element export =======================================================
@@ -35,15 +34,16 @@ def export_bezier_vtu(
               | Sequence[Mapping[str, npt.ArrayLike] | None]
               | None = None,
     title: str = "pyck bezier",
+    binary: bool = True,
 ) -> Path:
     """Export one or more surface patches as rational-Bezier elements (.vtu).
 
     Each non-empty knot span becomes one ``VTK_BEZIER_QUADRILATERAL`` cell of
     degree (p, q). The geometry and every ``point_data`` field are pushed
-    onto the per-element Bezier basis via repeated knot insertion to full
-    multiplicity (the standard Bezier-extraction operator), so the surface
-    and fields are represented exactly — ParaView 5.9+ evaluates them with
-    Bernstein polynomials and ``RationalWeights`` for the NURBS denominator.
+    onto the per-element Bezier basis via the (rational, for NURBS) Bezier
+    extraction operator, so the surface and fields are represented exactly —
+    ParaView 5.9+ evaluates them with Bernstein polynomials and
+    ``RationalWeights`` for the NURBS denominator.
 
     Parameters
     ----------
@@ -69,11 +69,12 @@ def export_bezier_vtu(
         ``bezier_anchor_params(patch).shape[0]``. The standard recipe is to
         evaluate the field at ``bezier_anchor_params(patch)`` (Greville
         abscissae of the extracted basis); ParaView then interpolates via
-        the same rational Bernstein form as the geometry. The result is a
-        quasi-interpolant — exact for smooth fields up to ``O(h^{p+1})``,
-        with ~1 element of smoothing near singularities.
+        the same rational Bernstein form as the geometry.
     title : str, optional
         XML header comment (default ``"pyck bezier"``).
+    binary : bool, optional
+        Write array data as raw appended binary (default *True*) — compact and
+        fast to load in ParaView. Set *False* for human-readable inline ASCII.
 
     Returns
     -------
@@ -84,167 +85,55 @@ def export_bezier_vtu(
     _, pde_list = _normalise_per_patch(surf, point_data_extracted,
                                        "point_data_extracted")
 
-    cell_pts_list: list[np.ndarray] = []
-    cell_w_list: list[np.ndarray] = []
-    cell_field_lists: dict[str, list[np.ndarray]] = {}
-    cell_degree_list: list[np.ndarray] = []
-    total_cells = 0
-
-    field_dims: dict[str, int] | None = None
-    for patch, pd, pde in zip(patches, pd_list, pde_list):
-        pts, w, fields, p, q, n_cells = _extract_bezier_cells(patch, pd, pde)
-
-        dims_here = {name: arr.shape[-1] for name, arr in fields.items()}
-        if field_dims is None:
-            field_dims = dims_here
-            for name in field_dims:
-                cell_field_lists[name] = []
-        elif dims_here != field_dims:
-            raise ValueError(
-                f"point_data field set / dims mismatch across patches: "
-                f"first patch has {field_dims}, this one has {dims_here}."
-            )
-
-        cell_pts_list.append(pts)
-        cell_w_list.append(w)
-        for name, arr in fields.items():
-            cell_field_lists[name].append(arr)
-        cell_degree_list.append(np.tile(np.asarray([p, q, 0], dtype=np.int32),
-                                        (n_cells, 1)))
-        total_cells += n_cells
-
-    points = np.vstack(cell_pts_list).reshape(-1, 3)
-    weights = np.concatenate([w.reshape(-1) for w in cell_w_list])
-    npts_total = points.shape[0]
-
-    pd_out: dict[str, np.ndarray] = {}
-    for name, blocks in cell_field_lists.items():
-        arr = np.vstack(blocks)
-        arr = arr.reshape(-1, arr.shape[-1])
-        pd_out[name] = arr.squeeze(-1) if arr.shape[1] == 1 else arr
-    pd_out["RationalWeights"] = weights
-
-    connectivity = np.arange(npts_total, dtype=np.int64)
-    cell_sizes = np.concatenate(
-        [np.full(b.shape[0], b.shape[1], dtype=np.int64) for b in cell_pts_list]
-    )
-    offsets = np.cumsum(cell_sizes)
-    cell_types = np.full(total_cells, _VTK_BEZIER_QUADRILATERAL, dtype=np.uint8)
-    degrees = np.vstack(cell_degree_list)
+    cpp_patches = [p._cpp_object for p in patches]
+    pd_maps = [_to_field_map(d) for d in pd_list]
+    pde_maps = [_to_field_map(d) for d in pde_list]
 
     out = Path(path)
-    _write_xml_vtu(
-        out, title, points, connectivity, offsets, cell_types,
-        point_data=pd_out, cell_data={"HigherOrderDegrees": degrees},
-    )
+    _pyck.export_bezier_vtu(str(out), cpp_patches, pd_maps, pde_maps,
+                            title, bool(binary))
     return out
 
 
-def _extract_bezier_cells(
-    surf: SurfacePatch,
-    point_data: Mapping[str, npt.ArrayLike] | None,
-    point_data_extracted: Mapping[str, npt.ArrayLike] | None,
-) -> tuple[np.ndarray, np.ndarray, dict[str, np.ndarray], int, int, int]:
-    """Bezier-extract one patch and pack per-cell points/weights/fields.
+def bezier_anchor_params(surf: SurfacePatch) -> npt.NDArray[np.float64]:
+    """Greville parametric coordinates of the Bezier-extracted basis CPs.
 
-    Returns ``(pts, weights, fields, p, q, n_cells)`` where ``pts`` has shape
-    ``(n_cells, (p+1)*(q+1), 3)`` in VTK Bezier-quad ordering, ``weights``
-    matches the first two dims, and ``fields`` is a name -> array map of the
-    same per-cell layout with trailing field dimension.
+    Returns an ``(n_ext_cps, 2)`` array of ``(u, v)`` anchor points, in
+    u-fastest order matching the extracted CP layout. Sampling a derived
+    field (strain, stress, …) at these points and passing the values to
+    :func:`export_bezier_vtu` via ``point_data_extracted`` is the standard
+    Greville quasi-interpolation recipe for visualising fields that do not
+    live on the displacement basis.
     """
-    bu, bv = surf.basis[0], surf.basis[1]
-    bu_bez, Cu = _bezier_extraction(bu)
-    bv_bez, Cv = _bezier_extraction(bv)
+    return np.asarray(_pyck.bezier_anchor_params(surf._cpp_object))
 
-    p, q = bu.degree, bv.degree
-    nu_old, nv_old = bu.num_basis, bv.num_basis
-    nu_new, nv_new = bu_bez.num_basis, bv_bez.num_basis
 
-    cps_old = np.asarray(surf.control_points, dtype=np.float64).reshape(nv_old, nu_old, 3)
-    cps_new = _kron_apply(Cu, Cv, cps_old)
+# === Internal helpers ============================================================
 
-    wu_new = np.asarray(getattr(bu_bez, "weights", np.ones(nu_new)), dtype=np.float64)
-    wv_new = np.asarray(getattr(bv_bez, "weights", np.ones(nv_new)), dtype=np.float64)
-    weights_new = np.outer(wv_new, wu_new)
 
-    extracted: dict[str, np.ndarray] = {}
-    if point_data:
-        for name, arr in point_data.items():
-            a = np.asarray(arr, dtype=np.float64)
-            if a.shape[0] != nu_old * nv_old:
-                raise ValueError(
-                    f"point_data['{name}']: first dim must be num_control_pts "
-                    f"({nu_old * nv_old}), got {a.shape[0]}."
-                )
-            if a.ndim == 1:
-                a3 = a.reshape(nv_old, nu_old, 1)
-            elif a.ndim == 2:
-                a3 = a.reshape(nv_old, nu_old, a.shape[1])
-            else:
-                raise ValueError(
-                    f"point_data['{name}']: must be 1D (scalar) or 2D (tensor), "
-                    f"got shape {a.shape}."
-                )
-            extracted[name] = _kron_apply(Cu, Cv, a3)
+def _to_field_map(
+    data: Mapping[str, npt.ArrayLike] | None,
+) -> dict[str, np.ndarray]:
+    """Coerce a field dict to ``name -> (n, k)`` float64 arrays (k≥1).
 
-    if point_data_extracted:
-        for name, arr in point_data_extracted.items():
-            a = np.asarray(arr, dtype=np.float64)
-            if a.shape[0] != nu_new * nv_new:
-                raise ValueError(
-                    f"point_data_extracted['{name}']: first dim must be the "
-                    f"number of extracted CPs ({nu_new * nv_new}, matches "
-                    f"bezier_anchor_params(patch).shape[0]), got {a.shape[0]}."
-                )
-            if name in extracted:
-                raise ValueError(
-                    f"Field '{name}' appears in both point_data and "
-                    f"point_data_extracted; choose one source."
-                )
-            if a.ndim == 1:
-                extracted[name] = a.reshape(nv_new, nu_new, 1)
-            elif a.ndim == 2:
-                extracted[name] = a.reshape(nv_new, nu_new, a.shape[1])
-            else:
-                raise ValueError(
-                    f"point_data_extracted['{name}']: must be 1D (scalar) or "
-                    f"2D (tensor), got shape {a.shape}."
-                )
-
-    n_eu = (nu_new - 1) // p
-    n_ev = (nv_new - 1) // q
-    if n_eu * p + 1 != nu_new or n_ev * q + 1 != nv_new:
-        raise RuntimeError(
-            "Bezier extraction did not yield N_e * p + 1 basis functions — "
-            "the basis is not fully C^0-extracted; this is a bug."
-        )
-
-    perm = _bezier_quad_ordering(p, q)
-    npts_per_cell = (p + 1) * (q + 1)
-    n_cells = n_eu * n_ev
-
-    pts = np.empty((n_cells, npts_per_cell, 3), dtype=np.float64)
-    w = np.empty((n_cells, npts_per_cell), dtype=np.float64)
-    fields = {
-        name: np.empty((n_cells, npts_per_cell, arr.shape[-1]), dtype=np.float64)
-        for name, arr in extracted.items()
-    }
-
-    cell = 0
-    for ev in range(n_ev):
-        j0 = ev * q
-        for eu in range(n_eu):
-            i0 = eu * p
-            lc = cps_new[j0:j0 + q + 1, i0:i0 + p + 1, :].reshape(-1, 3)
-            lw = weights_new[j0:j0 + q + 1, i0:i0 + p + 1].reshape(-1)
-            pts[cell] = lc[perm]
-            w[cell] = lw[perm]
-            for name, arr in extracted.items():
-                local = arr[j0:j0 + q + 1, i0:i0 + p + 1, :].reshape(-1, arr.shape[-1])
-                fields[name][cell] = local[perm]
-            cell += 1
-
-    return pts, w, fields, p, q, n_cells
+    Scalars given as 1-D ``(n,)`` are reshaped to ``(n, 1)`` so the native
+    writer always sees a 2-D array and reads the component count from its
+    columns.
+    """
+    if not data:
+        return {}
+    out: dict[str, np.ndarray] = {}
+    for name, arr in data.items():
+        a = np.ascontiguousarray(np.asarray(arr, dtype=np.float64))
+        if a.ndim == 1:
+            a = a.reshape(-1, 1)
+        elif a.ndim != 2:
+            raise ValueError(
+                f"field '{name}': must be 1-D (scalar) or 2-D (tensor), "
+                f"got shape {a.shape}."
+            )
+        out[name] = a
+    return out
 
 
 def _normalise_per_patch(
@@ -275,145 +164,3 @@ def _normalise_per_patch(
                     f"of patches ({len(patches)})."
                 )
     return patches, out
-
-
-def bezier_anchor_params(surf: SurfacePatch) -> npt.NDArray[np.float64]:
-    """Greville parametric coordinates of the Bezier-extracted basis CPs.
-
-    Returns an ``(n_ext_cps, 2)`` array of ``(u, v)`` anchor points, in
-    u-fastest order matching the extracted CP layout. Sampling a derived
-    field (strain, stress, …) at these points and passing the values to
-    :func:`export_bezier_vtu` via ``point_data_extracted`` is the standard
-    Greville quasi-interpolation recipe for visualising fields that do not
-    live on the displacement basis.
-    """
-    bu, bv = surf.basis[0], surf.basis[1]
-    bu_bez, _ = _bezier_extraction(bu)
-    bv_bez, _ = _bezier_extraction(bv)
-    g_u = _greville(bu_bez)
-    g_v = _greville(bv_bez)
-    uu, vv = np.meshgrid(g_u, g_v, indexing="xy")  # v outer, u inner
-    return np.column_stack([uu.ravel(), vv.ravel()])
-
-
-def _greville(basis: Basis) -> npt.NDArray[np.float64]:
-    """Greville abscissae G_i = mean(knots[i+1 : i+p+1]) for i in 0..n-1."""
-    knots = np.asarray(basis.knots, dtype=np.float64)
-    p = basis.degree
-    n = basis.num_basis
-    return np.asarray([knots[i + 1 : i + p + 1].mean() for i in range(n)])
-
-
-def _bezier_extraction(basis: Basis) -> tuple[Basis, npt.NDArray[np.float64]]:
-    """Refine `basis` so every interior knot has multiplicity p; return (basis, T)."""
-    p = basis.degree
-    knots = np.asarray(basis.knots, dtype=np.float64)
-    interior = knots[p + 1:-(p + 1)]
-    new_basis = basis
-    transform: np.ndarray | None = None
-    if interior.size > 0:
-        for u in np.unique(interior):
-            current_mult = int(np.sum(np.isclose(np.asarray(new_basis.knots), u)))
-            count = p - current_mult
-            if count > 0:
-                new_basis, T_step = new_basis.insert_knot(float(u), count=count)
-                transform = T_step if transform is None else T_step @ transform
-    if transform is None:
-        transform = np.eye(basis.num_basis)
-    return new_basis, transform
-
-
-def _kron_apply(Cu: np.ndarray, Cv: np.ndarray,
-                arr: np.ndarray) -> np.ndarray:
-    """Apply Cu along the u (axis 1) and Cv along the v (axis 0) direction.
-
-    arr has shape (nv_old, nu_old, k); returns (nv_new, nu_new, k).
-    """
-    tmp = np.einsum("ij,vjk->vik", Cu, arr)
-    return np.einsum("Jv,vik->Jik", Cv, tmp)
-
-
-def _bezier_quad_ordering(p: int, q: int) -> npt.NDArray[np.int64]:
-    """Permutation mapping VTK Bezier-quad ordinal -> lex index ``i + j*(p+1)``.
-
-    VTK Lagrange/Bezier quad layout (vtkHigherOrderQuadrilateral): 4 corners,
-    then per-edge interior CPs ordered along *increasing* parametric coords —
-    so both i-axis edges run with i=1..p-1 and both j-axis edges with
-    j=1..q-1 (NOT a CCW corner walk; edges 2 and 3 are not reversed). Then
-    the interior face block in lex order with i fastest.
-    """
-    def lex(i: int, j: int) -> int:
-        return i + j * (p + 1)
-
-    perm: list[int] = [lex(0, 0), lex(p, 0), lex(p, q), lex(0, q)]
-    perm.extend(lex(i, 0) for i in range(1, p))    # edge 0: j=0, i ascending
-    perm.extend(lex(p, j) for j in range(1, q))    # edge 1: i=p, j ascending
-    perm.extend(lex(i, q) for i in range(1, p))    # edge 2: j=q, i ascending
-    perm.extend(lex(0, j) for j in range(1, q))    # edge 3: i=0, j ascending
-    for j in range(1, q):
-        for i in range(1, p):
-            perm.append(lex(i, j))                  # interior face, lex
-    return np.asarray(perm, dtype=np.int64)
-
-
-def _write_xml_vtu(
-    path: Path,
-    title: str,
-    points: npt.NDArray[np.float64],
-    connectivity: npt.NDArray[np.int64],
-    offsets: npt.NDArray[np.int64],
-    cell_types: npt.NDArray[np.uint8],
-    point_data: Mapping[str, npt.NDArray],
-    cell_data: Mapping[str, npt.NDArray],
-) -> None:
-    n_pts = points.shape[0]
-    n_cells = offsets.shape[0]
-
-    def write_array(f, name: str, arr: np.ndarray, dtype: str) -> None:
-        ncomp = 1 if arr.ndim == 1 else arr.shape[1]
-        name_attr = f' Name="{name}"' if name else ""
-        ncomp_attr = f' NumberOfComponents="{ncomp}"' if ncomp > 1 else ""
-        f.write(
-            f'        <DataArray type="{dtype}"{name_attr}{ncomp_attr} '
-            f'format="ascii">\n'
-        )
-        fmt = "%.8e" if dtype.startswith("Float") else "%d"
-        data = arr.reshape(-1, ncomp) if arr.ndim > 1 else arr[:, None]
-        np.savetxt(f, data, fmt=fmt)
-        f.write("        </DataArray>\n")
-
-    with path.open("w") as f:
-        f.write('<?xml version="1.0"?>\n')
-        f.write(f"<!-- {title} -->\n")
-        f.write(
-            '<VTKFile type="UnstructuredGrid" version="2.2" '
-            'byte_order="LittleEndian">\n'
-        )
-        f.write("  <UnstructuredGrid>\n")
-        f.write(
-            f'    <Piece NumberOfPoints="{n_pts}" NumberOfCells="{n_cells}">\n'
-        )
-
-        f.write("      <PointData>\n")
-        for name, arr in point_data.items():
-            write_array(f, name, np.asarray(arr), "Float64")
-        f.write("      </PointData>\n")
-
-        f.write("      <CellData>\n")
-        for name, arr in cell_data.items():
-            write_array(f, name, np.asarray(arr), "Int32")
-        f.write("      </CellData>\n")
-
-        f.write("      <Points>\n")
-        write_array(f, "", points, "Float64")
-        f.write("      </Points>\n")
-
-        f.write("      <Cells>\n")
-        write_array(f, "connectivity", connectivity, "Int64")
-        write_array(f, "offsets", offsets, "Int64")
-        write_array(f, "types", cell_types, "UInt8")
-        f.write("      </Cells>\n")
-
-        f.write("    </Piece>\n")
-        f.write("  </UnstructuredGrid>\n")
-        f.write("</VTKFile>\n")
