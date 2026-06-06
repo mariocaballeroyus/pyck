@@ -36,6 +36,7 @@ constexpr unsigned Curvature       = 1u << 4;  ///< B_{αβ} = A_{α,β}·A_3   
 constexpr unsigned Deriv3          = 1u << 5;  ///< A_{α,βγ}                  (position order 3)
 constexpr unsigned NormalDeriv1    = 1u << 6;  ///< A_{3,β} = −B^α_β A_α      (d=2)
 constexpr unsigned Connection      = 1u << 7;  ///< Christoffel Γ_{ε,αβ} = A_ε·A_{,αβ}
+constexpr unsigned NormalDeriv2    = 1u << 8;  ///< A_{3,βγ}                  (d=2)
 
 } // namespace Flags
 
@@ -207,6 +208,8 @@ public:
             if (flags_ & Flags::NormalDeriv1)
                 geometry::surface::compute_normal_derivative<T>(position_derivs, curvature_,
                                                                 metric_inv_, A3_d_);
+            if (flags_ & Flags::NormalDeriv2)
+                geometry::surface::compute_normal_derivative2<T>(position_derivs, jac, A3_dd_);
         }
     }
 
@@ -284,6 +287,11 @@ public:
     /// @brief First derivatives of the unit normal A_{3,β} (Weingarten), packed
     ///        β-major: A_{3,β} at q in row β·Q + q. Shape (d·Q) × 3.
     ColMatrix<T, 3> A3_d_;
+
+    /// @brief Second derivatives of the unit normal A_{3,βγ}, symmetric in (β, γ),
+    ///        packed pair-major via pack2: A_{3,βγ} at q in row pack2(β,γ)·Q + q.
+    ///        Shape (d(d+1)/2 · Q) × 3.
+    ColMatrix<T, 3> A3_dd_;
 
     // === Per-point accessors ========================================================
     //
@@ -364,6 +372,11 @@ public:
     detail::VectorFieldView<T> normal_deriv(Index q) const
     { return {A3_d_, num_points(), q}; }
 
+    /// @brief Second derivatives A_{3,βγ} of the unit normal; read as `ndd(β, γ)`.
+    ///        Symmetric in (β, γ). (d == 2 only.)
+    detail::VectorField2View<T, d> normal_deriv2(Index q) const
+    { return {A3_dd_, num_points(), q}; }
+
     /// @brief Second fundamental form component b_{ij} at point q (packed).
     T curvature(Index q, Index packed) const { return curvature_(q, packed); }
 
@@ -381,6 +394,7 @@ private:
     ///        for the Laplace–Beltrami gradient.
     static unsigned expand_flags(unsigned f)
     {
+        if (f & Flags::NormalDeriv2)     f |= Flags::Deriv3;
         if (f & Flags::Connection)       f |= Flags::Deriv2;
         if (f & Flags::NormalDeriv1)     f |= Flags::Curvature;
         if (f & Flags::Curvature)        f |= Flags::Deriv2 | Flags::Normal;

@@ -151,6 +151,85 @@ inline void compute_normal_derivative(const std::vector<ColMatrix<T, 3>>& pos_de
     }
 }
 
+// === Second Normal Derivative =======================================================
+
+/**
+ * @brief Fill the second derivatives of the unit normal A_{3,βγ} by differentiating
+ *        A_3 = m/J, m = A_1 × A_2, J = ‖m‖, twice — straight from the position
+ *        derivatives, with no curvature or connection intermediary. With
+ *          m_{,α}  = A_{1,α}×A_2 + A_1×A_{2,α},
+ *          m_{,αβ} = A_{1,αβ}×A_2 + A_{1,α}×A_{2,β} + A_{1,β}×A_{2,α} + A_1×A_{2,αβ},
+ *          J_{,α}  = (m·m_{,α})/J,
+ *          J_{,αβ} = (m_{,α}·m_{,β} + m·m_{,αβ})/J − J_{,α}J_{,β}/J,
+ *        the quotient rule gives
+ *          A_{3,αβ} = m_{,αβ}/J − (m_{,α}J_{,β} + m_{,β}J_{,α} + m J_{,αβ})/J²
+ *                     + 2 m J_{,α}J_{,β}/J³.
+ *        Reads position derivatives up to order 3 (A_{α,βγ}); the cached surface
+ *        Jacobian supplies J.
+ *
+ * @param pos_derivs        Per-order position derivatives at Q quadrature points.
+ * @param jacobians         Surface Jacobians √det A_{αβ} at each point.
+ * @param normal_deriv2_out Output A_{3,βγ}, pair-major: A_{3,βγ} at q in row pack2(β,γ)·Q + q.
+ */
+template <std::floating_point T>
+inline void compute_normal_derivative2(const std::vector<ColMatrix<T, 3>>& pos_derivs,
+                                       const Vector<T>& jacobians,
+                                       ColMatrix<T, 3>& normal_deriv2_out)
+{
+    const auto& R   = pos_derivs;
+    const auto& Jac = jacobians;
+    auto&       ddA3 = normal_deriv2_out;
+
+    const Index n_gp = Jac.size();
+    ddA3.resize(3 * n_gp, 3);
+
+    // A_α, A_{α,β}, A_{α,βγ} at point q (α, β, γ ∈ {0, 1}).
+    auto A    = [&](Index a, Index q) -> Vector3<T> {
+        return R[1].row(a * n_gp + q).transpose();
+    };
+    auto A_d  = [&](Index a, Index b, Index q) -> Vector3<T> {
+        return R[2].row(pack2<2>(a, b) * n_gp + q).transpose();
+    };
+    auto A_dd = [&](Index a, Index b, Index c, Index q) -> Vector3<T> {
+        return R[3].row(pack3<2>(a, b, c) * n_gp + q).transpose();
+    };
+
+    for (Index q = 0; q < n_gp; ++q) {
+        const T J  = Jac(q);
+        const T J2 = J * J, J3 = J2 * J;
+
+        const Vector3<T> A1 = A(0, q), A2 = A(1, q);
+        const Vector3<T> m  = A1.cross(A2);
+
+        // m_{,α} and J_{,α}.
+        Vector3<T> m_d[2];
+        T          J_d[2];
+        for (Index a = 0; a < 2; ++a) {
+            m_d[a] = A_d(0, a, q).cross(A2) + A1.cross(A_d(1, a, q));
+            J_d[a] = m.dot(m_d[a]) / J;
+        }
+
+        // A_{3,αβ} for the unique pairs (0,0), (0,1), (1,1).
+        for (Index a = 0; a < 2; ++a)
+            for (Index b = a; b < 2; ++b) {
+                const Vector3<T> m_dd = A_dd(0, a, b, q).cross(A2)
+                                      + A_d(0, a, q).cross(A_d(1, b, q))
+                                      + A_d(0, b, q).cross(A_d(1, a, q))
+                                      + A1.cross(A_dd(1, a, b, q));
+
+                const T J_dd = (m_d[a].dot(m_d[b]) + m.dot(m_dd)) / J
+                             - J_d[a] * J_d[b] / J;
+
+                const Vector3<T> ddA3_ab =
+                      m_dd / J
+                    - (m_d[a] * J_d[b] + m_d[b] * J_d[a] + J_dd * m) / J2
+                    + (T(2) * J_d[a] * J_d[b] / J3) * m;
+
+                ddA3.row(pack2<2>(a, b) * n_gp + q) = ddA3_ab.transpose();
+            }
+    }
+}
+
 } // namespace geometry::surface
 
 } // namespace pyck

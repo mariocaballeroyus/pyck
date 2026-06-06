@@ -374,6 +374,125 @@ TEST_CASE("Patch<double, 2>: composable primitives on twisted z=u·v patch",
 
 
 // ===========================================================================
+// Test 6b: Second normal derivative A_{3,αβ} — closed form on the twisted
+// z = u·v patch. Validates compute_normal_derivative2 / normal_deriv2. The
+// patch is bilinear, so the third position derivatives A_{α,βγ} vanish and this
+// exercises the quotient-rule assembly (m_{,α}, J_{,α}, J_{,αβ}); Test 6d below
+// covers the A_{α,βγ} terms.
+// ===========================================================================
+
+TEST_CASE("Patch<double, 2>: second normal derivative on twisted z=u·v patch",
+          "[geometry][surface][primitives]") {
+
+    auto kv = KnotVector<double>(std::vector<double>{0, 0, 1, 1});
+    auto basis_u = std::make_shared<BSpline<double>>(1, kv);
+    auto basis_v = std::make_shared<BSpline<double>>(1, kv);
+
+    Eigen::MatrixXd cp(4, 3);
+    cp.row(0) << 0.0, 0.0, 0.0;
+    cp.row(1) << 1.0, 0.0, 0.0;
+    cp.row(2) << 0.0, 1.0, 0.0;
+    cp.row(3) << 1.0, 1.0, 1.0;
+    Patch<double, 2> surf(basis_u, basis_v, cp);
+
+    ColMatrix<double, 2> pts(3, 2);
+    pts << 0.3, 0.4,
+           0.5, 0.5,
+           0.8, 0.2;
+
+    auto local = element_values_at(surf, pts, Index(3), Flags::NormalDeriv2);
+    REQUIRE(local.num_points() == 3);
+
+    for (Eigen::Index q = 0; q < pts.rows(); ++q) {
+        const double u = pts(q, 0);
+        const double v = pts(q, 1);
+        const double D   = 1.0 + u * u + v * v;
+        const double D52 = D * D * std::sqrt(D);   // D^{5/2}
+
+        const auto ndd = local.normal_deriv2(q);
+        const Vector3<double> a3_uu = ndd(0, 0);
+        const Vector3<double> a3_uv = ndd(0, 1);
+        const Vector3<double> a3_vv = ndd(1, 1);
+
+        // Closed form on z = u·v (third position derivatives vanish):
+        //   A_{3,uu} = ( v(1−2u²+v²),  3u(1+v²),     2u²−v²−1 ) / D^{5/2}
+        //   A_{3,uv} = ( u(1+u²−2v²),  v(1−2u²+v²),  3uv      ) / D^{5/2}
+        //   A_{3,vv} = ( 3v(1+u²),     u(1+u²−2v²),  2v²−u²−1 ) / D^{5/2}
+        CHECK(a3_uu(0) == Approx(v * (1.0 - 2*u*u + v*v) / D52).margin(1e-11));
+        CHECK(a3_uu(1) == Approx(3.0 * u * (1.0 + v*v)   / D52).margin(1e-11));
+        CHECK(a3_uu(2) == Approx((2*u*u - v*v - 1.0)     / D52).margin(1e-11));
+
+        CHECK(a3_uv(0) == Approx(u * (1.0 + u*u - 2*v*v) / D52).margin(1e-11));
+        CHECK(a3_uv(1) == Approx(v * (1.0 - 2*u*u + v*v) / D52).margin(1e-11));
+        CHECK(a3_uv(2) == Approx(3.0 * u * v             / D52).margin(1e-11));
+
+        CHECK(a3_vv(0) == Approx(3.0 * v * (1.0 + u*u)   / D52).margin(1e-11));
+        CHECK(a3_vv(1) == Approx(u * (1.0 + u*u - 2*v*v) / D52).margin(1e-11));
+        CHECK(a3_vv(2) == Approx((2*v*v - u*u - 1.0)     / D52).margin(1e-11));
+
+        // Symmetry A_{3,αβ} = A_{3,βα}.
+        const Vector3<double> a3_vu = ndd(1, 0);
+        CHECK((a3_uv - a3_vu).norm() == Approx(0.0).margin(1e-14));
+    }
+}
+
+
+// ===========================================================================
+// Test 6d: Second normal derivative on a curved bi-quadratic patch — checked
+// against a central finite difference of the cached (Weingarten) first
+// derivative A_{3,α}. The two are computed by independent paths (cross-product
+// quotient rule vs. shape operator), and the bi-quadratic geometry has nonzero
+// third position derivatives, so this exercises the A_{α,βγ} terms.
+// ===========================================================================
+
+TEST_CASE("Patch<double, 2>: second normal derivative matches FD of the first",
+          "[geometry][surface][primitives]") {
+
+    auto kv = KnotVector<double>(std::vector<double>{0, 0, 0, 1, 1, 1});
+    auto basis_u = std::make_shared<BSpline<double>>(2, kv);
+    auto basis_v = std::make_shared<BSpline<double>>(2, kv);
+
+    // Arbitrary doubly-curved control net (nonzero third position derivatives).
+    const double zs[3][3] = {{0.0, 0.2, 0.1}, {0.3, 0.7, 0.2}, {0.1, 0.4, 0.9}};
+    Eigen::MatrixXd cp(9, 3);
+    int r = 0;
+    for (int j = 0; j < 3; ++j)
+        for (int i = 0; i < 3; ++i)
+            cp.row(r++) << 0.5 * i, 0.5 * j, zs[j][i];
+    Patch<double, 2> surf(basis_u, basis_v, cp);
+
+    // First derivative A_{3,α} (Weingarten) at a single point.
+    auto a3d_at = [&](double u, double v) {
+        ColMatrix<double, 2> p(1, 2);
+        p << u, v;
+        auto lv = element_values_at(surf, p, Index(3),
+                                    Flags::Normal | Flags::NormalDeriv1);
+        return std::array<Vector3<double>, 2>{ lv.normal_deriv(0)(0),
+                                               lv.normal_deriv(0)(1) };
+    };
+
+    const double u0 = 0.4, v0 = 0.55, h = 1e-5;
+
+    ColMatrix<double, 2> p(1, 2);
+    p << u0, v0;
+    auto local = element_values_at(surf, p, Index(3), Flags::NormalDeriv2);
+    const auto ndd = local.normal_deriv2(0);
+
+    const auto a3d_up = a3d_at(u0 + h, v0), a3d_um = a3d_at(u0 - h, v0);
+    const auto a3d_vp = a3d_at(u0, v0 + h), a3d_vm = a3d_at(u0, v0 - h);
+
+    for (int a = 0; a < 2; ++a) {
+        const Vector3<double> d_du = (a3d_up[a] - a3d_um[a]) / (2.0 * h);  // A_{3,αu}
+        const Vector3<double> d_dv = (a3d_vp[a] - a3d_vm[a]) / (2.0 * h);  // A_{3,αv}
+        for (int c = 0; c < 3; ++c) {
+            CHECK(ndd(a, 0)(c) == Approx(d_du(c)).margin(1e-6));
+            CHECK(ndd(a, 1)(c) == Approx(d_dv(c)).margin(1e-6));
+        }
+    }
+}
+
+
+// ===========================================================================
 // Test 6c: IntrinsicGeometry / ExtrinsicGeometry composition. Verifies that
 // the container builders produce byte-for-byte the same data as calling the
 // underlying free functions individually on the twisted z = u·v patch.
