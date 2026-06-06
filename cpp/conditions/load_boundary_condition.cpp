@@ -51,9 +51,11 @@ template <std::floating_point T, std::size_t d>
 requires (d > 1)
 void LoadBoundaryCondition<T, d>::apply(SystemAssembler<T>& assembler,
                                         const DofLayout& layout,
-                                        DofLayout::BlockId primal_block) const
+                                        const PatchBlocks<T, d>& blocks) const
 {
     if (terms_.empty()) return;
+
+    const DofLayout::BlockId primal_block = blocks.primal(*boundary_.parent());
 
     // Infer the required order and flags
     Index    order = element_.basis_order();

@@ -54,13 +54,13 @@ public:
     /**
      * @brief Assemble the condition's contribution into the global system.
      *
-     * @param assembler     Sparse-assembly sink for stiffness and load (mutable).
-     * @param layout        DOF layout (read-only).
-     * @param primal_block  This condition's patch primal block.
+     * @param assembler  Sparse-assembly sink for stiffness and load (mutable).
+     * @param layout     DOF layout (read-only).
+     * @param blocks     Patch to primal-block resolver.
      */
     void apply(SystemAssembler<T>& assembler,
                const DofLayout& layout,
-               DofLayout::BlockId primal_block) const override;
+               const PatchBlocks<T, d>& blocks) const override;
 
     // === Properties =================================================================
 

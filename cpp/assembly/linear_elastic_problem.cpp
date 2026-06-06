@@ -36,6 +36,13 @@ void LinearElasticProblem<T, d>::assemble(SparseMatrix<T>& K, Vector<T>& F) cons
         primal_blocks.push_back(layout_.allocate(DofType::Primal, num_cps * ndof, ndof));
     }
 
+    // Resolver mapping patch identity to its primal block. A single-patch
+    // condition resolves its own patch; a coupling condition resolves both.
+    PatchBlocks<T, d> blocks;
+    for (std::size_t p = 0; p < patches_.size(); ++p) {
+        blocks.add(*patches_[p], primal_blocks[p]);
+    }
+
     // Allocate auxiliary DOFs per patch (e.g. Lagrange multipliers).
     for (std::size_t p = 0; p < patches_.size(); ++p) {
         for (const auto& cond : conditions_per_patch_[p]) {
@@ -94,7 +101,7 @@ void LinearElasticProblem<T, d>::assemble(SparseMatrix<T>& K, Vector<T>& F) cons
     // --- Conditions -----------------------------------------------------------------
     for (std::size_t p = 0; p < patches_.size(); ++p) {
         for (const auto& cond : conditions_per_patch_[p]) {
-            cond->apply(assembler, layout_, primal_blocks[p]);
+            cond->apply(assembler, layout_, blocks);
         }
     }
 

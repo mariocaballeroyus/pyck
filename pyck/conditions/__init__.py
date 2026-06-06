@@ -10,6 +10,9 @@ from pyck.conditions.boundary_lagrange_condition import (
 from pyck.conditions.boundary_penalty_condition import (
     PenaltyBoundaryCondition,
 )
+from pyck.conditions.penalty_coupling_condition import (
+    PenaltyCouplingCondition,
+)
 
 
 __all__ = [
@@ -19,4 +22,5 @@ __all__ = [
     "LoadBoundaryCondition",
     "LagrangeBoundaryCondition",
     "PenaltyBoundaryCondition",
+    "PenaltyCouplingCondition",
 ]

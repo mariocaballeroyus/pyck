@@ -24,6 +24,7 @@ from pyck.conditions import (
     LoadBoundaryCondition,
     LagrangeBoundaryCondition,
     PenaltyBoundaryCondition,
+    PenaltyCouplingCondition,
 )
 from pyck.constraints import (
     Constraint,
@@ -80,6 +81,7 @@ __all__ = [
     "LoadBoundaryCondition",
     "LagrangeBoundaryCondition",
     "PenaltyBoundaryCondition",
+    "PenaltyCouplingCondition",
     "Constraint",
     "DirectConstraint",
     "LinearConstraint",

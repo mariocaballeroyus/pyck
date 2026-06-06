@@ -4,7 +4,7 @@ import numpy
 import numpy.typing
 import scipy.sparse
 import typing
-__all__: list[str] = ['BSpline', 'Basis', 'BoundaryValue', 'Condition1d', 'Condition2d', 'Constraint', 'DirectConstraint', 'Element1d', 'Element2d', 'Field', 'FieldType', 'Function1d', 'Function2d', 'GaussLegendre1d', 'GaussLegendre2d', 'LagrangeBoundaryCondition2d', 'LinearConstraint', 'LinearElasticProblem1d', 'LinearElasticProblem2d', 'LoadBoundaryCondition2d', 'Material1d', 'Material2d', 'NURBS', 'Patch1d', 'Patch2d', 'PatchBoundary2d', 'PenaltyBoundaryCondition2d', 'PlaneStress2d', 'QuadratureRule1d', 'QuadratureRule2d', 'ShellKirchhoffLove3p', 'ShellReissnerMindlin4p', 'ShellReissnerMindlin5p', 'UniaxialStress1d', 'bezier_anchor_params', 'eval_quadrature_data', 'export_bezier_vtm', 'export_bezier_vtu', 'inner_product']
+__all__: list[str] = ['BSpline', 'Basis', 'BoundaryValue', 'Condition1d', 'Condition2d', 'Constraint', 'DirectConstraint', 'Element1d', 'Element2d', 'Field', 'FieldType', 'Function1d', 'Function2d', 'GaussLegendre1d', 'GaussLegendre2d', 'LagrangeBoundaryCondition2d', 'LinearConstraint', 'LinearElasticProblem1d', 'LinearElasticProblem2d', 'LoadBoundaryCondition2d', 'Material1d', 'Material2d', 'NURBS', 'Patch1d', 'Patch2d', 'PatchBoundary2d', 'PenaltyBoundaryCondition2d', 'PenaltyCouplingCondition2d', 'PlaneStress2d', 'QuadratureRule1d', 'QuadratureRule2d', 'ShellKirchhoffLove3p', 'ShellReissnerMindlin4p', 'ShellReissnerMindlin5p', 'UniaxialStress1d', 'bezier_anchor_params', 'eval_quadrature_data', 'export_bezier_vtm', 'export_bezier_vtu', 'inner_product']
 class BSpline(Basis):
     @staticmethod
     def clamped_uniform(degree: typing.SupportsInt | typing.SupportsIndex, num_basis: typing.SupportsInt | typing.SupportsIndex) -> BSpline:
@@ -295,6 +295,15 @@ class PenaltyBoundaryCondition2d(Condition2d):
     def __init__(self, boundary: PatchBoundary2d, element: Element2d, quadrature: QuadratureRule1d) -> None:
         ...
     def add(self, field: BoundaryValue, penalty: typing.SupportsFloat | typing.SupportsIndex, value: typing.SupportsFloat | typing.SupportsIndex = 0.0) -> PenaltyBoundaryCondition2d:
+        ...
+class PenaltyCouplingCondition2d(Condition2d):
+    def __init__(self, boundary_a: PatchBoundary2d, boundary_b: PatchBoundary2d, element: Element2d, quadrature: QuadratureRule1d) -> None:
+        ...
+    def add(self, field: BoundaryValue, penalty: typing.SupportsFloat | typing.SupportsIndex) -> PenaltyCouplingCondition2d:
+        ...
+    def couple_displacement(self, penalty: typing.SupportsFloat | typing.SupportsIndex) -> PenaltyCouplingCondition2d:
+        ...
+    def couple_kinematics(self, penalty_disp: typing.SupportsFloat | typing.SupportsIndex, penalty_rot: typing.SupportsFloat | typing.SupportsIndex) -> PenaltyCouplingCondition2d:
         ...
 class PlaneStress2d(Material2d):
     def __init__(self, E: typing.SupportsFloat | typing.SupportsIndex, nu: typing.SupportsFloat | typing.SupportsIndex, t: typing.SupportsFloat | typing.SupportsIndex, k: typing.SupportsFloat | typing.SupportsIndex = 0.8333333333333334, rho: typing.SupportsFloat | typing.SupportsIndex = 0.0) -> None:

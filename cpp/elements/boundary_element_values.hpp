@@ -109,6 +109,52 @@ public:
         }
     }
 
+    /**
+     * @brief Refresh per-span data at caller-supplied boundary parametric points
+     *        within a known live boundary span, instead of self-driving the
+     *        boundary quadrature.
+     *
+     * @details Same pipeline as `reinit` (lift, parent `reinit_on_pts`, frame
+     *          cache) but the boundary points come from the caller, not from this
+     *          boundary's own quadrature. This is the seam multipatch coupling
+     *          uses to evaluate a partner boundary at points coincident with the
+     *          driving side's quadrature stations. The supplied points must lie in
+     *          `live_boundary_span` — there is no containment check, so the caller
+     *          owns parametric correctness (coupling conditions assert physical
+     *          coincidence as a guard). A future non-conforming (mortar) driver
+     *          reuses this with point-inversion-derived points.
+     *
+     * @param live_boundary_span Live boundary-span index the points fall in.
+     * @param boundary_pts       Boundary parametric points (Q × (d-1)).
+     */
+    void reinit_on_boundary_pts(Index live_boundary_span,
+                                const ColMatrix<T, d - 1>& boundary_pts)
+    {
+        // 1. Boundary side: basis + intrinsic geometry at the supplied points.
+        const auto bdy_spans =
+            boundary_vals_.patch().tensor_product().decode_element(live_boundary_span);
+        boundary_vals_.reinit_on_pts(bdy_spans, boundary_pts);
+        // 2. Lift the supplied boundary points to the parent's parametric space.
+        const ColMatrix<T, d> lifted = boundary_.lift_to_parent(boundary_pts);
+        // 3. Parent span containing this boundary span.
+        const Index parent_flat_span = boundary_.parent_flat_span(bdy_spans[0]);
+        const auto parent_spans =
+            parent_vals_.patch().decode_span(parent_flat_span);
+        // 4. Parent side: basis + intrinsic + extrinsic geometry at lifted points.
+        parent_vals_.reinit_on_pts(parent_spans, lifted);
+        // 5. Cache the boundary frame the projection fields contract against.
+        if constexpr (d == 2) {
+            outward_normal_ = boundary_.eval_outward_normal(boundary_vals_, parent_vals_);
+            const Index Q = static_cast<Index>(outward_normal_.rows());
+            surface_tangent_.resize(Q, 3);
+            for (Index q = 0; q < Q; ++q) {
+                const Vector3<T> a3 = parent_vals_.A3_.row(q).transpose();
+                const Vector3<T> n  = outward_normal_.row(q).transpose();
+                surface_tangent_.row(q) = a3.cross(n).transpose();
+            }
+        }
+    }
+
     ElementValues<T, d - 1> boundary_vals_;
 
     ElementValues<T, d>     parent_vals_;

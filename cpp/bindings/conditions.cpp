@@ -7,6 +7,7 @@
 #include "load_boundary_condition.hpp"
 #include "boundary_lagrange_condition.hpp"
 #include "boundary_penalty_condition.hpp"
+#include "penalty_coupling_condition.hpp"
 #include "patch_boundary.hpp"
 #include "element.hpp"
 #include "quadrature.hpp"
@@ -66,6 +67,31 @@ void bind_conditions(py::module_& m)
                  return self.add(std::move(field), penalty, value);
              },
              py::arg("field"), py::arg("penalty"), py::arg("value") = 0.0,
+             py::return_value_policy::reference);
+
+    using PenaltyCouplingCondition2d = PenaltyCouplingCondition<double, 2>;
+    py::class_<PenaltyCouplingCondition2d, Condition<double, 2>, Ptr<PenaltyCouplingCondition2d>>(m, "PenaltyCouplingCondition2d")
+        .def(py::init<const PatchBoundary2d&, const PatchBoundary2d&, const Element2d&, const QuadratureRule1d&>(),
+             py::arg("boundary_a"), py::arg("boundary_b"), py::arg("element"), py::arg("quadrature"))
+        .def("add",
+             [](PenaltyCouplingCondition2d& self, BoundaryValue<double> field,
+                double penalty) -> PenaltyCouplingCondition2d& {
+                 return self.add(std::move(field), penalty);
+             },
+             py::arg("field"), py::arg("penalty"),
+             py::return_value_policy::reference)
+        .def("couple_displacement",
+             [](PenaltyCouplingCondition2d& self, double penalty) -> PenaltyCouplingCondition2d& {
+                 return self.couple_displacement(penalty);
+             },
+             py::arg("penalty"),
+             py::return_value_policy::reference)
+        .def("couple_kinematics",
+             [](PenaltyCouplingCondition2d& self, double penalty_disp,
+                double penalty_rot) -> PenaltyCouplingCondition2d& {
+                 return self.couple_kinematics(penalty_disp, penalty_rot);
+             },
+             py::arg("penalty_disp"), py::arg("penalty_rot"),
              py::return_value_policy::reference);
 
     using LagrangeBoundaryCondition2d = LagrangeBoundaryCondition<double, 2>;

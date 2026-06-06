@@ -1,0 +1,272 @@
+"""Patch tests for multipatch penalty coupling (``PenaltyCouplingCondition``).
+
+A rectangular strip is split into two patches along its mid-line. The far-left
+edge is clamped and the far-right edge is pulled in axial tension, so the only
+load path to the clamp runs *through* the coupled interface. With displacement
+coupling the assembly stretches as one strip (reproducing the closed-form
+uniaxial-tension field) and the displacement is continuous across the seam — even
+when the two sides are non-conforming (different element counts / degree along
+the seam), because the seam is straight and the A↔B map is affine.
+
+The load is membrane (axial tension): displacement-only coupling is C0 across the
+interface, so a membrane case reproduces the monolithic field exactly while a
+cross-seam bending case would not (that needs rotation coupling, a follow-on).
+"""
+
+import numpy as np
+import pytest
+
+import pyck as ck
+
+Lx, Ly, E, nu, h, fx = 4.0, 1.0, 1.0e7, 0.3, 0.1, 200.0
+ND = 3
+
+
+def _displacement(u, el, patch, params):
+    return np.asarray(
+        ck.Function(u, el, patch, ck.FieldType.DISPLACEMENT)(params)
+    ).reshape(-1, 3)
+
+
+def _solve_coupled_strip(left, right):
+    """Clamp the far-left edge, couple the seam, pull the far-right edge in axial
+    tension; solve and return per-side displacement samples + the closed-form value.
+
+    Returns ``(clamped, loaded, left_iface, right_iface, exact)``, each displacement
+    array sampled at the same parametric v-stations (which map to identical physical
+    y on both rectangles regardless of their knot counts)."""
+    el = ck.ShellKirchhoffLove3p(ck.PlaneStress2d(E, nu, h))
+    prob = ck.LinearElasticProblem([left, right], el, ck.GaussLegendre.from_patch(left))
+    nL, nR = left.num_control_pts, right.num_control_pts
+
+    # Suppress transverse bending DOFs on both patches (flat membrane problem).
+    # Global DOFs: left occupies block [0, nL*ND), right [nL*ND, (nL+nR)*ND).
+    transverse = (
+        [cp * ND + 2 for cp in range(nL)]
+        + [nL * ND + cp * ND + 2 for cp in range(nR)]
+    )
+    prob.add_constraint(ck.DirectConstraint(transverse, value=0.0))
+
+    # Clamp the far-left edge in-plane (pins translation + rotation -> well-posed).
+    clamp = ck.PenaltyBoundaryCondition(left.boundary(0, True), ck.GaussLegendre(4, dim=1))
+    clamp.add(ck.Field.U_X, 1.0e12).add(ck.Field.U_Y, 1.0e12)
+    prob.add_condition(clamp, patch="left")
+
+    # Couple the shared interface (left u=1  <->  right u=0).
+    coupling = ck.PenaltyCouplingCondition(
+        left.boundary(0, False), right.boundary(0, True), ck.GaussLegendre(5, dim=1)
+    )
+    coupling.couple_displacement(1.0e12)
+    prob.add_condition(coupling, patch="left")
+
+    # Axial tension on the far-right edge.
+    load = ck.LoadBoundaryCondition(right.boundary(0, False), ck.GaussLegendre(4, dim=1))
+    load.add(ck.Field.U_X, fx)
+    prob.add_condition(load, patch="right")
+
+    K, f = prob.assemble()
+    u = ck.solve(K, f, physical_dofs=prob.num_physical_dofs)
+    u_left, u_right = u[: nL * ND], u[nL * ND:]
+
+    vs = np.linspace(0.2, 0.8, 5)
+    exact = fx * Lx / (E * h)  # closed-form u_x at the far-right edge (x = Lx)
+    clamped = _displacement(u_left, el, left, np.array([[0.0, v] for v in vs]))
+    loaded = _displacement(u_right, el, right, np.array([[1.0, v] for v in vs]))
+    left_iface = _displacement(u_left, el, left, np.array([[1.0, v] for v in vs]))
+    right_iface = _displacement(u_right, el, right, np.array([[0.0, v] for v in vs]))
+    return clamped, loaded, left_iface, right_iface, exact
+
+
+def _assert_reproduces_monolith(clamped, loaded, left_iface, right_iface, exact):
+    # Load transferred through the seam: clamp held, far edge at the closed-form stretch.
+    assert np.abs(clamped).max() < 1e-6 * exact
+    assert abs(loaded[:, 0].mean() - exact) / exact < 1e-2
+    # Displacement continuous across the interface (penalty drives the jump to ~0).
+    assert np.abs(left_iface - right_iface).max() < 1e-4 * exact
+    # And the seam sits at the midpoint stretch (x = Lx/2).
+    assert abs(left_iface[:, 0].mean() - 0.5 * exact) / exact < 1e-2
+
+
+def _half(nu, nv, deg, cx, name):
+    return ck.SurfacePatch.rectangle(Lx / 2, Ly, nu=nu, nv=nv, deg=deg, cx=cx, name=name)
+
+
+def test_conforming_strip():
+    """Matching discretisation on the seam (the degenerate / conforming case)."""
+    left = _half(nu=6, nv=6, deg=3, cx=Lx / 4, name="left")
+    right = _half(nu=6, nv=6, deg=3, cx=3 * Lx / 4, name="right")
+    _assert_reproduces_monolith(*_solve_coupled_strip(left, right))
+
+
+def test_nonconforming_different_nv():
+    """Different element counts ALONG the seam (left nv=6, right nv=9): the common
+    refinement integrates the coupling exactly and still reproduces the strip."""
+    left = _half(nu=6, nv=6, deg=3, cx=Lx / 4, name="left")
+    right = _half(nu=8, nv=9, deg=3, cx=3 * Lx / 4, name="right")
+    _assert_reproduces_monolith(*_solve_coupled_strip(left, right))
+
+
+def test_nonconforming_different_degree():
+    """Different degree along the seam (left deg=3, right deg=2)."""
+    left = _half(nu=6, nv=6, deg=3, cx=Lx / 4, name="left")
+    right = _half(nu=6, nv=6, deg=2, cx=3 * Lx / 4, name="right")
+    _assert_reproduces_monolith(*_solve_coupled_strip(left, right))
+
+
+def test_geometry_mismatch_raises():
+    """Boundaries that are NOT the same physical curve are rejected at construction.
+
+    The right patch is offset in y so its u=0 edge no longer coincides with the
+    left patch's u=1 edge — the endpoint/coincidence check throws."""
+    left = _half(nu=6, nv=6, deg=3, cx=Lx / 4, name="left")
+    right = ck.SurfacePatch.rectangle(
+        Lx / 2, Ly, nu=6, nv=6, deg=3, cx=3 * Lx / 4, cy=Ly, name="right"
+    )
+    coupling = ck.PenaltyCouplingCondition(
+        left.boundary(0, False), right.boundary(0, True), ck.GaussLegendre(4, dim=1)
+    )
+    coupling.couple_displacement(1.0e12)
+
+    el = ck.ShellKirchhoffLove3p(ck.PlaneStress2d(E, nu, h))
+    prob = ck.LinearElasticProblem([left, right], el, ck.GaussLegendre.from_patch(left))
+    with pytest.raises(ValueError):
+        prob.add_condition(coupling, patch="left")  # bind() runs the geometry check
+
+
+def test_add_rejects_unvalidated_fields():
+    """Only U_X/Y/Z and the bending rotation ROT_N are supported; others rejected."""
+    left = _half(nu=6, nv=6, deg=3, cx=Lx / 4, name="left")
+    right = _half(nu=6, nv=6, deg=3, cx=3 * Lx / 4, name="right")
+    coupling = ck.PenaltyCouplingCondition(
+        left.boundary(0, False), right.boundary(0, True), ck.GaussLegendre(4, dim=1)
+    )
+    coupling.add(ck.Field.ROT_S, 1.0e12)  # twist; stored lazily, rejected at bind()
+    el = ck.ShellKirchhoffLove3p(ck.PlaneStress2d(E, nu, h))
+    prob = ck.LinearElasticProblem([left, right], el, ck.GaussLegendre.from_patch(left))
+    with pytest.raises(ValueError):
+        prob.add_condition(coupling, patch="left")
+
+
+# === Bending (out-of-plane) coupling ==========================================
+# A transverse-loaded cantilever plate bends; the seam must transfer the bending
+# moment, which needs ROT_N (normal/bending rotation) continuity on top of
+# displacement. Without it the partner patch is a mechanism (free to rotate about
+# the seam); with couple_kinematics the two-patch plate reproduces the monolith.
+
+Lb, Wb, tb, fz = 10.0, 2.0, 0.1, 1.0       # plate length, width, thickness, tip load
+AD, AR = 1.0e12, 1.0e10                     # displacement / rotation penalties
+
+
+def _clamp_root(prob, patch, name):
+    """Fully clamp the patch's u=0 edge: U_X/Y/Z = 0 and the slope ROT_N = 0."""
+    c = ck.PenaltyBoundaryCondition(patch.boundary(0, True), ck.GaussLegendre(4, dim=1))
+    c.add(ck.Field.U_X, AD).add(ck.Field.U_Y, AD).add(ck.Field.U_Z, AD).add(ck.Field.ROT_N, AR)
+    prob.add_condition(c, patch=name)
+
+
+def _tip_w(u, el, patch):
+    return float(_displacement(u, el, patch, [[1.0, 0.5]])[0, 2])
+
+
+def _bending_monolith():
+    el = ck.ShellKirchhoffLove3p(ck.PlaneStress2d(E, nu, tb))
+    plate = ck.SurfacePatch.rectangle(Lb, Wb, nu=12, nv=4, deg=3, cx=Lb / 2, name="m")
+    prob = ck.LinearElasticProblem([plate], el, ck.GaussLegendre.from_patch(plate))
+    _clamp_root(prob, plate, "m")
+    lc = ck.LoadBoundaryCondition(plate.boundary(0, False), ck.GaussLegendre(4, dim=1))
+    lc.add(ck.Field.U_Z, fz)
+    prob.add_condition(lc, patch="m")
+    return _tip_w(ck.solve(prob), el, plate)
+
+
+def _bending_two_patch(left_nv, right_nv):
+    el = ck.ShellKirchhoffLove3p(ck.PlaneStress2d(E, nu, tb))
+    left = ck.SurfacePatch.rectangle(Lb / 2, Wb, nu=7, nv=left_nv, deg=3, cx=Lb / 4, name="left")
+    right = ck.SurfacePatch.rectangle(Lb / 2, Wb, nu=7, nv=right_nv, deg=3, cx=3 * Lb / 4, name="right")
+    prob = ck.LinearElasticProblem([left, right], el, ck.GaussLegendre.from_patch(left))
+    _clamp_root(prob, left, "left")
+    seam = ck.PenaltyCouplingCondition(
+        left.boundary(0, False), right.boundary(0, True), ck.GaussLegendre(5, dim=1))
+    seam.couple_kinematics(AD, AR)
+    prob.add_condition(seam, patch="left")
+    lc = ck.LoadBoundaryCondition(right.boundary(0, False), ck.GaussLegendre(4, dim=1))
+    lc.add(ck.Field.U_Z, fz)
+    prob.add_condition(lc, patch="right")
+    u = ck.solve(prob)
+    return _tip_w(u[left.num_control_pts * ND:], el, right)
+
+
+def test_bending_conforming_reproduces_monolith():
+    """Conforming seam + ROT_N coupling: two-patch bending == monolithic plate."""
+    w_mono = _bending_monolith()
+    w_two = _bending_two_patch(left_nv=4, right_nv=4)
+    assert abs(w_two - w_mono) / abs(w_mono) < 1e-2
+
+
+def test_bending_nonconforming_reproduces_monolith():
+    """Non-conforming seam (different nv) + ROT_N coupling still reproduces it."""
+    w_mono = _bending_monolith()
+    w_two = _bending_two_patch(left_nv=4, right_nv=7)
+    assert abs(w_two - w_mono) / abs(w_mono) < 2e-2
+
+
+def test_bending_rm4p_reproduces_monolith():
+    """Element-agnostic: the same displacement+ROT_N tie reproduces the monolith for
+    ShellReissnerMindlin4p (4 dofs/cp, psi pinned). RM-4p needs C2 basis *within* a
+    patch, but inter-patch continuity is still C0 displacement + G1 rotation."""
+    nd = 4  # RM-4p: slot 3 is the psi twist potential
+
+    def pin_psi(prob, patches):
+        idx, off = [], 0
+        for p in patches:
+            n = p.num_control_pts
+            idx += [off + cp * nd + 3 for cp in range(n)]
+            off += n * nd
+        prob.add_constraint(ck.DirectConstraint(idx, value=0.0))
+
+    def clamp_and_load(prob, root, tip, names):
+        c = ck.PenaltyBoundaryCondition(root.boundary(0, True), ck.GaussLegendre(5, dim=1))
+        c.add(ck.Field.U_X, AD).add(ck.Field.U_Y, AD).add(ck.Field.U_Z, AD).add(ck.Field.ROT_N, AR)
+        prob.add_condition(c, patch=names[0])
+        lc = ck.LoadBoundaryCondition(tip.boundary(0, False), ck.GaussLegendre(5, dim=1))
+        lc.add(ck.Field.U_Z, fz)
+        prob.add_condition(lc, patch=names[-1])
+
+    el = ck.ShellReissnerMindlin4p(ck.PlaneStress2d(E, nu, tb))
+
+    mono = ck.SurfacePatch.rectangle(Lb, Wb, nu=14, nv=4, deg=3, cx=Lb / 2, name="m")
+    pm = ck.LinearElasticProblem([mono], el, ck.GaussLegendre.from_patch(mono))
+    pin_psi(pm, [mono]); clamp_and_load(pm, mono, mono, ["m"])
+    w_mono = float(_displacement(ck.solve(pm), el, mono, [[1.0, 0.5]])[0, 2])
+
+    left = ck.SurfacePatch.rectangle(Lb / 2, Wb, nu=8, nv=4, deg=3, cx=Lb / 4, name="left")
+    right = ck.SurfacePatch.rectangle(Lb / 2, Wb, nu=8, nv=7, deg=3, cx=3 * Lb / 4, name="right")
+    p = ck.LinearElasticProblem([left, right], el, ck.GaussLegendre.from_patch(left))
+    pin_psi(p, [left, right])
+    seam = ck.PenaltyCouplingCondition(
+        left.boundary(0, False), right.boundary(0, True), ck.GaussLegendre(6, dim=1))
+    seam.couple_kinematics(AD, AR)
+    p.add_condition(seam, patch="left")
+    clamp_and_load(p, left, right, ["left", "right"])
+    w_two = float(_displacement(ck.solve(p)[left.num_control_pts * nd:], el, right, [[1.0, 0.5]])[0, 2])
+
+    assert abs(w_two - w_mono) / abs(w_mono) < 2e-2
+
+
+def test_bending_needs_rotation_coupling():
+    """Without ROT_N the partner patch is under-constrained (a seam hinge/mechanism),
+    so displacement-only coupling does NOT reproduce the monolith."""
+    el = ck.ShellKirchhoffLove3p(ck.PlaneStress2d(E, nu, tb))
+    left = ck.SurfacePatch.rectangle(Lb / 2, Wb, nu=7, nv=4, deg=3, cx=Lb / 4, name="left")
+    right = ck.SurfacePatch.rectangle(Lb / 2, Wb, nu=7, nv=4, deg=3, cx=3 * Lb / 4, name="right")
+    prob = ck.LinearElasticProblem([left, right], el, ck.GaussLegendre.from_patch(left))
+    _clamp_root(prob, left, "left")
+    seam = ck.PenaltyCouplingCondition(
+        left.boundary(0, False), right.boundary(0, True), ck.GaussLegendre(5, dim=1))
+    seam.couple_displacement(AD)   # displacement only -> seam hinges
+    prob.add_condition(seam, patch="left")
+    lc = ck.LoadBoundaryCondition(right.boundary(0, False), ck.GaussLegendre(4, dim=1))
+    lc.add(ck.Field.U_Z, fz)
+    prob.add_condition(lc, patch="right")
+    w_two = _tip_w(ck.solve(prob)[left.num_control_pts * ND:], el, right)
+    assert abs(w_two - _bending_monolith()) / abs(_bending_monolith()) > 0.1

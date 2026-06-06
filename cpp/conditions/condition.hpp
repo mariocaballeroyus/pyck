@@ -6,6 +6,7 @@
 
 #include "patch.hpp"
 #include "../assembly/dof_layout.hpp"
+#include "../assembly/patch_blocks.hpp"
 #include "../assembly/system_assembler.hpp"
 #include "../types.hpp"
 
@@ -39,13 +40,15 @@ public:
     /**
      * @brief Assemble the condition's contribution into the global system.
      *
-     * @param assembler     Sparse-assembly sink for stiffness and load (mutable).
-     * @param layout        DOF layout (read-only).
-     * @param primal_block  This condition's patch primal block.
+     * @param assembler  Sparse-assembly sink for stiffness and load (mutable).
+     * @param layout     DOF layout (read-only).
+     * @param blocks     Patch to primal-block resolver. A single-patch condition
+     *                   resolves its own `patch()`; a coupling condition resolves
+     *                   both of the patches it ties.
      */
     virtual void apply(SystemAssembler<T>& assembler,
                        const DofLayout& layout,
-                       DofLayout::BlockId primal_block) const = 0;
+                       const PatchBlocks<T, d>& blocks) const = 0;
 
     // === Properties =================================================================
 

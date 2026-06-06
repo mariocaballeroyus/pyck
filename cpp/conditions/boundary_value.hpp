@@ -46,6 +46,9 @@ public:
 
     explicit BoundaryValue(Field field) : field_(field) {}
 
+    /// @brief The selected boundary-value field.
+    Field field() const { return field_; }
+
     /// @brief Field-trace matrix (Q × K) at the boundary quadrature points.
     Matrix<T> evaluate(const Element<T, 2>& element,
                        const BoundaryElementValues<T, 2>& bvals) const
