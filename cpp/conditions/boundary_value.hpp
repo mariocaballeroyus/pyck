@@ -77,6 +77,39 @@ public:
         __builtin_unreachable();
     }
 
+    /// @brief Work-conjugate flux-trace matrix (Q × K) at the boundary quadrature
+    ///        points: the boundary force traction for the displacement fields (U_*)
+    ///        or the bending moment for the rotation fields (ROT_*), built from the
+    ///        element's generalised stress and contracted with the boundary co-normal
+    ///        ν = `outward_normal()`. This is the consistency flux a Nitsche condition
+    ///        pairs with `evaluate`; the projection direction is chosen exactly as there.
+    Matrix<T> evaluate_flux(const Element<T, 2>& element,
+                            const BoundaryElementValues<T, 2>& bvals) const
+    {
+        const ElementValues<T, 2>& parent = bvals.parent_vals_;
+        const Index Q = parent.num_points();
+        const ColMatrix<T, 3>& n = bvals.outward_normal();   // boundary co-normal ν
+        const ColMatrix<T, 3>& s = bvals.surface_tangent();
+        const ColMatrix<T, 3>  x = cartesian_axis(Q, 0);
+        const ColMatrix<T, 3>  y = cartesian_axis(Q, 1);
+        const ColMatrix<T, 3>  z = cartesian_axis(Q, 2);
+        Matrix<T> out;
+
+        switch (field_) {
+            case Field::U_X:   element.traction(parent, n, x, out); return out;
+            case Field::U_Y:   element.traction(parent, n, y, out); return out;
+            case Field::U_Z:   element.traction(parent, n, z, out); return out;
+            case Field::U_N:   element.traction(parent, n, n, out); return out;
+            case Field::U_S:   element.traction(parent, n, s, out); return out;
+            case Field::ROT_X: element.moment(parent, n, x, out); return out;
+            case Field::ROT_Y: element.moment(parent, n, y, out); return out;
+            case Field::ROT_Z: element.moment(parent, n, z, out); return out;
+            case Field::ROT_N: element.moment(parent, n, n, out); return out;
+            case Field::ROT_S: element.moment(parent, n, s, out); return out;
+        }
+        __builtin_unreachable();
+    }
+
     /// @brief Extra basis derivative order beyond the element's own. Uniform (0)
     ///        for the kinematic fields; the element's `basis_order` already covers
     ///        its shape matrices.
