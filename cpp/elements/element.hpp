@@ -152,6 +152,20 @@ public:
     virtual void rotation(const ElementValues<T, d>& parent,
                           const ColMatrix<T, 3>& dir, Matrix<T>& out) const;
 
+    // The work-conjugate *natural* trace: the boundary force traction t = σ·ν,
+    // built from the generalised-stress shape S = D B and the in-surface boundary
+    // co-normal ν, then projected onto `dir` — the consistency flux a Nitsche
+    // condition pairs with the kinematic trace above. `conormal` is the outward
+    // in-surface unit normal of the boundary edge (ν); `dir` selects the
+    // work-conjugate component exactly as for `displacement`. The base default
+    // covers the first-gradient (membrane + transverse-shear) force, exact for the
+    // Reissner–Mindlin shells; a C¹ Kirchhoff–Love element would override to add the
+    // effective-shear / corner contribution carried by the moment derivatives.
+
+    virtual void traction(const ElementValues<T, d>& parent,
+                          const ColMatrix<T, 3>& conormal,
+                          const ColMatrix<T, 3>& dir, Matrix<T>& out) const;
+
 protected:
 
     /// @brief Contravariant surface components (d^1, d^2) of a 3D direction at qp
@@ -300,6 +314,43 @@ Element<T, d>::rotation(const ElementValues<T, d>& parent,
             const Vector3<T> dq = dir.row(q).transpose();
             const auto [du1, du2] = contravariant_dir(parent, q, dq);
             out.row(q) = du1 * Np.row(2 * q) + du2 * Np.row(2 * q + 1);
+        }
+    } else {
+        out.setZero();
+    }
+}
+
+template <std::floating_point T, std::size_t d>
+void
+Element<T, d>::traction(const ElementValues<T, d>& parent,
+                        const ColMatrix<T, 3>& conormal,
+                        const ColMatrix<T, 3>& dir, Matrix<T>& out) const
+{
+    stress_shape_matrix(parent);
+    const Matrix<T>& S = N_sigma_;
+    const Index Q        = parent.num_points();
+    const Index n_strain = S.rows() / Q;
+    out.resize(Q, S.cols());
+
+    if constexpr (d == 2) {
+        const bool has_shear = (n_strain == 8);
+        for (Index q = 0; q < Q; ++q) {
+            const auto A = parent.cov_basis(q);
+            const Vector3<T> A1 = A(0), A2 = A(1), A3 = parent.normal(q);
+            const Vector3<T> nu = conormal.row(q).transpose();
+            const Vector3<T> dv = dir.row(q).transpose();
+            const T nu1 = nu.dot(A1), nu2 = nu.dot(A2);
+            const T d1  = dv.dot(A1), d2  = dv.dot(A2), d3 = dv.dot(A3);
+
+            // Membrane: nᵅᵝ ν_β d_α, the symmetric {11,22,12} Voigt contraction.
+            out.row(q) =  (nu1 * d1)            * S.row(n_strain * q + 0)
+                        + (nu2 * d2)            * S.row(n_strain * q + 1)
+                        + (nu2 * d1 + nu1 * d2) * S.row(n_strain * q + 2);
+
+            // Transverse shear (Reissner–Mindlin): qᵅ ν_α resolved along A₃.
+            if (has_shear)
+                out.row(q) += (nu1 * d3) * S.row(n_strain * q + 6)
+                            + (nu2 * d3) * S.row(n_strain * q + 7);
         }
     } else {
         out.setZero();
