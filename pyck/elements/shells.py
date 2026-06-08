@@ -78,6 +78,51 @@ class ShellReissnerMindlin4p(Element):
         return f"ShellReissnerMindlin4p(material={self._material})"
 
 
+class ShellReissnerMindlinHier4p(Element):
+    """Hierarchic four-parameter Reissner-Mindlin shell element.
+
+    A shear-deformable shell built hierarchically on the Kirchhoff-Love
+    displacement field: the primary unknowns are the three Cartesian mid-surface
+    displacement components (as in ``ShellKirchhoffLove3p``) plus a single twist
+    potential ``psi``:
+
+        slot 0..2 : Cartesian displacements (u_x, u_y, u_z)
+        slot 3    : twist potential psi
+
+    Unlike ``ShellReissnerMindlin4p`` (covariant ``u_1, u_2, w_b, psi``), the
+    bending potential is not an independent field: ``w_b = v . A_3``. The whole
+    formulation is written in the base vectors, the director ``A_3`` and its
+    derivatives, and the metric. The recovered fields are
+
+        w_psi = grad(psi) x A_3
+        w_s   = -(Kb/Ks) Laplacian(w_b),     w_b = v . A_3
+        gamma = grad(w_s) + w_psi . A_alpha
+
+    The shear carries third derivatives of ``w_b``, so the basis must be C^2
+    (degree >= 3). The constant-``psi`` mode is a zero-energy mode and should be
+    suppressed with a zero-mean Lagrange condition on slot 3.
+
+    See ``report/sections/extra.tex`` for the formulation.
+
+    Parameters
+    ----------
+    material : PlaneStress2d
+        Shell material model.
+    """
+    num_node_dofs: int = 4
+
+    def __init__(self, material: PlaneStress2d) -> None:
+        self._material = material
+        self._cpp_object = _pyck.ShellReissnerMindlinHier4p(self._material._cpp_object)
+
+    @property
+    def material(self) -> PlaneStress2d:
+        return self._material
+
+    def __repr__(self) -> str:
+        return f"ShellReissnerMindlinHier4p(material={self._material})"
+
+
 class ShellKirchhoffLove3p(Element):
     """Kirchhoff-Love thin-shell element (rotation-free).
 

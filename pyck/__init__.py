@@ -13,6 +13,7 @@ from pyck.geometry import (
 from pyck.elements import (
     ShellKirchhoffLove3p,
     ShellReissnerMindlin4p,
+    ShellReissnerMindlinHier4p,
     ShellReissnerMindlin5p,
 )
 from pyck.materials import (
@@ -74,6 +75,7 @@ __all__ = [
     "SurfacePatch",
     "ShellKirchhoffLove3p",
     "ShellReissnerMindlin4p",
+    "ShellReissnerMindlinHier4p",
     "ShellReissnerMindlin5p",
     "PlaneStress2d",
     "UniaxialStress1d",
