@@ -26,7 +26,8 @@ enum class FieldType
     DISPLACEMENT,  ///< Generalised displacement(s) — N_w · u_local.
     ROTATION,      ///< Generalised rotation(s)     — N_φ · u_local.
     STRAIN,        ///< Generalised strain          — B · u_local.
-    STRESS,        ///< Generalised stress          — D · B · u_local.
+    TRACTION,      ///< Force resultants  [n¹¹ n²² n¹² (q¹ q²)] — conjugate to DISPLACEMENT.
+    MOMENT,        ///< Moment resultants [m¹¹ m²² m¹²]         — conjugate to ROTATION.
 };
 
 /**
@@ -79,6 +80,23 @@ public:
      *        reuses @ref B_voigt_ as scratch for B.
      */
     virtual void stress_shape_matrix(const ElementValues<T, d>& ev) const;
+
+    /**
+     * @brief Force-resultant shape matrix: the membrane-force and transverse-
+     *        shear rows of @ref stress_shape_matrix, stacked per qp as
+     *        `[n¹¹ n²² n¹² (q¹ q²)]` (shear absent for a shear-free shell). The
+     *        static counterpart of @ref displacement_shape_matrix. Writes into
+     *        @ref N_traction_.
+     */
+    virtual void traction_shape_matrix(const ElementValues<T, d>& ev) const;
+
+    /**
+     * @brief Moment-resultant shape matrix: the bending/twisting rows of
+     *        @ref stress_shape_matrix, stacked per qp as `[m¹¹ m²² m¹²]`. The
+     *        static counterpart of @ref rotation_shape_matrix. Writes into
+     *        @ref N_moment_.
+     */
+    virtual void moment_shape_matrix(const ElementValues<T, d>& ev) const;
 
     /**
      * @brief Primal-DOF shape matrix N_p.
@@ -197,8 +215,10 @@ public:
     mutable Matrix<T> B_voigt_;        ///< strain_matrix output / stress_shape_matrix scratch
     mutable Matrix<T> N_w_;      ///< displacement_shape_matrix output
     mutable Matrix<T> N_phi_;    ///< rotation_shape_matrix output
-    mutable Matrix<T> N_sigma_;  ///< stress_shape_matrix output
-    mutable Matrix<T> N_primal_; ///< primal_shape_matrix output
+    mutable Matrix<T> N_sigma_;    ///< stress_shape_matrix output
+    mutable Matrix<T> N_traction_; ///< traction_shape_matrix output (force resultants)
+    mutable Matrix<T> N_moment_;   ///< moment_shape_matrix output (moment resultants)
+    mutable Matrix<T> N_primal_;   ///< primal_shape_matrix output
 };
 
 
@@ -216,6 +236,50 @@ Element<T, d>::stress_shape_matrix(const ElementValues<T, d>& ev) const
         const auto D = constitutive_matrix(ev, q);
         N_sigma_.middleRows(n_strain * q, n_strain).noalias() =
             D * B_voigt_.middleRows(n_strain * q, n_strain);
+    }
+}
+
+template <std::floating_point T, std::size_t d>
+void
+Element<T, d>::traction_shape_matrix(const ElementValues<T, d>& ev) const
+{
+    stress_shape_matrix(ev);
+    if constexpr (d == 2) {
+        const Index Q         = ev.basis_derivs[0].cols();
+        const Index n_strain  = N_sigma_.rows() / Q;
+        const Index K         = N_sigma_.cols();
+        const bool  has_shear = (n_strain == 8);
+        const Index n_force   = has_shear ? 5 : 3;
+
+        N_traction_.setZero(n_force * Q, K);
+        for (Index q = 0; q < Q; ++q) {
+            N_traction_.middleRows(n_force * q, 3) =
+                N_sigma_.middleRows(n_strain * q, 3);                  // membrane n^{αβ}
+            if (has_shear)
+                N_traction_.middleRows(n_force * q + 3, 2) =
+                    N_sigma_.middleRows(n_strain * q + 6, 2);          // transverse shear q^α
+        }
+    } else {
+        N_traction_.setZero(0, N_sigma_.cols());
+    }
+}
+
+template <std::floating_point T, std::size_t d>
+void
+Element<T, d>::moment_shape_matrix(const ElementValues<T, d>& ev) const
+{
+    stress_shape_matrix(ev);
+    if constexpr (d == 2) {
+        const Index Q        = ev.basis_derivs[0].cols();
+        const Index n_strain = N_sigma_.rows() / Q;
+        const Index K        = N_sigma_.cols();
+
+        N_moment_.setZero(3 * Q, K);
+        for (Index q = 0; q < Q; ++q)
+            N_moment_.middleRows(3 * q, 3) =
+                N_sigma_.middleRows(n_strain * q + 3, 3);             // bending/twisting m^{αβ}
+    } else {
+        N_moment_.setZero(0, N_sigma_.cols());
     }
 }
 

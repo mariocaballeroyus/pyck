@@ -103,15 +103,18 @@ class FieldType:
       ROTATION
     
       STRAIN
-    
-      STRESS
+
+      TRACTION
+
+      MOMENT
     """
     DISPLACEMENT: typing.ClassVar[FieldType]  # value = <FieldType.DISPLACEMENT: 1>
     PRIMAL: typing.ClassVar[FieldType]  # value = <FieldType.PRIMAL: 0>
     ROTATION: typing.ClassVar[FieldType]  # value = <FieldType.ROTATION: 2>
     STRAIN: typing.ClassVar[FieldType]  # value = <FieldType.STRAIN: 3>
-    STRESS: typing.ClassVar[FieldType]  # value = <FieldType.STRESS: 4>
-    __members__: typing.ClassVar[dict[str, FieldType]]  # value = {'PRIMAL': <FieldType.PRIMAL: 0>, 'DISPLACEMENT': <FieldType.DISPLACEMENT: 1>, 'ROTATION': <FieldType.ROTATION: 2>, 'STRAIN': <FieldType.STRAIN: 3>, 'STRESS': <FieldType.STRESS: 4>}
+    TRACTION: typing.ClassVar[FieldType]  # value = <FieldType.TRACTION: 4>
+    MOMENT: typing.ClassVar[FieldType]  # value = <FieldType.MOMENT: 5>
+    __members__: typing.ClassVar[dict[str, FieldType]]  # value = {'PRIMAL': <FieldType.PRIMAL: 0>, 'DISPLACEMENT': <FieldType.DISPLACEMENT: 1>, 'ROTATION': <FieldType.ROTATION: 2>, 'STRAIN': <FieldType.STRAIN: 3>, 'TRACTION': <FieldType.TRACTION: 4>, 'MOMENT': <FieldType.MOMENT: 5>}
     @typing.overload
     def __eq__(self, other: FieldType) -> bool:
         ...

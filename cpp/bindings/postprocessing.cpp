@@ -18,7 +18,8 @@ void bind_postprocessing(py::module_& m)
         .value("DISPLACEMENT", FieldType::DISPLACEMENT)
         .value("ROTATION",     FieldType::ROTATION)
         .value("STRAIN",       FieldType::STRAIN)
-        .value("STRESS",       FieldType::STRESS);
+        .value("TRACTION",     FieldType::TRACTION)
+        .value("MOMENT",       FieldType::MOMENT);
 
     // === Function =================================================================
     py::class_<Function<double, 1>, Ptr<Function<double, 1>>>(m, "Function1d")
