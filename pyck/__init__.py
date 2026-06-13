@@ -15,6 +15,7 @@ from pyck.elements import (
     ShellReissnerMindlin4p,
     ShellReissnerMindlinHier4p,
     ShellReissnerMindlin5p,
+    ShellReissnerMindlinHier5p,
 )
 from pyck.materials import (
     PlaneStress2d,
@@ -77,6 +78,7 @@ __all__ = [
     "ShellReissnerMindlin4p",
     "ShellReissnerMindlinHier4p",
     "ShellReissnerMindlin5p",
+    "ShellReissnerMindlinHier5p",
     "PlaneStress2d",
     "UniaxialStress1d",
     "Field",

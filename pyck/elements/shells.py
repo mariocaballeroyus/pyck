@@ -123,6 +123,45 @@ class ShellReissnerMindlinHier4p(Element):
         return f"ShellReissnerMindlinHier4p(material={self._material})"
 
 
+class ShellReissnerMindlinHier5p(Element):
+    """Hierarchic five-parameter Reissner-Mindlin shell element.
+
+    A shear-deformable shell built hierarchically on the Kirchhoff-Love
+    displacement field (Echter, Oesterle & Bischoff 2013, sec. 2.2): the three
+    Cartesian mid-surface displacements (as in ``ShellKirchhoffLove3p``) are
+    enriched by a hierarchic difference vector ``w = w^1 A_1 + w^2 A_2`` added to
+    the *rotated* director ``a_3 = (A_3 + Phi x A_3) + w``:
+
+        slot 0..2 : Cartesian displacements (v_x, v_y, v_z)
+        slot 3..4 : hierarchic difference vector (w^1, w^2)
+
+    The hierarchic split of bending and shear makes the element free of
+    transverse-shear locking by construction; setting ``w = 0`` recovers
+    ``ShellKirchhoffLove3p`` exactly. The Kirchhoff-Love bending of ``v`` uses
+    the covariant Hessian, so the basis must be C^1 (degree >= 2).
+
+    Reference: R. Echter, B. Oesterle, M. Bischoff, "A hierarchic family of
+    isogeometric shell finite elements", CMAME 254 (2013) 170-180, sec. 2.2.
+
+    Parameters
+    ----------
+    material : PlaneStress2d
+        Shell material model.
+    """
+    num_node_dofs: int = 5
+
+    def __init__(self, material: PlaneStress2d) -> None:
+        self._material = material
+        self._cpp_object = _pyck.ShellReissnerMindlinHier5p(self._material._cpp_object)
+
+    @property
+    def material(self) -> PlaneStress2d:
+        return self._material
+
+    def __repr__(self) -> str:
+        return f"ShellReissnerMindlinHier5p(material={self._material})"
+
+
 class ShellKirchhoffLove3p(Element):
     """Kirchhoff-Love thin-shell element (rotation-free).
 

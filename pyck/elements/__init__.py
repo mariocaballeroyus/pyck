@@ -6,6 +6,7 @@ from pyck.elements.shells import (
     ShellReissnerMindlin4p,
     ShellReissnerMindlinHier4p,
     ShellReissnerMindlin5p,
+    ShellReissnerMindlinHier5p,
 )
 
 
@@ -15,4 +16,5 @@ __all__ = [
     "ShellReissnerMindlin4p",
     "ShellReissnerMindlinHier4p",
     "ShellReissnerMindlin5p",
+    "ShellReissnerMindlinHier5p",
 ]
