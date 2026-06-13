@@ -68,48 +68,48 @@ ShellReissnerMindlinHier4p<T>::strain_matrix(const ElementValues<T, 2>& ev) cons
             const T L   = lapb(i);
             const T P1  = lgrad(i, 0), P2 = lgrad(i, 1);
 
-            // Cartesian displacement columns (the bending displacement vector v_b)
+            // --- Cartesian displacement v (Kirchhoff-Love field + shear correction) ---
+    .
             for (Index k = 0; k < 3; ++k) {
                 const Index idx = 4 * i + k;
                 const T A3k = A3(k);
-                // Shear deflection w_s = −(K_b/K_s) Δ_g w_b. The Laplacian of the derived
-                // w_b = v_b·A_3 keeps the frozen-frame A_3 projection — w_s is an O(t²)
-                // correction, so the dropped curvature-variation terms are higher order.
+                // Shear deflection w_s = −(K_b/K_s) Δ w_b
                 const T ws = -ratio * L * A3k;
 
                 // --- Membrane Strain ------------------------------------------------
-                // ε_{αβ} = (1/2)(A_α·v_{b,β} + A_β·v_{b,α}) − B_{αβ} w_s. The A_α·v_{b,β}
-                // projection already carries the −w_b B_{αβ} part, so only w_s is explicit.
-                B_voigt(8*q + 0, idx) = A1(k) * N_u            - B11 * ws;
-                B_voigt(8*q + 1, idx) = A2(k) * N_v            - B22 * ws;
+
+                // Membrane ε_{αβ}: Kirchhoff-Love A_α·v_{,β} 
+                // Shear enrichment += −B_{αβ} w_s.
+                B_voigt(8*q + 0, idx) = A1(k) * N_u              - B11 * ws;
+                B_voigt(8*q + 1, idx) = A2(k) * N_v              - B22 * ws;
                 B_voigt(8*q + 2, idx) = A1(k) * N_v + A2(k) * N_u - T(2) * B12 * ws;
 
                 // --- Bending Strain -------------------------------------------------
-                // κ_{αβ} = −A_α·(Φ_{b,β}×A_3) − v_{,α}·A_{3,β}.
 
-                // The rotation cross-terms cancel v_{b,α}·A_{3,β}, leaving 
-                // κ_{αβ} = (covariant Hessian of v_b)·A_3 − w_s (B²)_{αβ}
-                B_voigt(8*q + 3, idx) =        H11 * A3k         - ws * B2_11;
-                B_voigt(8*q + 4, idx) =        H22 * A3k         - ws * B2_22;
-                B_voigt(8*q + 5, idx) = T(2) * H12 * A3k  - T(2) * ws * B2_12;
+                // Bending κ_{αβ}: Kirchhoff-Love −v_{|αβ}·A_3
+                // The rotation cross-terms cancel, leaving κ_{αβ} = hess(v_b)·A_3
+                // Shear enrichment += w_s (B^2)_{αβ}.
+                B_voigt(8*q + 3, idx) =        -H11 * A3k        + ws * B2_11;
+                B_voigt(8*q + 4, idx) =        -H22 * A3k        + ws * B2_22;
+                B_voigt(8*q + 5, idx) = -T(2) * H12 * A3k  + T(2) * ws * B2_12;
 
                 // --- Transverse Shear Strain ----------------------------------------
-                // γ_α = A_α·(Φ_b×A_3) + v_{,α}·A_3
 
+                // γ_α = A_α·(Φ_b×A_3) + v_{,α}·A_3
                 // the A_α·(Φ_b×A_3) = −v_{b,α}·A_3 cancels the bending part, leaving
-                // γ_α = w_{s,α} =−(K_b/K_s)(Δ_g w_b)_{,α}
+                // γ_α = w_{s,α} =−(K_b/K_s)(Δ w_b)_{,α}
                 B_voigt(8*q + 6, idx) = -ratio * P1 * A3k;
                 B_voigt(8*q + 7, idx) = -ratio * P2 * A3k;
             }
 
-            // --- Twist potential columns --------------------------------------------
+            // --- Twist potential ψ (solenoidal hierarchic enrichment) ---------------
 
             const Index idx_psi = 4 * i + 3;
 
-            // Bending: κ_{αβ} += −(1/2)(ε_α^δ ψ_{|δβ} + ε_β^δ ψ_{|δα}) = −(curl ψ)_{(α|β)}
-            B_voigt(8*q + 3, idx_psi) = -curlgrad(i, 0, 0);
-            B_voigt(8*q + 4, idx_psi) = -curlgrad(i, 1, 1);
-            B_voigt(8*q + 5, idx_psi) = -(curlgrad(i, 0, 1) + curlgrad(i, 1, 0));
+            // Bending: κ_{αβ} += (1/2)(ε_α^δ ψ_{|δβ} + ε_β^δ ψ_{|δα}) = (curl ψ)_{(α|β)}
+            B_voigt(8*q + 3, idx_psi) = curlgrad(i, 0, 0);
+            B_voigt(8*q + 4, idx_psi) = curlgrad(i, 1, 1);
+            B_voigt(8*q + 5, idx_psi) = curlgrad(i, 0, 1) + curlgrad(i, 1, 0);
 
             // Shear: γ_α += ε_α^β ψ_{,β}
             B_voigt(8*q + 6, idx_psi) =  curl(i, 0);
