@@ -76,6 +76,28 @@ class _Field:
     def __pow__(self, exponent) -> "_Field":
         return _UnaryOp(self, lambda a, e=exponent: np.power(a, e))
 
+    def __getitem__(self, key: int | slice | tuple[int, ...]) -> "_Field":
+        """Select component(s) by column index — sugar for :meth:`component`.
+
+        ``f[2]`` is a scalar ``(Q, 1)`` field; ``f[:3]`` and ``f[0, 1, 2]``
+        keep their columns as a ``(Q, m)`` field.
+        """
+        if isinstance(key, tuple):
+            key = list(key)
+        return _Component(self, key)
+
+    def component(self, *idx: int) -> "_Field":
+        """Project onto one or more components, returning a lazy field.
+
+        A single index yields a scalar ``(Q, 1)`` field; several indices keep
+        the selected columns as a ``(Q, len(idx))`` field. This is the generic,
+        physics-agnostic way to pull individual resultants out of a packed
+        field (stresses, tractions, moments) — the caller supplies the meaning;
+        the field only knows its column count, so it works unchanged whether a
+        shell packs 5 + 3 resultants or a 3-D solid packs 6 stresses.
+        """
+        return _Component(self, idx[0] if len(idx) == 1 else list(idx))
+
 
 def _coerce(obj, patch: Patch) -> "_Field":
     """Lift a Function, scalar, or bare physical-space callable into a _Field."""
@@ -145,6 +167,28 @@ class _UnaryOp(_Field):
 
     def __call__(self, params: npt.ArrayLike) -> np.ndarray:
         return self._op(self._operand(params))
+
+
+class _Component(_Field):
+    """Lazy projection onto a subset of a field's components.
+
+    ``key`` is anything valid as a column index into the operand's ``(Q, k)``
+    output (an ``int``, a ``slice``, or a list of ints). An ``int`` collapses
+    to a single column but is promoted back to ``(Q, 1)`` so the result is
+    always 2-D and composes with the rest of the field algebra.
+    """
+
+    def __init__(self, operand: _Field, key) -> None:
+        self._operand = operand
+        self._key = key
+        self._patch = operand._patch
+
+    def __call__(self, params: npt.ArrayLike) -> np.ndarray:
+        vals = np.asarray(self._operand(params))
+        if vals.ndim == 1:
+            vals = vals[:, None]
+        out = vals[:, self._key]
+        return out[:, None] if out.ndim == 1 else out
 
 
 class Function(_Field):
