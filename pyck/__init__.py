@@ -11,6 +11,7 @@ from pyck.geometry import (
     SurfacePatch,
 )
 from pyck.elements import (
+    Element,
     ShellKirchhoffLove3p,
     ShellReissnerMindlin4p,
     ShellReissnerMindlinHier4p,
@@ -74,6 +75,7 @@ __all__ = [
     "NURBS",
     "CurvePatch",
     "SurfacePatch",
+    "Element",
     "ShellKirchhoffLove3p",
     "ShellReissnerMindlin4p",
     "ShellReissnerMindlinHier4p",
