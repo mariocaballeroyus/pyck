@@ -50,9 +50,21 @@ void LinearElasticProblem<T, d>::assemble(SparseMatrix<T>& K, Vector<T>& F) cons
         }
     }
 
+    // Estimate the global triplet count up front
+    std::size_t nnz_estimate = 0;
+    for (std::size_t p = 0; p < patches_.size(); ++p) {
+        std::size_t nodes = 1;
+        for (std::size_t i = 0; i < d; ++i) {
+            nodes *= static_cast<std::size_t>(patches_[p]->basis(i).degree()) + 1;
+        }
+        const std::size_t elem_dofs = nodes * elements_[p]->num_node_dofs();
+        nnz_estimate += static_cast<std::size_t>(patches_[p]->tensor_product().num_elements())
+                        * elem_dofs * elem_dofs;
+    }
+
     // Sparse-assembly sink for the global stiffness and load
     const Index total_dofs = static_cast<Index>(layout_.num_dofs());
-    SystemAssembler<T> assembler(total_dofs);
+    SystemAssembler<T> assembler(total_dofs, nnz_estimate);
 
     // Single allocation of element stiffness and local load
     Matrix<T> K_local;
