@@ -312,11 +312,13 @@ Element<T, d>::compute_local_stiffness(const ElementValues<T, d>& ev,
     const Index K        = B.cols();
 
     stiffness.setZero(K, K);
+    Matrix<T> DB(n_strain, K);
     for (Index q = 0; q < Q; ++q) {
         const T dV = ev.mapped_weights_(q) * ev.jac(q);
         const auto D = constitutive_matrix(ev, q);
         const auto B_voigt_q = B.middleRows(n_strain * q, n_strain);
-        stiffness.noalias() += dV * (B_voigt_q.transpose() * D * B_voigt_q);
+        DB.noalias() = D * B_voigt_q;
+        stiffness.noalias() += dV * (B_voigt_q.transpose() * DB);
     }
 }
 
