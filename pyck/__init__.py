@@ -26,6 +26,7 @@ from pyck.conditions import (
     Field,
     LoadBoundaryCondition,
     LagrangeBoundaryCondition,
+    NitscheBoundaryCondition,
     PenaltyBoundaryCondition,
     PenaltyCouplingCondition,
 )
@@ -86,6 +87,7 @@ __all__ = [
     "Field",
     "LoadBoundaryCondition",
     "LagrangeBoundaryCondition",
+    "NitscheBoundaryCondition",
     "PenaltyBoundaryCondition",
     "PenaltyCouplingCondition",
     "Constraint",

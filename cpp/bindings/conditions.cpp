@@ -6,6 +6,7 @@
 #include "condition.hpp"
 #include "load_boundary_condition.hpp"
 #include "boundary_lagrange_condition.hpp"
+#include "boundary_nitsche_condition.hpp"
 #include "boundary_penalty_condition.hpp"
 #include "penalty_coupling_condition.hpp"
 #include "patch_boundary.hpp"
@@ -103,6 +104,18 @@ void bind_conditions(py::module_& m)
                  return self.add(std::move(field), value);
              },
              py::arg("field"), py::arg("value") = 0.0,
+             py::return_value_policy::reference);
+
+    using NitscheBoundaryCondition2d = NitscheBoundaryCondition<double, 2>;
+    py::class_<NitscheBoundaryCondition2d, Condition<double, 2>, Ptr<NitscheBoundaryCondition2d>>(m, "NitscheBoundaryCondition2d")
+        .def(py::init<const PatchBoundary2d&, const Element2d&, const QuadratureRule1d&>(),
+             py::arg("boundary"), py::arg("element"), py::arg("quadrature"))
+        .def("add",
+             [](NitscheBoundaryCondition2d& self, BoundaryValue<double> field,
+                double penalty, double value) -> NitscheBoundaryCondition2d& {
+                 return self.add(std::move(field), penalty, value);
+             },
+             py::arg("field"), py::arg("penalty"), py::arg("value") = 0.0,
              py::return_value_policy::reference);
 
 }

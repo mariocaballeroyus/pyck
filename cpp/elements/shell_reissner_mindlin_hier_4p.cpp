@@ -69,7 +69,6 @@ ShellReissnerMindlinHier4p<T>::strain_matrix(const ElementValues<T, 2>& ev) cons
             const T P1  = lgrad(i, 0), P2 = lgrad(i, 1);
 
             // --- Cartesian displacement v (Kirchhoff-Love field + shear correction) ---
-    .
             for (Index k = 0; k < 3; ++k) {
                 const Index idx = 4 * i + k;
                 const T A3k = A3(k);
