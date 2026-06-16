@@ -1,6 +1,12 @@
 cmake_minimum_required(VERSION 3.14)
 project(pyck VERSION 0.1.0 LANGUAGES CXX C)
 
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING
+        "Build type (Release, Debug, RelWithDebInfo, MinSizeRel)" FORCE)
+    message(STATUS "CMAKE_BUILD_TYPE not set; defaulting to Release.")
+endif()
+
 # Build Options
 option(PYCK_BUILD_SINGLE_PRECISION "Build single precision (float) explicit instantiations alongside double" OFF)
 
