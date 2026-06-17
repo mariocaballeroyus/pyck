@@ -77,7 +77,7 @@ public:
 
     unsigned flags()           const override { return Flags::Normal | Flags::Deriv2 | Flags::Connection; }
     unsigned essential_flags() const override { return Flags::None; }
-    unsigned natural_flags()   const override { return Flags::Normal | Flags::Deriv2; }
+    unsigned natural_flags()   const override { return Flags::Normal | Flags::Deriv2 | Flags::Connection; }
 
 private:
 

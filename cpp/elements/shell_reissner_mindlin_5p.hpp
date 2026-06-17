@@ -80,8 +80,9 @@ public:
     { return Flags::Normal | Flags::NormalDeriv1 | Flags::Deriv2 | Flags::Connection; }
 
     unsigned essential_flags() const override { return Flags::None; }
+    
     unsigned natural_flags()   const override
-    { return Flags::Normal | Flags::NormalDeriv1 | Flags::Deriv2; }
+    { return Flags::Normal | Flags::NormalDeriv1 | Flags::Deriv2 | Flags::Connection; }
 
 private:
 
