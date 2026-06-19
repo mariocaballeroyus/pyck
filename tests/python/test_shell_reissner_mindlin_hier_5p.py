@@ -6,7 +6,8 @@ The hierarchic five-parameter shell implemented here is the "5p-hier." element o
     shell finite elements", Comput. Methods Appl. Mech. Engrg. 254 (2013) 170-180,
 
 i.e. the *pure*, displacement-based formulation with a hierarchic difference
-vector and NO membrane-locking treatment (no DSG, no hybrid stress). It is
+vector and NO membrane-locking treatment (unlike the mixed-displacement variant
+ShellReissnerMindlinHier5pMD). It is
 validated against the two benchmarks for which that exact element has tabulated
 reference values:
 

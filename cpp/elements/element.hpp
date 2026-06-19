@@ -1,6 +1,7 @@
 #ifndef PYCK_ELEMENT_HPP
 #define PYCK_ELEMENT_HPP
 
+#include <memory>
 #include <stdexcept>
 #include <utility>
 #include <Eigen/Dense>
@@ -315,7 +316,7 @@ Element<T, d>::compute_local_stiffness(const ElementValues<T, d>& ev,
     Matrix<T> DB(n_strain, K);
     for (Index q = 0; q < Q; ++q) {
         const T dV = ev.mapped_weights_(q) * ev.jac(q);
-        const auto D = constitutive_matrix(ev, q);
+        const ConstitutiveMatrix<T> D = constitutive_matrix(ev, q);
         const auto B_voigt_q = B.middleRows(n_strain * q, n_strain);
         DB.noalias() = D * B_voigt_q;
         stiffness.noalias() += dV * (B_voigt_q.transpose() * DB);

@@ -15,8 +15,11 @@ from pyck.elements import (
     ShellKirchhoffLove3p,
     ShellReissnerMindlin4p,
     ShellReissnerMindlinHier4p,
+    ShellReissnerMindlinHier4pMD,
     ShellReissnerMindlin5p,
     ShellReissnerMindlinHier5p,
+    ShellReissnerMindlinHier5pMD,
+    membrane_md_boundary_dofs,
 )
 from pyck.materials import (
     PlaneStress2d,
@@ -80,8 +83,11 @@ __all__ = [
     "ShellKirchhoffLove3p",
     "ShellReissnerMindlin4p",
     "ShellReissnerMindlinHier4p",
+    "ShellReissnerMindlinHier4pMD",
     "ShellReissnerMindlin5p",
     "ShellReissnerMindlinHier5p",
+    "ShellReissnerMindlinHier5pMD",
+    "membrane_md_boundary_dofs",
     "PlaneStress2d",
     "UniaxialStress1d",
     "Field",

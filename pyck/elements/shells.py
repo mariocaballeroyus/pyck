@@ -162,6 +162,105 @@ class ShellReissnerMindlinHier5p(Element):
         return f"ShellReissnerMindlinHier5p(material={self._material})"
 
 
+class ShellReissnerMindlinHier4pMD(ShellReissnerMindlinHier4p):
+    """Mixed-Displacement (MD) hierarchic four-parameter Reissner-Mindlin shell.
+
+    Identical kinematics to :class:`ShellReissnerMindlinHier4p`, but membrane locking is
+    removed by the Mixed-Displacement method (Bieber, Oesterle, Ramm, Bischoff, IJNME 2018):
+    a 3-component, equal-order membrane strain-displacement field is added (slots 4..6),
+    whose derivative supplies the lower-order membrane strain. The element builds the mixed
+    (symmetric-indefinite) stiffness directly — no condensation, element-local assembly.
+
+        slot 0..2 : Cartesian displacements (u_x, u_y, u_z)
+        slot 3    : twist potential psi
+        slot 4..6 : membrane strain-displacements (v~_11, v~_12, v~_22)
+
+    The strain-displacement field has integration-constant zero-energy modes; pin its
+    boundary DOFs with a Dirichlet constraint (see ``membrane_md_boundary_dofs``).
+
+    Parameters
+    ----------
+    material : PlaneStress2d
+        Shell material model.
+    """
+    num_node_dofs: int = 7
+
+    def __init__(self, material: PlaneStress2d) -> None:
+        self._material = material
+        self._cpp_object = _pyck.ShellReissnerMindlinHier4pMD(self._material._cpp_object)
+
+    def __repr__(self) -> str:
+        return f"ShellReissnerMindlinHier4pMD(material={self._material})"
+
+
+class ShellReissnerMindlinHier5pMD(ShellReissnerMindlinHier5p):
+    """Mixed-Displacement (MD) hierarchic five-parameter Reissner-Mindlin shell.
+
+    Identical kinematics to :class:`ShellReissnerMindlinHier5p`, but membrane locking is
+    removed by the Mixed-Displacement method (Bieber, Oesterle, Ramm, Bischoff, IJNME 2018):
+    a 3-component, equal-order membrane strain-displacement field is added (slots 5..7),
+    whose derivative supplies the lower-order membrane strain. The element builds the mixed
+    (symmetric-indefinite) stiffness directly — no condensation, element-local assembly.
+
+        slot 0..2 : Cartesian displacements (v_x, v_y, v_z)
+        slot 3..4 : hierarchic difference vector (w^1, w^2)
+        slot 5..7 : membrane strain-displacements (v~_11, v~_12, v~_22)
+
+    The strain-displacement field has integration-constant zero-energy modes; pin its
+    boundary DOFs with a Dirichlet constraint (see ``membrane_md_boundary_dofs``).
+
+    Parameters
+    ----------
+    material : PlaneStress2d
+        Shell material model.
+    """
+    num_node_dofs: int = 8
+
+    def __init__(self, material: PlaneStress2d) -> None:
+        self._material = material
+        self._cpp_object = _pyck.ShellReissnerMindlinHier5pMD(self._material._cpp_object)
+
+    def __repr__(self) -> str:
+        return f"ShellReissnerMindlinHier5pMD(material={self._material})"
+
+
+def membrane_md_boundary_dofs(patch, element) -> list[int]:
+    """Boundary strain-displacement DOFs to pin for a Mixed-Displacement shell.
+
+    The MD membrane field has integration-constant zero-energy modes
+    (``v~_11 = F(xi2)``, ``v~_22 = G(xi1)``, ``v~_12 = F(xi1) + G(xi2)``). They carry no
+    stiffness and no influence on the solution, but make the system singular. Pinning
+    these boundary DOFs to zero removes them: ``v~_11`` on a xi1-edge, ``v~_22`` on a
+    xi2-edge, ``v~_12`` on one edge of each direction.
+
+    Parameters
+    ----------
+    patch : SurfacePatch
+        The patch carrying the MD element.
+    element : ShellReissnerMindlinHier4pMD or ShellReissnerMindlinHier5pMD
+        The MD element (used for ``num_node_dofs``).
+
+    Returns
+    -------
+    list[int]
+        Global DOF indices to constrain to zero (e.g. with ``DirectConstraint``).
+    """
+    nd = int(element.num_node_dofs)
+    s11, s12, s22 = nd - 3, nd - 2, nd - 1  # u~ slots are the last three
+
+    def edge_cps(pdim: int) -> list[int]:
+        return [int(c) for c in patch.boundary(pdim, True).displacement_dofs]
+
+    dofs: set[int] = set()
+    for cp in edge_cps(0):  # xi1-edge
+        dofs.add(cp * nd + s11)
+        dofs.add(cp * nd + s12)
+    for cp in edge_cps(1):  # xi2-edge
+        dofs.add(cp * nd + s22)
+        dofs.add(cp * nd + s12)
+    return sorted(dofs)
+
+
 class ShellKirchhoffLove3p(Element):
     """Kirchhoff-Love thin-shell element (rotation-free).
 

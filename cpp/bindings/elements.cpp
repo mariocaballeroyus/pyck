@@ -15,6 +15,7 @@
 #include "shell_reissner_mindlin_4p.hpp"
 #include "shell_reissner_mindlin_hier_4p.hpp"
 #include "shell_reissner_mindlin_hier_5p.hpp"
+#include "mixed_displacement_shells.hpp"
 #include "shell_kirchhoff_love_3p.hpp"
 #include "plane_stress_2d.hpp"
 
@@ -184,6 +185,16 @@ void bind_elements(py::module_& m)
 
      py::class_<ShellReissnerMindlinHier5p<double>, Element2d,
                 Ptr<ShellReissnerMindlinHier5p<double>>>(m, "ShellReissnerMindlinHier5p")
+          .def(py::init<Ptr<PlaneStress2d<double>>>(),
+               py::arg("material"));
+
+     py::class_<ShellReissnerMindlinHier4pMD<double>, ShellReissnerMindlinHier4p<double>,
+                Ptr<ShellReissnerMindlinHier4pMD<double>>>(m, "ShellReissnerMindlinHier4pMD")
+          .def(py::init<Ptr<PlaneStress2d<double>>>(),
+               py::arg("material"));
+
+     py::class_<ShellReissnerMindlinHier5pMD<double>, ShellReissnerMindlinHier5p<double>,
+                Ptr<ShellReissnerMindlinHier5pMD<double>>>(m, "ShellReissnerMindlinHier5pMD")
           .def(py::init<Ptr<PlaneStress2d<double>>>(),
                py::arg("material"));
 

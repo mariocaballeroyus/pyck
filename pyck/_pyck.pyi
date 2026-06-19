@@ -336,10 +336,16 @@ class ShellReissnerMindlin4p(Element2d):
 class ShellReissnerMindlinHier4p(Element2d):
     def __init__(self, material: PlaneStress2d) -> None:
         ...
+class ShellReissnerMindlinHier4pMD(ShellReissnerMindlinHier4p):
+    def __init__(self, material: PlaneStress2d) -> None:
+        ...
 class ShellReissnerMindlin5p(Element2d):
     def __init__(self, material: PlaneStress2d) -> None:
         ...
 class ShellReissnerMindlinHier5p(Element2d):
+    def __init__(self, material: PlaneStress2d) -> None:
+        ...
+class ShellReissnerMindlinHier5pMD(ShellReissnerMindlinHier5p):
     def __init__(self, material: PlaneStress2d) -> None:
         ...
 class UniaxialStress1d(Material1d):
