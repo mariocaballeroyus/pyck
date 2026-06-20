@@ -4,6 +4,7 @@
 #include <memory>
 #include <stdexcept>
 #include <utility>
+#include <vector>
 #include <Eigen/Dense>
 
 #include "patch.hpp"
@@ -29,6 +30,17 @@ enum class FieldType
     STRAIN,        ///< Generalised strain          — B · u_local.
     TRACTION,      ///< Force resultants  [n¹¹ n²² n¹² (q¹ q²)] — conjugate to DISPLACEMENT.
     MOMENT,        ///< Moment resultants [m¹¹ m²² m¹²]         — conjugate to ROTATION.
+};
+
+/**
+ * @brief A contiguous range of generalised-strain rows (and the matching square
+ *        constitutive sub-block). For the shells the 8-row strain layout is
+ *        membrane = {0, 3}, bending = {3, 3}, transverse shear = {6, 2}.
+ */
+struct StrainBlock
+{
+    Index offset;  ///< First strain row of the block.
+    Index count;   ///< Number of rows in the block.
 };
 
 /**
@@ -71,6 +83,12 @@ public:
     ///        *natural*-boundary fields — those applying work-conjugate
     ///        tractions (shear, bending moment, twisting moment).
     virtual unsigned natural_flags() const = 0;
+
+    /// @brief Mark a strain block as supplied externally (e.g. by a mixed
+    ///        formulation): its constitutive sub-block is zeroed in
+    ///        `compute_local_stiffness`, so the block contributes no stiffness
+    ///        through this element. The external formulation re-supplies it.
+    void suppress_block(StrainBlock block) { suppressed_blocks_.push_back(block); }
 
     // === Matrix Operators (Element Formulation-Agnostic) ============================
 
@@ -203,6 +221,10 @@ protected:
     std::pair<T, T> contravariant_dir(const ElementValues<T, d>& parent, Index q,
                                       const Vector3<T>& dvec) const;
 
+    /// @brief Strain blocks whose contribution is supplied externally; see
+    ///        `suppress_block`. Empty for a standalone displacement element.
+    std::vector<StrainBlock> suppressed_blocks_;
+
 public:
 
     // === Preallocated scratch =======================================================
@@ -316,7 +338,9 @@ Element<T, d>::compute_local_stiffness(const ElementValues<T, d>& ev,
     Matrix<T> DB(n_strain, K);
     for (Index q = 0; q < Q; ++q) {
         const T dV = ev.mapped_weights_(q) * ev.jac(q);
-        const ConstitutiveMatrix<T> D = constitutive_matrix(ev, q);
+        ConstitutiveMatrix<T> D = constitutive_matrix(ev, q);
+        for (const StrainBlock& b : suppressed_blocks_)
+            D.block(b.offset, b.offset, b.count, b.count).setZero();
         const auto B_voigt_q = B.middleRows(n_strain * q, n_strain);
         DB.noalias() = D * B_voigt_q;
         stiffness.noalias() += dV * (B_voigt_q.transpose() * DB);

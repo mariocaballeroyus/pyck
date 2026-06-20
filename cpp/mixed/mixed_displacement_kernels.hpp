@@ -1,14 +1,11 @@
-#ifndef PYCK_MIXED_DISPLACEMENT_SHELLS_HPP
-#define PYCK_MIXED_DISPLACEMENT_SHELLS_HPP
+#ifndef PYCK_MIXED_DISPLACEMENT_KERNELS_HPP
+#define PYCK_MIXED_DISPLACEMENT_KERNELS_HPP
 
 #include <concepts>
-#include <utility>
 #include <Eigen/Dense>
 
-#include "element.hpp"
-#include "element_values.hpp"
-#include "shell_reissner_mindlin_hier_4p.hpp"
-#include "shell_reissner_mindlin_hier_5p.hpp"
+#include "../elements/element.hpp"
+#include "../elements/element_values.hpp"
 #include "../multi_index.hpp"
 #include "../types.hpp"
 
@@ -16,7 +13,7 @@ namespace pyck
 {
 
 /**
- * @brief Mixed-Displacement (MD) hierarchic shells and their shared kernels
+ * @brief Mixed-Displacement (MD) membrane-locking kernels
  *        (Bieber, Oesterle, Ramm, Bischoff, IJNME 114 (2018) 801-827).
  *
  * @details Membrane locking is removed by a 3-component strain-displacement field
@@ -35,8 +32,8 @@ namespace pyck
  *          \f]
  *          with per-node DOFs ordered \f$[\,\text{displacement (ndof\_base)};\,
  *          \tilde{\mathbf u}\,(3)\,]\f$. The membrane is absent from the displacement
- *          block; it enters only through \f$\mathbf G_e\f$. The element classes are thin
- *          wrappers over the `md::` kernels below.
+ *          block; it enters only through \f$\mathbf G_e\f$. These kernels are driven by the
+ *          `MixedDisplacementShell` decorator, which supplies the base displacement element.
  */
 namespace md
 {
@@ -198,124 +195,6 @@ inline void assemble_stress_shape(const Element<T, 2>& element, Index ndof_base,
 
 } // namespace md
 
-/**
- * @brief Mixed-Displacement (MD) hierarchic four-parameter Reissner-Mindlin shell.
- *
- * @details Same kinematics as ShellReissnerMindlinHier4p (rotation-free), but membrane
- *          locking is removed by the Mixed-Displacement method: a 3-component, equal-order
- *          membrane strain-displacement field (slots 4..6) supplies the lower-order membrane
- *          strain through a symmetric-indefinite mixed stiffness (no condensation); bending
- *          and transverse shear stay primal.
- *
- *              slot 0..2 : Cartesian displacements (v_x, v_y, v_z)
- *              slot 3    : twist potential psi
- *              slot 4..6 : membrane strain-displacements (ṽ_11, ṽ_12, ṽ_22)
- *
- * @note The \f$\tilde{\mathbf u}\f$ field has integration-constant zero-energy modes that must
- *       be stabilised by Dirichlet boundary conditions on its boundary DOFs.
- *
- * @tparam T Scalar type.
- */
-template <std::floating_point T>
-class ShellReissnerMindlinHier4pMD : public ShellReissnerMindlinHier4p<T>
-{
-public:
-
-    explicit ShellReissnerMindlinHier4pMD(Ptr<PlaneStress2d<T>> material)
-        : ShellReissnerMindlinHier4p<T>(std::move(material)) {}
-
-    /// @brief Displacement (4) + membrane strain-displacements (3).
-    std::size_t num_node_dofs() const override { return 7; }
-
-    /// @brief Local mixed stiffness [[-H, G],[Gᵀ, K_bending+shear]] over the 7-DOF layout.
-    void compute_local_stiffness(const ElementValues<T, 2>& ev, Matrix<T>& stiffness) const override
-    {
-        md::assemble_local_stiffness<T>(*this, /*ndof_base=*/4, ev, stiffness);
-    }
-
-    /// @brief Displacement shape on the 7-DOF layout (displacement slots only; ũ slots zero).
-    void displacement_shape_matrix(const ElementValues<T, 2>& ev) const override
-    {
-        ShellReissnerMindlinHier4p<T>::displacement_shape_matrix(ev);
-        md::widen_dof_columns<T>(this->N_w_, /*ndof_base=*/4,
-                                 static_cast<Index>(ev.basis_derivs[0].rows()));
-    }
-
-    /// @brief Director-tilt shape on the 7-DOF layout (for weak rotation BCs).
-    void rotation_shape_matrix(const ElementValues<T, 2>& ev) const override
-    {
-        ShellReissnerMindlinHier4p<T>::rotation_shape_matrix(ev);
-        md::widen_dof_columns<T>(this->N_phi_, /*ndof_base=*/4,
-                                 static_cast<Index>(ev.basis_derivs[0].rows()));
-    }
-
-    /// @brief Generalised-stress shape on the 7-DOF layout: membrane stress from ũ,
-    ///        bending/shear from displacement (for traction/moment BCs and recovery).
-    void stress_shape_matrix(const ElementValues<T, 2>& ev) const override
-    {
-        md::assemble_stress_shape<T>(*this, /*ndof_base=*/4, ev, this->N_sigma_);
-    }
-};
-
-/**
- * @brief Mixed-Displacement (MD) hierarchic five-parameter Reissner-Mindlin shell.
- *
- * @details Same kinematics as ShellReissnerMindlinHier5p, but membrane locking is removed by
- *          the Mixed-Displacement method: a 3-component, equal-order membrane
- *          strain-displacement field (slots 5..7) supplies the lower-order membrane strain
- *          through a symmetric-indefinite mixed stiffness (no condensation); bending and
- *          transverse shear stay primal.
- *
- *              slot 0..2 : Cartesian displacements (v_x, v_y, v_z)
- *              slot 3..4 : hierarchic difference vector (w^1, w^2)
- *              slot 5..7 : membrane strain-displacements (ṽ_11, ṽ_12, ṽ_22)
- *
- * @note The \f$\tilde{\mathbf u}\f$ field has integration-constant zero-energy modes that must
- *       be stabilised by Dirichlet boundary conditions on its boundary DOFs.
- *
- * @tparam T Scalar type.
- */
-template <std::floating_point T>
-class ShellReissnerMindlinHier5pMD : public ShellReissnerMindlinHier5p<T>
-{
-public:
-
-    explicit ShellReissnerMindlinHier5pMD(Ptr<PlaneStress2d<T>> material)
-        : ShellReissnerMindlinHier5p<T>(std::move(material)) {}
-
-    /// @brief Displacement (5) + membrane strain-displacements (3).
-    std::size_t num_node_dofs() const override { return 8; }
-
-    /// @brief Local mixed stiffness [[-H, G],[Gᵀ, K_bending+shear]] over the 8-DOF layout.
-    void compute_local_stiffness(const ElementValues<T, 2>& ev, Matrix<T>& stiffness) const override
-    {
-        md::assemble_local_stiffness<T>(*this, /*ndof_base=*/5, ev, stiffness);
-    }
-
-    /// @brief Displacement shape on the 8-DOF layout (displacement slots only; ũ slots zero).
-    void displacement_shape_matrix(const ElementValues<T, 2>& ev) const override
-    {
-        ShellReissnerMindlinHier5p<T>::displacement_shape_matrix(ev);
-        md::widen_dof_columns<T>(this->N_w_, /*ndof_base=*/5,
-                                 static_cast<Index>(ev.basis_derivs[0].rows()));
-    }
-
-    /// @brief Director-tilt shape on the 8-DOF layout (for weak rotation BCs).
-    void rotation_shape_matrix(const ElementValues<T, 2>& ev) const override
-    {
-        ShellReissnerMindlinHier5p<T>::rotation_shape_matrix(ev);
-        md::widen_dof_columns<T>(this->N_phi_, /*ndof_base=*/5,
-                                 static_cast<Index>(ev.basis_derivs[0].rows()));
-    }
-
-    /// @brief Generalised-stress shape on the 8-DOF layout: membrane stress from ũ,
-    ///        bending/shear from displacement (for traction/moment BCs and recovery).
-    void stress_shape_matrix(const ElementValues<T, 2>& ev) const override
-    {
-        md::assemble_stress_shape<T>(*this, /*ndof_base=*/5, ev, this->N_sigma_);
-    }
-};
-
 } // namespace pyck
 
-#endif // PYCK_MIXED_DISPLACEMENT_SHELLS_HPP
+#endif // PYCK_MIXED_DISPLACEMENT_KERNELS_HPP

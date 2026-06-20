@@ -162,66 +162,41 @@ class ShellReissnerMindlinHier5p(Element):
         return f"ShellReissnerMindlinHier5p(material={self._material})"
 
 
-class ShellReissnerMindlinHier4pMD(ShellReissnerMindlinHier4p):
-    """Mixed-Displacement (MD) hierarchic four-parameter Reissner-Mindlin shell.
+class MixedDisplacementShell(Element):
+    """Mixed-Displacement (MD) membrane-locking treatment wrapping any base shell.
 
-    Identical kinematics to :class:`ShellReissnerMindlinHier4p`, but membrane locking is
-    removed by the Mixed-Displacement method (Bieber, Oesterle, Ramm, Bischoff, IJNME 2018):
-    a 3-component, equal-order membrane strain-displacement field is added (slots 4..6),
-    whose derivative supplies the lower-order membrane strain. The element builds the mixed
-    (symmetric-indefinite) stiffness directly — no condensation, element-local assembly.
+    A composition decorator (Bieber, Oesterle, Ramm, Bischoff, IJNME 2018): it wraps a base
+    displacement shell and adds a 3-component, equal-order membrane strain-displacement field
+    as the **last three** node DOFs, whose derivative supplies the lower-order membrane
+    strain. The mixed (symmetric-indefinite) stiffness is built element-locally — no
+    condensation. One class works for every base shell, so there is no per-shell MD subclass.
 
-        slot 0..2 : Cartesian displacements (u_x, u_y, u_z)
-        slot 3    : twist potential psi
-        slot 4..6 : membrane strain-displacements (v~_11, v~_12, v~_22)
-
-    The strain-displacement field has integration-constant zero-energy modes; pin its
-    boundary DOFs with a Dirichlet constraint (see ``membrane_md_boundary_dofs``).
-
-    Parameters
-    ----------
-    material : PlaneStress2d
-        Shell material model.
-    """
-    num_node_dofs: int = 7
-
-    def __init__(self, material: PlaneStress2d) -> None:
-        self._material = material
-        self._cpp_object = _pyck.ShellReissnerMindlinHier4pMD(self._material._cpp_object)
-
-    def __repr__(self) -> str:
-        return f"ShellReissnerMindlinHier4pMD(material={self._material})"
-
-
-class ShellReissnerMindlinHier5pMD(ShellReissnerMindlinHier5p):
-    """Mixed-Displacement (MD) hierarchic five-parameter Reissner-Mindlin shell.
-
-    Identical kinematics to :class:`ShellReissnerMindlinHier5p`, but membrane locking is
-    removed by the Mixed-Displacement method (Bieber, Oesterle, Ramm, Bischoff, IJNME 2018):
-    a 3-component, equal-order membrane strain-displacement field is added (slots 5..7),
-    whose derivative supplies the lower-order membrane strain. The element builds the mixed
-    (symmetric-indefinite) stiffness directly — no condensation, element-local assembly.
-
-        slot 0..2 : Cartesian displacements (v_x, v_y, v_z)
-        slot 3..4 : hierarchic difference vector (w^1, w^2)
-        slot 5..7 : membrane strain-displacements (v~_11, v~_12, v~_22)
+        slot 0..n-1 : the base element's DOFs
+        slot n..n+2 : membrane strain-displacements (v~_11, v~_12, v~_22)
 
     The strain-displacement field has integration-constant zero-energy modes; pin its
     boundary DOFs with a Dirichlet constraint (see ``membrane_md_boundary_dofs``).
 
     Parameters
     ----------
-    material : PlaneStress2d
-        Shell material model.
+    base : Element
+        The base displacement shell element (e.g. ``ShellReissnerMindlinHier5p``). The same
+        instance is wrapped; the decorator adds three membrane DOFs per node.
     """
-    num_node_dofs: int = 8
 
-    def __init__(self, material: PlaneStress2d) -> None:
-        self._material = material
-        self._cpp_object = _pyck.ShellReissnerMindlinHier5pMD(self._material._cpp_object)
+    def __init__(self, base: Element) -> None:
+        self._base = base
+        self._material = base._material
+        self._cpp_object = _pyck.MixedDisplacementShell(base._cpp_object)
+        self.num_node_dofs = int(base.num_node_dofs) + 3
+
+    @property
+    def base(self) -> Element:
+        """The wrapped base shell element."""
+        return self._base
 
     def __repr__(self) -> str:
-        return f"ShellReissnerMindlinHier5pMD(material={self._material})"
+        return f"MixedDisplacementShell(base={self._base!r})"
 
 
 def membrane_md_boundary_dofs(patch, element) -> list[int]:
@@ -237,7 +212,7 @@ def membrane_md_boundary_dofs(patch, element) -> list[int]:
     ----------
     patch : SurfacePatch
         The patch carrying the MD element.
-    element : ShellReissnerMindlinHier4pMD or ShellReissnerMindlinHier5pMD
+    element : MixedDisplacementShell
         The MD element (used for ``num_node_dofs``).
 
     Returns

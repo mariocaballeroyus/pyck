@@ -336,17 +336,14 @@ class ShellReissnerMindlin4p(Element2d):
 class ShellReissnerMindlinHier4p(Element2d):
     def __init__(self, material: PlaneStress2d) -> None:
         ...
-class ShellReissnerMindlinHier4pMD(ShellReissnerMindlinHier4p):
-    def __init__(self, material: PlaneStress2d) -> None:
-        ...
 class ShellReissnerMindlin5p(Element2d):
     def __init__(self, material: PlaneStress2d) -> None:
         ...
 class ShellReissnerMindlinHier5p(Element2d):
     def __init__(self, material: PlaneStress2d) -> None:
         ...
-class ShellReissnerMindlinHier5pMD(ShellReissnerMindlinHier5p):
-    def __init__(self, material: PlaneStress2d) -> None:
+class MixedDisplacementShell(Element2d):
+    def __init__(self, base: Element2d) -> None:
         ...
 class UniaxialStress1d(Material1d):
     def __init__(self, E: typing.SupportsFloat | typing.SupportsIndex, nu: typing.SupportsFloat | typing.SupportsIndex, A: typing.SupportsFloat | typing.SupportsIndex, I22: typing.SupportsFloat | typing.SupportsIndex, k22: typing.SupportsFloat | typing.SupportsIndex = 0.8333333333333334, rho: typing.SupportsFloat | typing.SupportsIndex = 0.0, I33: typing.SupportsFloat | typing.SupportsIndex = 0.0, k33: typing.SupportsFloat | typing.SupportsIndex = 0.0, J: typing.SupportsFloat | typing.SupportsIndex = 0.0) -> None:
