@@ -43,8 +43,10 @@ void LinearElasticProblem<T, d>::assemble(SparseMatrix<T>& K, Vector<T>& F) cons
         blocks.add(*patches_[p], primal_blocks[p]);
     }
 
-    // Allocate auxiliary DOFs per patch (e.g. Lagrange multipliers).
+    // Allocate auxiliary DOFs per patch (e.g. Lagrange multipliers). An element may
+    // also own auxiliary blocks (e.g. a mixed-formulation field); allocate those too.
     for (std::size_t p = 0; p < patches_.size(); ++p) {
+        elements_[p]->allocate_dofs(layout_);
         for (const auto& cond : conditions_per_patch_[p]) {
             cond->allocate_dofs(layout_);
         }
@@ -110,8 +112,9 @@ void LinearElasticProblem<T, d>::assemble(SparseMatrix<T>& K, Vector<T>& F) cons
         }
     }
 
-    // --- Conditions -----------------------------------------------------------------
+    // --- Element-owned auxiliary contributions + conditions -------------------------
     for (std::size_t p = 0; p < patches_.size(); ++p) {
+        elements_[p]->apply(assembler, layout_, blocks);
         for (const auto& cond : conditions_per_patch_[p]) {
             cond->apply(assembler, layout_, blocks);
         }

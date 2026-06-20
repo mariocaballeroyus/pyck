@@ -7,8 +7,6 @@ from pyck.elements.shells import (
     ShellReissnerMindlinHier4p,
     ShellReissnerMindlin5p,
     ShellReissnerMindlinHier5p,
-    MixedDisplacementShell,
-    membrane_md_boundary_dofs,
 )
 
 
@@ -19,6 +17,4 @@ __all__ = [
     "ShellReissnerMindlinHier4p",
     "ShellReissnerMindlin5p",
     "ShellReissnerMindlinHier5p",
-    "MixedDisplacementShell",
-    "membrane_md_boundary_dofs",
 ]

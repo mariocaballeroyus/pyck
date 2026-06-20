@@ -79,6 +79,7 @@ def solve(
     f: npt.NDArray[np.float64] | None = None,
     *,
     physical_dofs: int | None = None,
+    full: bool = False,
 ) -> npt.NDArray[np.float64]:
     """Solve a linear system or a linear-elastic problem.
 
@@ -92,6 +93,8 @@ def solve(
         f: Load vector `(n,)` with BCs applied. Omit when solving a problem.
         physical_dofs: Optional number of leading physical DOFs to return.
             This is inferred automatically when `K` is a problem.
+        full: Return the untruncated solution, including auxiliary unknowns
+            (e.g. a mixed formulation's field), needed for field recovery.
 
     Returns:
         Solution vector.
@@ -111,6 +114,8 @@ def solve(
         solution = np.linalg.solve(K, f)
 
     solution = np.asarray(solution, dtype=np.float64).ravel()
+    if full:
+        return solution
     if physical_dofs is not None:
         return solution[: int(physical_dofs)]
     return solution

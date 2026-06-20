@@ -4,7 +4,7 @@ import numpy
 import numpy.typing
 import scipy.sparse
 import typing
-__all__: list[str] = ['BSpline', 'Basis', 'BoundaryValue', 'Condition1d', 'Condition2d', 'Constraint', 'DirectConstraint', 'Element1d', 'Element2d', 'Field', 'FieldType', 'Function1d', 'Function2d', 'GaussLegendre1d', 'GaussLegendre2d', 'LagrangeBoundaryCondition2d', 'LinearConstraint', 'LinearElasticProblem1d', 'LinearElasticProblem2d', 'LoadBoundaryCondition2d', 'Material1d', 'Material2d', 'NURBS', 'Patch1d', 'Patch2d', 'PatchBoundary2d', 'PenaltyBoundaryCondition2d', 'PenaltyCouplingCondition2d', 'PlaneStress2d', 'QuadratureRule1d', 'QuadratureRule2d', 'ShellKirchhoffLove3p', 'ShellReissnerMindlin4p', 'ShellReissnerMindlinHier4p', 'ShellReissnerMindlin5p', 'ShellReissnerMindlinHier5p', 'UniaxialStress1d', 'bezier_anchor_params', 'eval_quadrature_data', 'export_bezier_vtm', 'export_bezier_vtu', 'inner_product']
+__all__: list[str] = ['BSpline', 'Basis', 'BoundaryValue', 'Condition1d', 'Condition2d', 'Constraint', 'DirectConstraint', 'Element1d', 'Element2d', 'Field', 'FieldType', 'Function1d', 'Function2d', 'GaussLegendre1d', 'GaussLegendre2d', 'LagrangeBoundaryCondition2d', 'LinearConstraint', 'LinearElasticProblem1d', 'LinearElasticProblem2d', 'LoadBoundaryCondition2d', 'MembraneAssumedStrainCondition2d', 'Material1d', 'Material2d', 'NURBS', 'Patch1d', 'Patch2d', 'PatchBoundary2d', 'PenaltyBoundaryCondition2d', 'PenaltyCouplingCondition2d', 'PlaneStress2d', 'QuadratureRule1d', 'QuadratureRule2d', 'ShellKirchhoffLove3p', 'ShellReissnerMindlin4p', 'ShellReissnerMindlinHier4p', 'ShellReissnerMindlin5p', 'ShellReissnerMindlinHier5p', 'UniaxialStress1d', 'bezier_anchor_params', 'eval_quadrature_data', 'export_bezier_vtm', 'export_bezier_vtu', 'inner_product']
 class BSpline(Basis):
     @staticmethod
     def clamped_uniform(degree: typing.SupportsInt | typing.SupportsIndex, num_basis: typing.SupportsInt | typing.SupportsIndex) -> BSpline:
@@ -308,6 +308,11 @@ class PenaltyCouplingCondition2d(Condition2d):
         ...
     def couple_kinematics(self, penalty_disp: typing.SupportsFloat | typing.SupportsIndex, penalty_rot: typing.SupportsFloat | typing.SupportsIndex) -> PenaltyCouplingCondition2d:
         ...
+class MembraneAssumedStrainCondition2d(Condition2d):
+    def __init__(self, patch: Patch2d, element: Element2d, quadrature: QuadratureRule2d, degree_drop: int = 1) -> None:
+        ...
+    def recover_membrane_force(self, u_full: numpy.typing.NDArray[numpy.float64], params: numpy.typing.NDArray[numpy.float64]) -> numpy.typing.NDArray[numpy.float64]:
+        ...
 class PlaneStress2d(Material2d):
     def __init__(self, E: typing.SupportsFloat | typing.SupportsIndex, nu: typing.SupportsFloat | typing.SupportsIndex, t: typing.SupportsFloat | typing.SupportsIndex, k: typing.SupportsFloat | typing.SupportsIndex = 0.8333333333333334, rho: typing.SupportsFloat | typing.SupportsIndex = 0.0) -> None:
         ...
@@ -341,9 +346,6 @@ class ShellReissnerMindlin5p(Element2d):
         ...
 class ShellReissnerMindlinHier5p(Element2d):
     def __init__(self, material: PlaneStress2d) -> None:
-        ...
-class MixedDisplacementShell(Element2d):
-    def __init__(self, base: Element2d) -> None:
         ...
 class UniaxialStress1d(Material1d):
     def __init__(self, E: typing.SupportsFloat | typing.SupportsIndex, nu: typing.SupportsFloat | typing.SupportsIndex, A: typing.SupportsFloat | typing.SupportsIndex, I22: typing.SupportsFloat | typing.SupportsIndex, k22: typing.SupportsFloat | typing.SupportsIndex = 0.8333333333333334, rho: typing.SupportsFloat | typing.SupportsIndex = 0.0, I33: typing.SupportsFloat | typing.SupportsIndex = 0.0, k33: typing.SupportsFloat | typing.SupportsIndex = 0.0, J: typing.SupportsFloat | typing.SupportsIndex = 0.0) -> None:

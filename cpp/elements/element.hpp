@@ -15,6 +15,12 @@
 namespace pyck
 {
 
+// Forward declarations for the optional element-owned auxiliary-DOF hooks
+// (allocate_dofs / apply). Defined in cpp/assembly/; only referenced by reference here.
+class DofLayout;
+template <std::floating_point T> class SystemAssembler;
+template <std::floating_point T, std::size_t d> class PatchBlocks;
+
 /**
  * @brief Field types supported by `Element::eval_field` and `integrate_on_patch`.
  *
@@ -89,6 +95,22 @@ public:
     ///        `compute_local_stiffness`, so the block contributes no stiffness
     ///        through this element. The external formulation re-supplies it.
     void suppress_block(StrainBlock block) { suppressed_blocks_.push_back(block); }
+
+    // === Optional auxiliary-DOF hooks (mixed formulations) ==========================
+    //
+    // An element may own auxiliary DOF blocks with their own connectivity (e.g. an
+    // assumed-strain field on a coarser basis) that do not fit the per-node primal
+    // layout. These mirror the `Condition` interface and are invoked by the assembler
+    // once per patch-element: `allocate_dofs` in the allocation phase, `apply` in the
+    // apply phase. Default no-ops, so standard elements are unaffected.
+
+    /// @brief Allocate auxiliary DOF blocks this element owns. Default: no-op.
+    virtual void allocate_dofs(DofLayout& layout) {}
+
+    /// @brief Assemble this element's auxiliary cross-block contribution (e.g. a
+    ///        mixed-formulation saddle) into the global system. Default: no-op.
+    virtual void apply(SystemAssembler<T>& assembler, const DofLayout& layout,
+                       const PatchBlocks<T, d>& blocks) const {}
 
     // === Matrix Operators (Element Formulation-Agnostic) ============================
 
@@ -256,7 +278,13 @@ Element<T, d>::stress_shape_matrix(const ElementValues<T, d>& ev) const
 
     N_sigma_.setZero(n_strain * Q, K);
     for (Index q = 0; q < Q; ++q) {
-        const auto D = constitutive_matrix(ev, q);
+        ConstitutiveMatrix<T> D = constitutive_matrix(ev, q);
+        // A suppressed block (supplied externally, e.g. by a mixed formulation) contributes
+        // no recovered stress either — mirror `compute_local_stiffness` so the element never
+        // reports a stress it did not compute (the membrane nᵅᵝ would otherwise be the locked
+        // D·B_m·u). D is block-diagonal, so bending / shear rows are untouched.
+        for (const StrainBlock& b : suppressed_blocks_)
+            D.block(b.offset, b.offset, b.count, b.count).setZero();
         N_sigma_.middleRows(n_strain * q, n_strain).noalias() =
             D * B_voigt_.middleRows(n_strain * q, n_strain);
     }
