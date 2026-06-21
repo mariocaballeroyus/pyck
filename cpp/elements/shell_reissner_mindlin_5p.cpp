@@ -20,72 +20,97 @@ ShellReissnerMindlin5p<T>::ShellReissnerMindlin5p(Ptr<PlaneStress2d<T>> material
 
 template <std::floating_point T>
 void
-ShellReissnerMindlin5p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
+ShellReissnerMindlin5p<T>::membrane_strain_matrix(const ElementValues<T, 2>& ev,
+                                                  Matrix<T>& B) const
 {
-    // Number of points and basis
     const Index Q = ev.basis_derivs[0].cols();
     const Index N = ev.basis_derivs[0].rows();
-    // Reset strain matrix values
-    Matrix<T>& B_voigt = this->B_voigt_;
-    B_voigt.setZero(8 * Q, 5 * N);
 
     for (Index q = 0; q < Q; ++q) {
-        // Covariant basis, unit normal, and its first derivative
         const auto cov = ev.cov_basis(q);
-        const Vector3<T> A1 = cov(0), A2 = cov(1), A3 = ev.normal(q);
-        // Unit normal 1st derivative
-        const auto nd  = ev.normal_deriv(q);
-        const Vector3<T> A3_d1 = nd(0), A3_d2 = nd(1);
-        // Midsurface metric
-        const auto A = ev.metric(q);
-        const T A11 = A(0, 0), A22 = A(1, 1), A12 = A(0, 1);
+        const Vector3<T> A1 = cov(0), A2 = cov(1);
+        const auto G = ev.dN(q);
 
-        // Shape N^i
-        const auto Nf = ev.N(q);
-        // Shape gradient N^i_{,α}
-        const auto G  = ev.dN(q);
-        // Covariant vector gradient  u_{α|β} = A_{αλ} N^i_{,β} u^λ_i 
-        //                                + Γ_{α,(λβ)} N^i u^λ_i
+        for (Index i = 0; i < N; ++i) {
+            const T G1i = G(i, 0), G2i = G(i, 1);
+            // Membrane ε_{αβ} = (1/2)(u_{,α}·A_β + u_{,β}·A_α)
+            for (Index k = 0; k < 3; ++k) {
+                B(8*q,     5*i + k) = G1i * A1(k);
+                B(8*q + 1, 5*i + k) = G2i * A2(k);
+                B(8*q + 2, 5*i + k) = G1i * A2(k) + G2i * A1(k);
+            }
+        }
+    }
+}
+
+template <std::floating_point T>
+void
+ShellReissnerMindlin5p<T>::bending_strain_matrix(const ElementValues<T, 2>& ev,
+                                                 Matrix<T>& B) const
+{
+    const Index Q = ev.basis_derivs[0].cols();
+    const Index N = ev.basis_derivs[0].rows();
+
+    for (Index q = 0; q < Q; ++q) {
+        // Unit normal 1st derivative A_{3,β}
+        const auto nd = ev.normal_deriv(q);
+        const Vector3<T> A3_d1 = nd(0), A3_d2 = nd(1);
+        const auto G = ev.dN(q);
+        // Covariant vector gradient φ_{α|β}
         const operators::CovariantGradient<T, 2> vgrad{ev, q};
 
         for (Index i = 0; i < N; ++i) {
-            const T Ni  = Nf(i);
             const T G1i = G(i, 0), G2i = G(i, 1);
             const T D111 = vgrad(i, 0, 0, 0), D112 = vgrad(i, 0, 0, 1),
                     D121 = vgrad(i, 0, 1, 0), D122 = vgrad(i, 0, 1, 1),
                     D211 = vgrad(i, 1, 0, 0), D212 = vgrad(i, 1, 0, 1),
                     D221 = vgrad(i, 1, 1, 0), D222 = vgrad(i, 1, 1, 1);
 
-            // Cartesian displacements
-
+            // Bending κ_{αβ} += (1/2)(u_{,α}·A_{3,β} + u_{,β}·A_{3,α}) — Cartesian u.
             for (Index k = 0; k < 3; ++k) {
-                // Membrane ε_{αβ} = (1/2)(u_{,α}·A_β + u_{,β}·A_α)
-                B_voigt(8*q,     5*i + k) = G1i * A1(k);
-                B_voigt(8*q + 1, 5*i + k) = G2i * A2(k);
-                B_voigt(8*q + 2, 5*i + k) = G1i * A2(k) + G2i * A1(k);
-                // Bending κ_{αβ} += (1/2)(u_{,α}·A_{3,β} + u_{,β}·A_{3,α})
-                B_voigt(8*q + 3, 5*i + k) = G1i * A3_d1(k);
-                B_voigt(8*q + 4, 5*i + k) = G2i * A3_d2(k);
-                B_voigt(8*q + 5, 5*i + k) = G1i * A3_d2(k) + G2i * A3_d1(k);
-                // Transverse Shear 2ε_{α3} += u_{,α}·A_3
-                B_voigt(8*q + 6, 5*i + k) = G1i * A3(k);
-                B_voigt(8*q + 7, 5*i + k) = G2i * A3(k);
+                B(8*q + 3, 5*i + k) = G1i * A3_d1(k);
+                B(8*q + 4, 5*i + k) = G2i * A3_d2(k);
+                B(8*q + 5, 5*i + k) = G1i * A3_d2(k) + G2i * A3_d1(k);
             }
+            // Bending κ_{αβ} += (1/2)(φ_{α|β} + φ_{β|α}) — contravariant rotations.
+            B(8*q + 3, 5*i + 3) = D111;
+            B(8*q + 3, 5*i + 4) = D211;
+            B(8*q + 4, 5*i + 3) = D122;
+            B(8*q + 4, 5*i + 4) = D222;
+            B(8*q + 5, 5*i + 3) = D112 + D121;
+            B(8*q + 5, 5*i + 4) = D212 + D221;
+        }
+    }
+}
 
-            // Contravariant rotations
+template <std::floating_point T>
+void
+ShellReissnerMindlin5p<T>::shear_strain_matrix(const ElementValues<T, 2>& ev,
+                                               Matrix<T>& B) const
+{
+    const Index Q = ev.basis_derivs[0].cols();
+    const Index N = ev.basis_derivs[0].rows();
 
-            // Bending κ_{αβ} += (1/2)(φ_{α|β} + φ_{β|α})
-            B_voigt(8*q + 3, 5*i + 3) = D111;
-            B_voigt(8*q + 3, 5*i + 4) = D211;
-            B_voigt(8*q + 4, 5*i + 3) = D122;
-            B_voigt(8*q + 4, 5*i + 4) = D222;
-            B_voigt(8*q + 5, 5*i + 3) = D112 + D121;
-            B_voigt(8*q + 5, 5*i + 4) = D212 + D221;
-            // Transverse Shear 2ε_{α3} += φ_α = φ^λ A_{λα}
-            B_voigt(8*q + 6, 5*i + 3) = Ni * A11;
-            B_voigt(8*q + 6, 5*i + 4) = Ni * A12;
-            B_voigt(8*q + 7, 5*i + 3) = Ni * A12;
-            B_voigt(8*q + 7, 5*i + 4) = Ni * A22;
+    for (Index q = 0; q < Q; ++q) {
+        const Vector3<T> A3 = ev.normal(q);
+        const auto A = ev.metric(q);
+        const T A11 = A(0, 0), A22 = A(1, 1), A12 = A(0, 1);
+        const auto Nf = ev.N(q);
+        const auto G  = ev.dN(q);
+
+        for (Index i = 0; i < N; ++i) {
+            const T Ni  = Nf(i);
+            const T G1i = G(i, 0), G2i = G(i, 1);
+            // Transverse shear 2ε_{α3} += u_{,α}·A_3 — Cartesian u.
+            for (Index k = 0; k < 3; ++k) {
+                B(8*q + 6, 5*i + k) = G1i * A3(k);
+                B(8*q + 7, 5*i + k) = G2i * A3(k);
+            }
+            // Transverse shear 2ε_{α3} += φ_α = φ^λ A_{λα} — contravariant rotations.
+            B(8*q + 6, 5*i + 3) = Ni * A11;
+            B(8*q + 6, 5*i + 4) = Ni * A12;
+            B(8*q + 7, 5*i + 3) = Ni * A12;
+            B(8*q + 7, 5*i + 4) = Ni * A22;
         }
     }
 }

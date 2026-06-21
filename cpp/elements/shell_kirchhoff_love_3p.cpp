@@ -20,38 +20,50 @@ ShellKirchhoffLove3p<T>::ShellKirchhoffLove3p(Ptr<PlaneStress2d<T>> material)
 
 template <std::floating_point T>
 void
-ShellKirchhoffLove3p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
+ShellKirchhoffLove3p<T>::membrane_strain_matrix(const ElementValues<T, 2>& ev,
+                                                Matrix<T>& B) const
 {
-    // Number of points and basis
     const Index Q = ev.basis_derivs[0].cols();
     const Index N = ev.basis_derivs[0].rows();
-    // Reset strain matrix values
-    Matrix<T>& B_voigt = this->B_voigt_;
-    B_voigt.setZero(6 * Q, 3 * N);
 
     for (Index q = 0; q < Q; ++q) {
         // Covariant basis
         const auto A = ev.cov_basis(q);
-        const Vector3<T> A1 = A(0), A2 = A(1), A3 = ev.normal(q);
-        
-        // Shape gradient N^i_{,α} 
+        const Vector3<T> A1 = A(0), A2 = A(1);
         const auto grad = ev.dN(q);
+
+        for (Index i = 0; i < N; ++i) {
+            const T G1i = grad(i, 0), G2i = grad(i, 1);
+            // Membrane ε_{αβ} = (1/2)(u_{,α}·A_β + u_{,β}·A_α)
+            for (Index k = 0; k < 3; ++k) {
+                B(6*q,     3*i + k) = G1i * A1(k);
+                B(6*q + 1, 3*i + k) = G2i * A2(k);
+                B(6*q + 2, 3*i + k) = G1i * A2(k) + G2i * A1(k);
+            }
+        }
+    }
+}
+
+template <std::floating_point T>
+void
+ShellKirchhoffLove3p<T>::bending_strain_matrix(const ElementValues<T, 2>& ev,
+                                               Matrix<T>& B) const
+{
+    const Index Q = ev.basis_derivs[0].cols();
+    const Index N = ev.basis_derivs[0].rows();
+
+    for (Index q = 0; q < Q; ++q) {
+        const Vector3<T> A3 = ev.normal(q);
         // Covariant Hessian H^i_{αβ}
         const operators::CovariantHessian<T, 2> hess{ev, q};
 
         for (Index i = 0; i < N; ++i) {
-            const T G1i = grad(i, 0), G2i = grad(i, 1);
             const T H11i = hess(i, 0, 0), H22i = hess(i, 1, 1), H12i = hess(i, 0, 1);
-
+            // Bending κ_{αβ} = -(1/2)(u_{|αβ}·A_3 + u_{|βα}·A_3)
             for (Index k = 0; k < 3; ++k) {
-                // Membrane ε_{αβ} = (1/2)(u_{,α}·A_β + u_{,β}·A_α)
-                B_voigt(6*q,     3*i + k) = G1i * A1(k);
-                B_voigt(6*q + 1, 3*i + k) = G2i * A2(k);
-                B_voigt(6*q + 2, 3*i + k) = G1i * A2(k) + G2i * A1(k);
-                // Bending κ_{αβ} = -(1/2)(u_{|αβ}·A_3 + u_{|βα}·A_3)
-                B_voigt(6*q + 3, 3*i + k) = -H11i * A3(k);
-                B_voigt(6*q + 4, 3*i + k) = -H22i * A3(k);
-                B_voigt(6*q + 5, 3*i + k) = -T(2) * H12i * A3(k);
+                B(6*q + 3, 3*i + k) = -H11i * A3(k);
+                B(6*q + 4, 3*i + k) = -H22i * A3(k);
+                B(6*q + 5, 3*i + k) = -T(2) * H12i * A3(k);
             }
         }
     }

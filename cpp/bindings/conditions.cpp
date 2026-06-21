@@ -9,7 +9,6 @@
 #include "boundary_nitsche_condition.hpp"
 #include "boundary_penalty_condition.hpp"
 #include "penalty_coupling_condition.hpp"
-#include "membrane_assumed_strain_condition.hpp"
 #include "patch_boundary.hpp"
 #include "patch.hpp"
 #include "element.hpp"
@@ -119,17 +118,6 @@ void bind_conditions(py::module_& m)
              },
              py::arg("field"), py::arg("penalty"), py::arg("value") = 0.0,
              py::return_value_policy::reference);
-
-    using MembraneAssumedStrainCondition2d = MembraneAssumedStrainCondition<double>;
-    py::class_<MembraneAssumedStrainCondition2d, Condition<double, 2>,
-               Ptr<MembraneAssumedStrainCondition2d>>(m, "MembraneAssumedStrainCondition2d")
-        .def(py::init<Ptr<Patch<double, 2>>, Ptr<Element<double, 2>>,
-                      Ptr<QuadratureRule<double, 2>>, Index>(),
-             py::arg("patch"), py::arg("element"), py::arg("quadrature"),
-             py::arg("degree_drop") = 1)
-        .def("recover_membrane_force",
-             &MembraneAssumedStrainCondition2d::recover_membrane_force,
-             py::arg("u_full"), py::arg("params"));
 
 }
 

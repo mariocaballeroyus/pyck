@@ -177,6 +177,12 @@ public:
     {
         span_indices_ = spans;
 
+        // Record the parametric points this workspace is evaluated at (so callers — the
+        // mixed boundary flux, recovery — can read them back). Guarded against the
+        // self-assignment from `reinit`, which passes `mapped_pts_` itself.
+        if (&pts != &mapped_pts_)
+            mapped_pts_ = pts;
+
         // Basis evaluation
         patch_.tensor_product().eval_on_span(pts, spans, basis_order_,
                                              uni_basis_derivs, basis_derivs);

@@ -35,12 +35,16 @@ public:
 
     // === Matrix Operators ===========================================================
 
+    /// @brief Six strain rows per qp (membrane + bending; no transverse shear).
+    Index num_strains() const override { return 6; }
+
     /**
-     * @brief Strain-displacement B-matrix.
-     *
-     * @param ev Precomputed per-element geometric primitives.
+     * @brief Membrane / bending sub-blocks of the strain-displacement B-matrix;
+     *        stacked by the base orchestrator. The shear block is the inherited
+     *        no-op (Kirchhoff-Love carries no transverse shear).
      */
-    void strain_matrix(const ElementValues<T, 2>& ev) const override;
+    void membrane_strain_matrix(const ElementValues<T, 2>& ev, Matrix<T>& B) const override;
+    void bending_strain_matrix (const ElementValues<T, 2>& ev, Matrix<T>& B) const override;
 
     /**
      * @brief Constitutive D-matrix.

@@ -16,9 +16,6 @@ from pyck.conditions.boundary_penalty_condition import (
 from pyck.conditions.penalty_coupling_condition import (
     PenaltyCouplingCondition,
 )
-from pyck.conditions.membrane_assumed_strain_condition import (
-    MembraneAssumedStrainCondition,
-)
 
 
 __all__ = [
@@ -30,5 +27,4 @@ __all__ = [
     "NitscheBoundaryCondition",
     "PenaltyBoundaryCondition",
     "PenaltyCouplingCondition",
-    "MembraneAssumedStrainCondition",
 ]

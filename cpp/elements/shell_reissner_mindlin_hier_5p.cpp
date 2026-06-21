@@ -20,64 +20,86 @@ ShellReissnerMindlinHier5p<T>::ShellReissnerMindlinHier5p(Ptr<PlaneStress2d<T>> 
 
 template <std::floating_point T>
 void
-ShellReissnerMindlinHier5p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
+ShellReissnerMindlinHier5p<T>::membrane_strain_matrix(const ElementValues<T, 2>& ev,
+                                                      Matrix<T>& B) const
 {
-    // Number of points and basis
     const Index Q = ev.basis_derivs[0].cols();
     const Index N = ev.basis_derivs[0].rows();
-    // Reset strain matrix values
-    Matrix<T>& B_voigt = this->B_voigt_;
-    B_voigt.setZero(8 * Q, 5 * N);
 
     for (Index q = 0; q < Q; ++q) {
-        // Covariant basis, unit normal, and midsurface metric
+        // Covariant basis
         const auto cov = ev.cov_basis(q);
-        const Vector3<T> A1 = cov(0), A2 = cov(1), A3 = ev.normal(q);
-        const auto A = ev.metric(q);
-        const T A11 = A(0, 0), A22 = A(1, 1), A12 = A(0, 1);
+        const Vector3<T> A1 = cov(0), A2 = cov(1);
+        const auto G = ev.dN(q);
 
-        // Shape N^i, shape gradient N^i_{,α}
-        const auto Nf = ev.N(q);
-        const auto G  = ev.dN(q);
+        for (Index i = 0; i < N; ++i) {
+            const T G1i = G(i, 0), G2i = G(i, 1);
+            // Membrane ε_{αβ} = (1/2)(v_{,α}·A_β + v_{,β}·A_α) — Cartesian v only.
+            for (Index k = 0; k < 3; ++k) {
+                B(8*q,     5*i + k) = G1i * A1(k);
+                B(8*q + 1, 5*i + k) = G2i * A2(k);
+                B(8*q + 2, 5*i + k) = G1i * A2(k) + G2i * A1(k);
+            }
+        }
+    }
+}
+
+template <std::floating_point T>
+void
+ShellReissnerMindlinHier5p<T>::bending_strain_matrix(const ElementValues<T, 2>& ev,
+                                                     Matrix<T>& B) const
+{
+    const Index Q = ev.basis_derivs[0].cols();
+    const Index N = ev.basis_derivs[0].rows();
+
+    for (Index q = 0; q < Q; ++q) {
+        const Vector3<T> A3 = ev.normal(q);
         // Covariant Hessian H^i_{αβ} (Kirchhoff-Love bending of v)
         const operators::CovariantHessian<T, 2> hess{ev, q};
         // Covariant gradient w_{α|β} (bending contribution of w)
         const operators::CovariantGradient<T, 2> wgrad{ev, q};
 
         for (Index i = 0; i < N; ++i) {
-            const T Ni  = Nf(i);
-            const T G1i = G(i, 0), G2i = G(i, 1);
             const T H11 = hess(i, 0, 0), H22 = hess(i, 1, 1), H12 = hess(i, 0, 1);
 
-            // --- Cartesian displacement v (Kirchhoff-Love part, no shear) -----------
-
+            // Bending κ_{αβ} = -(1/2)(v_{|αβ} + v_{|βα})·A_3 — Cartesian v.
             for (Index k = 0; k < 3; ++k) {
-                // Membrane ε_{αβ} = (1/2)(v_{,α}·A_β + v_{,β}·A_α)
-                B_voigt(8*q,     5*i + k) = G1i * A1(k);
-                B_voigt(8*q + 1, 5*i + k) = G2i * A2(k);
-                B_voigt(8*q + 2, 5*i + k) = G1i * A2(k) + G2i * A1(k);
-                // Bending κ_{αβ} = -(1/2)(v_{|αβ} + v_{|βα})·A_3
-                B_voigt(8*q + 3, 5*i + k) =        -H11 * A3(k);
-                B_voigt(8*q + 4, 5*i + k) =        -H22 * A3(k);
-                B_voigt(8*q + 5, 5*i + k) = -T(2) * H12 * A3(k);
-                // Transverse shear vanishes for the Kirchhoff-Love field
+                B(8*q + 3, 5*i + k) =        -H11 * A3(k);
+                B(8*q + 4, 5*i + k) =        -H22 * A3(k);
+                B(8*q + 5, 5*i + k) = -T(2) * H12 * A3(k);
             }
 
-            // --- Hierarchic difference vector w = w^λ A_λ (λ = slots 3, 4) ----------
-
+            // Bending κ_{αβ} += (1/2)(w_{α|β} + w_{β|α}) — difference vector w.
             for (Index lam = 0; lam < 2; ++lam) {
                 const Index idx = 5 * i + 3 + lam;
-                // Bending κ_{αβ} += (1/2)(w_{α|β} + w_{β|α})
-                // ε_{αβ} = ε^3p_{αβ} + θ³ w_{,α}·A_β.
-                B_voigt(8*q + 3, idx) = wgrad(i, lam, 0, 0);
-                B_voigt(8*q + 4, idx) = wgrad(i, lam, 1, 1);
-                B_voigt(8*q + 5, idx) = wgrad(i, lam, 0, 1) + wgrad(i, lam, 1, 0);
+                B(8*q + 3, idx) = wgrad(i, lam, 0, 0);
+                B(8*q + 4, idx) = wgrad(i, lam, 1, 1);
+                B(8*q + 5, idx) = wgrad(i, lam, 0, 1) + wgrad(i, lam, 1, 0);
             }
-            // Transverse shear 2ε_{α3} = w·A_α = N^i w^λ A_{λα}
-            B_voigt(8*q + 6, 5*i + 3) = Ni * A11;
-            B_voigt(8*q + 6, 5*i + 4) = Ni * A12;
-            B_voigt(8*q + 7, 5*i + 3) = Ni * A12;
-            B_voigt(8*q + 7, 5*i + 4) = Ni * A22;
+        }
+    }
+}
+
+template <std::floating_point T>
+void
+ShellReissnerMindlinHier5p<T>::shear_strain_matrix(const ElementValues<T, 2>& ev,
+                                                   Matrix<T>& B) const
+{
+    const Index Q = ev.basis_derivs[0].cols();
+    const Index N = ev.basis_derivs[0].rows();
+
+    for (Index q = 0; q < Q; ++q) {
+        const auto A = ev.metric(q);
+        const T A11 = A(0, 0), A22 = A(1, 1), A12 = A(0, 1);
+        const auto Nf = ev.N(q);
+
+        for (Index i = 0; i < N; ++i) {
+            const T Ni = Nf(i);
+            // Transverse shear 2ε_{α3} = w·A_α = N^i w^λ A_{λα}.
+            B(8*q + 6, 5*i + 3) = Ni * A11;
+            B(8*q + 6, 5*i + 4) = Ni * A12;
+            B(8*q + 7, 5*i + 3) = Ni * A12;
+            B(8*q + 7, 5*i + 4) = Ni * A22;
         }
     }
 }

@@ -16,6 +16,7 @@
 #include "shell_reissner_mindlin_hier_4p.hpp"
 #include "shell_reissner_mindlin_hier_5p.hpp"
 #include "shell_kirchhoff_love_3p.hpp"
+#include "mixed_membrane_strain_shell.hpp"
 #include "plane_stress_2d.hpp"
 #include "quadrature.hpp"
 
@@ -192,6 +193,16 @@ void bind_elements(py::module_& m)
                 Ptr<ShellKirchhoffLove3p<double>>>(m, "ShellKirchhoffLove3p")
           .def(py::init<Ptr<PlaneStress2d<double>>>(),
                py::arg("material"));
+
+     py::class_<MixedMembraneStrainShell<double>, Element2d,
+                Ptr<MixedMembraneStrainShell<double>>>(m, "MixedMembraneStrainShell")
+          .def(py::init<Ptr<Patch<double, 2>>, Ptr<Element<double, 2>>,
+                        Ptr<QuadratureRule<double, 2>>, Index>(),
+               py::arg("patch"), py::arg("base_element"), py::arg("quadrature"),
+               py::arg("degree_drop") = 1)
+          .def("recover_membrane_force",
+               &MixedMembraneStrainShell<double>::recover_membrane_force,
+               py::arg("full_u"), py::arg("params"));
 }
 
 }

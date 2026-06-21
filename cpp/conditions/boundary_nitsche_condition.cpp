@@ -3,6 +3,7 @@
 #include "boundary_element_values.hpp"
 
 #include <stdexcept>
+#include <vector>
 
 namespace pyck
 {
@@ -73,16 +74,27 @@ void NitscheBoundaryCondition<T, d>::apply(SystemAssembler<T>& assembler,
         K_nit.setZero();
         f_nit.setZero();
 
+        // Global primal DOF indices for this span (needed for the auxiliary cross-terms).
+        layout.scatter_primal(primal_block, bd_values.parent_vals_.elem_cps_,
+                              bd_values.parent_vals_.elem_dofs_);
+        const std::vector<Index>& gdofs = bd_values.parent_vals_.elem_dofs_;
+
         for (const auto& term : terms_) {
-            // Evaluate the kinematic trace (N_w) and its conjugate flux (B_t) at
-            // the boundary quadrature points; both are (n_gp, n_primal).
+            // Kinematic trace N_w (n_gp × n_primal) and its conjugate flux. For a mixed
+            // element the flux splits: B_t (n_gp × n_primal) carries the displacement part
+            // (zero membrane + real shear), B_t_aux (n_gp × n_aux) the ε̃-sourced membrane.
+            Matrix<T>          B_t_aux;
+            std::vector<Index> aux_dofs;
             Matrix<T> N_w = term.field.evaluate(element_, bd_values);
-            Matrix<T> B_t = term.field.evaluate_flux(element_, bd_values);
+            Matrix<T> B_t = term.field.evaluate_flux(element_, bd_values, B_t_aux, aux_dofs);
+
+            const Index na = static_cast<Index>(aux_dofs.size());
+            Matrix<T> K_cross = Matrix<T>::Zero(n_primal, na);   // K(u_test, ε̃)
+            Vector<T> f_aux   = Vector<T>::Zero(na);
 
             // Loop over quadrature points
             for (Index q = 0; q < n_gp; ++q) {
-                // Get the boundary integration measure
-                // ds = Jac * w_gp
+                // Boundary integration measure ds = Jac * w_gp
                 const T ds = bd_values.boundary_vals_.jac(q) *
                              bd_values.boundary_vals_.mapped_weights_(q);
 
@@ -97,25 +109,32 @@ void NitscheBoundaryCondition<T, d>::apply(SystemAssembler<T>& assembler,
                 // f_nit += ( -B_t^T \bar{w} + \alpha N_w^T \bar{w} ) ds
                 f_nit.noalias() -= ds * term.value * bt.transpose();
                 f_nit.noalias() += ds * term.penalty * term.value * nw.transpose();
+
+                // Consistency coupling to the auxiliary (ε̃) flux columns, if any.
+                if (na > 0) {
+                    K_cross.noalias() -= ds * nw.transpose() * B_t_aux.row(q);
+                    f_aux.noalias()   -= ds * term.value * B_t_aux.row(q).transpose();
+                }
+            }
+
+            // Scatter the symmetric primal↔auxiliary cross-coupling K(u, ε̃) and the
+            // matching auxiliary load. The aux-aux block is zero (the kinematic trace has
+            // no auxiliary component); a standard element yields na == 0, so this is inert.
+            for (Index a = 0; a < na; ++a) {
+                const Index ga = aux_dofs[static_cast<std::size_t>(a)];
+                for (Index i = 0; i < n_primal; ++i) {
+                    assembler.add_stiffness(gdofs[i], ga, K_cross(i, a));
+                    assembler.add_stiffness(ga, gdofs[i], K_cross(i, a));
+                }
+                assembler.add_load(ga, f_aux(a));
             }
         }
 
-        // --- Scatter into Global System ---------------------------------------------
-        // [ K + K_nit ] = {f + f_nit}
-
-        // Scatter the parent primal DOFs for this span
-        layout.scatter_primal(primal_block, bd_values.parent_vals_.elem_cps_,
-                              bd_values.parent_vals_.elem_dofs_);
-
-        // Loop over primal DOFs
+        // --- Scatter the primal Nitsche block into the global system ----------------
         for (Index i = 0; i < n_primal; ++i) {
-            // Scatter f_nit into global load vector
-            const Index gi = bd_values.parent_vals_.elem_dofs_[i];
-            assembler.add_load(gi, f_nit(i));
-            // Scatter K_nit into global stiffness matrix
-            for (Index j = 0; j < n_primal; ++j) {
-                assembler.add_stiffness(gi, bd_values.parent_vals_.elem_dofs_[j], K_nit(i, j));
-            }
+            assembler.add_load(gdofs[i], f_nit(i));
+            for (Index j = 0; j < n_primal; ++j)
+                assembler.add_stiffness(gdofs[i], gdofs[j], K_nit(i, j));
         }
     }
 }

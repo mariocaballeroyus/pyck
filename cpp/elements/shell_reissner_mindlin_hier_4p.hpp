@@ -32,11 +32,17 @@ public:
 
     // === Matrix Operators =======================================================
 
+    /// @brief Eight strain rows per qp (ε_{11}, ε_{22}, 2ε_{12}, κ_{11}, κ_{22},
+    ///        2κ_{12}, γ_1, γ_2).
+    Index num_strains() const override { return 8; }
+
     /**
-     * @brief Strain-displacement B-matrix (8Q × 4N). Eight strain rows per qp,
-     *        ordered (ε_{11}, ε_{22}, 2ε_{12}, κ_{11}, κ_{22}, 2κ_{12}, γ_1, γ_2).
+     * @brief Membrane / bending / transverse-shear sub-blocks of the (8Q × 4N)
+     *        strain-displacement B-matrix; stacked by the base orchestrator.
      */
-    void strain_matrix(const ElementValues<T, 2>& ev) const override;
+    void membrane_strain_matrix(const ElementValues<T, 2>& ev, Matrix<T>& B) const override;
+    void bending_strain_matrix (const ElementValues<T, 2>& ev, Matrix<T>& B) const override;
+    void shear_strain_matrix   (const ElementValues<T, 2>& ev, Matrix<T>& B) const override;
 
     /**
      * @brief Constitutive D-matrix (8×8 block-diag [D_m; D_b; D_s]).

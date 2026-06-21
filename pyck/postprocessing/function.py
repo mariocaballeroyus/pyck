@@ -192,7 +192,14 @@ class _Component(_Field):
 
 
 class Function(_Field):
-    """Callable field defined by ``(u, element, patch, field)``."""
+    """Callable field defined by ``(u, element, patch, field)``.
+
+    For a :class:`~pyck.MixedMembraneStrainShell`, the faithful ``STRAIN`` and
+    ``TRACTION`` fields draw their membrane part from the assumed-strain field, so
+    ``u`` must be the **full** solution including the auxiliary DOFs
+    (``ck.solve(problem, full=True)``); passing the truncated physical solution
+    raises. All other fields (and every standard element) take the physical vector.
+    """
 
     def __init__(
         self,

@@ -77,11 +77,18 @@ public:
 
     // === Matrix Operators =======================================================
 
+    /// @brief Eight strain rows per qp (ε_{11}, ε_{22}, 2ε_{12}, κ_{11}, κ_{22},
+    ///        2κ_{12}, γ_1, γ_2).
+    Index num_strains() const override { return 8; }
+
     /**
-     * @brief Strain-displacement B-matrix (8Q × 4N). Eight strain rows per qp,
-     *        ordered (ε_{11}, ε_{22}, 2ε_{12}, κ_{11}, κ_{22}, 2κ_{12}, γ_1, γ_2).
+     * @brief Membrane / bending / transverse-shear sub-blocks of the (8Q × 4N)
+     *        strain-displacement B-matrix; stacked by the base orchestrator. Each
+     *        shares the per-qp curvature primitives via @ref compute_q_primitives.
      */
-    void strain_matrix(const ElementValues<T, 2>& ev) const override;
+    void membrane_strain_matrix(const ElementValues<T, 2>& ev, Matrix<T>& B) const override;
+    void bending_strain_matrix (const ElementValues<T, 2>& ev, Matrix<T>& B) const override;
+    void shear_strain_matrix   (const ElementValues<T, 2>& ev, Matrix<T>& B) const override;
 
     /**
      * @brief Constitutive D-matrix (8×8 block-diag [D_m; D_b; D_s]).
@@ -127,6 +134,20 @@ public:
     { return Flags::Normal | Flags::Curvature | Flags::NormalDeriv1 | Flags::Deriv3 | Flags::Connection; }
 
 private:
+
+    /// @brief Per-quadrature-point curvature primitives shared by all three strain
+    ///        blocks: second fundamental form, shape operator B^α_β, third form
+    ///        (B²)_{αβ}, and the Codazzi-symmetric covariant derivatives (B^μ_α)_{|β}.
+    struct QPrim
+    {
+        T B11, B22, B12;
+        T Bmix11, Bmix12, Bmix21, Bmix22;
+        T B2_11, B2_22, B2_12;
+        T B11_cov1, B11_cov2, B12_cov1, B12_cov2, B22_cov1, B22_cov2;
+    };
+
+    /// @brief Compute @ref QPrim at quadrature point @p q.
+    QPrim compute_q_primitives(const ElementValues<T, 2>& ev, Index q) const;
 
     /// @brief Shell material properties.
     Ptr<PlaneStress2d<T>> material_;

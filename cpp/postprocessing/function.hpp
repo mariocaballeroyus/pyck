@@ -1,10 +1,12 @@
 #ifndef PYCK_FUNCTION_HPP
 #define PYCK_FUNCTION_HPP
 
+#include <algorithm>
 #include <array>
 #include <concepts>
 #include <cstddef>
 #include <stdexcept>
+#include <vector>
 
 #include "../elements/element.hpp"
 #include "../elements/element_values.hpp"
@@ -41,13 +43,17 @@ public:
           patch_(std::move(patch)), 
           field_(field)
     {
-        const Index expected = static_cast<Index>(patch_->num_control_pts())
-                             * static_cast<Index>(element_->num_node_dofs());
-                             
-        if (u_.size() != expected) {
+        // The physical (per-node) block is the leading slice of the solution. A bare
+        // physical vector (== n_cp·ndof) drives the standard fields; the FULL solution
+        // (> n_cp·ndof, incl. a mixed formulation's auxiliary DOFs) is required for the
+        // faithful, ε̃-sourced membrane fields (see the two-block gather below).
+        const Index phys = static_cast<Index>(patch_->num_control_pts())
+                         * static_cast<Index>(element_->num_node_dofs());
+
+        if (u_.size() < phys) {
             throw std::runtime_error(
                 "Function: DOF vector has " + std::to_string(u_.size()) +
-                " entries but patch/element imply " + std::to_string(expected) +
+                " entries but the physical block needs " + std::to_string(phys) +
                 " (n_cp * ndof).");
         }
     }
@@ -92,6 +98,10 @@ public:
         Index     k = 0;
         Vector<T> u_local;
 
+        // Two-block-gather scratch (auxiliary contribution; empty for standard elements).
+        Matrix<T>          N_aux;
+        std::vector<Index> aux_dofs;
+
         for (Index q = 0; q < Q; ++q)
         {
             ColMatrix<T, d> pt = params.row(q);
@@ -120,6 +130,24 @@ public:
 
             // Local mat-vec: (k × n_active·ndof) × (n_active·ndof) — tight inner loop.
             out.row(q).noalias() = (N_local * u_local).transpose();
+
+            // Two-block gather: an element (e.g. a mixed formulation) may add an
+            // auxiliary contribution sourced from its own global DOF block — the faithful,
+            // ε̃-sourced membrane part of STRAIN / TRACTION. Read it from the FULL solution.
+            if (element_->field_aux_contribution(ev, pt, field_, N_aux, aux_dofs)
+                && !aux_dofs.empty()) {
+                const Index max_idx = *std::max_element(aux_dofs.begin(), aux_dofs.end());
+                if (max_idx >= u_.size()) {
+                    throw std::runtime_error(
+                        "Function: this field is sourced from a mixed formulation's "
+                        "auxiliary DOFs; pass the full solution (ck.solve(problem, "
+                        "full=True)).");
+                }
+                Vector<T> u_aux(static_cast<Index>(aux_dofs.size()));
+                for (Index a = 0; a < u_aux.size(); ++a)
+                    u_aux(a) = u_(aux_dofs[static_cast<std::size_t>(a)]);
+                out.row(q).noalias() += (N_aux * u_aux).transpose();
+            }
         }
         return out;
     }

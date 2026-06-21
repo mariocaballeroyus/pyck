@@ -23,96 +23,101 @@ ShellReissnerMindlinHier4p<T>::ShellReissnerMindlinHier4p(Ptr<PlaneStress2d<T>> 
 
 template <std::floating_point T>
 void
-ShellReissnerMindlinHier4p<T>::strain_matrix(const ElementValues<T, 2>& ev) const
+ShellReissnerMindlinHier4p<T>::membrane_strain_matrix(const ElementValues<T, 2>& ev,
+                                                      Matrix<T>& B) const
 {
-    // Number of points and basis
     const Index Q = ev.basis_derivs[0].cols();
     const Index N = ev.basis_derivs[0].rows();
-
-    // Reset strain matrix values
-    Matrix<T>& B_voigt = this->B_voigt_;
-    B_voigt.setZero(8 * Q, 4 * N);
-
-    // Bending-stiffness ratio for kinematic relation
     const T ratio = material_->bending_stiffness() / material_->shear_stiffness();
 
-    for (Index q = 0; q < Q; ++q)
-    {
-        // --- Precomputed geometric primitives ---------------------------------------
-
-        // Second fundamental form
-        const auto B = ev.curvature(q);
-        const T B11 = B(0, 0), B22 = B(1, 1), B12 = B(0, 1);
-        // Covariant tangents, unit normal, and Weingarten derivatives A_{3,β}
+    for (Index q = 0; q < Q; ++q) {
+        const auto Bc = ev.curvature(q);
+        const T B11 = Bc(0, 0), B22 = Bc(1, 1), B12 = Bc(0, 1);
         const auto A = ev.cov_basis(q);
         const Vector3<T> A1 = A(0), A2 = A(1), A3 = ev.normal(q);
-        const auto nd = ev.normal_deriv(q);
-        const Vector3<T> A3_d1 = nd(0), A3_d2 = nd(1);
-        // Third fundamental form (B²)_{αβ} = A_{3,α}·A_{3,β} (exact; no metric raise)
-        const T B2_11 = A3_d1.dot(A3_d1);
-        const T B2_22 = A3_d2.dot(A3_d2);
-        const T B2_12 = A3_d1.dot(A3_d2);
-
-        // --- Shape operators --------------------------------------------------------
-
-        const auto G  = ev.dN(q);
-        const operators::CovariantHessian<T, 2>        hess {ev, q};
-        const operators::LaplaceBeltrami<T, 2>         lapb {ev, q};
-        const operators::Curl<T, 2>                    curl {ev, q};
-        const operators::CurlGradient<T, 2>            curlgrad{ev, q};
-        const operators::LaplaceBeltramiGradient<T, 2> lgrad{ev, q};
+        const auto G = ev.dN(q);
+        const operators::LaplaceBeltrami<T, 2> lapb{ev, q};
 
         for (Index i = 0; i < N; ++i) {
             const T N_u = G(i, 0), N_v = G(i, 1);
-            const T H11 = hess(i, 0, 0), H22 = hess(i, 1, 1), H12 = hess(i, 0, 1);
-            const T L   = lapb(i);
-            const T P1  = lgrad(i, 0), P2 = lgrad(i, 1);
-
-            // --- Cartesian displacement v (Kirchhoff-Love field + shear correction) ---
+            const T L = lapb(i);
+            // Membrane ε_{αβ}: Kirchhoff-Love A_α·v_{,β}; shear enrichment += -B_{αβ} w_s.
             for (Index k = 0; k < 3; ++k) {
                 const Index idx = 4 * i + k;
-                const T A3k = A3(k);
-                // Shear deflection w_s = −(K_b/K_s) Δ w_b
-                const T ws = -ratio * L * A3k;
-
-                // --- Membrane Strain ------------------------------------------------
-
-                // Membrane ε_{αβ}: Kirchhoff-Love A_α·v_{,β} 
-                // Shear enrichment += −B_{αβ} w_s.
-                B_voigt(8*q + 0, idx) = A1(k) * N_u              - B11 * ws;
-                B_voigt(8*q + 1, idx) = A2(k) * N_v              - B22 * ws;
-                B_voigt(8*q + 2, idx) = A1(k) * N_v + A2(k) * N_u - T(2) * B12 * ws;
-
-                // --- Bending Strain -------------------------------------------------
-
-                // Bending κ_{αβ}: Kirchhoff-Love −v_{|αβ}·A_3
-                // The rotation cross-terms cancel, leaving κ_{αβ} = hess(v_b)·A_3
-                // Shear enrichment += w_s (B^2)_{αβ}.
-                B_voigt(8*q + 3, idx) =        -H11 * A3k        + ws * B2_11;
-                B_voigt(8*q + 4, idx) =        -H22 * A3k        + ws * B2_22;
-                B_voigt(8*q + 5, idx) = -T(2) * H12 * A3k  + T(2) * ws * B2_12;
-
-                // --- Transverse Shear Strain ----------------------------------------
-
-                // γ_α = A_α·(Φ_b×A_3) + v_{,α}·A_3
-                // the A_α·(Φ_b×A_3) = −v_{b,α}·A_3 cancels the bending part, leaving
-                // γ_α = w_{s,α} =−(K_b/K_s)(Δ w_b)_{,α}
-                B_voigt(8*q + 6, idx) = -ratio * P1 * A3k;
-                B_voigt(8*q + 7, idx) = -ratio * P2 * A3k;
+                const T ws = -ratio * L * A3(k);
+                B(8*q + 0, idx) = A1(k) * N_u                - B11 * ws;
+                B(8*q + 1, idx) = A2(k) * N_v                - B22 * ws;
+                B(8*q + 2, idx) = A1(k) * N_v + A2(k) * N_u  - T(2) * B12 * ws;
             }
+        }
+    }
+}
 
-            // --- Twist potential ψ (solenoidal hierarchic enrichment) ---------------
+template <std::floating_point T>
+void
+ShellReissnerMindlinHier4p<T>::bending_strain_matrix(const ElementValues<T, 2>& ev,
+                                                     Matrix<T>& B) const
+{
+    const Index Q = ev.basis_derivs[0].cols();
+    const Index N = ev.basis_derivs[0].rows();
+    const T ratio = material_->bending_stiffness() / material_->shear_stiffness();
 
+    for (Index q = 0; q < Q; ++q) {
+        const Vector3<T> A3 = ev.normal(q);
+        const auto nd = ev.normal_deriv(q);
+        const Vector3<T> A3_d1 = nd(0), A3_d2 = nd(1);
+        // Third fundamental form (B²)_{αβ} = A_{3,α}·A_{3,β}
+        const T B2_11 = A3_d1.dot(A3_d1), B2_22 = A3_d2.dot(A3_d2), B2_12 = A3_d1.dot(A3_d2);
+        const operators::CovariantHessian<T, 2> hess{ev, q};
+        const operators::LaplaceBeltrami<T, 2>  lapb{ev, q};
+        const operators::CurlGradient<T, 2>     curlgrad{ev, q};
+
+        for (Index i = 0; i < N; ++i) {
+            const T H11 = hess(i, 0, 0), H22 = hess(i, 1, 1), H12 = hess(i, 0, 1);
+            const T L = lapb(i);
+            // Bending κ_{αβ}: Kirchhoff-Love −v_{|αβ}·A_3; shear enrichment += w_s (B²)_{αβ}.
+            for (Index k = 0; k < 3; ++k) {
+                const Index idx = 4 * i + k;
+                const T ws = -ratio * L * A3(k);
+                B(8*q + 3, idx) =        -H11 * A3(k)       + ws * B2_11;
+                B(8*q + 4, idx) =        -H22 * A3(k)       + ws * B2_22;
+                B(8*q + 5, idx) = -T(2) * H12 * A3(k) + T(2) * ws * B2_12;
+            }
+            // Twist potential ψ: κ_{αβ} += (curl ψ)_{(α|β)}
             const Index idx_psi = 4 * i + 3;
+            B(8*q + 3, idx_psi) = curlgrad(i, 0, 0);
+            B(8*q + 4, idx_psi) = curlgrad(i, 1, 1);
+            B(8*q + 5, idx_psi) = curlgrad(i, 0, 1) + curlgrad(i, 1, 0);
+        }
+    }
+}
 
-            // Bending: κ_{αβ} += (1/2)(ε_α^δ ψ_{|δβ} + ε_β^δ ψ_{|δα}) = (curl ψ)_{(α|β)}
-            B_voigt(8*q + 3, idx_psi) = curlgrad(i, 0, 0);
-            B_voigt(8*q + 4, idx_psi) = curlgrad(i, 1, 1);
-            B_voigt(8*q + 5, idx_psi) = curlgrad(i, 0, 1) + curlgrad(i, 1, 0);
+template <std::floating_point T>
+void
+ShellReissnerMindlinHier4p<T>::shear_strain_matrix(const ElementValues<T, 2>& ev,
+                                                   Matrix<T>& B) const
+{
+    const Index Q = ev.basis_derivs[0].cols();
+    const Index N = ev.basis_derivs[0].rows();
+    const T ratio = material_->bending_stiffness() / material_->shear_stiffness();
 
-            // Shear: γ_α += ε_α^β ψ_{,β}
-            B_voigt(8*q + 6, idx_psi) =  curl(i, 0);
-            B_voigt(8*q + 7, idx_psi) =  curl(i, 1);
+    for (Index q = 0; q < Q; ++q) {
+        const Vector3<T> A3 = ev.normal(q);
+        const operators::Curl<T, 2>                    curl {ev, q};
+        const operators::LaplaceBeltramiGradient<T, 2> lgrad{ev, q};
+
+        for (Index i = 0; i < N; ++i) {
+            const T P1 = lgrad(i, 0), P2 = lgrad(i, 1);
+            // γ_α = w_{s,α} = -(K_b/K_s)(Δ w_b)_{,α}
+            for (Index k = 0; k < 3; ++k) {
+                const Index idx = 4 * i + k;
+                B(8*q + 6, idx) = -ratio * P1 * A3(k);
+                B(8*q + 7, idx) = -ratio * P2 * A3(k);
+            }
+            // Twist potential ψ: γ_α += ε_α^β ψ_{,β}
+            const Index idx_psi = 4 * i + 3;
+            B(8*q + 6, idx_psi) = curl(i, 0);
+            B(8*q + 7, idx_psi) = curl(i, 1);
         }
     }
 }

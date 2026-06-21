@@ -12,6 +12,7 @@ from pyck.geometry import (
 )
 from pyck.elements import (
     Element,
+    MixedMembraneStrainShell,
     ShellKirchhoffLove3p,
     ShellReissnerMindlin4p,
     ShellReissnerMindlinHier4p,
@@ -29,7 +30,6 @@ from pyck.conditions import (
     NitscheBoundaryCondition,
     PenaltyBoundaryCondition,
     PenaltyCouplingCondition,
-    MembraneAssumedStrainCondition,
 )
 from pyck.constraints import (
     Constraint,
@@ -83,6 +83,7 @@ __all__ = [
     "ShellReissnerMindlinHier4p",
     "ShellReissnerMindlin5p",
     "ShellReissnerMindlinHier5p",
+    "MixedMembraneStrainShell",
     "PlaneStress2d",
     "UniaxialStress1d",
     "Field",
@@ -91,7 +92,6 @@ __all__ = [
     "NitscheBoundaryCondition",
     "PenaltyBoundaryCondition",
     "PenaltyCouplingCondition",
-    "MembraneAssumedStrainCondition",
     "Constraint",
     "DirectConstraint",
     "LinearConstraint",

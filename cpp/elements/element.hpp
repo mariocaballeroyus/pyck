@@ -39,17 +39,6 @@ enum class FieldType
 };
 
 /**
- * @brief A contiguous range of generalised-strain rows (and the matching square
- *        constitutive sub-block). For the shells the 8-row strain layout is
- *        membrane = {0, 3}, bending = {3, 3}, transverse shear = {6, 2}.
- */
-struct StrainBlock
-{
-    Index offset;  ///< First strain row of the block.
-    Index count;   ///< Number of rows in the block.
-};
-
-/**
  * @brief Base class for structural elements of parametric dimension d.
  *
  * @tparam T Scalar type.
@@ -90,12 +79,6 @@ public:
     ///        tractions (shear, bending moment, twisting moment).
     virtual unsigned natural_flags() const = 0;
 
-    /// @brief Mark a strain block as supplied externally (e.g. by a mixed
-    ///        formulation): its constitutive sub-block is zeroed in
-    ///        `compute_local_stiffness`, so the block contributes no stiffness
-    ///        through this element. The external formulation re-supplies it.
-    void suppress_block(StrainBlock block) { suppressed_blocks_.push_back(block); }
-
     // === Optional auxiliary-DOF hooks (mixed formulations) ==========================
     //
     // An element may own auxiliary DOF blocks with their own connectivity (e.g. an
@@ -111,6 +94,17 @@ public:
     ///        mixed-formulation saddle) into the global system. Default: no-op.
     virtual void apply(SystemAssembler<T>& assembler, const DofLayout& layout,
                        const PatchBlocks<T, d>& blocks) const {}
+
+    /// @brief Auxiliary-DOF contribution to a recovered field at parametric point @p pt,
+    ///        gathered from the FULL solution by `Function` (the second of the two-block
+    ///        gather). Fills @p N_aux (k × n_aux) and the matching GLOBAL DOF indices
+    ///        @p aux_dofs for the chosen field; returns true if this element owns such a
+    ///        contribution. Default: none, so standard elements keep the per-node path.
+    virtual bool field_aux_contribution(const ElementValues<T, d>& /*ev*/,
+                                        const ColMatrix<T, d>& /*pt*/, FieldType /*field*/,
+                                        Matrix<T>& /*N_aux*/,
+                                        std::vector<Index>& /*aux_dofs*/) const
+    { return false; }
 
     // === Matrix Operators (Element Formulation-Agnostic) ============================
 
@@ -167,10 +161,35 @@ public:
     // === Matrix Operators (Element Formulation-Specific) ============================
 
     /**
-     * @brief Strain-displacement operator B, row-stacked per qp. Writes
-     *        into this element's own @ref B_voigt_.
+     * @brief Number of generalised-strain rows per quadrature point (8 for a
+     *        membrane + bending + transverse-shear shell, 6 for a shear-free
+     *        Kirchhoff-Love shell). Authoritative size for @ref strain_matrix.
      */
-    virtual void strain_matrix(const ElementValues<T, d>& ev) const = 0;
+    virtual Index num_strains() const = 0;
+
+    /**
+     * @brief Strain-displacement operator B, row-stacked per qp, written into this
+     *        element's own @ref B_voigt_.
+     *
+     * Non-virtual orchestrator: it sizes and zeros @ref B_voigt_ and stacks the
+     * membrane / bending / transverse-shear sub-blocks below. A formulation
+     * overrides only the blocks it changes — e.g. a mixed element zeroes the
+     * membrane block and re-supplies it through an auxiliary field.
+     */
+    void strain_matrix(const ElementValues<T, d>& ev) const;
+
+    /**
+     * @brief Membrane / bending / transverse-shear sub-blocks of @ref strain_matrix.
+     *
+     * Each writes ONLY its interleaved rows (`num_strains()*q + offset`, offsets
+     * 0 / 3 / 6) into the supplied buffer @p B, which the orchestrator has already
+     * sized and zeroed — so a block never calls `setZero`. Default no-op so a
+     * formulation lacking a block (Kirchhoff-Love transverse shear) contributes
+     * nothing.
+     */
+    virtual void membrane_strain_matrix(const ElementValues<T, d>&, Matrix<T>&) const {}
+    virtual void bending_strain_matrix (const ElementValues<T, d>&, Matrix<T>&) const {}
+    virtual void shear_strain_matrix   (const ElementValues<T, d>&, Matrix<T>&) const {}
 
     /**
      * @brief Constitutive operator D at quadrature point q.
@@ -225,6 +244,22 @@ public:
                           const ColMatrix<T, 3>& conormal,
                           const ColMatrix<T, 3>& dir, Matrix<T>& out) const;
 
+    // Augmented boundary traction: like the 4-argument overload, but also emits the
+    // auxiliary-block flux columns `out_aux` (Q × n_aux) and their GLOBAL DOF indices
+    // `aux_dofs` — e.g. a mixed element's ε̃-sourced membrane traction, which a Nitsche
+    // condition scatters as the consistency coupling K(u_test, ε̃). The base default
+    // forwards to the 4-argument flux and leaves the auxiliary part empty, so a standard
+    // element's Nitsche block is unchanged.
+
+    virtual void traction(const ElementValues<T, d>& parent, const ColMatrix<T, 3>& conormal,
+                          const ColMatrix<T, 3>& dir, Matrix<T>& out, Matrix<T>& out_aux,
+                          std::vector<Index>& aux_dofs) const
+    {
+        traction(parent, conormal, dir, out);
+        out_aux.resize(parent.num_points(), 0);
+        aux_dofs.clear();
+    }
+
     // The moment counterpart of `traction`, work-conjugate to the `rotation` trace:
     // the boundary bending-moment vector m⃗ = mᵅᵝ ν_β A_α projected onto `dir`. Both
     // m⃗ and the rotation θ⃗ are in-surface (tangent) vectors, so this is a plain
@@ -242,10 +277,6 @@ protected:
     ///        for the rotation projections. (d == 2 only.)
     std::pair<T, T> contravariant_dir(const ElementValues<T, d>& parent, Index q,
                                       const Vector3<T>& dvec) const;
-
-    /// @brief Strain blocks whose contribution is supplied externally; see
-    ///        `suppress_block`. Empty for a standalone displacement element.
-    std::vector<StrainBlock> suppressed_blocks_;
 
 public:
 
@@ -269,6 +300,21 @@ public:
 
 template <std::floating_point T, std::size_t d>
 void
+Element<T, d>::strain_matrix(const ElementValues<T, d>& ev) const
+{
+    const Index Q    = ev.basis_derivs[0].cols();
+    const Index N    = ev.basis_derivs[0].rows();
+    const Index ns   = num_strains();
+    const Index ndof = static_cast<Index>(num_node_dofs());
+
+    B_voigt_.setZero(ns * Q, ndof * N);
+    membrane_strain_matrix(ev, B_voigt_);
+    bending_strain_matrix(ev, B_voigt_);
+    shear_strain_matrix(ev, B_voigt_);
+}
+
+template <std::floating_point T, std::size_t d>
+void
 Element<T, d>::stress_shape_matrix(const ElementValues<T, d>& ev) const
 {
     strain_matrix(ev);
@@ -278,13 +324,7 @@ Element<T, d>::stress_shape_matrix(const ElementValues<T, d>& ev) const
 
     N_sigma_.setZero(n_strain * Q, K);
     for (Index q = 0; q < Q; ++q) {
-        ConstitutiveMatrix<T> D = constitutive_matrix(ev, q);
-        // A suppressed block (supplied externally, e.g. by a mixed formulation) contributes
-        // no recovered stress either — mirror `compute_local_stiffness` so the element never
-        // reports a stress it did not compute (the membrane nᵅᵝ would otherwise be the locked
-        // D·B_m·u). D is block-diagonal, so bending / shear rows are untouched.
-        for (const StrainBlock& b : suppressed_blocks_)
-            D.block(b.offset, b.offset, b.count, b.count).setZero();
+        const ConstitutiveMatrix<T> D = constitutive_matrix(ev, q);
         N_sigma_.middleRows(n_strain * q, n_strain).noalias() =
             D * B_voigt_.middleRows(n_strain * q, n_strain);
     }
@@ -366,9 +406,7 @@ Element<T, d>::compute_local_stiffness(const ElementValues<T, d>& ev,
     Matrix<T> DB(n_strain, K);
     for (Index q = 0; q < Q; ++q) {
         const T dV = ev.mapped_weights_(q) * ev.jac(q);
-        ConstitutiveMatrix<T> D = constitutive_matrix(ev, q);
-        for (const StrainBlock& b : suppressed_blocks_)
-            D.block(b.offset, b.offset, b.count, b.count).setZero();
+        const ConstitutiveMatrix<T> D = constitutive_matrix(ev, q);
         const auto B_voigt_q = B.middleRows(n_strain * q, n_strain);
         DB.noalias() = D * B_voigt_q;
         stiffness.noalias() += dV * (B_voigt_q.transpose() * DB);

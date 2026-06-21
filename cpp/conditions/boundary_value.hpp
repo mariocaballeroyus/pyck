@@ -2,6 +2,7 @@
 #define PYCK_BOUNDARY_VALUE_HPP
 
 #include <concepts>
+#include <vector>
 
 #include "../elements/element.hpp"
 #include "../elements/boundary_element_values.hpp"
@@ -86,6 +87,21 @@ public:
     Matrix<T> evaluate_flux(const Element<T, 2>& element,
                             const BoundaryElementValues<T, 2>& bvals) const
     {
+        Matrix<T> out_aux;
+        std::vector<Index> aux_dofs;
+        return evaluate_flux(element, bvals, out_aux, aux_dofs);
+    }
+
+    /// @brief Flux trace as above, but also surfacing the element's **auxiliary-block**
+    ///        flux columns @p out_aux (Q × n_aux) and their global DOF indices @p aux_dofs
+    ///        — the ε̃-sourced membrane traction of a mixed element, which a Nitsche
+    ///        condition pairs with the kinematic trace as the consistency coupling
+    ///        K(u_test, ε̃). The work-conjugate moment fields (ROT_*) carry no membrane,
+    ///        so their auxiliary part is empty.
+    Matrix<T> evaluate_flux(const Element<T, 2>& element,
+                            const BoundaryElementValues<T, 2>& bvals,
+                            Matrix<T>& out_aux, std::vector<Index>& aux_dofs) const
+    {
         const ElementValues<T, 2>& parent = bvals.parent_vals_;
         const Index Q = parent.num_points();
         const ColMatrix<T, 3>& n = bvals.outward_normal();   // boundary co-normal ν
@@ -96,18 +112,20 @@ public:
         Matrix<T> out;
 
         switch (field_) {
-            case Field::U_X:   element.traction(parent, n, x, out); return out;
-            case Field::U_Y:   element.traction(parent, n, y, out); return out;
-            case Field::U_Z:   element.traction(parent, n, z, out); return out;
-            case Field::U_N:   element.traction(parent, n, n, out); return out;
-            case Field::U_S:   element.traction(parent, n, s, out); return out;
-            case Field::ROT_X: element.moment(parent, n, x, out); return out;
-            case Field::ROT_Y: element.moment(parent, n, y, out); return out;
-            case Field::ROT_Z: element.moment(parent, n, z, out); return out;
-            case Field::ROT_N: element.moment(parent, n, n, out); return out;
-            case Field::ROT_S: element.moment(parent, n, s, out); return out;
+            case Field::U_X:   element.traction(parent, n, x, out, out_aux, aux_dofs); return out;
+            case Field::U_Y:   element.traction(parent, n, y, out, out_aux, aux_dofs); return out;
+            case Field::U_Z:   element.traction(parent, n, z, out, out_aux, aux_dofs); return out;
+            case Field::U_N:   element.traction(parent, n, n, out, out_aux, aux_dofs); return out;
+            case Field::U_S:   element.traction(parent, n, s, out, out_aux, aux_dofs); return out;
+            case Field::ROT_X: element.moment(parent, n, x, out); break;
+            case Field::ROT_Y: element.moment(parent, n, y, out); break;
+            case Field::ROT_Z: element.moment(parent, n, z, out); break;
+            case Field::ROT_N: element.moment(parent, n, n, out); break;
+            case Field::ROT_S: element.moment(parent, n, s, out); break;
         }
-        __builtin_unreachable();
+        out_aux.resize(Q, 0);   // moment (ROT_*) fields: no membrane, empty auxiliary part
+        aux_dofs.clear();
+        return out;
     }
 
     /// @brief Extra basis derivative order beyond the element's own. Uniform (0)
