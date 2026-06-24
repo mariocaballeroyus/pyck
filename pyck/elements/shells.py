@@ -162,6 +162,47 @@ class ShellReissnerMindlinHier5p(Element):
         return f"ShellReissnerMindlinHier5p(material={self._material})"
 
 
+class ShellReissnerMindlinHierDisp5p(Element):
+    """Rotation-free, shear-deformable hierarchic-*displacement* five-parameter shell.
+
+    Oesterle, Ramm & Bischoff, "A shear deformable, rotation-free isogeometric
+    shell formulation", CMAME 307 (2016) 235-255, sec. 4. The Kirchhoff-Love
+    bending displacement ``v_b`` (three Cartesian mid-surface components) is
+    enriched by two **displacement-like** shear parameters: the mid-surface
+    displacement splits additively ``v = v_b + (v^s1 + v^s2) A_3``, with the
+    ``v^sa`` shear deflections along the director:
+
+        slot 0..2 : Cartesian bending displacements v_b (v_x, v_y, v_z)
+        slot 3..4 : shear displacements (v^s1, v^s2) along A_3
+
+    Unlike the rotation-like difference vector of ``ShellReissnerMindlinHier5p``
+    (Echter 2013), the transverse shear strain is a *derivative* of a
+    displacement (2e_13 = v^s1,1, 2e_23 = v^s2,2), one order below the deflection,
+    which removes the transverse-shear-force oscillations. Setting
+    ``v^s1 = v^s2 = 0`` recovers ``ShellKirchhoffLove3p`` exactly. The basis must
+    be C^1 (degree >= 2). The constant part of each shear displacement is a
+    spurious zero-energy mode; anchor it with a ``DirectConstraint`` on slots
+    (3, 4) over (part of) the boundary, per Oesterle sec. 4.5 / Table 1.
+
+    Parameters
+    ----------
+    material : PlaneStress2d
+        Shell material model.
+    """
+    num_node_dofs: int = 5
+
+    def __init__(self, material: PlaneStress2d) -> None:
+        self._material = material
+        self._cpp_object = _pyck.ShellReissnerMindlinHierDisp5p(self._material._cpp_object)
+
+    @property
+    def material(self) -> PlaneStress2d:
+        return self._material
+
+    def __repr__(self) -> str:
+        return f"ShellReissnerMindlinHierDisp5p(material={self._material})"
+
+
 class ShellKirchhoffLove3p(Element):
     """Kirchhoff-Love thin-shell element (rotation-free).
 

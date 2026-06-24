@@ -69,6 +69,15 @@ def _curved_problem(mixed, n_cp=9, nitsche=False, penalty=1.0e8):
             diaphragm.update(int(c) for c in patch.boundary(1, at_start).displacement_dofs)
         prob.add_constraint(ck.DirectConstraint(
             [cp * 5 + c for cp in diaphragm for c in (0, 2)], value=0.0))
+    # The rotation-free shell carries a spurious near-zero-energy boundary mode in the
+    # shear displacements v^{sα} (their constant part); remove it by pinning slots 3,4 on
+    # the boundary, as Oesterle (2016) §4.5 mandates.
+    vs = set()
+    for d in (0, 1):
+        for at_start in (True, False):
+            vs.update(int(c) for c in patch.boundary(d, at_start).displacement_dofs)
+    prob.add_constraint(ck.DirectConstraint(
+        sorted({cp * 5 + 3 for cp in vs} | {cp * 5 + 4 for cp in vs}), value=0.0))
     return prob, element, patch
 
 

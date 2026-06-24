@@ -4,7 +4,7 @@ import numpy
 import numpy.typing
 import scipy.sparse
 import typing
-__all__: list[str] = ['BSpline', 'Basis', 'BoundaryValue', 'Condition1d', 'Condition2d', 'Constraint', 'DirectConstraint', 'Element1d', 'Element2d', 'Field', 'FieldType', 'Function1d', 'Function2d', 'GaussLegendre1d', 'GaussLegendre2d', 'LagrangeBoundaryCondition2d', 'LinearConstraint', 'LinearElasticProblem1d', 'LinearElasticProblem2d', 'LoadBoundaryCondition2d', 'Material1d', 'Material2d', 'MixedMembraneStrainShell', 'NURBS', 'Patch1d', 'Patch2d', 'PatchBoundary2d', 'PenaltyBoundaryCondition2d', 'PenaltyCouplingCondition2d', 'PlaneStress2d', 'QuadratureRule1d', 'QuadratureRule2d', 'ShellKirchhoffLove3p', 'ShellReissnerMindlin4p', 'ShellReissnerMindlinHier4p', 'ShellReissnerMindlin5p', 'ShellReissnerMindlinHier5p', 'UniaxialStress1d', 'bezier_anchor_params', 'eval_quadrature_data', 'export_bezier_vtm', 'export_bezier_vtu', 'inner_product']
+__all__: list[str] = ['BSpline', 'Basis', 'BoundaryValue', 'Condition1d', 'Condition2d', 'Constraint', 'DirectConstraint', 'Element1d', 'Element2d', 'Field', 'FieldType', 'Function1d', 'Function2d', 'GaussLegendre1d', 'GaussLegendre2d', 'LagrangeBoundaryCondition2d', 'LinearConstraint', 'LinearElasticProblem1d', 'LinearElasticProblem2d', 'LoadBoundaryCondition2d', 'Material1d', 'Material2d', 'MixedMembraneStrainShell', 'NURBS', 'Patch1d', 'Patch2d', 'PatchBoundary2d', 'PenaltyBoundaryCondition2d', 'PenaltyCouplingCondition2d', 'PlaneStress2d', 'QuadratureRule1d', 'QuadratureRule2d', 'ShellKirchhoffLove3p', 'ShellReissnerMindlin4p', 'ShellReissnerMindlinHier4p', 'ShellReissnerMindlin5p', 'ShellReissnerMindlinHier5p', 'ShellReissnerMindlinHierDisp5p', 'UniaxialStress1d', 'bezier_anchor_params', 'eval_quadrature_data', 'export_bezier_vtm', 'export_bezier_vtu', 'inner_product']
 class BSpline(Basis):
     @staticmethod
     def clamped_uniform(degree: typing.SupportsInt | typing.SupportsIndex, num_basis: typing.SupportsInt | typing.SupportsIndex) -> BSpline:
@@ -345,6 +345,9 @@ class ShellReissnerMindlin5p(Element2d):
     def __init__(self, material: PlaneStress2d) -> None:
         ...
 class ShellReissnerMindlinHier5p(Element2d):
+    def __init__(self, material: PlaneStress2d) -> None:
+        ...
+class ShellReissnerMindlinHierDisp5p(Element2d):
     def __init__(self, material: PlaneStress2d) -> None:
         ...
 class UniaxialStress1d(Material1d):
