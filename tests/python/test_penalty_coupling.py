@@ -203,6 +203,48 @@ def test_bending_conforming_reproduces_monolith():
     assert abs(w_two - w_mono) / abs(w_mono) < 1e-2
 
 
+def test_cartesian_rotation_is_seam_continuous():
+    """The covariant rotation components θ_α = θ·A_α are basis dependent, so on a
+    non-conforming seam (the two halves parametrise the crossing direction at different
+    speeds) the u-covariant component θ_1 jumps even though the physical rotation is
+    continuous; θ_2 survives only because A_2 (the seam tangent) is parametrised
+    identically. ``as_cartesian_vector`` maps θ_α → physical Cartesian (θ_x,θ_y,θ_z),
+    which is continuous across the seam — the form to export for visualization."""
+    el = ck.ShellKirchhoffLove3p(ck.PlaneStress2d(E, nu, tb))
+    # Unequal split: the left half is a narrow u-strip, the right a wide one.
+    left = ck.SurfacePatch.rectangle(Lb * 0.25, Wb, nu=6, nv=4, deg=3, cx=Lb * 0.125, name="left")
+    right = ck.SurfacePatch.rectangle(Lb * 0.75, Wb, nu=10, nv=7, deg=3, cx=Lb * 0.625, name="right")
+    prob = ck.LinearElasticProblem([left, right], el, ck.GaussLegendre.from_patch(left))
+    _clamp_root(prob, left, "left")
+    seam = ck.PenaltyCouplingCondition(
+        left.boundary(0, False), right.boundary(0, True), ck.GaussLegendre(6, dim=1))
+    seam.couple_kinematics(AD, AR)
+    prob.add_condition(seam, patch="left")
+    lc = ck.LoadBoundaryCondition(right.boundary(0, False), ck.GaussLegendre(5, dim=1))
+    lc.add(ck.Field.U_Z, fz)
+    prob.add_condition(lc, patch="right")
+    u = ck.solve(prob)
+    u_left, u_right = u[: left.num_control_pts * ND], u[left.num_control_pts * ND:]
+
+    f_l = ck.Function(u_left, el, left, ck.FieldType.ROTATION)
+    f_r = ck.Function(u_right, el, right, ck.FieldType.ROTATION)
+    vs = np.linspace(0.2, 0.8, 5)
+    p_l = np.array([[1.0, v] for v in vs])
+    p_r = np.array([[0.0, v] for v in vs])
+
+    cov_l, cov_r = np.asarray(f_l(p_l)), np.asarray(f_r(p_r))
+    # Raw covariant: θ_1 (u-tangent) jumps; θ_2 (seam tangent) is continuous.
+    assert np.abs(cov_l[:, 0] - cov_r[:, 0]).max() > 1e-3
+    assert np.abs(cov_l[:, 1] - cov_r[:, 1]).max() < 1e-8
+
+    car_l = ck.as_cartesian_vector(f_l, left)(p_l)
+    car_r = ck.as_cartesian_vector(f_r, right)(p_r)
+    assert car_l.shape == (len(vs), 3)
+    scale = max(np.abs(np.r_[car_l, car_r]).max(), 1e-30)
+    # Physical Cartesian rotation is continuous across the seam.
+    assert np.abs(car_l - car_r).max() < 1e-6 * scale
+
+
 def test_bending_nonconforming_reproduces_monolith():
     """Non-conforming seam (different nv) + ROT_N coupling still reproduces it."""
     w_mono = _bending_monolith()

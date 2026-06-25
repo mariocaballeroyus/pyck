@@ -4,6 +4,7 @@
 #include <pybind11/functional.h>
 
 #include "function.hpp"
+#include "field_transform.hpp"
 #include "inner_product.hpp"
 
 namespace py = pybind11;
@@ -60,6 +61,11 @@ void bind_postprocessing(py::module_& m)
           &inner_product<double, 2>,
           py::arg("patch"), py::arg("quadrature"),
           py::arg("f_vals"), py::arg("g_vals"));
+
+    // === Field transforms =========================================================
+    m.def("covariant_to_cartesian",
+          &covariant_to_cartesian<double>,
+          py::arg("patch"), py::arg("params"), py::arg("comps"));
 }
 
 }

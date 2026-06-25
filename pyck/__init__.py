@@ -56,6 +56,7 @@ from pyck import postprocessing
 from pyck.postprocessing import (
     FieldType,
     Function,
+    as_cartesian_vector,
     eval_geometry_at,
     eval_shape_at,
     evaluate_field,
@@ -111,6 +112,7 @@ __all__ = [
     "postprocessing",
     "FieldType",
     "Function",
+    "as_cartesian_vector",
     "eval_geometry_at",
     "eval_shape_at",
     "evaluate_field",
