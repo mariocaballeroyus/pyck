@@ -44,6 +44,11 @@ namespace pyck
  *          restores G1/slope continuity, so a bending plate transfers moment across
  *          the seam instead of hinging.
  *
+ *          The hierarchic shear potential `PSI` of the four-parameter shells is also
+ *          supported, tied as a *difference* (@f$ \psi_A - \psi_B @f$) like a global
+ *          scalar — valid when both patches share the same surface-normal orientation
+ *          (the ε-tensor in ψ's curl is built from that normal).
+ *
  * @tparam T Scalar floating-point type.
  * @tparam d Parent patch parametric dimension.
  */
@@ -73,7 +78,9 @@ public:
     /**
      * @brief Register a field whose continuity is penalised across the interface.
      *
-     * @param field   Boundary value to tie (only `U_X/U_Y/U_Z` in this version).
+     * @param field   Boundary value to tie: a displacement component
+     *                (`U_X/U_Y/U_Z`), the normal/bending rotation (`ROT_N`) or the
+     *                hierarchic shear potential (`PSI`) of the four-parameter shells.
      * @param penalty Penalty factor α.
      */
     PenaltyCouplingCondition& add(BoundaryValue<T> field, T penalty);

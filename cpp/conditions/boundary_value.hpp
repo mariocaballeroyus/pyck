@@ -2,6 +2,7 @@
 #define PYCK_BOUNDARY_VALUE_HPP
 
 #include <concepts>
+#include <stdexcept>
 #include <vector>
 
 #include "../elements/element.hpp"
@@ -26,6 +27,7 @@ enum class Field
 {
     U_X, U_Y, U_Z, U_N, U_S,
     ROT_X, ROT_Y, ROT_Z, ROT_N, ROT_S,
+    PSI,   ///< Hierarchic shear potential ψ of the four-parameter shells (DOF slot 3).
 };
 
 /**
@@ -74,6 +76,7 @@ public:
             case Field::ROT_Z: element.rotation(parent, z, out); return out;
             case Field::ROT_N: element.rotation(parent, n, out); return out;
             case Field::ROT_S: element.rotation(parent, s, out); return out;
+            case Field::PSI:   element.psi(parent, out); return out;
         }
         __builtin_unreachable();
     }
@@ -122,6 +125,11 @@ public:
             case Field::ROT_Z: element.moment(parent, n, z, out); break;
             case Field::ROT_N: element.moment(parent, n, n, out); break;
             case Field::ROT_S: element.moment(parent, n, s, out); break;
+            case Field::PSI:
+                throw std::logic_error(
+                    "BoundaryValue::evaluate_flux: the hierarchic field psi has no "
+                    "work-conjugate boundary flux (Nitsche/natural traces are undefined "
+                    "for it). PSI is supported only as a kinematic coupling trace.");
         }
         out_aux.resize(Q, 0);   // moment (ROT_*) fields: no membrane, empty auxiliary part
         aux_dofs.clear();

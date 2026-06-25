@@ -37,7 +37,8 @@ void bind_conditions(py::module_& m)
         .value("ROT_Y", Field::ROT_Y)
         .value("ROT_Z", Field::ROT_Z)
         .value("ROT_N", Field::ROT_N)
-        .value("ROT_S", Field::ROT_S);
+        .value("ROT_S", Field::ROT_S)
+        .value("PSI", Field::PSI);
 
     py::class_<BoundaryValue<double>>(m, "BoundaryValue")
         .def(py::init<Field>(), py::arg("field"));

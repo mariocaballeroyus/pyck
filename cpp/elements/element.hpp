@@ -230,6 +230,14 @@ public:
     virtual void rotation(const ElementValues<T, d>& parent,
                           const ColMatrix<T, 3>& dir, Matrix<T>& out) const;
 
+    // Scalar trace of the hierarchic primary field ψ (the rotation-free shear
+    // potential of the four-parameter shells): one row per qp, the nodal B-spline
+    // placed in ψ's DOF slot. ψ is a scalar primary unknown, not a projected vector,
+    // so there is no `dir`. The base default throws — a formulation must override to
+    // declare it carries a ψ field.
+
+    virtual void psi(const ElementValues<T, d>& parent, Matrix<T>& out) const;
+
     // The work-conjugate *natural* trace: the boundary force traction t = σ·ν,
     // built from the generalised-stress shape S = D B and the in-surface boundary
     // co-normal ν, then projected onto `dir` — the consistency flux a Nitsche
@@ -485,6 +493,15 @@ Element<T, d>::rotation(const ElementValues<T, d>& parent,
     } else {
         out.setZero();
     }
+}
+
+template <std::floating_point T, std::size_t d>
+void
+Element<T, d>::psi(const ElementValues<T, d>& /*parent*/, Matrix<T>& /*out*/) const
+{
+    throw std::logic_error(
+        "Element::psi: this formulation has no hierarchic psi field. The psi trace "
+        "is defined only for the four-parameter rotation-free shells.");
 }
 
 template <std::floating_point T, std::size_t d>

@@ -205,6 +205,20 @@ ShellReissnerMindlinHier4p<T>::rotation_shape_matrix(const ElementValues<T, 2>& 
     }
 }
 
+template <std::floating_point T>
+void
+ShellReissnerMindlinHier4p<T>::psi(const ElementValues<T, 2>& parent, Matrix<T>& out) const
+{
+    const Index Q = parent.basis_derivs[0].cols();
+    const Index N = parent.basis_derivs[0].rows();
+    out.setZero(Q, 4 * N);
+    for (Index q = 0; q < Q; ++q) {
+        const auto Nf = parent.N(q);
+        for (Index i = 0; i < N; ++i)
+            out(q, 4 * i + 3) = Nf(i);   // ψ lives in DOF slot 3
+    }
+}
+
 // === Template Instantiations ========================================================
 
 template class ShellReissnerMindlinHier4p<double>;

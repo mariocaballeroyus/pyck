@@ -253,6 +253,60 @@ def test_bending_rm4p_reproduces_monolith():
     assert abs(w_two - w_mono) / abs(w_mono) < 2e-2
 
 
+def _hier4p_seam_psi(couple_psi):
+    """Cantilever Hier4p plate split at mid-span, transverse tip load. Returns the
+    recovered hierarchic shear potential ψ (PRIMAL slot 3) sampled at the seam from
+    both sides. ``couple_psi`` toggles the Field.PSI tie on top of U + ROT_N."""
+    nd = 4  # Hier4p: slot 3 is the psi shear potential
+    el = ck.ShellReissnerMindlinHier4p(ck.PlaneStress2d(E, nu, tb))
+    left = ck.SurfacePatch.rectangle(Lb / 2, Wb, nu=8, nv=4, deg=3, cx=Lb / 4, name="left")
+    right = ck.SurfacePatch.rectangle(Lb / 2, Wb, nu=8, nv=7, deg=3, cx=3 * Lb / 4, name="right")
+    p = ck.LinearElasticProblem([left, right], el, ck.GaussLegendre.from_patch(left))
+    p.add_constraint(ck.DirectConstraint([3], value=0.0))  # pin one constant-psi mode
+
+    seam = ck.PenaltyCouplingCondition(
+        left.boundary(0, False), right.boundary(0, True), ck.GaussLegendre(6, dim=1))
+    seam.couple_kinematics(AD, AR)
+    if couple_psi:
+        seam.add(ck.Field.PSI, AR)
+    p.add_condition(seam, patch="left")
+
+    c = ck.PenaltyBoundaryCondition(left.boundary(0, True), ck.GaussLegendre(5, dim=1))
+    c.add(ck.Field.U_X, AD).add(ck.Field.U_Y, AD).add(ck.Field.U_Z, AD).add(ck.Field.ROT_N, AR)
+    p.add_condition(c, patch="left")
+    lc = ck.LoadBoundaryCondition(right.boundary(0, False), ck.GaussLegendre(5, dim=1))
+    lc.add(ck.Field.U_Z, fz)
+    p.add_condition(lc, patch="right")
+
+    u = ck.solve(p)
+    nL = left.num_control_pts
+    u_left, u_right = u[: nL * nd], u[nL * nd:]
+
+    def psi(uvec, patch, edge):
+        params = np.array([[edge, v] for v in np.linspace(0.15, 0.85, 5)])
+        primal = np.asarray(ck.Function(uvec, el, patch, ck.FieldType.PRIMAL)(params)).reshape(-1, nd)
+        return primal[:, 3]
+
+    return psi(u_left, left, 1.0), psi(u_right, right, 0.0)
+
+
+def test_hier4p_psi_coupling_enforces_continuity():
+    """Field.PSI ties the hierarchic shear potential of ShellReissnerMindlinHier4p
+    across the seam: the recovered ψ matches on both sides (penalty drives the jump
+    to ~0), where without the tie each patch carries its own ψ and they disagree."""
+    psi_l, psi_r = _hier4p_seam_psi(couple_psi=True)
+    scale = max(np.abs(np.r_[psi_l, psi_r]).max(), 1e-30)
+    assert np.abs(psi_l - psi_r).max() < 1e-4 * scale
+
+
+def test_hier4p_psi_discontinuous_without_coupling():
+    """Companion: without the Field.PSI tie the seam ψ is discontinuous, so the tie
+    above is doing real work (not merely confirming an already-continuous field)."""
+    psi_l, psi_r = _hier4p_seam_psi(couple_psi=False)
+    scale = np.abs(np.r_[psi_l, psi_r]).max()
+    assert np.abs(psi_l - psi_r).max() > 0.1 * scale
+
+
 def test_bending_needs_rotation_coupling():
     """Without ROT_N the partner patch is under-constrained (a seam hinge/mechanism),
     so displacement-only coupling does NOT reproduce the monolith."""

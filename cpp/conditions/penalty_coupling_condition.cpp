@@ -232,11 +232,13 @@ PenaltyCouplingCondition<T, d>&
 PenaltyCouplingCondition<T, d>::add(BoundaryValue<T> field, T penalty)
 {
     const Field f = field.field();
-    if (f != Field::U_X && f != Field::U_Y && f != Field::U_Z && f != Field::ROT_N) {
+    if (f != Field::U_X && f != Field::U_Y && f != Field::U_Z
+        && f != Field::ROT_N && f != Field::PSI) {
         throw std::invalid_argument(
             "PenaltyCouplingCondition::add: supported fields are the displacement "
-            "components (U_X, U_Y, U_Z) and the normal/bending rotation (ROT_N). "
-            "Other frame/rotation components are not validated for coupling.");
+            "components (U_X, U_Y, U_Z), the normal/bending rotation (ROT_N) and the "
+            "hierarchic shear potential (PSI) of the four-parameter shells. Other "
+            "frame/rotation components are not validated for coupling.");
     }
     terms_.push_back({std::move(field), penalty});
     return *this;

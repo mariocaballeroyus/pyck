@@ -64,6 +64,12 @@ public:
      */
     void rotation_shape_matrix(const ElementValues<T, 2>& ev) const override;
 
+    /**
+     * @brief Scalar trace of the hierarchic field ψ (DOF slot 3): the nodal
+     *        B-spline value placed in each node's ψ column. One row per qp.
+     */
+    void psi(const ElementValues<T, 2>& parent, Matrix<T>& out) const override;
+
     // === Getters ================================================================
 
     /// @brief Number of node degrees of freedom (v_x, v_y, v_z, ψ).
