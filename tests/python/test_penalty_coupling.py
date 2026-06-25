@@ -307,6 +307,162 @@ def test_hier4p_psi_discontinuous_without_coupling():
     assert np.abs(psi_l - psi_r).max() > 0.1 * scale
 
 
+def _hier4p_seam_psi_slope(c1):
+    """Cantilever Hier4p plate split at mid-span, transverse tip load, with the seam
+    coupled in displacement + director + ψ. Returns the value jump and the relative
+    normal-slope (ψ_,n) jump of the recovered ψ at the seam. ``c1`` toggles the PSI_N
+    (normal-slope) tie on top of the PSI (C0) tie."""
+    nd = 4
+    el = ck.ShellReissnerMindlinHier4p(ck.PlaneStress2d(E, nu, tb))
+    left = ck.SurfacePatch.rectangle(Lb / 2, Wb, nu=8, nv=4, deg=3, cx=Lb / 4, name="left")
+    right = ck.SurfacePatch.rectangle(Lb / 2, Wb, nu=8, nv=7, deg=3, cx=3 * Lb / 4, name="right")
+    p = ck.LinearElasticProblem([left, right], el, ck.GaussLegendre.from_patch(left))
+    p.add_constraint(ck.DirectConstraint([3], value=0.0))
+    seam = ck.PenaltyCouplingCondition(
+        left.boundary(0, False), right.boundary(0, True), ck.GaussLegendre(6, dim=1))
+    seam.couple_displacement(AD).couple_director_continuity(AR)
+    if c1:
+        seam.couple_psi_continuity(AR, AR)
+    else:
+        seam.add(ck.Field.PSI, AR)
+    p.add_condition(seam, patch="left")
+    c = ck.PenaltyBoundaryCondition(left.boundary(0, True), ck.GaussLegendre(5, dim=1))
+    c.add(ck.Field.U_X, AD).add(ck.Field.U_Y, AD).add(ck.Field.U_Z, AD).add(ck.Field.ROT_N, AR)
+    p.add_condition(c, patch="left")
+    lc = ck.LoadBoundaryCondition(right.boundary(0, False), ck.GaussLegendre(5, dim=1))
+    lc.add(ck.Field.U_Z, fz)
+    p.add_condition(lc, patch="right")
+    u = ck.solve(p)
+    nL = left.num_control_pts
+    u_left, u_right = u[: nL * nd], u[nL * nd:]
+
+    def psi(uvec, patch, params):
+        return np.asarray(ck.Function(uvec, el, patch, ck.FieldType.PRIMAL)(params)).reshape(-1, nd)[:, 3]
+
+    # Physical normal derivative ∂ψ/∂x via a one-sided difference into each half
+    # (outward x at the left u=1 edge, into +x from the right u=0 edge); dx/du = Lb/2.
+    dxdu, eps = Lb / 2, 1e-3
+    vs = np.linspace(0.2, 0.8, 4)
+    pL1 = psi(u_left, left, np.array([[1.0, v] for v in vs]))
+    pLe = psi(u_left, left, np.array([[1 - eps, v] for v in vs]))
+    pR0 = psi(u_right, right, np.array([[0.0, v] for v in vs]))
+    pRe = psi(u_right, right, np.array([[eps, v] for v in vs]))
+    slope_l = (pL1 - pLe) / (eps * dxdu)
+    slope_r = (pRe - pR0) / (eps * dxdu)
+    val_jump = np.abs(pL1 - pR0).max()
+    slope_scale = max(np.abs(np.r_[slope_l, slope_r]).max(), 1e-30)
+    return val_jump, np.abs(slope_l - slope_r).max() / slope_scale
+
+
+def test_hier4p_psi_c1_continuity():
+    """couple_psi_continuity adds the PSI_N (normal-slope) tie on top of PSI (C0), giving
+    C1 of ψ: the recovered ψ is continuous AND its boundary-normal derivative matches
+    across the seam (slope jump driven to a small fraction)."""
+    val_jump, slope_rel = _hier4p_seam_psi_slope(c1=True)
+    assert slope_rel < 0.1
+
+
+def test_hier4p_psi_c0_only_leaves_slope_jump():
+    """Companion: with PSI (C0) only, ψ is continuous but its normal slope is not — the
+    derivative jumps by order unity, so PSI_N is what supplies the C1 part."""
+    _, slope_rel = _hier4p_seam_psi_slope(c1=False)
+    assert slope_rel > 0.5
+
+
+def _bending_two_patch_director(left_nv, right_nv):
+    """Like `_bending_two_patch` but ties the slope with the director-form G1 coupling
+    (`couple_director_continuity`) instead of `ROT_N`."""
+    el = ck.ShellKirchhoffLove3p(ck.PlaneStress2d(E, nu, tb))
+    left = ck.SurfacePatch.rectangle(Lb / 2, Wb, nu=7, nv=left_nv, deg=3, cx=Lb / 4, name="left")
+    right = ck.SurfacePatch.rectangle(Lb / 2, Wb, nu=7, nv=right_nv, deg=3, cx=3 * Lb / 4, name="right")
+    prob = ck.LinearElasticProblem([left, right], el, ck.GaussLegendre.from_patch(left))
+    _clamp_root(prob, left, "left")
+    seam = ck.PenaltyCouplingCondition(
+        left.boundary(0, False), right.boundary(0, True), ck.GaussLegendre(5, dim=1))
+    seam.couple_displacement(AD).couple_director_continuity(AR)
+    prob.add_condition(seam, patch="left")
+    lc = ck.LoadBoundaryCondition(right.boundary(0, False), ck.GaussLegendre(4, dim=1))
+    lc.add(ck.Field.U_Z, fz)
+    prob.add_condition(lc, patch="right")
+    return _tip_w(ck.solve(prob)[left.num_control_pts * ND:], el, right)
+
+
+def test_director_continuity_reproduces_monolith():
+    """couple_displacement + couple_director_continuity reproduces the monolithic plate:
+    the director-form slope tie transfers bending moment across the seam (no hinge)."""
+    w_mono = _bending_monolith()
+    assert abs(_bending_two_patch_director(4, 4) - w_mono) / abs(w_mono) < 1e-2
+    assert abs(_bending_two_patch_director(4, 7) - w_mono) / abs(w_mono) < 2e-2
+
+
+def test_director_continuity_matches_rotn():
+    """The director form (a_n^A·a_3^B − ref)² is ROT_N written in director vectors: on a
+    G1 seam it gives the same solution as the couple_kinematics ROT_N tie."""
+    for left_nv, right_nv in ((4, 4), (4, 7)):
+        w_rotn = _bending_two_patch(left_nv, right_nv)
+        w_dir = _bending_two_patch_director(left_nv, right_nv)
+        assert abs(w_dir - w_rotn) / abs(w_rotn) < 1e-4
+
+
+def test_director_continuity_hier4p_reproduces_monolith():
+    """director_variation is implemented for the hierarchical shells too (the KL part of
+    the tilt, from the bending Cartesian slots). For ShellReissnerMindlinHier4p the
+    director-form slope tie (+ψ continuity) reproduces the monolithic plate. Here the
+    surface-normal tie is genuinely distinct from ROT_N — it ties the bending surface,
+    not the full director field — but on a thin plate the two agree."""
+    nd = 4
+    el = ck.ShellReissnerMindlinHier4p(ck.PlaneStress2d(E, nu, tb))
+
+    def clamp_and_load(prob, root, tip, names):
+        c = ck.PenaltyBoundaryCondition(root.boundary(0, True), ck.GaussLegendre(5, dim=1))
+        c.add(ck.Field.U_X, AD).add(ck.Field.U_Y, AD).add(ck.Field.U_Z, AD).add(ck.Field.ROT_N, AR)
+        prob.add_condition(c, patch=names[0])
+        lc = ck.LoadBoundaryCondition(tip.boundary(0, False), ck.GaussLegendre(5, dim=1))
+        lc.add(ck.Field.U_Z, fz)
+        prob.add_condition(lc, patch=names[-1])
+
+    mono = ck.SurfacePatch.rectangle(Lb, Wb, nu=14, nv=4, deg=3, cx=Lb / 2, name="m")
+    pm = ck.LinearElasticProblem([mono], el, ck.GaussLegendre.from_patch(mono))
+    pm.add_constraint(ck.DirectConstraint([3], value=0.0))
+    clamp_and_load(pm, mono, mono, ["m"])
+    w_mono = float(_displacement(ck.solve(pm), el, mono, [[1.0, 0.5]])[0, 2])
+
+    left = ck.SurfacePatch.rectangle(Lb / 2, Wb, nu=8, nv=4, deg=3, cx=Lb / 4, name="left")
+    right = ck.SurfacePatch.rectangle(Lb / 2, Wb, nu=8, nv=7, deg=3, cx=3 * Lb / 4, name="right")
+    p = ck.LinearElasticProblem([left, right], el, ck.GaussLegendre.from_patch(left))
+    p.add_constraint(ck.DirectConstraint([3], value=0.0))
+    seam = ck.PenaltyCouplingCondition(
+        left.boundary(0, False), right.boundary(0, True), ck.GaussLegendre(6, dim=1))
+    seam.couple_displacement(AD).add(ck.Field.PSI, AR).couple_director_continuity(AR)
+    p.add_condition(seam, patch="left")
+    clamp_and_load(p, left, right, ["left", "right"])
+    w_two = float(_displacement(ck.solve(p)[left.num_control_pts * nd:], el, right, [[1.0, 0.5]])[0, 2])
+
+    assert abs(w_two - w_mono) / abs(w_mono) < 2e-2
+
+
+def test_director_continuity_hier5p_transfers_bending():
+    """director_variation works for the difference-vector hierarchical 5p shell: the
+    director-form slope tie transfers bending across the seam (finite, sensible tip)."""
+    nd = 5
+    el = ck.ShellReissnerMindlinHier5p(ck.PlaneStress2d(E, nu, tb))
+    left = ck.SurfacePatch.rectangle(Lb / 2, Wb, nu=8, nv=4, deg=3, cx=Lb / 4, name="left")
+    right = ck.SurfacePatch.rectangle(Lb / 2, Wb, nu=8, nv=4, deg=3, cx=3 * Lb / 4, name="right")
+    p = ck.LinearElasticProblem([left, right], el, ck.GaussLegendre.from_patch(left))
+    seam = ck.PenaltyCouplingCondition(
+        left.boundary(0, False), right.boundary(0, True), ck.GaussLegendre(6, dim=1))
+    seam.couple_displacement(AD).couple_director_continuity(AR)
+    p.add_condition(seam, patch="left")
+    c = ck.PenaltyBoundaryCondition(left.boundary(0, True), ck.GaussLegendre(5, dim=1))
+    c.add(ck.Field.U_X, AD).add(ck.Field.U_Y, AD).add(ck.Field.U_Z, AD).add(ck.Field.ROT_N, AR)
+    p.add_condition(c, patch="left")
+    lc = ck.LoadBoundaryCondition(right.boundary(0, False), ck.GaussLegendre(5, dim=1))
+    lc.add(ck.Field.U_Z, fz)
+    p.add_condition(lc, patch="right")
+    w_two = float(_displacement(ck.solve(p)[left.num_control_pts * nd:], el, right, [[1.0, 0.5]])[0, 2])
+    assert abs(w_two - _bending_monolith()) / abs(_bending_monolith()) < 5e-2
+
+
 def test_bending_needs_rotation_coupling():
     """Without ROT_N the partner patch is under-constrained (a seam hinge/mechanism),
     so displacement-only coupling does NOT reproduce the monolith."""

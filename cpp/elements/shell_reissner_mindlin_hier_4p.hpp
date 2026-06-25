@@ -70,6 +70,22 @@ public:
      */
     void psi(const ElementValues<T, 2>& parent, Matrix<T>& out) const override;
 
+    /**
+     * @brief Directional derivative ∇ψ·dir = ψ_,α(A^α·dir) of the hierarchic field
+     *        (DOF slot 3). With `dir` the boundary co-normal this is the normal slope
+     *        ψ_,n that completes C1 continuity of ψ across a seam.
+     */
+    void psi_gradient(const ElementValues<T, 2>& parent,
+                      const ColMatrix<T, 3>& dir, Matrix<T>& out) const override;
+
+    /**
+     * @brief Surface-normal variation δa_3·dir: the Kirchhoff–Love tilt built from the
+     *        bending (Cartesian) displacement in slots 0..2; the ψ slot carries shear,
+     *        not surface rotation, so it stays zero.
+     */
+    void director_variation(const ElementValues<T, 2>& parent,
+                            const ColMatrix<T, 3>& dir, Matrix<T>& out) const override;
+
     // === Getters ================================================================
 
     /// @brief Number of node degrees of freedom (v_x, v_y, v_z, ψ).

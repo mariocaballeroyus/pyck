@@ -188,6 +188,16 @@ ShellReissnerMindlinHier5p<T>::rotation_shape_matrix(const ElementValues<T, 2>& 
     }
 }
 
+template <std::floating_point T>
+void
+ShellReissnerMindlinHier5p<T>::director_variation(const ElementValues<T, 2>& parent,
+                                                  const ColMatrix<T, 3>& dir, Matrix<T>& out) const
+{
+    // Surface normal a_3 rotates with the bending (Cartesian) displacement only; the
+    // difference-vector slots carry shear, which does not tilt the surface.
+    this->surface_director_variation(parent, dir, out);
+}
+
 // === Template Instantiations ========================================================
 
 template class ShellReissnerMindlinHier5p<double>;

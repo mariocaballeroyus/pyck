@@ -27,6 +27,7 @@ T coupling_sign(Field f)
     switch (f) {
         case Field::U_N: case Field::U_S:
         case Field::ROT_N: case Field::ROT_S:
+        case Field::PSI_N:
             return T(1);
         default:
             return T(-1);
@@ -233,12 +234,14 @@ PenaltyCouplingCondition<T, d>::add(BoundaryValue<T> field, T penalty)
 {
     const Field f = field.field();
     if (f != Field::U_X && f != Field::U_Y && f != Field::U_Z
-        && f != Field::ROT_N && f != Field::PSI) {
+        && f != Field::VB_X && f != Field::VB_Y && f != Field::VB_Z
+        && f != Field::ROT_N && f != Field::PSI && f != Field::PSI_N) {
         throw std::invalid_argument(
-            "PenaltyCouplingCondition::add: supported fields are the displacement "
-            "components (U_X, U_Y, U_Z), the normal/bending rotation (ROT_N) and the "
-            "hierarchic shear potential (PSI) of the four-parameter shells. Other "
-            "frame/rotation components are not validated for coupling.");
+            "PenaltyCouplingCondition::add: supported fields are the total displacement "
+            "(U_X, U_Y, U_Z), the bending-surface displacement (VB_X, VB_Y, VB_Z), the "
+            "normal/bending rotation (ROT_N) and the hierarchic shear potential and its "
+            "normal slope (PSI, PSI_N) of the four-parameter shells. Other frame/rotation "
+            "components are not validated for coupling.");
     }
     terms_.push_back({std::move(field), penalty});
     return *this;
@@ -249,9 +252,9 @@ requires (d > 1)
 PenaltyCouplingCondition<T, d>&
 PenaltyCouplingCondition<T, d>::couple_kinematics(T penalty_disp, T penalty_rot)
 {
-    add(BoundaryValue<T>(Field::U_X), penalty_disp);
-    add(BoundaryValue<T>(Field::U_Y), penalty_disp);
-    add(BoundaryValue<T>(Field::U_Z), penalty_disp);
+    add(BoundaryValue<T>(Field::VB_X), penalty_disp);
+    add(BoundaryValue<T>(Field::VB_Y), penalty_disp);
+    add(BoundaryValue<T>(Field::VB_Z), penalty_disp);
     add(BoundaryValue<T>(Field::ROT_N), penalty_rot);
     return *this;
 }
@@ -261,9 +264,28 @@ requires (d > 1)
 PenaltyCouplingCondition<T, d>&
 PenaltyCouplingCondition<T, d>::couple_displacement(T penalty)
 {
-    add(BoundaryValue<T>(Field::U_X), penalty);
-    add(BoundaryValue<T>(Field::U_Y), penalty);
-    add(BoundaryValue<T>(Field::U_Z), penalty);
+    add(BoundaryValue<T>(Field::VB_X), penalty);
+    add(BoundaryValue<T>(Field::VB_Y), penalty);
+    add(BoundaryValue<T>(Field::VB_Z), penalty);
+    return *this;
+}
+
+template <std::floating_point T, std::size_t d>
+requires (d > 1)
+PenaltyCouplingCondition<T, d>&
+PenaltyCouplingCondition<T, d>::couple_director_continuity(T penalty)
+{
+    director_penalty_ = penalty;
+    return *this;
+}
+
+template <std::floating_point T, std::size_t d>
+requires (d > 1)
+PenaltyCouplingCondition<T, d>&
+PenaltyCouplingCondition<T, d>::couple_psi_continuity(T penalty_value, T penalty_slope)
+{
+    add(BoundaryValue<T>(Field::PSI),   penalty_value);
+    add(BoundaryValue<T>(Field::PSI_N), penalty_slope);
     return *this;
 }
 
@@ -275,7 +297,7 @@ void PenaltyCouplingCondition<T, d>::apply(SystemAssembler<T>& assembler,
                                            const DofLayout& layout,
                                            const PatchBlocks<T, d>& blocks) const
 {
-    if (terms_.empty()) return;
+    if (terms_.empty() && !director_penalty_) return;
 
     const DofLayout::BlockId block_a = blocks.primal(patch_a());
     const DofLayout::BlockId block_b = blocks.primal(patch_b());
@@ -288,6 +310,9 @@ void PenaltyCouplingCondition<T, d>::apply(SystemAssembler<T>& assembler,
         flags |= term.field.flags();
         flags |= term.field.element_flags(element_);
     }
+    // The director-continuity term reads the surface frame and first displacement
+    // gradient on both sides (and the cached boundary frame needs the parent normal).
+    if (director_penalty_) flags |= Flags::Deriv1 | Flags::Normal;
 
     // Two-basis workspaces, one per side; both evaluated at the segment's points.
     BoundaryElementValues<T, d> bd_a(boundary_a_, order, flags, quadrature_);
@@ -348,6 +373,32 @@ void PenaltyCouplingCondition<T, d>::apply(SystemAssembler<T>& assembler,
                 K_AA.noalias() += w * (r_a.transpose() * r_a);
                 K_AB.noalias() += sgn * w * (r_a.transpose() * r_b);
                 K_BA.noalias() += sgn * w * (r_b.transpose() * r_a);
+                K_BB.noalias() += w * (r_b.transpose() * r_b);
+            }
+        }
+
+        // --- C¹ director-continuity term --------------------------------------------
+        // The linearised G1 jump ĝ = δ(a_n^A·a_3^B) = A_n^A·(δa_3^B − δa_3^A): the
+        // difference of the two sides' surface-director variations, both projected onto
+        // A's reference co-normal A_n^A. (At a G1 seam A_3^A = A_3^B, so the co-normal
+        // variation δa_n^A·A_3^B collapses to −A_n^A·δa_3^A via a_n·a_3 = 0 — this is
+        // `ROT_N` rotation continuity written in director vectors.) It is two-sided
+        // because B's trace is projected onto A's reference frame; otherwise it is a
+        // plain difference, so the four blocks reuse the −1 cross-sign.
+        if (director_penalty_) {
+            const ColMatrix<T, 3>& An_A = bd_a.outward_normal();   // A's reference co-normal
+            Matrix<T> N_A, N_B;
+            element_.director_variation(bd_a.parent_vals_, An_A, N_A);  // δa_3^A · A_n^A
+            element_.director_variation(bd_b.parent_vals_, An_A, N_B);  // δa_3^B · A_n^A
+
+            for (Index q = 0; q < n_gp; ++q) {
+                const T ds = bd_a.boundary_vals_.jac(q) * seg.weights(q);
+                const T w = *director_penalty_ * ds;
+                const auto r_a = N_A.row(q);
+                const auto r_b = N_B.row(q);
+                K_AA.noalias() += w * (r_a.transpose() * r_a);
+                K_AB.noalias() -= w * (r_a.transpose() * r_b);
+                K_BA.noalias() -= w * (r_b.transpose() * r_a);
                 K_BB.noalias() += w * (r_b.transpose() * r_b);
             }
         }

@@ -76,6 +76,14 @@ public:
      */
     void rotation_shape_matrix(const ElementValues<T, 2>& ev) const override;
 
+    /**
+     * @brief Surface-normal variation δa_3·dir: the Kirchhoff–Love tilt built from the
+     *        bending (Cartesian) displacement in slots 0..2; the difference-vector slots
+     *        carry shear, not surface rotation, so they stay zero.
+     */
+    void director_variation(const ElementValues<T, 2>& parent,
+                            const ColMatrix<T, 3>& dir, Matrix<T>& out) const override;
+
     // === Getters ================================================================
 
     /// @brief Number of node degrees of freedom (v_x, v_y, v_z, w^1, w^2).

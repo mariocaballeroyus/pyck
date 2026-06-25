@@ -71,6 +71,14 @@ public:
      */
     void rotation_shape_matrix(const ElementValues<T, 2>& ev) const override;
 
+    /**
+     * @brief Surface-director variation δa_3·dir. For this displacement-based shell
+     *        a_3 is the surface normal and δa_3 is the covariant tilt θ_α = −u_,α·A_3,
+     *        so this coincides with the `rotation` trace.
+     */
+    void director_variation(const ElementValues<T, 2>& parent,
+                            const ColMatrix<T, 3>& dir, Matrix<T>& out) const override;
+
     // === Properties =================================================================
 
     /// @brief Number of node degrees of freedom (3 Cartesian displacements).

@@ -146,6 +146,16 @@ ShellKirchhoffLove3p<T>::rotation_shape_matrix(const ElementValues<T, 2>& ev) co
     }
 }
 
+template <std::floating_point T>
+void
+ShellKirchhoffLove3p<T>::director_variation(const ElementValues<T, 2>& parent,
+                                            const ColMatrix<T, 3>& dir, Matrix<T>& out) const
+{
+    // a_3 is the surface normal; its variation is the covariant tilt θ_α = −u_,α·A_3.
+    // For this rotation-free shell that is the whole `rotation` trace.
+    this->surface_director_variation(parent, dir, out);
+}
+
 // === Template Instantiations ========================================================
 
 template class ShellKirchhoffLove3p<double>;

@@ -2,6 +2,7 @@
 #define PYCK_PENALTY_COUPLING_CONDITION_HPP
 
 #include <Eigen/Dense>
+#include <optional>
 #include <vector>
 
 #include "boundary_value.hpp"
@@ -36,8 +37,14 @@ namespace pyck
  *          detected and rejected pending a point-inversion driver. A conforming
  *          interface is just the degenerate case where the breakpoints coincide.
  *
- *          Couples the three displacement components (`U_X/U_Y/U_Z`, global axes,
- *          tied as a difference) and the normal/bending rotation (`ROT_N`). The
+ *          Couples the three displacement components (global axes, tied as a
+ *          difference) and the normal/bending rotation (`ROT_N`). The displacement
+ *          tie acts on the Cartesian bending surface `v_b` (`VB_X/VB_Y/VB_Z`, the
+ *          primal translation slots), not the recovered total displacement — for a
+ *          hierarchic shell the latter carries a shear correction `w_s A_3` that is a
+ *          derived, not a primary, quantity; for Kirchhoff–Love the two coincide. The
+ *          total-displacement traces (`U_X/U_Y/U_Z`) remain available via `add` for the
+ *          rare case they are wanted. The
  *          frame-projected rotation is tied as a *sum*: the two sides' outward
  *          normals oppose at the seam (@f$ n_A = -n_B @f$), so the bending-rotation
  *          jump is @f$ \theta_A\!\cdot n_A + \theta_B\!\cdot n_B @f$. Tying `ROT_N`
@@ -78,26 +85,32 @@ public:
     /**
      * @brief Register a field whose continuity is penalised across the interface.
      *
-     * @param field   Boundary value to tie: a displacement component
-     *                (`U_X/U_Y/U_Z`), the normal/bending rotation (`ROT_N`) or the
-     *                hierarchic shear potential (`PSI`) of the four-parameter shells.
+     * @param field   Boundary value to tie: the bending-surface displacement
+     *                (`VB_X/VB_Y/VB_Z`) or total displacement (`U_X/U_Y/U_Z`), the
+     *                normal/bending rotation (`ROT_N`), or the hierarchic shear
+     *                potential and its normal slope (`PSI`, `PSI_N`).
      * @param penalty Penalty factor α.
      */
     PenaltyCouplingCondition& add(BoundaryValue<T> field, T penalty);
 
     /**
-     * @brief Convenience: tie all three displacement components with one penalty.
+     * @brief Convenience: tie all three bending-surface displacement components with
+     *        one penalty.
      *
-     * @param penalty Penalty factor α for `U_X`, `U_Y` and `U_Z`.
+     *        Adds `VB_X/VB_Y/VB_Z` — the Cartesian bending surface `v_b` (primal
+     *        translation slots), not the recovered total displacement.
+     *
+     * @param penalty Penalty factor α for `VB_X`, `VB_Y` and `VB_Z`.
      */
     PenaltyCouplingCondition& couple_displacement(T penalty);
 
     /**
-     * @brief Convenience: tie displacement and the normal (bending) rotation.
+     * @brief Convenience: tie the bending-surface displacement and the normal (bending)
+     *        rotation.
      *
-     *        Adds `U_X/U_Y/U_Z` at @p penalty_disp and `ROT_N` at @p penalty_rot.
-     *        This is the full G1 coupling for a shell/plate — displacement keeps the
-     *        surface connected, `ROT_N` keeps it kink-free so bending moment crosses
+     *        Adds `VB_X/VB_Y/VB_Z` at @p penalty_disp and `ROT_N` at @p penalty_rot.
+     *        This is the full G1 coupling for a shell/plate — the bending surface keeps
+     *        the patches connected, `ROT_N` keeps it kink-free so bending moment crosses
      *        the seam. The two penalties scale differently (translation vs rotation)
      *        and are passed separately.
      *
@@ -105,6 +118,42 @@ public:
      * @param penalty_rot  Penalty factor for the normal/bending rotation.
      */
     PenaltyCouplingCondition& couple_kinematics(T penalty_disp, T penalty_rot);
+
+    /**
+     * @brief Penalise G1 (slope) continuity across the seam in director form.
+     *
+     *        Adds the penalty
+     *        @f$ \alpha \int_\Gamma (a_n^A\!\cdot a_3^B - A_n^A\!\cdot A_3^B)^2 d\Gamma @f$,
+     *        linearised about the reference state — the change in the angle between A's
+     *        in-surface co-normal and B's surface director. For a G1 seam (the two
+     *        patches share a tangent plane, so @f$ A_3^A = A_3^B @f$) this is identical
+     *        to the `ROT_N` rotation tie, expressed through the surface-director
+     *        variations @f$ \delta a_3 @f$ rather than a frame-projected rotation:
+     *        @f$ \hat g = A_n^A\!\cdot(\delta a_3^B - \delta a_3^A) @f$. The reference
+     *        value is subtracted, so only stiffness is assembled and no surface-normal
+     *        orientation assumption is needed. Use it in place of `ROT_N` when the slope
+     *        tie is wanted in director variables; pair it with `couple_displacement` for
+     *        the full G1 coupling. Requires an element supplying `director_variation`
+     *        (the Kirchhoff–Love shell). Intended for kink-free (G1) seams.
+     *
+     * @param penalty Penalty factor α for the director-continuity term.
+     */
+    PenaltyCouplingCondition& couple_director_continuity(T penalty);
+
+    /**
+     * @brief Tie the hierarchic field ψ to C1 across the seam (four-parameter shells).
+     *
+     *        Adds `PSI` (the value, C0) at @p penalty_value and `PSI_N` (the
+     *        boundary-normal slope ψ_,n) at @p penalty_slope. The C0 tie already makes
+     *        the along-seam derivative ψ_,s continuous; adding the normal slope ψ_,n
+     *        completes a continuous ∇ψ — i.e. C1 of ψ — which is what makes the
+     *        ψ-sourced shear rotation continuous across the seam. The two penalties
+     *        scale differently (value vs slope) and are passed separately.
+     *
+     * @param penalty_value Penalty factor for the ψ value (C0).
+     * @param penalty_slope Penalty factor for the ψ normal slope ψ_,n (the C1 part).
+     */
+    PenaltyCouplingCondition& couple_psi_continuity(T penalty_value, T penalty_slope);
 
     /**
      * @brief Assemble the four coupling blocks into the global system.
@@ -172,6 +221,12 @@ private:
 
     /// @brief Registered penalised field continuities.
     std::vector<Term> terms_;
+
+    /// @brief Penalty α for the G1 director-continuity term, if registered. It is
+    ///        two-sided (B's director variation is projected onto A's reference co-normal),
+    ///        so it cannot be expressed as a single-sided `Term` and is stored and
+    ///        assembled separately.
+    std::optional<T> director_penalty_;
 
     /// @brief Integration segments (common refinement of both sides' breakpoints).
     std::vector<Segment> segments_;

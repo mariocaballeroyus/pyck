@@ -33,12 +33,16 @@ void bind_conditions(py::module_& m)
         .value("U_Z", Field::U_Z)
         .value("U_N", Field::U_N)
         .value("U_S", Field::U_S)
+        .value("VB_X", Field::VB_X)
+        .value("VB_Y", Field::VB_Y)
+        .value("VB_Z", Field::VB_Z)
         .value("ROT_X", Field::ROT_X)
         .value("ROT_Y", Field::ROT_Y)
         .value("ROT_Z", Field::ROT_Z)
         .value("ROT_N", Field::ROT_N)
         .value("ROT_S", Field::ROT_S)
-        .value("PSI", Field::PSI);
+        .value("PSI", Field::PSI)
+        .value("PSI_N", Field::PSI_N);
 
     py::class_<BoundaryValue<double>>(m, "BoundaryValue")
         .def(py::init<Field>(), py::arg("field"));
@@ -95,6 +99,19 @@ void bind_conditions(py::module_& m)
                  return self.couple_kinematics(penalty_disp, penalty_rot);
              },
              py::arg("penalty_disp"), py::arg("penalty_rot"),
+             py::return_value_policy::reference)
+        .def("couple_director_continuity",
+             [](PenaltyCouplingCondition2d& self, double penalty) -> PenaltyCouplingCondition2d& {
+                 return self.couple_director_continuity(penalty);
+             },
+             py::arg("penalty"),
+             py::return_value_policy::reference)
+        .def("couple_psi_continuity",
+             [](PenaltyCouplingCondition2d& self, double penalty_value,
+                double penalty_slope) -> PenaltyCouplingCondition2d& {
+                 return self.couple_psi_continuity(penalty_value, penalty_slope);
+             },
+             py::arg("penalty_value"), py::arg("penalty_slope"),
              py::return_value_policy::reference);
 
     using LagrangeBoundaryCondition2d = LagrangeBoundaryCondition<double, 2>;

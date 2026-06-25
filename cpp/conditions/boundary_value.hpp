@@ -26,8 +26,11 @@ namespace pyck
 enum class Field
 {
     U_X, U_Y, U_Z, U_N, U_S,
+    VB_X, VB_Y, VB_Z,   ///< Cartesian bending-surface displacement v_b (primal slots 0..2),
+                        ///< without the shear correction the recovered displacement adds.
     ROT_X, ROT_Y, ROT_Z, ROT_N, ROT_S,
     PSI,   ///< Hierarchic shear potential ψ of the four-parameter shells (DOF slot 3).
+    PSI_N, ///< Boundary-normal slope ψ_,n of the hierarchic field (the C1 trace of ψ).
 };
 
 /**
@@ -71,12 +74,16 @@ public:
             case Field::U_Z:   element.displacement(parent, z, out); return out;
             case Field::U_N:   element.displacement(parent, n, out); return out;
             case Field::U_S:   element.displacement(parent, s, out); return out;
+            case Field::VB_X:  element.bending_displacement(parent, x, out); return out;
+            case Field::VB_Y:  element.bending_displacement(parent, y, out); return out;
+            case Field::VB_Z:  element.bending_displacement(parent, z, out); return out;
             case Field::ROT_X: element.rotation(parent, x, out); return out;
             case Field::ROT_Y: element.rotation(parent, y, out); return out;
             case Field::ROT_Z: element.rotation(parent, z, out); return out;
             case Field::ROT_N: element.rotation(parent, n, out); return out;
             case Field::ROT_S: element.rotation(parent, s, out); return out;
             case Field::PSI:   element.psi(parent, out); return out;
+            case Field::PSI_N: element.psi_gradient(parent, n, out); return out;
         }
         __builtin_unreachable();
     }
@@ -120,16 +127,23 @@ public:
             case Field::U_Z:   element.traction(parent, n, z, out, out_aux, aux_dofs); return out;
             case Field::U_N:   element.traction(parent, n, n, out, out_aux, aux_dofs); return out;
             case Field::U_S:   element.traction(parent, n, s, out, out_aux, aux_dofs); return out;
+            case Field::VB_X: case Field::VB_Y: case Field::VB_Z:
+                throw std::logic_error(
+                    "BoundaryValue::evaluate_flux: the bending-surface displacement v_b "
+                    "(VB_X/Y/Z) has no work-conjugate boundary flux; it is a multipatch "
+                    "coupling trace only. Use U_X/Y/Z for the work-conjugate total "
+                    "displacement traction.");
             case Field::ROT_X: element.moment(parent, n, x, out); break;
             case Field::ROT_Y: element.moment(parent, n, y, out); break;
             case Field::ROT_Z: element.moment(parent, n, z, out); break;
             case Field::ROT_N: element.moment(parent, n, n, out); break;
             case Field::ROT_S: element.moment(parent, n, s, out); break;
             case Field::PSI:
+            case Field::PSI_N:
                 throw std::logic_error(
                     "BoundaryValue::evaluate_flux: the hierarchic field psi has no "
                     "work-conjugate boundary flux (Nitsche/natural traces are undefined "
-                    "for it). PSI is supported only as a kinematic coupling trace.");
+                    "for it). PSI/PSI_N are supported only as kinematic coupling traces.");
         }
         out_aux.resize(Q, 0);   // moment (ROT_*) fields: no membrane, empty auxiliary part
         aux_dofs.clear();

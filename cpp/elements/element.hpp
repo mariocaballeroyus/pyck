@@ -230,6 +230,18 @@ public:
     virtual void rotation(const ElementValues<T, d>& parent,
                           const ColMatrix<T, 3>& dir, Matrix<T>& out) const;
 
+    // Cartesian mid-surface (bending) displacement v_b·dir: the first three primal DOF
+    // slots, value-interpolated and projected onto `dir`, WITHOUT the formulation-
+    // specific corrections the recovered `displacement` carries (e.g. the hierarchic
+    // shear term w_s A_3 of the four-parameter shells). This is the bending surface that
+    // a multipatch coupling ties, as opposed to the work-conjugate total displacement
+    // that loads/BCs pair with. The base default reads slots 0..2 as the Cartesian
+    // translation, which is correct for all the shells; for Kirchhoff–Love it coincides
+    // with `displacement`.
+
+    virtual void bending_displacement(const ElementValues<T, d>& parent,
+                                      const ColMatrix<T, 3>& dir, Matrix<T>& out) const;
+
     // Scalar trace of the hierarchic primary field ψ (the rotation-free shear
     // potential of the four-parameter shells): one row per qp, the nodal B-spline
     // placed in ψ's DOF slot. ψ is a scalar primary unknown, not a projected vector,
@@ -237,6 +249,28 @@ public:
     // declare it carries a ψ field.
 
     virtual void psi(const ElementValues<T, d>& parent, Matrix<T>& out) const;
+
+    // Directional derivative of the hierarchic field ψ projected onto `dir`:
+    // ∇ψ·dir = ψ_,α (A^α·dir), one scalar row per qp. With `dir` the boundary co-normal
+    // this is the normal-slope trace ψ_,n a C1 coupling pairs across the seam (the C1
+    // counterpart of the C0 `psi` value trace). Base throws — only the ψ-carrying shells
+    // override it.
+
+    virtual void psi_gradient(const ElementValues<T, d>& parent,
+                              const ColMatrix<T, 3>& dir, Matrix<T>& out) const;
+
+    // Linearised geometric variation of the deformed surface director
+    // a_3 = (a_1×a_2)/|a_1×a_2|, projected onto `dir`: δ(a_3·dir) as a (Q × K) row-
+    // per-qp operator, linear in the dofs and evaluated about the reference state. This
+    // is the surface-normal rotation built from the displacement gradient alone (a pure
+    // geometry quantity, distinct from an independent director field). It is the trace a
+    // multipatch C¹ / G1 director-continuity coupling pairs across the seam. Base throws;
+    // a surface element overrides it (for the displacement-based shells it coincides with
+    // the `rotation` trace, since the covariant tilt θ_α = −u_,α·A_3 are the components
+    // of δa_3).
+
+    virtual void director_variation(const ElementValues<T, d>& parent,
+                                    const ColMatrix<T, 3>& dir, Matrix<T>& out) const;
 
     // The work-conjugate *natural* trace: the boundary force traction t = σ·ν,
     // built from the generalised-stress shape S = D B and the in-surface boundary
@@ -285,6 +319,16 @@ protected:
     ///        for the rotation projections. (d == 2 only.)
     std::pair<T, T> contravariant_dir(const ElementValues<T, d>& parent, Index q,
                                       const Vector3<T>& dvec) const;
+
+    /// @brief Kirchhoff–Love surface-normal variation δ(a_3·dir) on the first three
+    ///        (Cartesian mid-surface) DOF slots of each node — θ_α = −u_,α·A_3, raised
+    ///        and contracted with `dir`. Shared by the shells: the bending displacement
+    ///        lives in slots 0..2 and drives the surface slope, while any trailing slots
+    ///        (ψ, hierarchic rotations / difference vectors) carry shear, not surface
+    ///        rotation, so they stay zero. Writes a (Q × num_node_dofs·N) operator.
+    ///        (d == 2 only; a no-op size otherwise.)
+    void surface_director_variation(const ElementValues<T, d>& parent,
+                                    const ColMatrix<T, 3>& dir, Matrix<T>& out) const;
 
 public:
 
@@ -475,6 +519,26 @@ Element<T, d>::displacement(const ElementValues<T, d>& parent,
 
 template <std::floating_point T, std::size_t d>
 void
+Element<T, d>::bending_displacement(const ElementValues<T, d>& parent,
+                                    const ColMatrix<T, 3>& dir, Matrix<T>& out) const
+{
+    // v_b·dir = Σ_{k<3} dir_k N^i: the Cartesian translation slots only, no shear
+    // correction. (For KL this equals `displacement`; for the hierarchic shells it is
+    // the bending surface without the recovered w_s A_3 term.)
+    const Index Q    = parent.num_points();
+    const Index N    = static_cast<Index>(parent.basis_derivs[0].rows());
+    const Index ndof = static_cast<Index>(num_node_dofs());
+    out.setZero(Q, ndof * N);
+    for (Index q = 0; q < Q; ++q) {
+        const auto Nf = parent.N(q);
+        for (Index i = 0; i < N; ++i)
+            for (Index k = 0; k < 3; ++k)
+                out(q, ndof * i + k) = Nf(i) * dir(q, k);
+    }
+}
+
+template <std::floating_point T, std::size_t d>
+void
 Element<T, d>::rotation(const ElementValues<T, d>& parent,
                         const ColMatrix<T, 3>& dir, Matrix<T>& out) const
 {
@@ -502,6 +566,51 @@ Element<T, d>::psi(const ElementValues<T, d>& /*parent*/, Matrix<T>& /*out*/) co
     throw std::logic_error(
         "Element::psi: this formulation has no hierarchic psi field. The psi trace "
         "is defined only for the four-parameter rotation-free shells.");
+}
+
+template <std::floating_point T, std::size_t d>
+void
+Element<T, d>::psi_gradient(const ElementValues<T, d>& /*parent*/,
+                            const ColMatrix<T, 3>& /*dir*/, Matrix<T>& /*out*/) const
+{
+    throw std::logic_error(
+        "Element::psi_gradient: this formulation has no hierarchic psi field. The psi "
+        "normal-slope trace is defined only for the four-parameter rotation-free shells.");
+}
+
+template <std::floating_point T, std::size_t d>
+void
+Element<T, d>::director_variation(const ElementValues<T, d>& /*parent*/,
+                                  const ColMatrix<T, 3>& /*dir*/, Matrix<T>& /*out*/) const
+{
+    throw std::logic_error(
+        "Element::director_variation: this formulation does not supply a surface-director "
+        "variation. It is implemented for the surface (shell) elements only.");
+}
+
+template <std::floating_point T, std::size_t d>
+void
+Element<T, d>::surface_director_variation(const ElementValues<T, d>& parent,
+                                          const ColMatrix<T, 3>& dir, Matrix<T>& out) const
+{
+    const Index Q    = parent.num_points();
+    const Index N    = static_cast<Index>(parent.basis_derivs[0].rows());
+    const Index ndof = static_cast<Index>(num_node_dofs());
+    out.setZero(Q, ndof * N);
+    if constexpr (d == 2) {
+        for (Index q = 0; q < Q; ++q) {
+            const Vector3<T> A3 = parent.normal(q);
+            const Vector3<T> dq = dir.row(q).transpose();
+            const auto [du1, du2] = contravariant_dir(parent, q, dq);  // d^α = A^α·dir
+            const auto grad = parent.dN(q);
+            for (Index i = 0; i < N; ++i) {
+                // δa_3·dir = θ_α d^α with θ_α = −u_,α·A_3 on the Cartesian slots.
+                const T coeff = -(du1 * grad(i, 0) + du2 * grad(i, 1));
+                for (Index k = 0; k < 3; ++k)
+                    out(q, ndof * i + k) = coeff * A3(k);
+            }
+        }
+    }
 }
 
 template <std::floating_point T, std::size_t d>

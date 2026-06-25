@@ -52,15 +52,19 @@ class PenaltyCouplingCondition:
         self._boundary_b = boundary_b
         self._quadrature = quadrature
         self._terms: list[tuple[_pyck.BoundaryValue, float]] = []
+        self._director_penalty: float | None = None
         self._cpp_object = None
 
     def add(self, field: Field, penalty: float) -> "PenaltyCouplingCondition":
-        """Tie one displacement component across the interface.
+        """Tie one field component across the interface.
 
         Parameters
         ----------
         field : Field
-            Component to tie (only ``Field.U_X``, ``U_Y``, ``U_Z``).
+            Field to tie: the bending-surface displacement (``VB_X/VB_Y/VB_Z``) or
+            total displacement (``U_X/U_Y/U_Z``), the normal/bending rotation
+            (``ROT_N``), or the hierarchic shear potential and its normal slope
+            (``PSI``, ``PSI_N``).
         penalty : float
             Penalty factor for this component.
 
@@ -77,21 +81,26 @@ class PenaltyCouplingCondition:
         return self
 
     def couple_displacement(self, penalty: float) -> "PenaltyCouplingCondition":
-        """Tie all three displacement components with a single penalty.
+        """Tie the three bending-surface displacement components with a single penalty.
+
+        Ties ``VB_X/VB_Y/VB_Z`` — the Cartesian bending surface ``v_b`` (primal
+        translation slots), not the recovered total displacement (which for a
+        hierarchic shell carries a shear correction). For Kirchhoff–Love the two
+        coincide.
 
         Parameters
         ----------
         penalty : float
-            Penalty factor applied to ``U_X``, ``U_Y`` and ``U_Z``.
+            Penalty factor applied to ``VB_X``, ``VB_Y`` and ``VB_Z``.
 
         Returns
         -------
         PenaltyCouplingCondition
             Self, to allow chaining.
         """
-        self.add(Field.U_X, penalty)
-        self.add(Field.U_Y, penalty)
-        self.add(Field.U_Z, penalty)
+        self.add(Field.VB_X, penalty)
+        self.add(Field.VB_Y, penalty)
+        self.add(Field.VB_Z, penalty)
         return self
 
     def couple_kinematics(
@@ -117,10 +126,66 @@ class PenaltyCouplingCondition:
         PenaltyCouplingCondition
             Self, to allow chaining.
         """
-        self.add(Field.U_X, penalty_disp)
-        self.add(Field.U_Y, penalty_disp)
-        self.add(Field.U_Z, penalty_disp)
+        self.add(Field.VB_X, penalty_disp)
+        self.add(Field.VB_Y, penalty_disp)
+        self.add(Field.VB_Z, penalty_disp)
         self.add(Field.ROT_N, penalty_rot)
+        return self
+
+    def couple_director_continuity(self, penalty: float) -> "PenaltyCouplingCondition":
+        """Penalise G1 (slope) continuity across the seam, in director form.
+
+        Adds ``α ∫ (a_n^A·a_3^B − A_n^A·A_3^B)²``, linearised about the reference — the
+        change in the angle between A's in-surface co-normal and B's surface director.
+        For a G1 seam (shared tangent plane, ``A_3^A = A_3^B``) this is exactly the
+        ``ROT_N`` rotation tie expressed through the surface-director variations δa_3,
+        ``ĝ = A_n^A·(δa_3^B − δa_3^A)``. The reference value is subtracted, so only
+        stiffness is assembled and no normal-orientation assumption is needed. Use it in
+        place of ``ROT_N`` when the slope tie is wanted in director variables; pair with
+        :meth:`couple_displacement` for the full G1 coupling. Requires an element
+        supplying the director variation (the Kirchhoff–Love shell).
+
+        Parameters
+        ----------
+        penalty : float
+            Penalty factor for the director-continuity term.
+
+        Returns
+        -------
+        PenaltyCouplingCondition
+            Self, to allow chaining.
+        """
+        if self._cpp_object is not None:
+            raise RuntimeError(
+                "Cannot add fields after the condition has been bound to a problem."
+            )
+        self._director_penalty = float(penalty)
+        return self
+
+    def couple_psi_continuity(
+        self, penalty_value: float, penalty_slope: float
+    ) -> "PenaltyCouplingCondition":
+        """Tie the hierarchic field ψ to C1 across the seam (four-parameter shells).
+
+        Adds ``PSI`` (value, C0) at ``penalty_value`` and ``PSI_N`` (the boundary-normal
+        slope ψ_,n) at ``penalty_slope``. The C0 tie makes the along-seam derivative
+        continuous; the normal slope completes a continuous ∇ψ (C1 of ψ), which is what
+        renders the ψ-sourced shear rotation continuous across the seam.
+
+        Parameters
+        ----------
+        penalty_value : float
+            Penalty factor for the ψ value (C0).
+        penalty_slope : float
+            Penalty factor for the ψ normal slope ψ_,n (the C1 part).
+
+        Returns
+        -------
+        PenaltyCouplingCondition
+            Self, to allow chaining.
+        """
+        self.add(Field.PSI, penalty_value)
+        self.add(Field.PSI_N, penalty_slope)
         return self
 
     def bind(self, _: "QuadratureRule", element: "Element") -> None:
@@ -138,6 +203,8 @@ class PenaltyCouplingCondition:
         )
         for field, penalty in self._terms:
             cpp.add(field, penalty)
+        if self._director_penalty is not None:
+            cpp.couple_director_continuity(self._director_penalty)
         self._cpp_object = cpp
 
     def __repr__(self) -> str:

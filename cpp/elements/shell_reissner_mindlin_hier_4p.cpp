@@ -219,6 +219,35 @@ ShellReissnerMindlinHier4p<T>::psi(const ElementValues<T, 2>& parent, Matrix<T>&
     }
 }
 
+template <std::floating_point T>
+void
+ShellReissnerMindlinHier4p<T>::psi_gradient(const ElementValues<T, 2>& parent,
+                                            const ColMatrix<T, 3>& dir, Matrix<T>& out) const
+{
+    const Index Q = parent.num_points();
+    const Index N = static_cast<Index>(parent.basis_derivs[0].rows());
+    out.setZero(Q, 4 * N);
+    for (Index q = 0; q < Q; ++q) {
+        // ∇ψ·dir = ψ_,α (A^α·dir): contravariant raise of dir contracted with the
+        // parametric ψ-gradient N^i_,α (ψ in DOF slot 3).
+        const Vector3<T> dq = dir.row(q).transpose();
+        const auto [d1, d2] = this->contravariant_dir(parent, q, dq);
+        const auto grad = parent.dN(q);
+        for (Index i = 0; i < N; ++i)
+            out(q, 4 * i + 3) = d1 * grad(i, 0) + d2 * grad(i, 1);
+    }
+}
+
+template <std::floating_point T>
+void
+ShellReissnerMindlinHier4p<T>::director_variation(const ElementValues<T, 2>& parent,
+                                                  const ColMatrix<T, 3>& dir, Matrix<T>& out) const
+{
+    // Surface normal a_3 rotates with the bending (Cartesian) displacement only; the ψ
+    // slot is the shear potential, which does not tilt the surface.
+    this->surface_director_variation(parent, dir, out);
+}
+
 // === Template Instantiations ========================================================
 
 template class ShellReissnerMindlinHier4p<double>;
