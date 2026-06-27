@@ -272,6 +272,16 @@ public:
     virtual void director_variation(const ElementValues<T, d>& parent,
                                     const ColMatrix<T, 3>& dir, Matrix<T>& out) const;
 
+    // Normal-curvature variation in the direction `dir`: δb(dir,dir) = dir^α dir^β κ_αβ,
+    // the bending strain (second-fundamental-form variation) contracted twice with the
+    // contravariant components of `dir`, as a (Q × K) scalar-per-qp operator. With `dir`
+    // the boundary co-normal this is δb_nn — the C2 trace a curvature-continuity coupling
+    // ties across the seam. The base default contracts this element's bending strain
+    // block (offset 3 of `strain_matrix`); a non-shell formulation would override.
+
+    virtual void normal_curvature(const ElementValues<T, d>& parent,
+                                  const ColMatrix<T, 3>& dir, Matrix<T>& out) const;
+
     // The work-conjugate *natural* trace: the boundary force traction t = σ·ν,
     // built from the generalised-stress shape S = D B and the in-surface boundary
     // co-normal ν, then projected onto `dir` — the consistency flux a Nitsche
@@ -586,6 +596,31 @@ Element<T, d>::director_variation(const ElementValues<T, d>& /*parent*/,
     throw std::logic_error(
         "Element::director_variation: this formulation does not supply a surface-director "
         "variation. It is implemented for the surface (shell) elements only.");
+}
+
+template <std::floating_point T, std::size_t d>
+void
+Element<T, d>::normal_curvature(const ElementValues<T, d>& parent,
+                                const ColMatrix<T, 3>& dir, Matrix<T>& out) const
+{
+    if constexpr (d == 2) {
+        strain_matrix(parent);   // fills B_voigt_; bending (κ) block at strain offset 3
+        const Index Q  = parent.num_points();
+        const Index ns = num_strains();
+        const Index K  = static_cast<Index>(B_voigt_.cols());
+        out.setZero(Q, K);
+        for (Index q = 0; q < Q; ++q) {
+            const Vector3<T> dq = dir.row(q).transpose();
+            const auto [d1, d2] = contravariant_dir(parent, q, dq);   // d^α = A^α·dir
+            // Voigt bending rows κ_11, κ_22, 2κ_12; δb(dir,dir) = d^α d^β κ_αβ.
+            const auto k11   = B_voigt_.row(ns * q + 3);
+            const auto k22   = B_voigt_.row(ns * q + 4);
+            const auto k2_12 = B_voigt_.row(ns * q + 5);
+            out.row(q) = d1 * d1 * k11 + d2 * d2 * k22 + d1 * d2 * k2_12;
+        }
+    } else {
+        out.setZero(parent.num_points(), 0);
+    }
 }
 
 template <std::floating_point T, std::size_t d>

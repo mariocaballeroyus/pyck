@@ -203,6 +203,54 @@ def test_bending_conforming_reproduces_monolith():
     assert abs(w_two - w_mono) / abs(w_mono) < 1e-2
 
 
+def _seam_normal_curvature(pen_c2):
+    """Non-conforming cantilever strip, transverse tip load. Returns the recovered normal
+    curvature κ_nn = (n¹)² κ_11 at the seam on each side (via the consistent bending
+    strain), with the C2 ``couple_curvature_continuity`` tie toggled by ``pen_c2``."""
+    el = ck.ShellKirchhoffLove3p(ck.PlaneStress2d(E, nu, tb))
+    left = ck.SurfacePatch.rectangle(Lb / 2, Wb, nu=5, nv=4, deg=3, cx=Lb / 4, name="left")
+    right = ck.SurfacePatch.rectangle(Lb / 2, Wb, nu=13, nv=8, deg=3, cx=3 * Lb / 4, name="right")
+    prob = ck.LinearElasticProblem([left, right], el, ck.GaussLegendre.from_patch(left))
+    _clamp_root(prob, left, "left")
+    seam = ck.PenaltyCouplingCondition(
+        left.boundary(0, False), right.boundary(0, True), ck.GaussLegendre(7, dim=1))
+    seam.couple_displacement(AD).couple_director_continuity(AR)
+    if pen_c2:
+        seam.couple_curvature_continuity(pen_c2)
+    prob.add_condition(seam, patch="left")
+    lc = ck.LoadBoundaryCondition(right.boundary(0, False), ck.GaussLegendre(5, dim=1))
+    lc.add(ck.Field.U_Z, fz)
+    prob.add_condition(lc, patch="right")
+    u = ck.solve(prob)
+    u_left, u_right = u[: left.num_control_pts * ND], u[left.num_control_pts * ND:]
+
+    def kappa_nn(uvec, patch, edge):
+        # n¹ = A¹·x̂ = 1/(Lb/2): each half maps u∈[0,1] to a span of Lb/2 along x.
+        n1 = 1.0 / (Lb / 2)
+        k11 = np.asarray(ck.Function(uvec, el, patch, ck.FieldType.STRAIN)(
+            [[edge, 0.5]])).reshape(-1)[3]   # Voigt bending row κ_11
+        return n1 * n1 * k11
+
+    return kappa_nn(u_left, left, 1.0), kappa_nn(u_right, right, 0.0)
+
+
+def test_curvature_continuity_reduces_jump():
+    """couple_curvature_continuity ties the cross-seam normal curvature κ_nn = n^α n^β κ_αβ
+    (C2 of the bending surface): on a non-conforming seam the κ_nn jump that C0+C1 leaves
+    is driven to ~0, completing C2."""
+    knn_l, knn_r = _seam_normal_curvature(pen_c2=AR)
+    scale = max(abs(knn_l), abs(knn_r), 1e-30)
+    assert abs(knn_l - knn_r) / scale < 1e-4
+
+
+def test_curvature_jump_without_c2_tie():
+    """Companion: with only C0+C1 the non-conforming seam carries a real κ_nn jump, so the
+    C2 tie above is doing genuine work (it is not an already-continuous field)."""
+    knn_l, knn_r = _seam_normal_curvature(pen_c2=0.0)
+    scale = max(abs(knn_l), abs(knn_r))
+    assert abs(knn_l - knn_r) / scale > 0.02
+
+
 def test_cartesian_rotation_is_seam_continuous():
     """The covariant rotation components θ_α = θ·A_α are basis dependent, so on a
     non-conforming seam (the two halves parametrise the crossing direction at different

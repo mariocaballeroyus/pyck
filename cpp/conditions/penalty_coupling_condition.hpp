@@ -2,7 +2,6 @@
 #define PYCK_PENALTY_COUPLING_CONDITION_HPP
 
 #include <Eigen/Dense>
-#include <optional>
 #include <vector>
 
 #include "boundary_value.hpp"
@@ -122,23 +121,36 @@ public:
     /**
      * @brief Penalise G1 (slope) continuity across the seam in director form.
      *
-     *        Adds the penalty
-     *        @f$ \alpha \int_\Gamma (a_n^A\!\cdot a_3^B - A_n^A\!\cdot A_3^B)^2 d\Gamma @f$,
-     *        linearised about the reference state — the change in the angle between A's
-     *        in-surface co-normal and B's surface director. For a G1 seam (the two
-     *        patches share a tangent plane, so @f$ A_3^A = A_3^B @f$) this is identical
-     *        to the `ROT_N` rotation tie, expressed through the surface-director
-     *        variations @f$ \delta a_3 @f$ rather than a frame-projected rotation:
-     *        @f$ \hat g = A_n^A\!\cdot(\delta a_3^B - \delta a_3^A) @f$. The reference
-     *        value is subtracted, so only stiffness is assembled and no surface-normal
-     *        orientation assumption is needed. Use it in place of `ROT_N` when the slope
-     *        tie is wanted in director variables; pair it with `couple_displacement` for
-     *        the full G1 coupling. Requires an element supplying `director_variation`
-     *        (the Kirchhoff–Love shell). Intended for kink-free (G1) seams.
+     *        Adds the `DIR_N` field — the director-based normal rotation
+     *        @f$ \delta a_3\!\cdot n @f$, computed per patch from its surface-director
+     *        variation and co-normal — combined as a *sum* across the seam (it is odd in
+     *        the co-normal, which flips @f$ n_A = -n_B @f$, so continuity reads
+     *        @f$ \delta a_3^A\!\cdot n_A + \delta a_3^B\!\cdot n_B = 0 @f$). For the
+     *        displacement-based shells this is the `ROT_N` slope tie expressed in director
+     *        variables; for the Reissner–Mindlin shells it ties the *surface* normal
+     *        rather than the director field. Pair with `couple_displacement` for the full
+     *        G1 coupling. Requires an element supplying `director_variation`.
      *
-     * @param penalty Penalty factor α for the director-continuity term.
+     * @param penalty Penalty factor α for the director-continuity (C1) term.
      */
     PenaltyCouplingCondition& couple_director_continuity(T penalty);
+
+    /**
+     * @brief Penalise C2 (curvature) continuity across the seam.
+     *
+     *        Adds the `KAPPA_NN` field — the normal curvature
+     *        @f$ b_{nn} = n^\alpha n^\beta \kappa_{\alpha\beta} @f$, the bending strain
+     *        (second-fundamental-form variation) contracted twice with the co-normal,
+     *        computed per patch — combined as a *difference* across the seam (it is even
+     *        in the co-normal, so @f$ n_A = -n_B @f$ leaves it unchanged). On top of the
+     *        C0 (`couple_displacement`) and C1 (`couple_director_continuity`) ties — which
+     *        already make the along-seam and mixed second derivatives continuous — this
+     *        adds the cross-seam curvature, completing C2 of the bending surface. Requires
+     *        an element supplying `normal_curvature` (any shell).
+     *
+     * @param penalty Penalty factor α for the curvature-continuity (C2) term.
+     */
+    PenaltyCouplingCondition& couple_curvature_continuity(T penalty);
 
     /**
      * @brief Tie the hierarchic field ψ to C1 across the seam (four-parameter shells).
@@ -221,12 +233,6 @@ private:
 
     /// @brief Registered penalised field continuities.
     std::vector<Term> terms_;
-
-    /// @brief Penalty α for the G1 director-continuity term, if registered. It is
-    ///        two-sided (B's director variation is projected onto A's reference co-normal),
-    ///        so it cannot be expressed as a single-sided `Term` and is stored and
-    ///        assembled separately.
-    std::optional<T> director_penalty_;
 
     /// @brief Integration segments (common refinement of both sides' breakpoints).
     std::vector<Segment> segments_;

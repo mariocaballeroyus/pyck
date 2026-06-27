@@ -52,7 +52,6 @@ class PenaltyCouplingCondition:
         self._boundary_b = boundary_b
         self._quadrature = quadrature
         self._terms: list[tuple[_pyck.BoundaryValue, float]] = []
-        self._director_penalty: float | None = None
         self._cpp_object = None
 
     def add(self, field: Field, penalty: float) -> "PenaltyCouplingCondition":
@@ -135,31 +134,47 @@ class PenaltyCouplingCondition:
     def couple_director_continuity(self, penalty: float) -> "PenaltyCouplingCondition":
         """Penalise G1 (slope) continuity across the seam, in director form.
 
-        Adds ``α ∫ (a_n^A·a_3^B − A_n^A·A_3^B)²``, linearised about the reference — the
-        change in the angle between A's in-surface co-normal and B's surface director.
-        For a G1 seam (shared tangent plane, ``A_3^A = A_3^B``) this is exactly the
-        ``ROT_N`` rotation tie expressed through the surface-director variations δa_3,
-        ``ĝ = A_n^A·(δa_3^B − δa_3^A)``. The reference value is subtracted, so only
-        stiffness is assembled and no normal-orientation assumption is needed. Use it in
-        place of ``ROT_N`` when the slope tie is wanted in director variables; pair with
-        :meth:`couple_displacement` for the full G1 coupling. Requires an element
-        supplying the director variation (the Kirchhoff–Love shell).
+        Adds ``DIR_N`` — the director-based normal rotation ``δa_3·n`` computed per patch
+        and combined as a sum across the seam (it is odd in the co-normal, which flips
+        ``n_A = −n_B``). For the displacement-based shells this is the ``ROT_N`` slope tie
+        in director variables; for Reissner–Mindlin shells it ties the *surface* normal
+        rather than the director field. Pair with :meth:`couple_displacement` for the full
+        G1 coupling. Requires an element supplying the director variation.
 
         Parameters
         ----------
         penalty : float
-            Penalty factor for the director-continuity term.
+            Penalty factor for the director-continuity (C1) term.
 
         Returns
         -------
         PenaltyCouplingCondition
             Self, to allow chaining.
         """
-        if self._cpp_object is not None:
-            raise RuntimeError(
-                "Cannot add fields after the condition has been bound to a problem."
-            )
-        self._director_penalty = float(penalty)
+        self.add(Field.DIR_N, penalty)
+        return self
+
+    def couple_curvature_continuity(self, penalty: float) -> "PenaltyCouplingCondition":
+        """Penalise C2 (curvature) continuity across the seam.
+
+        Adds ``KAPPA_NN`` — the normal curvature ``n^α n^β κ_αβ`` (the bending strain
+        contracted twice with the co-normal) computed per patch and combined as a
+        difference across the seam (it is even in the co-normal). On top of the C0
+        (:meth:`couple_displacement`) and C1 (:meth:`couple_director_continuity`) ties it
+        adds the cross-seam curvature, completing C2 of the bending surface. Requires an
+        element supplying the normal-curvature trace (any shell).
+
+        Parameters
+        ----------
+        penalty : float
+            Penalty factor for the curvature-continuity (C2) term.
+
+        Returns
+        -------
+        PenaltyCouplingCondition
+            Self, to allow chaining.
+        """
+        self.add(Field.KAPPA_NN, penalty)
         return self
 
     def couple_psi_continuity(
@@ -203,8 +218,6 @@ class PenaltyCouplingCondition:
         )
         for field, penalty in self._terms:
             cpp.add(field, penalty)
-        if self._director_penalty is not None:
-            cpp.couple_director_continuity(self._director_penalty)
         self._cpp_object = cpp
 
     def __repr__(self) -> str:

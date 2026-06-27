@@ -16,20 +16,23 @@ namespace {
 
 /// @brief Cross-block sign for a coupled field's continuity penalty.
 ///
-/// Global-axis traces (`U_X/Y/Z`, `ROT_X/Y/Z`) measure the same quantity on both
-/// sides, so their jump is a difference (sign −1). Frame-projected traces
-/// (`U_N/U_S`, `ROT_N/ROT_S`) are taken against each side's own outward frame,
-/// which opposes across a coplanar seam (n_A = −n_B, s_A = −s_B); their physical
-/// jump is therefore a sum (sign +1), e.g. ROT_N_A·n_A + ROT_N_B·n_B = 0.
+/// The seam combination is set by how the trace depends on the outward boundary
+/// frame, which flips between the two sides (n_A = −n_B, s_A = −s_B):
+///   - frame-independent / global-axis traces (`U_X/Y/Z`, `VB_*`, `ROT_X/Y/Z`)
+///     measure the same quantity on both sides → jump is a difference (sign −1);
+///   - traces ODD in the frame (`U_N/U_S`, `ROT_N/ROT_S`, `PSI_N`, the director
+///     rotation `DIR_N` = δa_3·n) flip sign across the seam → tied as a sum (+1);
+///   - traces EVEN in the frame (the normal curvature `KAPPA_NN` = n^α n^β κ_αβ,
+///     where the co-normal enters squared) do not flip → difference (−1).
 template <std::floating_point T>
 T coupling_sign(Field f)
 {
     switch (f) {
         case Field::U_N: case Field::U_S:
         case Field::ROT_N: case Field::ROT_S:
-        case Field::PSI_N:
+        case Field::PSI_N: case Field::DIR_N:
             return T(1);
-        default:
+        default:   // global axes, VB_*, PSI, and the even-in-n KAPPA_NN
             return T(-1);
     }
 }
@@ -235,13 +238,15 @@ PenaltyCouplingCondition<T, d>::add(BoundaryValue<T> field, T penalty)
     const Field f = field.field();
     if (f != Field::U_X && f != Field::U_Y && f != Field::U_Z
         && f != Field::VB_X && f != Field::VB_Y && f != Field::VB_Z
-        && f != Field::ROT_N && f != Field::PSI && f != Field::PSI_N) {
+        && f != Field::ROT_N && f != Field::DIR_N && f != Field::KAPPA_NN
+        && f != Field::PSI && f != Field::PSI_N) {
         throw std::invalid_argument(
             "PenaltyCouplingCondition::add: supported fields are the total displacement "
             "(U_X, U_Y, U_Z), the bending-surface displacement (VB_X, VB_Y, VB_Z), the "
-            "normal/bending rotation (ROT_N) and the hierarchic shear potential and its "
-            "normal slope (PSI, PSI_N) of the four-parameter shells. Other frame/rotation "
-            "components are not validated for coupling.");
+            "normal/bending rotation (ROT_N), the director-based normal rotation (DIR_N, "
+            "C1) and normal curvature (KAPPA_NN, C2), and the hierarchic shear potential "
+            "and its normal slope (PSI, PSI_N) of the four-parameter shells. Other "
+            "frame/rotation components are not validated for coupling.");
     }
     terms_.push_back({std::move(field), penalty});
     return *this;
@@ -275,7 +280,20 @@ requires (d > 1)
 PenaltyCouplingCondition<T, d>&
 PenaltyCouplingCondition<T, d>::couple_director_continuity(T penalty)
 {
-    director_penalty_ = penalty;
+    // C1 slope continuity: the director-based normal rotation δa_3·n, per patch, summed
+    // across the seam (odd in the co-normal, so n_A = −n_B flips it).
+    add(BoundaryValue<T>(Field::DIR_N), penalty);
+    return *this;
+}
+
+template <std::floating_point T, std::size_t d>
+requires (d > 1)
+PenaltyCouplingCondition<T, d>&
+PenaltyCouplingCondition<T, d>::couple_curvature_continuity(T penalty)
+{
+    // C2 curvature continuity: the normal curvature n^α n^β κ_αβ, per patch, differenced
+    // across the seam (even in the co-normal, so n_A = −n_B leaves it unchanged).
+    add(BoundaryValue<T>(Field::KAPPA_NN), penalty);
     return *this;
 }
 
@@ -297,7 +315,7 @@ void PenaltyCouplingCondition<T, d>::apply(SystemAssembler<T>& assembler,
                                            const DofLayout& layout,
                                            const PatchBlocks<T, d>& blocks) const
 {
-    if (terms_.empty() && !director_penalty_) return;
+    if (terms_.empty()) return;
 
     const DofLayout::BlockId block_a = blocks.primal(patch_a());
     const DofLayout::BlockId block_b = blocks.primal(patch_b());
@@ -310,9 +328,6 @@ void PenaltyCouplingCondition<T, d>::apply(SystemAssembler<T>& assembler,
         flags |= term.field.flags();
         flags |= term.field.element_flags(element_);
     }
-    // The director-continuity term reads the surface frame and first displacement
-    // gradient on both sides (and the cached boundary frame needs the parent normal).
-    if (director_penalty_) flags |= Flags::Deriv1 | Flags::Normal;
 
     // Two-basis workspaces, one per side; both evaluated at the segment's points.
     BoundaryElementValues<T, d> bd_a(boundary_a_, order, flags, quadrature_);
@@ -373,32 +388,6 @@ void PenaltyCouplingCondition<T, d>::apply(SystemAssembler<T>& assembler,
                 K_AA.noalias() += w * (r_a.transpose() * r_a);
                 K_AB.noalias() += sgn * w * (r_a.transpose() * r_b);
                 K_BA.noalias() += sgn * w * (r_b.transpose() * r_a);
-                K_BB.noalias() += w * (r_b.transpose() * r_b);
-            }
-        }
-
-        // --- C¹ director-continuity term --------------------------------------------
-        // The linearised G1 jump ĝ = δ(a_n^A·a_3^B) = A_n^A·(δa_3^B − δa_3^A): the
-        // difference of the two sides' surface-director variations, both projected onto
-        // A's reference co-normal A_n^A. (At a G1 seam A_3^A = A_3^B, so the co-normal
-        // variation δa_n^A·A_3^B collapses to −A_n^A·δa_3^A via a_n·a_3 = 0 — this is
-        // `ROT_N` rotation continuity written in director vectors.) It is two-sided
-        // because B's trace is projected onto A's reference frame; otherwise it is a
-        // plain difference, so the four blocks reuse the −1 cross-sign.
-        if (director_penalty_) {
-            const ColMatrix<T, 3>& An_A = bd_a.outward_normal();   // A's reference co-normal
-            Matrix<T> N_A, N_B;
-            element_.director_variation(bd_a.parent_vals_, An_A, N_A);  // δa_3^A · A_n^A
-            element_.director_variation(bd_b.parent_vals_, An_A, N_B);  // δa_3^B · A_n^A
-
-            for (Index q = 0; q < n_gp; ++q) {
-                const T ds = bd_a.boundary_vals_.jac(q) * seg.weights(q);
-                const T w = *director_penalty_ * ds;
-                const auto r_a = N_A.row(q);
-                const auto r_b = N_B.row(q);
-                K_AA.noalias() += w * (r_a.transpose() * r_a);
-                K_AB.noalias() -= w * (r_a.transpose() * r_b);
-                K_BA.noalias() -= w * (r_b.transpose() * r_a);
                 K_BB.noalias() += w * (r_b.transpose() * r_b);
             }
         }

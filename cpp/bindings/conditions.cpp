@@ -41,6 +41,8 @@ void bind_conditions(py::module_& m)
         .value("ROT_Z", Field::ROT_Z)
         .value("ROT_N", Field::ROT_N)
         .value("ROT_S", Field::ROT_S)
+        .value("DIR_N", Field::DIR_N)
+        .value("KAPPA_NN", Field::KAPPA_NN)
         .value("PSI", Field::PSI)
         .value("PSI_N", Field::PSI_N);
 
@@ -103,6 +105,12 @@ void bind_conditions(py::module_& m)
         .def("couple_director_continuity",
              [](PenaltyCouplingCondition2d& self, double penalty) -> PenaltyCouplingCondition2d& {
                  return self.couple_director_continuity(penalty);
+             },
+             py::arg("penalty"),
+             py::return_value_policy::reference)
+        .def("couple_curvature_continuity",
+             [](PenaltyCouplingCondition2d& self, double penalty) -> PenaltyCouplingCondition2d& {
+                 return self.couple_curvature_continuity(penalty);
              },
              py::arg("penalty"),
              py::return_value_policy::reference)

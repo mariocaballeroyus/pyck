@@ -29,6 +29,8 @@ enum class Field
     VB_X, VB_Y, VB_Z,   ///< Cartesian bending-surface displacement v_b (primal slots 0..2),
                         ///< without the shear correction the recovered displacement adds.
     ROT_X, ROT_Y, ROT_Z, ROT_N, ROT_S,
+    DIR_N,    ///< Director-based normal rotation δa_3·n (surface-normal slope; C1 trace).
+    KAPPA_NN, ///< Normal curvature n^α n^β κ_αβ (second fundamental form; C2 trace).
     PSI,   ///< Hierarchic shear potential ψ of the four-parameter shells (DOF slot 3).
     PSI_N, ///< Boundary-normal slope ψ_,n of the hierarchic field (the C1 trace of ψ).
 };
@@ -82,6 +84,8 @@ public:
             case Field::ROT_Z: element.rotation(parent, z, out); return out;
             case Field::ROT_N: element.rotation(parent, n, out); return out;
             case Field::ROT_S: element.rotation(parent, s, out); return out;
+            case Field::DIR_N:    element.director_variation(parent, n, out); return out;
+            case Field::KAPPA_NN: element.normal_curvature(parent, n, out);   return out;
             case Field::PSI:   element.psi(parent, out); return out;
             case Field::PSI_N: element.psi_gradient(parent, n, out); return out;
         }
@@ -138,6 +142,12 @@ public:
             case Field::ROT_Z: element.moment(parent, n, z, out); break;
             case Field::ROT_N: element.moment(parent, n, n, out); break;
             case Field::ROT_S: element.moment(parent, n, s, out); break;
+            case Field::DIR_N:
+            case Field::KAPPA_NN:
+                throw std::logic_error(
+                    "BoundaryValue::evaluate_flux: the director rotation (DIR_N) and "
+                    "normal curvature (KAPPA_NN) are multipatch coupling traces only; "
+                    "they have no work-conjugate boundary flux.");
             case Field::PSI:
             case Field::PSI_N:
                 throw std::logic_error(
@@ -160,8 +170,14 @@ public:
     ///        (Normal) for the boundary frame {n, s}.
     unsigned flags() const { return Flags::Deriv1 | Flags::Normal; }
 
-    /// @brief Parent-side flags the element's shape-matrix call triggers.
-    unsigned element_flags(const Element<T, 2>& e) const { return e.essential_flags(); }
+    /// @brief Parent-side flags the element's shape-matrix call triggers. The normal
+    ///        curvature reads the bending strain (the same geometry as the stress path),
+    ///        so it needs the element's `natural_flags`; the kinematic traces need only
+    ///        the `essential_flags`.
+    unsigned element_flags(const Element<T, 2>& e) const
+    {
+        return field_ == Field::KAPPA_NN ? e.natural_flags() : e.essential_flags();
+    }
 
 private:
 
