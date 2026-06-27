@@ -103,16 +103,23 @@ ShellReissnerMindlinHier4p<T>::shear_strain_matrix(const ElementValues<T, 2>& ev
 
     for (Index q = 0; q < Q; ++q) {
         const Vector3<T> A3 = ev.normal(q);
+        const auto nd = ev.normal_deriv(q);
+        const Vector3<T> A3_d1 = nd(0), A3_d2 = nd(1);
         const operators::Curl<T, 2>                    curl {ev, q};
+        const operators::LaplaceBeltrami<T, 2>         lapb{ev, q};
         const operators::LaplaceBeltramiGradient<T, 2> lgrad{ev, q};
 
         for (Index i = 0; i < N; ++i) {
-            const T P1 = lgrad(i, 0), P2 = lgrad(i, 1);
-            // γ_α = w_{s,α} = -(K_b/K_s)(Δ w_b)_{,α}
+            // w_s of DOF (i,k) is -(K_b/K_s)(Δ N_i) A_3(k); the transverse shear is its surface
+            // gradient γ_α = ∂_α(w_s) = -(K_b/K_s)[ (Δ N_i)_{,α} A_3(k) + (Δ N_i) A_{3,α}(k) ].
+            // The second (Weingarten) product term is O(curvature), vanishing on a flat plate.
+            const T L  = lapb(i);
+            const T P1 = lgrad(i, 0);
+            const T P2 = lgrad(i, 1);
             for (Index k = 0; k < 3; ++k) {
                 const Index idx = 4 * i + k;
-                B(8*q + 6, idx) = -ratio * P1 * A3(k);
-                B(8*q + 7, idx) = -ratio * P2 * A3(k);
+                B(8*q + 6, idx) = -ratio * (P1 * A3(k) + L * A3_d1(k));
+                B(8*q + 7, idx) = -ratio * (P2 * A3(k) + L * A3_d2(k));
             }
             // Twist potential ψ: γ_α += ε_α^β ψ_{,β}
             const Index idx_psi = 4 * i + 3;

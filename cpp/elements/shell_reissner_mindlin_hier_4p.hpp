@@ -97,9 +97,9 @@ public:
     Index basis_order() const override { return 3; }
 
     // Normal (A_3) + Curvature (B_{αβ}) + NormalDeriv1 (Weingarten A_{3,β}, for the exact
-    // third fundamental form B² = A_{3,α}·A_{3,β}) + Deriv3 (third surface derivatives for
-    // the order-3 Laplace–Beltrami gradient in the shear) + Connection (Christoffels for
-    // the covariant Hessian). The rotation-based bending needs no second normal derivative.
+    // third fundamental form B² = A_{3,α}·A_{3,β} and the A_{3,α} term in the shear gradient
+    // ∂_α(w_s)) + Deriv3 (third surface derivatives for the order-3 Laplace–Beltrami gradient
+    // in the shear) + Connection (Christoffels for the covariant Hessian).
     unsigned flags() const override
     { return Flags::Normal | Flags::Curvature | Flags::NormalDeriv1 | Flags::Deriv3 | Flags::Connection; }
 
