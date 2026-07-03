@@ -8,6 +8,7 @@ from pyck.elements.shells import (
     ShellReissnerMindlinHier4p,
     ShellReissnerMindlin5p,
     ShellReissnerMindlinHier5p,
+    ShellReissnerMindlinHier5pHelmholtz,
     ShellReissnerMindlinHierDisp5p,
 )
 
@@ -19,6 +20,7 @@ __all__ = [
     "ShellReissnerMindlinHier4p",
     "ShellReissnerMindlin5p",
     "ShellReissnerMindlinHier5p",
+    "ShellReissnerMindlinHier5pHelmholtz",
     "ShellReissnerMindlinHierDisp5p",
     "MixedMembraneStrainShell",
 ]

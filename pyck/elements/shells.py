@@ -162,6 +162,44 @@ class ShellReissnerMindlinHier5p(Element):
         return f"ShellReissnerMindlinHier5p(material={self._material})"
 
 
+class ShellReissnerMindlinHier5pHelmholtz(Element):
+    """Hierarchic five-parameter Reissner-Mindlin shell with an independent shear potential.
+
+    Identical kinematics to ``ShellReissnerMindlinHier4p``, except the shear
+    deflection ``w_s`` is carried as its own nodal field rather than condensed out
+    through ``w_s = -(Kb/Ks)(Laplacian + 2 nu K) w_b``. The transverse shear is then
+    the genuine Helmholtz decomposition ``gamma = grad(w_s) + curl(psi)`` of an
+    independent gradient potential ``w_s`` and curl potential ``psi``:
+
+        slot 0..2 : Cartesian mid-surface displacements v_b (v_x, v_y, v_z)
+        slot 3    : twist (curl) potential psi
+        slot 4    : shear (gradient) potential w_s
+
+    The recovered mid-surface displacement is ``u = v_b + w_s A_3``. Freeing ``w_s``
+    removes the third derivative of ``w_b`` that the 4p shear carried, so the basis
+    need only be C^1 (degree >= 2). As in the 4p element, the constant-``psi`` mode is
+    a zero-energy mode and should be suppressed with a zero-mean Lagrange condition on
+    slot 3.
+
+    Parameters
+    ----------
+    material : PlaneStress2d
+        Shell material model.
+    """
+    num_node_dofs: int = 5
+
+    def __init__(self, material: PlaneStress2d) -> None:
+        self._material = material
+        self._cpp_object = _pyck.ShellReissnerMindlinHier5pHelmholtz(self._material._cpp_object)
+
+    @property
+    def material(self) -> PlaneStress2d:
+        return self._material
+
+    def __repr__(self) -> str:
+        return f"ShellReissnerMindlinHier5pHelmholtz(material={self._material})"
+
+
 class ShellReissnerMindlinHierDisp5p(Element):
     """Rotation-free, shear-deformable hierarchic-*displacement* five-parameter shell.
 
