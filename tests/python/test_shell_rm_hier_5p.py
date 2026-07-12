@@ -104,10 +104,65 @@ def _solve_cylinder_strip(slenderness: int, num_arc_cp: int = 12, deg: int = 2) 
 
 @pytest.mark.parametrize("slenderness", list(CYLINDER_STRIP_REF))
 def test_cylinder_strip(slenderness: int) -> None:
-    # Looser tolerance than the flat plate: pyck and the paper differ in the
-    # clamp discretisation and exact-normal construction, and the reference
-    # values are themselves locking-contaminated (mesh-dependent). The tolerance
-    # still pins the locking collapse - a locking-free result would fail at the
-    # thin slendernesses by a wide margin.
     u_x = _solve_cylinder_strip(slenderness)
     assert u_x == pytest.approx(CYLINDER_STRIP_REF[slenderness], rel=0.2, abs=1e-4)
+
+
+# =============================================================================
+# Case 3 - Scordelis-Lo roof (Echter dissertation sec. 7.1, Table 7.1)
+# =============================================================================
+
+# 5p-hier. row of Table 7.1: vertical displacement v_zA vs control points per edge
+SCORDELIS_REF = {
+    7: 0.1151,
+    11: 0.2585,
+    19: 0.2970,
+    35: 0.3008,
+}
+
+
+def _solve_scordelis(cp_per_edge: int, deg: int = 2) -> float:
+    """Vertical displacement at midside point A of the Scordelis-Lo roof. Boundary 
+    conditions via Lagrange multipliers.
+    """
+    R, L, t, E, nu = 25.0, 50.0, 0.25, 4.32e8, 0.0
+    half_arc = np.radians(80.0 / 2.0)
+
+    raw = ck.SurfacePatch.quarter_cylinder(
+        nu=cp_per_edge, nv=cp_per_edge, deg=deg, radius=R, height=L, angle=80.0, name="roof",
+    )
+    basis_u, basis_v = raw.basis
+    cps = np.asarray(raw.control_points)
+    remapped = np.column_stack([
+        -np.sin(half_arc) * cps[:, 0] + np.cos(half_arc) * cps[:, 1],
+        cps[:, 2],
+        np.cos(half_arc) * cps[:, 0] + np.sin(half_arc) * cps[:, 1],
+    ])
+    patch = ck.SurfacePatch(basis_u, basis_v, remapped, name="roof")
+
+    element = ck.ShellReissnerMindlinHier5p(ck.PlaneStress2d(E, nu, t))
+    problem = ck.LinearElasticProblem([patch], element, ck.GaussLegendre(deg + 1, dim=2))
+    problem.add_domain_load(np.array([0.0, 0.0, -90.0]))
+
+    g1 = ck.GaussLegendre(deg + 1, dim=1)
+    diaphragm_cps: set[int] = set()
+    for side in (True, False):
+        condition = ck.LagrangeBoundaryCondition(patch.boundary(1, side), g1)
+        condition.add(ck.Field.U_X)
+        condition.add(ck.Field.U_Z)
+        problem.add_condition(condition, patch="roof")
+        diaphragm_cps.update(int(c) for c in patch.boundary(1, side).displacement_dofs)
+
+    pinned = [cp * 5 + 3 for cp in diaphragm_cps] + [cp * 5 + 4 for cp in diaphragm_cps]
+    pinned.append(min(diaphragm_cps) * 5 + 1)  # one axial dof -> no rigid span motion
+    problem.add_constraint(ck.DirectConstraint(sorted(set(pinned)), value=0.0))
+
+    u = ck.solve(problem)
+    point_a = ck.Function(u, element, patch, ck.FieldType.DISPLACEMENT)(np.array([[0.0, 0.5]]))
+    return abs(np.asarray(point_a).reshape(-1, 3)[0, 2])
+
+
+@pytest.mark.parametrize("cp_per_edge", list(SCORDELIS_REF))
+def test_scordelis(cp_per_edge: int) -> None:
+    v_z = _solve_scordelis(cp_per_edge)
+    assert v_z == pytest.approx(SCORDELIS_REF[cp_per_edge], abs=1e-4)

@@ -43,24 +43,26 @@ membrane locking treatment.
 
 ---
 
-## Case 3 — Scordelis–Lo roof (§5.3)
+## Case 3 — Scordelis–Lo roof (dissertation [[2]](#ref-2) §7.1)
 
 **Setup.** The classic Scordelis–Lo roof: a cylindrical shell segment with
-`R = 25`, length `L = 50`, thickness `t = 0.25` and arc `φ = 40°`
+`R = 25`, length `L = 50`, thickness `t = 0.25` and total arc `80°`
 (`E = 4.32·10⁸`, `ν = 0.0`, slenderness `R/t = 100`), supported by rigid
-diaphragms at `y = 0, L` (`u_x = w_z = 0`, other edges free) and loaded by a
-self-weight dead load of `90.0` per unit area.
+diaphragms at the two spanwise ends (`u_x = u_z = 0`, the two longitudinal edges
+free) and loaded by a self-weight dead load of `90.0` per unit area.
 
-**Discretization.** Biquadratic patches refined by control points per side
-`CP ∈ {3, 5, 7, 9, 11, 13}`, no membrane locking treatment.
+**Discretization.** The full roof is a single biquadratic (`p = 2`) patch — no
+symmetry, matching the dissertation — refined by control points per edge
+`CP ∈ {7, 11, 19, 35}`, no membrane locking treatment.
 
-**Table 5 — vertical displacement `w_z,A` vs CP per side:**
+**Table 7.1 — vertical displacement `w_z,A` vs CP per edge:**
 
-| Shell formulation | 3 | 5 | 7 | 9 | 11 | 13 |
-|-------------------|--------|--------|--------|--------|--------|--------|
-| **5p-hier.-HS**   | 0.7680 | 0.2517 | 0.2998 | 0.3001 | 0.3005 | 0.3006 |
-| 3p-HS (ref)       | 0.7679 | 0.2516 | 0.2996 | 0.3000 | 0.3003 | 0.3005 |
-| 7p-hier.-HS       | 0.7681 | 0.2517 | 0.2999 | 0.3001 | 0.3005 | 0.3007 |
+| Shell formulation | 7 | 11 | 19 | 35 |
+|-------------------|--------|--------|--------|--------|
+| 3p               | 0.1151 | 0.2584 | 0.2967 | 0.3003 |
+| 5p-stand.        | 0.1101 | 0.2480 | 0.2956 | 0.3008 |
+| **5p-hier.**     | 0.1151 | 0.2585 | 0.2970 | 0.3008 |
+| 7p-hier.         | 0.1151 | 0.2585 | 0.2970 | 0.3008 |
 
 ---
 
