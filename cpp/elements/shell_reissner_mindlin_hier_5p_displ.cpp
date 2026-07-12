@@ -1,4 +1,4 @@
-#include "shell_reissner_mindlin_hier_disp_5p.hpp"
+#include "shell_reissner_mindlin_hier_5p_displ.hpp"
 #include "patch.hpp"
 #include "primitives_intrinsic.hpp"
 #include "../operators/covariant_hessian.hpp"
@@ -7,11 +7,11 @@ namespace pyck
 {
 
 template <std::floating_point T>
-ShellReissnerMindlinHierDisp5p<T>::ShellReissnerMindlinHierDisp5p(Ptr<PlaneStress2d<T>> material)
+ShellReissnerMindlinHier5pDispl<T>::ShellReissnerMindlinHier5pDispl(Ptr<PlaneStress2d<T>> material)
     : material_(material)
 {
     if (!material_) {
-        throw std::invalid_argument("ShellReissnerMindlinHierDisp5p: material is null.");
+        throw std::invalid_argument("ShellReissnerMindlinHier5pDispl: material is null.");
     }
 }
 
@@ -19,7 +19,7 @@ ShellReissnerMindlinHierDisp5p<T>::ShellReissnerMindlinHierDisp5p(Ptr<PlaneStres
 
 template <std::floating_point T>
 void
-ShellReissnerMindlinHierDisp5p<T>::membrane_strain_matrix(const ElementValues<T, 2>& ev,
+ShellReissnerMindlinHier5pDispl<T>::membrane_strain_matrix(const ElementValues<T, 2>& ev,
                                                       Matrix<T>& B) const
 {
     const Index Q = ev.basis_derivs[0].cols();
@@ -51,7 +51,7 @@ ShellReissnerMindlinHierDisp5p<T>::membrane_strain_matrix(const ElementValues<T,
 
 template <std::floating_point T>
 void
-ShellReissnerMindlinHierDisp5p<T>::bending_strain_matrix(const ElementValues<T, 2>& ev,
+ShellReissnerMindlinHier5pDispl<T>::bending_strain_matrix(const ElementValues<T, 2>& ev,
                                                      Matrix<T>& B) const
 {
     const Index Q = ev.basis_derivs[0].cols();
@@ -71,21 +71,22 @@ ShellReissnerMindlinHierDisp5p<T>::bending_strain_matrix(const ElementValues<T, 
             const T H11 = hess(i, 0, 0), H22 = hess(i, 1, 1), H12 = hess(i, 0, 1);
             const T Ni = Nf(i);
 
-            // (a) Kirchhoff-Love bending of the TOTAL displacement v = v_b + v_s, κ = -v_{|αβ}·A₃.
-            //     v_b (Cartesian) → -H·A₃ on slots 0..2; v_s = s·A₃ (scalar along the director)
-            //     → -s_{|αβ} = -H on slots 3,4 (covariant Hessian, no A₃ factor).
+            // (a) Kirchhoff-Love bending of the bending displacement v_b: κ = -v_{b|αβ}·A₃
+            //     (Cartesian slots 0..2, covariant Hessian).
             for (Index k = 0; k < 3; ++k) {
                 B(8*q + 3, 5*i + k) =        -H11 * A3(k);
                 B(8*q + 4, 5*i + k) =        -H22 * A3(k);
                 B(8*q + 5, 5*i + k) = -T(2) * H12 * A3(k);
             }
 
-            // (b) Diagonal shear-rotation gradient (covariant Hessian): with (a)'s -s_{|αβ}
-            //     this is the crossed form -- v^{s1} ends in κ₂₂, v^{s2} in κ₁₁.
-            B(8*q + 3, 5*i + 3) = -H11;   // v^{s1}: κ₁₁
-            B(8*q + 5, 5*i + 3) = -H12;   //         2κ₁₂
-            B(8*q + 4, 5*i + 4) = -H22;   // v^{s2}: κ₂₂
+            // (b) CROSSED shear bending (covariant Hessian), from Oesterle Eqs. (18)/(27):
+            //     φ̃¹ carries (v_b+v_s1),₂ and φ̃² carries (v_b+v_s2),₁, so κ₁₁ bends with
+            //     v^{s2} and κ₂₂ with v^{s1}. The crossing is what removes the in-plane
+            //     zero-energy shear modes (v^{s1}=f(ξ²) etc.).
+            B(8*q + 3, 5*i + 4) = -H11;   // v^{s2}: κ₁₁
             B(8*q + 5, 5*i + 4) = -H12;   //         2κ₁₂
+            B(8*q + 4, 5*i + 3) = -H22;   // v^{s1}: κ₂₂
+            B(8*q + 5, 5*i + 3) = -H12;   //         2κ₁₂
 
             // (c) Shear-deflection curvature coupling (curved shell only): the v_s displace
             //     along A₃, so the displacement-curvature term v_s,α·A_{3,β} = (B²)_{αβ} v_s
@@ -99,7 +100,7 @@ ShellReissnerMindlinHierDisp5p<T>::bending_strain_matrix(const ElementValues<T, 
 
 template <std::floating_point T>
 void
-ShellReissnerMindlinHierDisp5p<T>::shear_strain_matrix(const ElementValues<T, 2>& ev,
+ShellReissnerMindlinHier5pDispl<T>::shear_strain_matrix(const ElementValues<T, 2>& ev,
                                                    Matrix<T>& B) const
 {
     const Index Q = ev.basis_derivs[0].cols();
@@ -107,26 +108,23 @@ ShellReissnerMindlinHierDisp5p<T>::shear_strain_matrix(const ElementValues<T, 2>
 
     for (Index q = 0; q < Q; ++q) {
         const auto G = ev.dN(q);
-        const auto A = ev.metric(q);
-        const T A11 = A(0, 0), A22 = A(1, 1), A12 = A(0, 1);
 
         for (Index i = 0; i < N; ++i) {
             const T G1i = G(i, 0), G2i = G(i, 1);
-            // Transverse shear 2ε_{α3} = w̃·A_α (covariant components) with the difference
-            // vector w̃ = v^{s1}_{,1}A₁ + v^{s2}_{,2}A₂. The metric g_{αβ}=A_{αβ} couples both
-            // shear DOFs into each component and is the proper conjugate to D_s (metric_inv).
-            // On a flat/orthonormal patch (g=I) this collapses to the diagonal v^{sα}_{,α}.
-            B(8*q + 6, 5*i + 3) = G1i * A11;   // 2ε₁₃: v^{s1}_{,1} g₁₁
-            B(8*q + 6, 5*i + 4) = G2i * A12;   //       v^{s2}_{,2} g₁₂
-            B(8*q + 7, 5*i + 3) = G1i * A12;   // 2ε₂₃: v^{s1}_{,1} g₁₂
-            B(8*q + 7, 5*i + 4) = G2i * A22;   //       v^{s2}_{,2} g₂₂
+            // Transverse shear 2ε_{α3} = v^{sα}_{,α} (Oesterle Eqs. 32-33): the v_sα displace
+            // along A₃, so (v^{sα}A₃)_{,α}·A₃ = v^{sα}_{,α} — already the covariant strain
+            // component. Each component depends on ONE shear DOF only; lowering through the
+            // metric (as the contravariant difference vector of Hier5p requires) would couple
+            // the DOFs and lose the decoupled/solenoidal shear modes of the formulation.
+            B(8*q + 6, 5*i + 3) = G1i;   // 2ε₁₃ = v^{s1}_{,1}
+            B(8*q + 7, 5*i + 4) = G2i;   // 2ε₂₃ = v^{s2}_{,2}
         }
     }
 }
 
 template <std::floating_point T>
 ConstitutiveMatrix<T>
-ShellReissnerMindlinHierDisp5p<T>::constitutive_matrix(const ElementValues<T, 2>& ev, Index q) const
+ShellReissnerMindlinHier5pDispl<T>::constitutive_matrix(const ElementValues<T, 2>& ev, Index q) const
 {
     // Transform elasticity matrices into curvilinear coordinate system
     const StaticVector<T, 3> metric_inv = ev.metric_inv_voigt(q);
@@ -151,7 +149,7 @@ ShellReissnerMindlinHierDisp5p<T>::constitutive_matrix(const ElementValues<T, 2>
 
 template <std::floating_point T>
 void
-ShellReissnerMindlinHierDisp5p<T>::displacement_shape_matrix(const ElementValues<T, 2>& ev) const
+ShellReissnerMindlinHier5pDispl<T>::displacement_shape_matrix(const ElementValues<T, 2>& ev) const
 {
     // Number of points and basis
     const Index Q = ev.basis_derivs[0].cols();
@@ -181,7 +179,7 @@ ShellReissnerMindlinHierDisp5p<T>::displacement_shape_matrix(const ElementValues
 
 template <std::floating_point T>
 void
-ShellReissnerMindlinHierDisp5p<T>::rotation_shape_matrix(const ElementValues<T, 2>& ev) const
+ShellReissnerMindlinHier5pDispl<T>::rotation_shape_matrix(const ElementValues<T, 2>& ev) const
 {
     // Number of points and basis
     const Index Q = ev.basis_derivs[0].cols();
@@ -212,7 +210,7 @@ ShellReissnerMindlinHierDisp5p<T>::rotation_shape_matrix(const ElementValues<T, 
 
 template <std::floating_point T>
 void
-ShellReissnerMindlinHierDisp5p<T>::director_variation(const ElementValues<T, 2>& parent,
+ShellReissnerMindlinHier5pDispl<T>::director_variation(const ElementValues<T, 2>& parent,
                                                       const ColMatrix<T, 3>& dir, Matrix<T>& out) const
 {
     // Surface normal a_3 rotates with the bending (Cartesian) displacement only; the
@@ -222,10 +220,10 @@ ShellReissnerMindlinHierDisp5p<T>::director_variation(const ElementValues<T, 2>&
 
 // === Template Instantiations ========================================================
 
-template class ShellReissnerMindlinHierDisp5p<double>;
+template class ShellReissnerMindlinHier5pDispl<double>;
 
 #ifdef PYCK_BUILD_SINGLE_PRECISION
-template class ShellReissnerMindlinHierDisp5p<float>;
+template class ShellReissnerMindlinHier5pDispl<float>;
 #endif
 
 } // namespace pyck

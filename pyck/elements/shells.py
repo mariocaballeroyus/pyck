@@ -200,7 +200,7 @@ class ShellReissnerMindlinHier5pHelmholtz(Element):
         return f"ShellReissnerMindlinHier5pHelmholtz(material={self._material})"
 
 
-class ShellReissnerMindlinHierDisp5p(Element):
+class ShellReissnerMindlinHier5pDispl(Element):
     """Rotation-free, shear-deformable hierarchic-*displacement* five-parameter shell.
 
     Oesterle, Ramm & Bischoff, "A shear deformable, rotation-free isogeometric
@@ -231,14 +231,14 @@ class ShellReissnerMindlinHierDisp5p(Element):
 
     def __init__(self, material: PlaneStress2d) -> None:
         self._material = material
-        self._cpp_object = _pyck.ShellReissnerMindlinHierDisp5p(self._material._cpp_object)
+        self._cpp_object = _pyck.ShellReissnerMindlinHier5pDispl(self._material._cpp_object)
 
     @property
     def material(self) -> PlaneStress2d:
         return self._material
 
     def __repr__(self) -> str:
-        return f"ShellReissnerMindlinHierDisp5p(material={self._material})"
+        return f"ShellReissnerMindlinHier5pDispl(material={self._material})"
 
 
 class ShellKirchhoffLove3p(Element):

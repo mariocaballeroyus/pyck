@@ -1,5 +1,5 @@
-#ifndef PYCK_SHELL_REISSNER_MINDLIN_HIER_DISP_5P_HPP
-#define PYCK_SHELL_REISSNER_MINDLIN_HIER_DISP_5P_HPP
+#ifndef PYCK_SHELL_REISSNER_MINDLIN_HIER_5P_DISPL_HPP
+#define PYCK_SHELL_REISSNER_MINDLIN_HIER_5P_DISPL_HPP
 
 #include <stdexcept>
 #include <vector>
@@ -47,7 +47,7 @@ namespace pyck
  * @tparam T Scalar type.
  */
 template <std::floating_point T>
-class ShellReissnerMindlinHierDisp5p : public Element<T, 2>
+class ShellReissnerMindlinHier5pDispl : public Element<T, 2>
 {
 public:
 
@@ -58,7 +58,7 @@ public:
      *
      * @param material Shell material (plane-stress + transverse shear).
      */
-    explicit ShellReissnerMindlinHierDisp5p(Ptr<PlaneStress2d<T>> material);
+    explicit ShellReissnerMindlinHier5pDispl(Ptr<PlaneStress2d<T>> material);
 
     // === Matrix Operators =======================================================
 
@@ -132,4 +132,4 @@ private:
 
 } // namespace pyck
 
-#endif // PYCK_SHELL_REISSNER_MINDLIN_HIER_DISP_5P_HPP
+#endif // PYCK_SHELL_REISSNER_MINDLIN_HIER_5P_DISPL_HPP

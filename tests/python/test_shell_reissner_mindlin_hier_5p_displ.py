@@ -1,4 +1,4 @@
-"""Validation of ShellReissnerMindlinHierDisp5p — the rotation-free, shear-deformable
+"""Validation of ShellReissnerMindlinHier5pDispl — the rotation-free, shear-deformable
 hierarchic five-parameter shell of
 
     B. Oesterle, E. Ramm, M. Bischoff, "A shear deformable, rotation-free isogeometric
@@ -60,7 +60,7 @@ def _simply_supported_plate(slenderness: float, *, length: float = 10.0,
     nu=0.3, biquadratic NURBS."""
     t = length / slenderness
     patch = ck.SurfacePatch.rectangle(length, length, nu=n, nv=n, deg=2, name="plate")
-    element = ck.ShellReissnerMindlinHierDisp5p(ck.PlaneStress2d(E, nu, t, 1.0))
+    element = ck.ShellReissnerMindlinHier5pDispl(ck.PlaneStress2d(E, nu, t, 1.0))
     prob = ck.LinearElasticProblem([patch], element, ck.GaussLegendre.from_patch(patch))
     prob.add_domain_load(np.array([0.0, 0.0, t ** 3]), patch="plate")
 
@@ -92,7 +92,7 @@ def _scordelis_lo(n_cp: int, *, E: float = 4.32e8, t: float = 0.25,
                   load: float = 90.0) -> float:
     """Vertical displacement w_z at the free-edge midpoint A of the Scordelis-Lo roof."""
     patch = _scordelis_roof_patch(n_cp)
-    element = ck.ShellReissnerMindlinHierDisp5p(ck.PlaneStress2d(E, 0.0, t, 1.0))
+    element = ck.ShellReissnerMindlinHier5pDispl(ck.PlaneStress2d(E, 0.0, t, 1.0))
     prob = ck.LinearElasticProblem([patch], element, ck.GaussLegendre.from_patch(patch))
     prob.add_domain_load(np.array([0.0, 0.0, -load]), patch="roof")
 
@@ -132,7 +132,7 @@ def test_kirchhoff_love_limit():
         return abs(np.asarray(d).reshape(-1, 3)[0, 2])
 
     kl = tip(ck.ShellKirchhoffLove3p(ck.PlaneStress2d(1.0e6, 0.0, t, 1.0)), 3, False)
-    h5 = tip(ck.ShellReissnerMindlinHierDisp5p(ck.PlaneStress2d(1.0e6, 0.0, t, 1.0)), 5, True)
+    h5 = tip(ck.ShellReissnerMindlinHier5pDispl(ck.PlaneStress2d(1.0e6, 0.0, t, 1.0)), 5, True)
     assert h5 == pytest.approx(kl, rel=1e-12)
 
 
